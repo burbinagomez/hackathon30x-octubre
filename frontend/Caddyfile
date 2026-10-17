@@ -1,0 +1,15 @@
+{
+	admin off
+}
+
+# Con handle: Caddy ordena try_files antes que respond, y suelto /health se reescribiría a /index.html.
+:{$PORT:8080} {
+	handle /health {
+		respond 200
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
