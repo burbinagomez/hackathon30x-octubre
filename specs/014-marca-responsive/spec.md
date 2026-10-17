@@ -38,7 +38,7 @@ Vale para este slice y para todos los siguientes que toquen UI. Cada uno la cump
   - `document.documentElement.scrollWidth <= document.documentElement.clientWidth`;
   - en los viewports móviles, `clientWidth` igual al ancho del viewport (360, 375). Hoy falla: sin `<meta name="viewport">` el layout móvil mide ~980 px;
   - `getComputedStyle(document.body)`: `backgroundColor === "rgb(255, 255, 255)"`, `color === "rgb(26, 26, 28)"` y `fontFamily` contiene `"DM Sans"`. Hoy falla: no hay estilos;
-  - ningún elemento con texto visible tiene `color` `rgb(203, 232, 80)`. Cuando haya superficies oscuras, este chequeo tiene que mirar el fondo efectivo, no solo el color;
+  - hay al menos un elemento con texto visible (sin candidatos, la negativa pasaría vacía); después, ninguno de ellos tiene `color` `rgb(203, 232, 80)`. Cuando haya superficies oscuras, este chequeo tiene que mirar el fondo efectivo, no solo el color;
   - **canario, última aserción:** `page.evaluate` agrega un `div` de 2000 px de ancho y se espera `scrollWidth > clientWidth`. Prueba que la medición detecta el desborde. Va después del chequeo de lima y del `clientWidth`; después del canario no se mide nada.
   - En cada `test.use` van solo `viewport`, `isMobile` y `hasTouch`, sin spread de `devices[...]`: trae `defaultBrowserType: "webkit"` y el único proyecto es chromium. Nada se fija en `playwright.config.ts`.
 - `frontend/src/marca.test.ts` (archivo nuevo, Vitest), solo lo estático:
@@ -47,11 +47,11 @@ Vale para este slice y para todos los siguientes que toquen UI. Cada uno la cump
   - la regla de `h1`–`h6` existe en `src/tokens.css` y usa `var(--fuente-titulos)`;
   - **hex prohibidos:** con esta llamada exacta:
     `import.meta.glob(["./**/*.{ts,tsx,css}", "!./tokens.css", "!./marca.test.ts"], { query: "?raw", import: "default", eager: true })`.
-    Antes de la aserción negativa, el test verifica `expect(Object.keys(archivos)).toContain("./App.tsx")` y que cada valor sea un string no vacío. Hoy no hay otro `.css` en `src/`, y sin `css.include` un CSS llegaría vacío y la negativa pasaría igual.
+    Antes de la aserción negativa, el test verifica `expect(Object.keys(archivos)).toContain("./App.tsx")`, que `main.tsx` importa `./tokens.css` (`expect(archivos["./main.tsx"]).toMatch(/import\s+["']\.\/tokens\.css["']/)`) y que cada valor sea un string no vacío. Hoy no hay otro `.css` en `src/`, y sin `css.include` un CSS llegaría vacío y la negativa pasaría igual.
     Después, ningún archivo matchea `/#(cbe850|1a1a1c|fff(fff)?|9b9999)\b/i` (cubre `#fff` corto).
-  - Hoy falla: `tokens.css` no existe y `index.html` no tiene ni meta ni fuentes.
+  - Hoy falla: `tokens.css` no existe y `index.html` no tiene ni meta ni fuentes. El test de hex falla por el import de `./tokens.css` que falta en `main.tsx`, no por la negativa (hoy no hay hex). Son 5 rojos en Vitest.
 
-**Qué nace verde (y está bien):** el caso de 1280×800 en layout, la aserción de scroll sola en 360×640 y en 1280×800, el chequeo de lima (hoy no hay color) y el canario. En 375×812 el scroll nace ROJO (981 > 980): sin meta viewport el layout de 980 px desborda un píxel. El test no lleva tolerancia. El rojo vive en el `clientWidth` móvil, en los estilos computados del `body` y en `marca.test.ts`. El canario es el que prueba que la aserción de scroll no es decorativa.
+**Qué nace verde (y está bien):** el caso de 1280×800 en layout, la aserción de scroll sola en 360×640 y en 1280×800, la aserción de que hay al menos un elemento con texto visible, el chequeo de lima (hoy no hay color) y el canario. En 375×812 el scroll nace ROJO (981 > 980): sin meta viewport el layout de 980 px desborda un píxel. El test no lleva tolerancia. El rojo vive en el `clientWidth` móvil, en los estilos computados del `body` y en `marca.test.ts`. El canario es el que prueba que la aserción de scroll no es decorativa.
 
 ## Cómo se corre el e2e local
 ```bash
