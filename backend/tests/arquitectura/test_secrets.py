@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.config import SecretProhibido
 from app.main import app
 
 DOCKERFILE_WEB = Path(__file__).resolve().parents[3] / "frontend" / "Dockerfile"
@@ -35,13 +36,17 @@ def _arrancar():
     ("SUPABASE_SERVICE_ROLE_KEY", "valor-secreto-2"),
     ("API_KEY", "sb_publishable_valorsecreto3"),
     ("OTRA_KEY", "sb_secret_valorsecreto4"),
+    ("TOKEN_CLI", "sbp_valorsecreto5"),
     ("ANON_TOKEN", _jwt({"role": "anon"})),
     ("ADMIN_TOKEN", _jwt({"role": "service_role"})),
+    # postgres es el usuario de `supabase db push`: con él api saltea RLS.
+    ("DATABASE_URL", "postgresql://postgres:valor-secreto-6@host/db"),
+    ("DATABASE_URL", "postgresql://postgres.abcdref:valor-secreto-7@pooler.supabase.com:6543/postgres"),
 ])
 def test_app_no_arranca_con_secret_prohibido(entorno, caplog, capsys, nombre, valor):
     entorno.setenv(nombre, valor)
 
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(SecretProhibido) as exc:
         _arrancar()
 
     assert nombre in str(exc.value)
@@ -56,7 +61,7 @@ def test_jwt_malformado_no_filtra_el_valor(entorno, caplog, capsys):
     _arrancar()
 
     entorno.setenv("SUPABASE_X", valor)
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(SecretProhibido) as exc:
         _arrancar()
 
     assert "SUPABASE_X" in str(exc.value)
@@ -65,7 +70,13 @@ def test_jwt_malformado_no_filtra_el_valor(entorno, caplog, capsys):
         assert valor not in texto
 
 
-def test_app_arranca_con_entorno_limpio(entorno):
+@pytest.mark.parametrize("database_url", [
+    "postgresql://app_rt:x@localhost/db",
+    # La forma de prod (pooler en modo transacción): si el guard la frenara, no habría deploy.
+    "postgresql+psycopg://app_rt.abcdref:x@aws-0-region.pooler.invalid:6543/postgres?sslmode=require",
+])
+def test_app_arranca_con_entorno_limpio(entorno, database_url):
+    entorno.setenv("DATABASE_URL", database_url)
     _arrancar()
 
 

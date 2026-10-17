@@ -257,7 +257,7 @@ Tests:
 - La línea de atribución del archivo se arma con las fuentes abiertas presentes en los leads exportados (no con `licencia` por fila), con el mismo mapa y orden de `v_atribuciones` (005).
 - `# ponytail:` los dos textos de la línea viven en el dominio de `calificacion`. Son una segunda copia del mapa de `v_atribuciones` (005), con el nombre de la licencia agregado. Si se suma una tercera fuente con atribución, los dos mapas pasan a una columna `atribucion` en `config/fuentes.yaml`, como dice la 005.
 
-**Migración `0008_calificaciones.py`** (a mano, con `GRANT` a `app_rt`):
+**Migración `supabase/migrations/0008_calificaciones.sql`** (a mano, con `GRANT` a `app_rt`):
 
 | Tabla / vista | Definición |
 |---|---|

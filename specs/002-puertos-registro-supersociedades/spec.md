@@ -137,7 +137,7 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
 - El dominio recibe instancias ya construidas.
 - `# ponytail:` una sección por slice. Cuando haya un segundo puerto cargado (006), el loader se generaliza por sección.
 
-**Tablas** (migración `0002_descubrimiento`, a mano, con `GRANT` a `app_rt` según la plantilla del 001):
+**Tablas** (migración `supabase/migrations/0002_descubrimiento.sql`, a mano, con `GRANT` a `app_rt` según la plantilla del 001):
 
 | Tabla | Columnas | Restricciones |
 |---|---|---|

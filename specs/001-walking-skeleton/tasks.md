@@ -22,7 +22,7 @@
 - [ ] T001 🧑B Verificar el proyecto Supabase del evento (ya existe). Anotar `project-ref` y región del pooler (no son secretos, pero no van al repo hasta el README de T033).
 - [ ] T002 🧑B Supabase → **Settings → API → Exposed schemas**: sacar `public`. **Database → Extensions**: habilitar `pg_trgm` y `pgcrypto` (quedan en `extensions`).
 - [ ] T003 🧑B Supabase: correr `\dn+ extensions` y `SELECT * FROM pg_default_acl` desde `psql` como `postgres` por el pooler en modo sesión. Pasarme **la salida** (no tiene secretos), que define si el `GRANT USAGE ON SCHEMA extensions` de `roles.sql` va a andar.
-- [X] T004 🤖 Esqueleto del back: `backend/pyproject.toml` (`uv python pin 3.12`, sin patch; FastAPI, SQLAlchemy 2, `psycopg[binary]` 3, Alembic, pydantic-settings, uvicorn; dev: pytest, httpx, import-linter, pip-audit) + `backend/uv.lock` commiteado y `backend/app/__init__.py`, `backend/app/modulos/__init__.py` vacíos.
+- [X] T004 🤖 Esqueleto del back: `backend/pyproject.toml` (`uv python pin 3.12`, sin patch; FastAPI, SQLAlchemy 2, `psycopg[binary]` 3, pydantic-settings, uvicorn; dev: pytest, httpx, import-linter, pip-audit, Alembic solo para el drift check) + `backend/uv.lock` commiteado y `backend/app/__init__.py`, `backend/app/modulos/__init__.py` vacíos.
 - [X] T005 🤖 **Rojo:** `backend/tests/unit/test_health_stub.py` (`GET /health` → 200). Verlo fallar por la ruta ausente, no por un import roto.
 - [X] T006 🤖 **Verde:** `backend/app/main.py` mínimo con `/health` stub. Después, `backend/Dockerfile` multi-stage y `backend/.dockerignore` (R-docker):
   - builder `python:3.12-slim` (tag fijo) + `uv` copiado de `ghcr.io/astral-sh/uv:<tag>`, con `uv sync --frozen --no-dev --no-install-project`;
@@ -45,12 +45,13 @@
   - `::test_app_no_arranca_con_secret_prohibido[…]`, un caso por parámetro:
     - `MIGRATION_DATABASE_URL`;
     - un nombre `SUPABASE_*`;
-    - un valor que empieza con `sb_publishable_` o `sb_secret_`;
-    - un JWT con `role` en `{anon, service_role}`.
+    - un valor que empieza con `sb_publishable_`, `sb_secret_` o `sbp_`;
+    - un JWT con `role` en `{anon, service_role}`;
+    - un `DATABASE_URL` con usuario `postgres` o `postgres.<ref>`.
 
-    En cada caso, el nombre de la variable aparece en `str(exc)`, y el valor no aparece en `str(exc)`, `caplog.text` ni `capsys`.
+    En cada caso sale `SecretProhibido` (no cualquier excepción), el nombre de la variable aparece en `str(exc)`, y el valor no aparece en `str(exc)`, `caplog.text` ni `capsys`.
   - `::test_jwt_malformado_no_filtra_el_valor`: con `FOO_TOKEN` la app arranca; con `SUPABASE_X` rechaza. En los dos, el valor no aparece.
-  - `::test_app_arranca_con_entorno_limpio`: con solo `DATABASE_URL` y `CORS_ORIGINS`, arranca.
+  - `::test_app_arranca_con_entorno_limpio`: con solo `DATABASE_URL` y `CORS_ORIGINS`, arranca. Uno de los casos es la forma de prod (`app_rt.<ref>`, pooler, 6543, `sslmode=require`), como control de falso positivo.
 - [X] T011 [P] 🤖 **Rojo:** `test_secrets.py::test_dockerfile_web_solo_recibe_vite_api_url`. Los `ARG` de `frontend/Dockerfile` son exactamente `{VITE_API_URL}`. Rojo porque el archivo no existe todavía.
 - [X] T012 🤖 **Verde:** el guard en `backend/app/config.py` (pydantic-settings), instanciado al crear la app en `main.py`. El JWT se decodifica sin verificar firma y el error de decodificación se traga.
 - [X] T013 🤖 **Verde:** `frontend/Dockerfile` multi-stage, `node:22-alpine` → `caddy:2-alpine` con tags fijos, `ARG VITE_API_URL` como único `ARG`, `USER` no root dueño de `/data` y `/config`, `setcap -r /usr/bin/caddy` en el build (con `libcap` instalado y borrado) y `HEALTHCHECK` con `wget`. Más `frontend/.dockerignore` y `frontend/Caddyfile` (R-docker):
@@ -60,16 +61,15 @@
   - `handle { root * /srv; try_files {path} /index.html; file_server }`.
 - [X] T014 🤖 `.env.example`: sumar `CORS_ORIGINS=` y `E2E_BASE_URL=`, solo nombres.
 
-### Tarea 3: roles, Alembic, drift y engine
+### Tarea 3: roles, migraciones SQL, drift y engine
 - [X] T015 🤖 `backend/scripts/roles.sql`, idempotente y sin passwords (R3):
-  - `app_mig` y `app_rt` con `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB`, dentro de un `DO … IF NOT EXISTS`;
-  - `GRANT app_mig TO CURRENT_USER`;
-  - `ALTER SCHEMA public OWNER TO app_mig`;
+  - solo `app_rt`, con `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB`, dentro de un `DO … IF NOT EXISTS` (las migraciones corren como `postgres`: no hay rol de migraciones);
   - `REVOKE CREATE ON SCHEMA public FROM PUBLIC`;
   - `GRANT USAGE ON SCHEMA public TO app_rt`;
-  - `ALTER DEFAULT PRIVILEGES FOR ROLE app_mig`: tablas (SELECT, INSERT, UPDATE, DELETE) y secuencias (USAGE, SELECT) para `app_rt`;
-  - `CREATE SCHEMA IF NOT EXISTS extensions` + `GRANT USAGE … TO app_rt, app_mig`;
-  - `search_path = public, extensions` en los dos roles.
+  - `CREATE SCHEMA IF NOT EXISTS extensions` + `GRANT USAGE … TO app_rt`;
+  - `search_path = public, extensions` en `app_rt`.
+
+  Los `GRANT` de tablas a `app_rt` van dentro de cada migración.
 - [X] T016 [P] 🤖 **Rojo:** `backend/tests/integration/test_rol_runtime.py::test_rol_runtime_no_es_super_ni_bypassrls_ni_puede_crear`. Como `app_rt`:
   - los 4 atributos (`rolsuper`, `rolbypassrls`, `rolcreaterole`, `rolcreatedb`) en false;
   - nada en `pg_namespace` ni en `pg_class` tiene dueño `app_rt`;
@@ -77,21 +77,26 @@
   - `has_schema_privilege('app_rt','extensions','USAGE')` da true.
 
   Si falta `TEST_DATABASE_URL`, falla; no se salta.
-- [X] T017 [P] 🤖 **Rojo:** `backend/tests/arquitectura/test_migraciones.py`:
-  - `::test_upgrade_head_desde_vacio`: `downgrade base` → `upgrade head` como `app_mig` → la revisión actual es `head` y `alembic check` da 0. `MIGRATION_DATABASE_URL` va solo en el `env=` del subproceso.
-  - `::test_drift_mira_solo_public_aunque_cambie_search_path`: con `ajeno.t` creada y `PGOPTIONS="-c search_path=ajeno,public"`, `check` da 0 y `alembic_version` queda en `public`. Con una tabla extra en `public`, `check` da ≠ 0.
+
+  Más `::test_api_no_arranca_con_un_rol_que_saltea_rls`: con un rol `SUPERUSER` o `BYPASSRLS` que no se llama `postgres`, la app no arranca y el error nombra `DATABASE_URL`. Lo cubre un evento `first_connect` del engine (`db.crear_engine`), que le pregunta a la base `rolsuper OR rolbypassrls` de `current_user`; el lifespan fuerza esa primera conexión con `db.verificar_rol()`. Más `::test_la_primera_conexion_real_chequea_el_rol_aunque_el_arranque_no_haya_podido`: si la base estaba caída al arrancar, el chequeo corre en la primera conexión real y en cada reintento. El chequeo del string en `config.py` es solo un barandal barato.
+- [X] T017 [P] 🤖 **Rojo:** `backend/tests/arquitectura/test_migraciones.py` (R-migraciones). Cada test arranca de una base nueva con `roles.sql`:
+  - `::test_migrar_local_desde_vacio_dos_veces_sin_drift`: `scripts/migrar_local.sh` dos veces, las dos en 0, `compare_metadata` contra `app/modelos.py` da vacío y queda registrada `0001`;
+  - `::test_aplica_solo_lo_que_falta_y_en_orden`: `0001` con un `CREATE TABLE` sin `IF NOT EXISTS` → la tabla existe y `0001` queda registrada; se suma `0002` que la altera → la segunda corrida da 0 y quedan `0001,0002`;
+  - `::test_aplica_varias_pendientes_en_orden_en_una_corrida`: `0001` y `0002` (que depende de `0001`) sobre una base vacía, en una sola corrida → 0 y quedan `0001,0002`;
+  - `::test_migracion_rota_falla_claro_y_no_deja_nada`: exit ≠ 0, stderr nombra el archivo, la tabla del archivo roto no existe y no queda fila en `schema_migrations`;
+  - `::test_version_repetida_falla_y_nombra_los_dos`: `0001_a` y `0001_b` → exit ≠ 0 y stderr nombra los dos;
+  - `::test_nombre_invalido_falla`: un nombre fuera de `^[0-9]+_[a-z0-9_]+$` → exit ≠ 0;
+  - `::test_drift_mira_solo_public_aunque_cambie_search_path`: con `ajeno.t` y `-c search_path=ajeno,public`, drift vacío; con una tabla extra en `public`, drift no vacío.
 - [X] T018 [P] 🤖 **Rojo:** `backend/tests/unit/test_db.py::test_engine_desactiva_prepared_statements`: el engine de `db.py` pasa `prepare_threshold=None`.
 - [X] T019 🤖 **Verde:**
   - `backend/app/modelos.py` con `metadata = MetaData()`, sin importar `config`;
   - `backend/app/db.py` con `connect_args={"prepare_threshold": None}`;
-  - `backend/alembic.ini`;
-  - `backend/alembic/env.py`: URL desde `os.environ["MIGRATION_DATABASE_URL"]`, sin importar `app.config`, `SET search_path TO public, extensions` al conectar, `target_metadata = metadata`, sin `version_table_schema`;
-  - `backend/alembic/versions/0001_inicial.py` vacía.
+  - `backend/scripts/migrar_local.sh`: aplica `supabase/migrations/*.sql` en orden con `psql -1 -v ON_ERROR_STOP=1` como superusuario y registra cada uno en `supabase_migrations.schema_migrations`;
+  - `supabase/migrations/0001_inicial.sql` sin tablas y `supabase/config.toml` con solo `project_id`.
 - [ ] T020 🧑B Supabase (cuando T015 esté commiteado):
   - pegar `backend/scripts/roles.sql` en el **SQL editor** y correrlo;
-  - poner las passwords con `\password app_mig` y `\password app_rt` desde `psql` (nunca en el SQL editor);
-  - verificar con `\dn+ public` que el dueño es `app_mig`;
-  - verificar que el pooler acepta `app_rt.<ref>` (6543) y `app_mig.<ref>` (5432) con `sslmode=require`.
+  - poner la password con `\password app_rt` desde `psql` (nunca en el SQL editor);
+  - verificar que el pooler acepta `app_rt.<ref>` (6543) con `sslmode=require`.
 
   Pasarme solo las salidas, sin passwords. **Acá te aviso (0a/0b).**
 
@@ -122,14 +127,14 @@
 
   Después, contra las imágenes de T006 (250 MB) y T013 (60 MB) → verde.
 - [X] T029 🤖 `.github/workflows/ci.yml` con estos jobs (además, `imagenes`: build de las dos imágenes + `check_imagen.sh`):
-  - `back`: `postgres:16` + `roles.sql` + passwords de test, `uv sync`, `pytest`, `lint-imports`, alembic desde cero + `check`;
+  - `back`: `postgres:16` + `roles.sql` + password de test, `migrar_local.sh` desde vacío, `uv sync`, `pytest`, `lint-imports`;
   - `front`: `npm ci`, `vitest`, build;
   - `seguridad`: pip-audit, `npm audit --audit-level=high`, binario de gitleaks;
   - `evals`;
-  - `migrar`: solo en push a `main`, con `environment: produccion` y `needs` de `back`, `front`, `seguridad` e `imagenes`.
+  - `migrar`: solo en push a `main`, con `environment: produccion` y `needs` de `back`, `front`, `seguridad` e `imagenes`; `supabase/setup-cli` pineado por SHA → `supabase db push --db-url "$SUPABASE_DB_URL" --yes`, con el secret solo en ese step.
 
   Más `.github/workflows/e2e.yml` (`workflow_dispatch`, input `base_url` → `E2E_BASE_URL`) y `.github/dependabot.yml` (pip/uv, npm, github-actions y docker).
-- [ ] T030 🧑B GitHub: crear el Environment `produccion`, limitado a `main`, con el secret `MIGRATION_DATABASE_URL` (pooler en modo sesión, `app_mig.<ref>`). Activar CodeQL default setup.
+- [ ] T030 🧑B GitHub: crear el Environment `produccion`, limitado a `main`, con el secret `SUPABASE_DB_URL`: URL del pooler en modo sesión (puerto 5432, usuario `postgres.<ref>`, `sslmode=require`) con la password de `postgres` adentro. Sin access token ni project ref. Activar CodeQL default setup.
 - [ ] T031 🧑A Railway:
   - `api`: `DATABASE_URL` (pooler en modo transacción, `app_rt.<ref>`, 6543) y `CORS_ORIGINS` (dominio de `web`);
   - `web`: solo `VITE_API_URL`;
@@ -137,8 +142,13 @@
   - "Wait for CI" activado en los dos servicios;
   - `web` con root `frontend/`.
 - [ ] T032 [US1] 🤖 **Rojo:** `frontend/e2e/health.spec.ts` + `frontend/playwright.config.ts`. Contra la URL pública, la página muestra "DB: ok". Lo corrés con `gh workflow run e2e.yml -f base_url=…` después del deploy, y ahí pasa a verde.
-- [ ] T033 🤖 `README.md`: cómo correr, variables (nombres), badge de CI, riesgo del pooler expuesto, atribuciones. Más `docs/arquitectura-backend.md` (incluye expand/contract y `SET LOCAL`) y `docs/arquitectura-frontend.md`.
+- [X] T033 🤖 `README.md`, versión mínima: cómo levantar el proyecto, cómo migrar con `supabase/migrations` y cómo correr los tests. `docs/arquitectura-backend.md` y `docs/arquitectura-frontend.md` no se crean acá: los consolida la spec 013 (otra rama), junto con badge de CI, riesgo del pooler expuesto, expand/contract y `SET LOCAL`.
 - [ ] T034 🧑B Protección de `main`: required checks `back`, `front`, `seguridad`, `evals` e `imagenes`, más 1 aprobación. Verificar con `gh api repos/:owner/:repo/branches/main/protection`.
+
+### Pendientes para la 013 (advisor del PR #16, no se tocan acá)
+- [ ] `migrar_local.sh`: una migración con su propio `BEGIN`/`COMMIT` rompe el `-1`. El `COMMIT` interno confirma lo anterior y el registro queda afuera. Rechazarlo en el script o dejarlo escrito en la plantilla.
+- [ ] `migrar_local.sh`: aplica en silencio una pendiente con versión menor que la última registrada, y `db push` la rechaza sin `--include-all`. Local y CI dan verde, y `migrar` falla en `main`. Que el script falle igual.
+- [ ] Sentencias que no corren en transacción (`CREATE/DROP INDEX CONCURRENTLY`, `REINDEX … CONCURRENTLY`, `VACUUM`, `ALTER SYSTEM`, `CLUSTER`). `db push` confirma lo anterior y las corre sueltas, así que si algo falla después queda a medias y sin fila en el historial (`SIDE_EFFECTS.md` del CLI v2.119.0). Regla: cada una va en su propio archivo de migración y con `IF NOT EXISTS`. Además `migrar_local.sh` tiene que correr esos archivos sin `-1`, para que local y prod se comporten igual: hoy local falla y prod las aplica.
 
 ## Dependencias
 
