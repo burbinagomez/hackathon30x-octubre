@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 
-type Estado = { api: "ok" | "error"; db: "ok" | "error" };
+type Estado = { api: "…" | "ok" | "error"; db: "…" | "ok" | "error" };
 
 export default function App() {
-  const [estado, setEstado] = useState<Estado>({ api: "ok", db: "ok" });
+  // Arranca sin "ok": si no, el e2e pasa antes de que /health conteste.
+  const [estado, setEstado] = useState<Estado>({ api: "…", db: "…" });
 
   useEffect(() => {
     const url = `${import.meta.env.VITE_API_URL ?? ""}/health`;

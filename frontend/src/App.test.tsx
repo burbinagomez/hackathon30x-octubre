@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { http, HttpResponse } from "msw";
+import { delay, http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, expect, test } from "vitest";
 import App from "./App";
@@ -16,6 +16,12 @@ test("muestra estado de la API", async () => {
   );
   render(<App />);
   expect(await screen.findByText("API: ok · DB: ok")).toBeInTheDocument();
+});
+
+test("sin respuesta todavía no muestra ok", async () => {
+  server.use(http.get("*/health", () => delay("infinite")));
+  render(<App />);
+  expect(screen.queryByText(/ok/)).not.toBeInTheDocument();
 });
 
 test("con la llamada caída muestra API: error", async () => {
