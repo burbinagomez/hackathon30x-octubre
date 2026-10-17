@@ -61,7 +61,7 @@ Campos con default o métodos nuevos; ninguno cambia la firma de `buscar` ni de 
 - `EmpresaCruda` + `telefono`, `email`, `geo: Geo | None` (`Geo(lat, lon)`), `telefono_canal`, `email_canal`. La 002 ya lo anticipa (002 plan:103). `licencia` queda en `MetaFuente`.
 - `PaginaEmpresas` + `truncado: bool = False`, `descartados_sin_nombre: int = 0`. Va como enmienda de la 003: el 002 dice que un cambio a los tipos de retorno pide spec (002 plan:103).
 - `CriteriosICP` sin cambios de tipo: criterio presente = clave de `filtros`; `ciudad: str`, `tipo_negocio: tuple[str, ...]`.
-- `RepositorioLeads` + entidad `Lead`, `por_id_fiscal`, `por_dominio`, `por_telefono`, `candidatos_por_nombre`, `registrar_revision` y `aplicar_fusion(lead_id, cambios: CambiosLead)` con `coalesce`.
+- `RepositorioLeads` + entidad `Lead`, `por_id_fiscal`, `por_dominio`, `por_telefono`, `candidatos_por_nombre`, `registrar_revision` y `aplicar_fusion(lead_id, cambios: CambiosLead)` con `coalesce` en los simples; los pares se reemplazan.
 - `seleccionar_fuentes(metas: Iterable[MetaFuente], criterios, actividades) -> (seleccionadas: dict[clave, CriteriosICP], ignoradas: dict[clave, motivo])`.
 - `cubre(meta, criterios)` (002 plan:101) queda solo con el país; `test_cubre` del 002 se actualiza (el caso del filtro fuera de `meta.filtros` pasa a verdadero).
 
