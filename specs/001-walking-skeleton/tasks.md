@@ -7,8 +7,11 @@
 **Organización:** la spec tiene una sola historia, **US1**: "`/health` de punta a punta: back → DB → front → deploy". Las fases siguen el "Orden de tareas" del `plan.md` (0a…9). Los barandales (1–3) son la fase fundacional, porque toda la historia depende de ellos.
 
 **Dueño:**
-- 🧑 **a mano (vos)**: cuentas, dashboards, passwords y secrets. Ninguno de estos valores pasa por mí ni queda en el repo.
-- 🤖 **yo**: código y tests, con un commit por tarea en `feature/001-walking-skeleton`. Sin push hasta mostrarte la lista de commits.
+- 🧑B **burbinagomez** (base de datos y repo): cuentas de Supabase/GitHub, roles, secrets. Ninguno de estos valores pasa por mí ni queda en el repo.
+- 🧑A **Angel** (Railway): proyecto y variables de Railway. Nada de base de datos.
+- 🤖 **yo (Claude)**: el resto — código y tests, con un commit por tarea en `feature/001-walking-skeleton`. Sin push hasta mostrarte la lista de commits.
+
+**Nota de arranque:** Environment de GitHub: `produccion`. Push por fase con OK. Nada de base de datos lo hace Angel.
 
 ## Formato: `[ID] [P?] [Story] Descripción`
 
@@ -16,9 +19,9 @@
 
 ## Fase 1: Setup (tareas 0a, 0b)
 
-- [ ] T001 🧑 Crear el proyecto Supabase nuevo del evento. Anotar `project-ref` y región del pooler (no son secretos, pero no van al repo hasta el README de T033).
-- [ ] T002 🧑 Supabase → **Settings → API → Exposed schemas**: sacar `public`. **Database → Extensions**: habilitar `pg_trgm` y `pgcrypto` (quedan en `extensions`).
-- [ ] T003 🧑 Supabase: correr `\dn+ extensions` y `SELECT * FROM pg_default_acl` desde `psql` como `postgres` por el pooler en modo sesión. Pasarme **la salida** (no tiene secretos), que define si el `GRANT USAGE ON SCHEMA extensions` de `roles.sql` va a andar.
+- [ ] T001 🧑B Verificar el proyecto Supabase del evento (ya existe). Anotar `project-ref` y región del pooler (no son secretos, pero no van al repo hasta el README de T033).
+- [ ] T002 🧑B Supabase → **Settings → API → Exposed schemas**: sacar `public`. **Database → Extensions**: habilitar `pg_trgm` y `pgcrypto` (quedan en `extensions`).
+- [ ] T003 🧑B Supabase: correr `\dn+ extensions` y `SELECT * FROM pg_default_acl` desde `psql` como `postgres` por el pooler en modo sesión. Pasarme **la salida** (no tiene secretos), que define si el `GRANT USAGE ON SCHEMA extensions` de `roles.sql` va a andar.
 - [ ] T004 🤖 Esqueleto del back: `backend/pyproject.toml` (`uv python pin 3.12`, sin patch; FastAPI, SQLAlchemy 2, `psycopg[binary]` 3, Alembic, pydantic-settings, uvicorn; dev: pytest, httpx, import-linter, pip-audit) + `backend/uv.lock` commiteado y `backend/app/__init__.py`, `backend/app/modulos/__init__.py` vacíos.
 - [ ] T005 🤖 **Rojo:** `backend/tests/unit/test_health_stub.py` (`GET /health` → 200). Verlo fallar por la ruta ausente, no por un import roto.
 - [ ] T006 🤖 **Verde:** `backend/app/main.py` mínimo con `/health` stub. Después, `backend/Dockerfile` multi-stage y `backend/.dockerignore` (R-docker):
@@ -27,7 +30,7 @@
   - `USER app`;
   - `HEALTHCHECK` con `python -c urllib…` sobre `${PORT:-8000}`;
   - `CMD exec uvicorn … --port ${PORT:-8000}`.
-- [ ] T007 🧑 Railway: crear el proyecto con 2 servicios (`api`, `web`) conectados al repo, `api` con root `backend/` y Dockerfile, y lanzar el primer deploy de `api` desde `feature/001-walking-skeleton`. Que construya mientras sigo con T008–T026.
+- [ ] T007 🧑A Railway: crear el proyecto con 2 servicios (`api`, `web`) conectados al repo, `api` con root `backend/` y Dockerfile, y lanzar el primer deploy de `api` desde `feature/001-walking-skeleton`. Que construya mientras sigo con T008–T026.
 
 ## Fase 2: Fundacional — barandales (tareas 1–3)
 
@@ -84,7 +87,7 @@
   - `backend/alembic.ini`;
   - `backend/alembic/env.py`: URL desde `os.environ["MIGRATION_DATABASE_URL"]`, sin importar `app.config`, `SET search_path TO public, extensions` al conectar, `target_metadata = metadata`, sin `version_table_schema`;
   - `backend/alembic/versions/0001_inicial.py` vacía.
-- [ ] T020 🧑 Supabase (cuando T015 esté commiteado):
+- [ ] T020 🧑B Supabase (cuando T015 esté commiteado):
   - pegar `backend/scripts/roles.sql` en el **SQL editor** y correrlo;
   - poner las passwords con `\password app_mig` y `\password app_rt` desde `psql` (nunca en el SQL editor);
   - verificar con `\dn+ public` que el dueño es `app_mig`;
@@ -126,8 +129,8 @@
   - `migrar`: solo en push a `main`, con `environment: produccion` y `needs` de `back`, `front`, `seguridad` e `imagenes`.
 
   Más `.github/workflows/e2e.yml` (`workflow_dispatch`, input `base_url` → `E2E_BASE_URL`) y `.github/dependabot.yml` (pip/uv, npm, github-actions y docker).
-- [ ] T030 🧑 GitHub: crear el Environment `produccion`, limitado a `main`, con el secret `MIGRATION_DATABASE_URL` (pooler en modo sesión, `app_mig.<ref>`). Activar CodeQL default setup. Si no sos admin del repo, lo hace burbinagomez.
-- [ ] T031 🧑 Railway:
+- [ ] T030 🧑B GitHub: crear el Environment `produccion`, limitado a `main`, con el secret `MIGRATION_DATABASE_URL` (pooler en modo sesión, `app_mig.<ref>`). Activar CodeQL default setup.
+- [ ] T031 🧑A Railway:
   - `api`: `DATABASE_URL` (pooler en modo transacción, `app_rt.<ref>`, 6543) y `CORS_ORIGINS` (dominio de `web`);
   - `web`: solo `VITE_API_URL`;
   - dominios públicos generados;
@@ -135,7 +138,7 @@
   - `web` con root `frontend/`.
 - [ ] T032 [US1] 🤖 **Rojo:** `frontend/e2e/health.spec.ts` + `frontend/playwright.config.ts`. Contra la URL pública, la página muestra "DB: ok". Lo corrés con `gh workflow run e2e.yml -f base_url=…` después del deploy, y ahí pasa a verde.
 - [ ] T033 🤖 `README.md`: cómo correr, variables (nombres), badge de CI, riesgo del pooler expuesto, atribuciones. Más `docs/arquitectura-backend.md` (incluye expand/contract y `SET LOCAL`) y `docs/arquitectura-frontend.md`.
-- [ ] T034 🧑 Protección de `main`: required checks `back`, `front`, `seguridad`, `evals` e `imagenes`, más 1 aprobación. Verificar con `gh api repos/:owner/:repo/branches/main/protection`. Necesita admin (burbinagomez).
+- [ ] T034 🧑B Protección de `main`: required checks `back`, `front`, `seguridad`, `evals` e `imagenes`, más 1 aprobación. Verificar con `gh api repos/:owner/:repo/branches/main/protection`.
 
 ## Dependencias
 
