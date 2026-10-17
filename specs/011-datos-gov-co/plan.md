@@ -16,23 +16,23 @@ Este slice suma un tercer adaptador de `FuenteDescubrimiento`, `datos_gov_co_rue
 
 ## Technical Context
 
-**Language/Version**: Python 3.12, con TypeScript para una celda del tablero.
+**Language/Version**: Python 3.12. Sin front: la columna del tablero se movió a la 005 (D7).
 **Primary Dependencies**:
 - `httpx`, que ya está.
 - `pyyaml`, que lo agrega la 002 (T001) en `dependencies`. La 011 **no** lo vuelve a declarar.
 - No se suma ninguna dependencia nueva: la fixture sin red es stdlib, sin `pytest-socket`.
 
 **Storage**: Postgres (Supabase). La 011 trae una migración nueva con la columna `busquedas.naturales_por_fuente`. Reutiliza `fuente_cache` (002) y `costos` (002) sin cambiarles el esquema.
-**Testing**: `pytest` (unit, contratos, integration), Vitest para `Tablero.test.tsx`. Sin Playwright: el E2E de búsqueda lo cortó la 005.
+**Testing**: `pytest` (unit, contratos, integration). Sin Vitest (D7) y sin Playwright: el E2E de búsqueda lo cortó la 005.
 **Target Platform**: servicio `api` en Railway, más la CLI local.
-**Project Type**: web (backend + frontend).
+**Project Type**: web, solo backend en este slice.
 **Performance Goals**: el peor caso de `buscar` son ~2 min (2 requests × 2 intentos × 30 s). El caso medido son ~5 s.
 **Constraints**:
 - SODA sin `$order`, con una página de 5.000.
 - El token es opcional y viaja en el header.
 - Los tests no tocan la red.
 
-**Scale/Scope**: un adaptador, un YAML de 58 cámaras, una migración, una celda del tablero.
+**Scale/Scope**: un adaptador, un YAML de 58 cámaras, una migración.
 
 ## Constitution Check
 
@@ -75,8 +75,8 @@ Cada una dice qué tareas bloquea. Si el puerto de la 002 o la 003 todavía pued
 | D3 | **Forma final de `PaginaEmpresas`.** Depende de la P1 de la 003. | T019, T020, T026 | **Resuelta:** campos aditivos con default sobre lo que deje la 003, sin cambiar ningún adaptador existente. Este adaptador devuelve `total=None`, y lo afirma T026. |
 | D4 | **¿Dónde va `licencia`?** | T024 | **Resuelta:** en `meta`, no en `EmpresaCruda`. T024 afirma `adaptador.meta.licencia == "CC-BY-SA-4.0"`. Los demás campos de `EmpresaCruda` (`telefono`, `email`, `geo`) se afirman en `None` si existen después de la 003. |
 | D5 | **Columna del caché.** | T031, T032 | **Resuelta:** `respuesta`, como en la 002. `spec.md` ya está corregida. |
-| D6 | **Estado "completada".** | T047 | **Resuelta:** pasa a la 005, que es la dueña de los estados. |
-| D7 | **Tests que dependen de la 005 dentro del PR de la 011.** Son los 3 de `contar` del contrato, `test_contar_usa_count_con_el_mismo_where`, `test_contar_registra_socrata_descarga`, `test_costo_maximo_llamada`, `test_tablero_trae_naturales_por_fuente` y `muestra_naturales_encontradas_no_contactables`. | T035, T047–T049 | **PENDIENTE DEL DUEÑO.** Propuesta: `contar` se implementa ya como método del adaptador, así que sus dos tests unitarios son rojo real que pasa a verde. Lo que necesita símbolos de la 005 va con `pytest.mark.xfail(strict=True, reason="depende de 005")`, o `it.fails` en Vitest, y la 005 quita la marca. La spec (línea 6) dice "quedan en rojo", y un rojo real bloquea el merge. No se aplica hasta que el dueño decida. |
+| D6 | **Estado "completada".** | — (era T047, movida a la 005 por D7) | **Resuelta:** pasa a la 005, que es la dueña de los estados. |
+| D7 | **Tests que dependen de la 005 dentro del PR de la 011.** | T035, T047–T049 | **Resuelta (dueño):** salen de la 011 y se mueven a `specs/005` (rama `docs/005-plan`) estos 6: `test_costo_maximo_llamada` y los 3 tests de `contar` de la suite de contrato de la 005 (de T035), `test_tablero_trae_naturales_por_fuente` (T047) y `muestra_naturales_encontradas_no_contactables` (T048). T049 se va con ellos. En la 011 quedan `test_contar_usa_count_con_el_mismo_where` y `test_contar_registra_socrata_descarga`, con rojo real por aserción sobre un stub de `contar`: sin `xfail`, `ImportError` ni `AttributeError`. |
 | D8 | **Número de la migración.** | T042 | **Resuelta:** el siguiente libre después de la `0003` al momento del merge, previsiblemente `0004`. Se elige después de la puerta T001. |
 | D9 | **Dónde viven `DATOS_GOV_CO_URL` y `DATOS_GOV_CO_APP_TOKEN`.** | T012, T033, T034 | **Resuelta:** en `settings`, igual que la 003 con Overpass. La fábrica se los pasa al adaptador, que no lee `os.environ`. Los tests usan `monkeypatch.setenv` y construyen un `settings` nuevo. |
 | D10 | **Tests que arman el registro desde el YAML real.** Pasar a `habilitado: true` puede cambiar lo que esperan, por ejemplo `test_icp_colombia_completo_usa_las_dos_fuentes`. | T040 | **Resuelta:** después de la puerta se listan con `grep -rn "config/fuentes.yaml" backend/tests` **y** con los usos de la ruta por defecto de `cargar_registro` (`grep -rn "cargar_registro(" backend`, donde una llamada sin ruta explícita lee el YAML real). Se actualizan en el mismo commit que el YAML. |
@@ -120,9 +120,8 @@ backend/
     │   ├── test_cli.py                    # + test_respeta_fuentes_yaml_del_entorno
     │   └── descubrimiento/{test_datos_gov_co.py, test_camaras_co.py, test_registro.py, test_seleccion_fuentes.py}
     ├── contratos/{conftest.py, fabricas.py, test_fuente_descubrimiento.py}
-    └── integration/{test_conectar_desconectar.py, test_costos_repo.py, test_rls.py, test_api_busquedas.py}
+    └── integration/{test_conectar_desconectar.py, test_costos_repo.py, test_rls.py}
 supabase/migrations/NNNN_naturales_por_fuente.sql   # D8
-frontend/src/tablero/{Tablero.tsx, Tablero.test.tsx, i18n es/en}
 .claude/skills/{fuentes-publicas,cumplimiento-datos}/SKILL.md
 docs/arquitectura-backend.md
 ```

@@ -3,7 +3,7 @@
 **Input**: [spec.md](./spec.md), [plan.md](./plan.md)
 **Prerequisites**:
 - La 002 y la 003 mergeadas en `main`, y `main` mergeado en esta rama (con merge, no rebase).
-- D1–D12 resueltas salvo D7 (dueño), que bloquea solo T035 (parte 005) y T047–T049.
+- D1–D12 resueltas. Con D7, los 6 tests que dependen de la 005 se movieron a `specs/005` (ver la nota de la Fase 10).
 
 > Formato de `/speckit-tasks` aplicado a mano: `setup-plan.sh` no resuelve el feature.
 
@@ -160,16 +160,22 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Pa
   - `::test_app_token_va_en_header_y_nunca_en_logs`. La parte del header es rojo real. Las de "nunca en logs" y "`tok-falso-123` no aparece en ningún `empresa.url_origen`" son guardas: la mutación `logger.debug(headers)`, o meter el token en la query de `url_origen`, las pone en rojo y se revierte.
   - `::test_url_se_puede_sobrescribir`.
 - [ ] T034 [Paso 6] **Verde:** campos `datos_gov_co_url` y `datos_gov_co_app_token` en `settings` (sin literales: el default de la URL es la constante pública del dataset). La fábrica se los pasa al adaptador.
-- [ ] T035 [Paso 6] **Rojo y verde de `contar` (D7):**
-  - `::test_contar_usa_count_con_el_mismo_where` y `::test_contar_registra_socrata_descarga` son rojo real. Su verde es `DatosGovCoRues.contar(criterios) -> int`, un método del adaptador que no necesita que el puerto lo declare todavía.
-  - `::test_costo_maximo_llamada` y los 3 tests de `contar` de la suite de contrato de la 005 se escriben con `xfail(strict=True, reason="depende de 005")` si la 005 no está en `main`, según lo que se resuelva en D7.
+- [ ] T035 [Paso 6] **Rojo y verde de `contar` (D7):** son dos tests en `test_datos_gov_co.py`, y los dos tienen que fallar por aserción. Ni `xfail`, ni `ImportError`, ni `AttributeError`.
+  - **Antes del rojo**, se agrega el stub `DatosGovCoRues.contar(criterios) -> int`, que devuelve `0` sin hacer request ni registrar costo. Así el test encuentra el método y falla en el `assert`. El método es del adaptador, y el puerto no tiene que declararlo todavía.
+  - `::test_contar_usa_count_con_el_mismo_where`.
+    - **Rojo:** con el stub, falla `len(capturadas) == 1`, porque no hubo request, y falla `== 2015`.
+    - **Mutación que lo pone en rojo:** quitar `nit IS NOT NULL` del `$where` de `contar`, de modo que difiera del de la request de filas, o devolver un valor fijo en lugar del `count`.
+  - `::test_contar_registra_socrata_descarga`.
+    - **Rojo:** con el stub, hay 0 filas `socrata_descarga` en el `RegistroCostos` falso, y el assert de 1 fila falla.
+    - **Mutación que lo pone en rojo:** no registrar la fila, o registrarla con `unidades=0`, que hace fallar el assert de los segundos medidos.
+  - **Verde:** `contar` hace `$select=count(*)` con el mismo `$where` de jurídicas y registra una fila `socrata_descarga` antes de devolver.
 - [ ] T036 [Paso 6] **Guarda (advisor):** `backend/tests/integration/test_costos_repo.py::test_socrata_descarga_escribe_fila_en_costos`, con `postgres_costos` real, rol `app_rt` y `SET LOCAL` del tenant.
   - Valida `unidades == Decimal(2)`, el `costo_unitario` como `numeric`, `gratis=false` y el `tenant_id`.
   - **Nace verde**, porque el CHECK de `costos.tipo` de la 002 ya incluye `socrata_descarga` (plan 002, línea 210) y el adaptador ya registra desde T030.
   - **Mutación:** registrar `unidades=0` (falla `== Decimal(2)`) o un `tipo` fuera del CHECK (falla la constraint) tiene que ponerlo en rojo. Se revierte.
 - [ ] T037 [Paso 6] El advisor revisa la guarda T036 y su mutación, hasta APRUEBA. No hay código nuevo.
 
-**Checkpoint**: `test_datos_gov_co.py` y `test_costos_repo.py` en verde. Lo que dependa de la 005 queda en xfail.
+**Checkpoint**: `test_datos_gov_co.py` y `test_costos_repo.py` en verde, sin `xfail`.
 
 ---
 
@@ -209,20 +215,18 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Pa
 
 ---
 
-## Fase 10: Tablero (Paso 9), bloqueada por D6 y D7
+## Fase 10: movidos a specs/005 (D7)
 
-- [ ] T047 [Paso 9] **Rojo:** `backend/tests/integration/test_api_busquedas.py::test_tablero_trae_naturales_por_fuente`.
-  - Con la 005 en `main`, es un rojo real.
-  - Sin la 005, se escribe con `xfail(strict=True)`.
-- [ ] T048 [P] [Paso 9] **Rojo:** `frontend/src/tablero/Tablero.test.tsx::muestra_naturales_encontradas_no_contactables`.
-  - Tres casos: `26.304`, `—` y "no aplica".
-  - Las cadenas salen de i18n en es y en, y el test corre en los dos idiomas.
-  - Sin la 005, va con `it.fails`.
-- [ ] T049 [Paso 9] **Verde:**
-  - `GET /tablero/fuentes`, con `DISTINCT ON (fuente) … ORDER BY creada_en DESC` sobre las búsquedas completadas;
-  - la columna del tablero y las claves de i18n en es y en.
+T047, T048 y T049 salen de la 011. Estos 6 tests los absorbe la 005, en la rama `docs/005-plan`:
 
-  Solo si la 005 está en `main`. Si no, se pasa a la 005.
+| ID original | Test |
+|---|---|
+| T035 | `test_datos_gov_co.py::test_costo_maximo_llamada` |
+| T035 | Los 3 tests de `contar` de la suite de contrato de la 005 (`tests/contratos/test_fuente_descubrimiento.py`), corriendo con `[datos_gov_co_rues]` |
+| T047 | `backend/tests/integration/test_api_busquedas.py::test_tablero_trae_naturales_por_fuente` |
+| T048 | `frontend/src/tablero/Tablero.test.tsx::muestra_naturales_encontradas_no_contactables` |
+
+T049, el verde del tablero (`GET /tablero/fuentes`, la columna y las claves de i18n en es y en), se va con ellos. En la 011, el conteo de naturales llega hasta `busquedas.naturales_por_fuente` y la CLI.
 
 ---
 
@@ -238,7 +242,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Pa
 ## Fase 12: Doc y cierre (Paso 11)
 
 - [ ] T051 [Paso 11] `docs/arquitectura-backend.md`: cómo conectar o desconectar una fuente, con este adaptador como ejemplo, y por qué la natural se filtra en el servidor y se cuenta. El mínimo si se corta son 5 líneas.
-- [ ] T052 [P] [Paso 11] Se revisa que `spec.md` siga alineada con el plan. D1 (`meta`) y D5 (`respuesta`) ya se corrigieron en el commit de docs; D7 se aplica cuando el dueño decida.
+- [ ] T052 [P] [Paso 11] Se revisa que `spec.md` siga alineada con el plan. D1 (`meta`), D5 (`respuesta`) y D7 (tests movidos a la 005) ya se corrigieron en los commits de docs.
 - [ ] T053 [Paso 11] Cierre:
   - la suite completa, `lint-imports` y `npm test` en verde;
   - el agente `security` sobre el diff (OWASP y principios V a VII), donde CRITICAL o HIGH bloquean;
@@ -253,7 +257,6 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Pa
 - **Adaptador.** La Fase 5 necesita las Fases 3 y 4, porque el adaptador usa cámaras y los tests corren sin red. Las Fases 6 y 7 siguen a la 5.
 - **Registro.** La Fase 8 necesita las Fases 5 a 7 en verde, porque `habilitado: true` va en el mismo commit en que pasa el contrato.
 - **Integración.** La Fase 9 necesita la Fase 8.
-- **Tablero.** La Fase 10 necesita la Fase 9 y la 005.
 - **Antes de la doc.** La Fase 11 va antes de la Fase 12.
 - **Pasos con advisor.** T017, T029 y T036 no pasan al verde sin APRUEBA.
 
@@ -262,7 +265,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Pa
 | Orden | Se corta | Tareas que se bajan |
 |---|---|---|
 | 1 | Doc completa | T051 queda en 5 líneas |
-| 2 | Columna de naturales en el tablero | T047, T048 y T049 |
+| 2 | ~~Columna de naturales en el tablero~~ | Movida a specs/005 (D7) |
 | 3 | `FUENTES_YAML` en la CLI | T045. T046 queda solo con la impresión |
 | 4 | Las 58 cámaras | `test_yaml_real_cubre_58…` de T007. T008 queda con las cámaras 04, 14, 47 y 58 |
 | 5 | Caché | T031 y T032 |
