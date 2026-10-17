@@ -1,26 +1,29 @@
-# Spec 011 — datos.gov.co (`c82u-588k`) desconectado, con contrato
+# Spec 011 — datos.gov.co (`c82u-588k`), segunda fuente de descubrimiento, con contrato
 
-**Slice:** 011 · **Rama:** `feature/011-datos-gov-co` · **Tiempo:** domingo, si hay tiempo (≤ 1,5 h con los cortes de "Cuándo cortar"; completo, ~2 h)
-**Depende de:** 002 (puerto, registro, contrato, caché), 003 (normalización, dedup, selección de fuentes), 005 (`contar`, `costo_maximo_llamada`, tablero). **Desbloquea:** el paso 11 del PRD §9 (mostrar en vivo que una fuente se conecta y se desconecta) y la atribución del README en la 013.
+**Slice:** 011 · **Rama:** `feature/011-datos-gov-co` · **Tiempo:** sábado PM, justo después de la 003 (≤ 1,5 h con los cortes de "Cuándo cortar"; completo, ~2 h)
+**Depende de:** 002 (puerto, registro, contrato, caché), 003 (normalización, dedup, selección de fuentes), 005 (`contar`, `costo_maximo_llamada`, tablero). **Desbloquea:** el descubrimiento en CO sin depender del tier de Croma, la demo en vivo de que una fuente se conecta y se desconecta (PRD §9) y la atribución del README en la 013.
+
+> **Orden 002 → 003 → 011.** Si la 005 no está en main cuando se implemente, los tests de `contar` (los tres de la suite de contrato de la 005, `test_contar_usa_count_con_el_mismo_where` y `test_contar_registra_socrata_descarga`), los del tablero (`test_tablero_trae_naturales_por_fuente`, `muestra_naturales_encontradas_no_contactables`) y los de atribución (`test_tablero_trae_atribucion_completa`, `muestra_atribucion_odbl_y_cc_by_sa`) quedan en rojo hasta que entre la 005. La spec no se parte: el PR de la 011 lo declara y esos tests se ponen en verde en el de la 005 o en uno posterior.
 
 > **Cambio de dataset.** El PRD §2 nombraba `nb3d-v3n7`. Al consultar la API real (2026-10-17) resultó ser "Establecimientos - Agencias - Sucursales": la identificación es la del **propietario** y **no distingue personas naturales**. En la verificación, 37 personas naturales tenían NIT de 9 dígitos con prefijo 8/9, y 24 de ellas tenían DV consistente, así que ninguna heurística sobre el NIT sirve. Esta spec usa **`c82u-588k`** ("Personas Naturales, Personas Jurídicas y ESAL", Confecámaras, CC BY-SA 4.0): es el registro mercantil, con una fila por matrícula y la naturaleza jurídica declarada en `organizacion_juridica`. Se mantiene el id de fuente `datos_gov_co_rues`. La nota quedó en el PRD §2.
 >
 > Rutas: `config/` es donde la deje el 001. Si ya entró `952738f`, es `backend/config/`.
 
 ## Para quién
-- **El jurado y Dapta:** ven que una fuente se conecta y se desconecta con un flag en `config/fuentes.yaml`, sin tocar el dominio. Además, si alguien objeta que Croma no es gratuita, o si se agota su tier, hay un respaldo para el descubrimiento en CO.
+- **El jurado y Dapta:** una segunda fuente pública y gratuita de descubrimiento en CO, junto a OSM, que no depende de los ~100 req/día de Croma y cubre las pymes pequeñas que no reportan a Supersociedades. Aporta volumen y cobertura, no contactabilidad: no trae teléfono ni web, y eso lo dan OSM y `sitio_web` (006). Además ven que se conecta y se desconecta con un flag en `config/fuentes.yaml`, sin tocar el dominio.
 - **El equipo:** un tercer adaptador de `FuenteDescubrimiento` que pasa la misma suite de contrato y demuestra que el puerto aguanta una fuente con forma distinta: SODA, sin contacto y con la persona natural excluida en el servidor.
 
 ## Qué hace
 - Un adaptador `datos_gov_co_rues` de `FuenteDescubrimiento` que consulta `c82u-588k` por CIIU y departamento. Filtra en el servidor `organizacion_juridica != 'PERSONA NATURAL' AND estado_matricula = 'ACTIVA'`, así que **las personas naturales nunca se descargan**.
 - **Cuenta** las personas naturales con un `count(*)` aparte, que no trae filas. Ese número llega a la CLI, a la respuesta de ejecutar y al tablero como "encontradas, no contactables".
-- Lo declara en `config/fuentes.yaml` con **`habilitado: false`**. Con la config del repo no se carga y no hace ni una request.
+- Lo declara en `config/fuentes.yaml` con **`habilitado: true`** desde que se implementa: entra a toda búsqueda CO junto a OSM y Croma. Con un YAML que lo pone en `false`, no se carga y no hace ni una request.
 - Registra el costo `socrata_descarga` por intento. Cada lead nuevo lleva su fila en `cumplimiento` con `CC-BY-SA-4.0`.
 - Tests sin red: una fixture bloquea toda conexión saliente que no sea a loopback.
 - Muestra la atribución completa de la regla 11 de `cumplimiento-datos` en el tablero.
 
 ## Puertos y adaptadores que toca (`config/fuentes.yaml`)
-- **`fuentes_descubrimiento.datos_gov_co_rues`** (`habilitado: false`, `paises: [CO]`, `licencia: CC-BY-SA-4.0`): implementa `FuenteDescubrimiento` (`buscar`, `contar`, `meta`) y entra al catálogo. Este slice le cambia tres cosas en el YAML:
+- **`fuentes_descubrimiento.datos_gov_co_rues`** (`habilitado: true`, `paises: [CO]`, `licencia: CC-BY-SA-4.0`): implementa `FuenteDescubrimiento` (`buscar`, `contar`, `meta`) y entra al catálogo. Este slice le cambia cuatro cosas en el YAML:
+  - `habilitado: false` → **`habilitado: true`**, en el mismo commit en que pasa la suite de contrato.
   - `dataset: nb3d-v3n7` → **`dataset: c82u-588k`**.
   - `filtros: [ciiu, camara, estado_matricula, tipo_propietario]` → **`filtros: [ciiu, departamento]`**. La cámara es una traducción interna del adaptador (ver Decisiones técnicas). El estado y la naturaleza jurídica los fija el adaptador: nadie los elige en el ICP.
   - `trae: [nit, nombre, ciiu, estado, tipo_titular]` → **`trae: [nit, nombre, ciiu, ciudad_camara]`**. `estado` siempre es "activa" y `tipo_titular` siempre es "juridica": los fija la consulta.
@@ -47,8 +50,8 @@
 Ninguno: este slice no usa IA.
 
 ## Flujo principal
-1. **Desconectado (estado del repo):** `cargar_registro` lee `habilitado: false` y no lo carga. `seleccionar_fuentes` no lo ve, y una búsqueda CO/4711/11 hace 0 requests a datos.gov.co.
-2. **Conectado (demo):** `FUENTES_YAML=/ruta/a/fuentes-demo.yaml uv run python -m app.cli buscar --tenant <id> --pais CO --ciiu 4711 --departamento 11`. El YAML de la demo es una copia del real con `datos_gov_co_rues.habilitado: true` y `croma_supersociedades_co.habilitado: false`: la misma búsqueda, con la fuente de respaldo en lugar de Croma.
+1. **Conectado (estado del repo):** `cargar_registro` lee `habilitado: true` y lo carga. `uv run python -m app.cli buscar --tenant <id> --pais CO --ciiu 4711 --departamento 11` lo consulta junto a OSM y Croma.
+2. **Desconectado (demo):** `FUENTES_YAML=/ruta/a/fuentes-demo.yaml uv run python -m app.cli buscar …` con la misma búsqueda. El YAML de la demo es una copia del real con `datos_gov_co_rues.habilitado: false`: `seleccionar_fuentes` no lo ve y hace 0 requests a datos.gov.co.
 3. `seleccionar_fuentes` (003, sin cambios) le pasa al adaptador `{ciiu: "4711", departamento: "11"}`. Lo que el adaptador no declara (`ciudad`, `ingresos_min`) queda en `ignorados`.
 4. El adaptador, en `buscar(criterios, pagina=1)`:
    - valida el CIIU (`^\d{4}$`) y traduce el departamento a cámaras con `config/camaras_co.yaml` (11 → `{04}`; 25 → `{04, 14, 47, 58}`). Si algo no valida, lanza `CriterioNoSoportado` sin hacer requests;
@@ -64,7 +67,7 @@ Ninguno: este slice no usa IA.
 ## Terminado cuando (tests que hoy fallan)
 
 **Registro y selección**
-- `backend/tests/unit/descubrimiento/test_registro.py::test_carga_config_fuentes_yaml_real_sin_error`: **se actualiza**. `datos_gov_co_rues` está en el catálogo, no se carga (`habilitado: false`) y no aparece en `sin_implementacion`. Su entrada del YAML real tiene `dataset == "c82u-588k"`, `filtros == ["ciiu", "departamento"]` y `licencia == "CC-BY-SA-4.0"`.
+- `backend/tests/unit/descubrimiento/test_registro.py::test_carga_config_fuentes_yaml_real_sin_error`: **se invierte**: `datos_gov_co_rues` está en el catálogo, **se carga** (`habilitado: true`) y no aparece en `sin_implementacion`. Nace rojo: hoy el YAML real lo tiene en `false`. Su entrada del YAML real tiene `dataset == "c82u-588k"`, `filtros == ["ciiu", "departamento"]` y `licencia == "CC-BY-SA-4.0"`.
 - `backend/tests/unit/descubrimiento/test_seleccion_fuentes.py::test_datos_gov_co_habilitada_recibe_ciiu_y_departamento`: con un registro en memoria que la habilita, el ICP CO/4711/11/Bogotá le pasa `{ciiu, departamento}`, y `ciudad` queda en sus `ignorados`. Nace rojo: con los `filtros` actuales la ignora por `sin_geografia`.
 - `backend/tests/unit/test_cli.py::test_respeta_fuentes_yaml_del_entorno`: con `FUENTES_YAML` apuntando a un YAML temporal, la CLI carga ese registro y no `config/fuentes.yaml`; esa parte nace roja. La de "sin la variable, carga el del repo" es una guarda que nace verde, contra un default roto.
 
@@ -119,8 +122,9 @@ Ninguno: este slice no usa IA.
 
 **Integración** (Postgres de prueba, rol `app_rt`, transportes falsos)
 - `backend/tests/integration/test_conectar_desconectar.py`:
-  - `::test_yaml_real_no_toca_datos_gov_co`: con el `config/fuentes.yaml` del repo, `EjecutarBusqueda` CO/4711/11 hace 0 requests al transporte de datos.gov.co.
-  - `::test_habilitada_por_yaml_temporal_da_leads_cc_by_sa`: con el YAML temporal del flujo, la misma búsqueda deja leads con `tipo_titular='juridica'`, con `lead_fuentes.licencia` y `cumplimiento.licencia` en `CC-BY-SA-4.0`, `url_origen` y `as_of` del header, y al menos una fila `socrata_descarga` en `costos` con el `tenant_id` del contexto.
+  - `::test_yaml_real_consulta_datos_gov_co` (antes `test_yaml_real_no_toca_datos_gov_co`, **se invierte**): con el `config/fuentes.yaml` del repo y la red mockeada (transporte falso para datos.gov.co, OSM y Croma), `EjecutarBusqueda` CO/4711/11 hace al menos 1 request al transporte de datos.gov.co.
+  - `::test_deshabilitada_por_yaml_temporal_no_toca_datos_gov_co`: el par del anterior. Con una copia del YAML real con `datos_gov_co_rues.habilitado: false`, la misma búsqueda hace 0 requests a ese transporte. Es lo que antes probaba el YAML del repo, y es la prueba de que se desconecta por config.
+  - `::test_habilitada_por_yaml_temporal_da_leads_cc_by_sa`: con un YAML temporal que solo habilita `datos_gov_co_rues` (para aislarla de OSM y Croma), la misma búsqueda deja leads con `tipo_titular='juridica'`, con `lead_fuentes.licencia` y `cumplimiento.licencia` en `CC-BY-SA-4.0`, `url_origen` y `as_of` del header, y al menos una fila `socrata_descarga` en `costos` con el `tenant_id` del contexto.
   - `::test_naturales_se_guardan_como_conteo`: después de esa búsqueda, `busquedas.naturales_por_fuente == {"datos_gov_co_rues": 26304}`, y ninguna fila de `leads` ni de `fuente_cache` contiene datos de personas naturales.
   - `::test_mismo_nit_que_supersociedades_fusiona_por_regla_1`: una búsqueda con Supersociedades (fixture de la 002, NIT 900123456) seguida de otra con datos.gov.co (mismo NIT) deja 1 lead con 2 `lead_fuentes` y el `cumplimiento` original de Supersociedades.
 - `backend/tests/integration/test_costos_repo.py::test_socrata_descarga_escribe_fila_en_costos`: el adaptador, con transporte y reloj falsos y `postgres_costos` real, deja 1 fila `socrata_descarga` por request, con `unidades == Decimal(2)`, `costo_unitario` igual a `computo_seg_usd` leído como `numeric`, `gratis=false` y el `tenant_id` del contexto.
@@ -137,12 +141,10 @@ Ninguno: este slice no usa IA.
     - con `cuenta_naturales: false`, muestra "no aplica".
 
 ## Fuera del alcance
-- **Habilitarlo en producción.** Queda `habilitado: false` en el repo y en Railway. Conectarlo es una decisión de producto (PRD:55), no de este slice.
 - **Contacto.** El dataset no trae teléfono, correo, dirección ni web. Un lead solo de datos.gov.co queda `sin_canal_publicado` hasta que se fusione con OSM (regla 4 → revisión) o el 006 le encuentre un sitio.
 - **Guardar personas naturales**, aunque sea sin contactarlas: se cuentan, no se descargan (ver Skills).
 - **Paginación.** Una sola página de 5.000 (ver Decisiones técnicas).
-- **La cola de revisión de la 005** (orden de corte 10): usa la holgura de este hueco del domingo, pero no es parte de esta spec ni de su "terminado cuando".
-- **Export a Dapta con atribución (008):** si la fuente se conecta, la base que se exporta lleva datos CC BY-SA y tiene que ir con atribución y la misma licencia. Queda escrito como contrato para la 008; mientras esté `habilitado: false`, no aplica.
+- **Export a Dapta con atribución (008):** con la fuente habilitada, la base que se exporta lleva datos CC BY-SA y tiene que ir con atribución y la misma licencia. Queda escrito como contrato para la 008, que hoy no lo menciona: al estar habilitada, aplica desde que la 008 exporte un lead con `lead_fuentes` de datos.gov.co.
 - **Otros países.** El dataset es solo de CO.
 - **Tamaño (`ingresos_min`).** El dataset no lo trae; queda en `ignorados`.
 - **El E2E de la búsqueda** que la 005 delegó: es de la 012.
@@ -253,10 +255,10 @@ GET https://www.datos.gov.co/resource/c82u-588k.json
 4. **Fixtures sintéticas y filtro jurídico:** `test_query_filtra_juridicas_en_servidor`, `test_select_no_pide_columnas_de_personas`, `test_cliente_descarta_lo_que_no_debio_llegar` y `test_descartados_no_se_loguean` en rojo → verde. El **advisor revisa estos tests antes de aceptarlos**, porque son el principio VII.
 5. **Conteo de naturales:** los campos aditivos del resultado de página y `cuenta_naturales` en `MetaFuente`, `test_campos_aditivos_del_resultado` en el contrato, `test_conteo_de_naturales_sin_filas` y `test_conteo_de_naturales_falla_y_las_filas_siguen` en rojo → verde.
 6. **Resto del adaptador:** cámaras, mapeo, `as_of`, truncado, página 2, `contar`, costos, fallo, caché (con `test_conteo_fallido_no_se_cachea`), token y URL en rojo → verde. Después `test_socrata_descarga_escribe_fila_en_costos`. El **advisor revisa los tests de costos**.
-7. **Registro y contrato:** cambio de `dataset`/`filtros`/`trae` en `fuentes.yaml`, alta en el catálogo, `test_registro.py` y `test_seleccion_fuentes.py` actualizados, suite de contrato con `[datos_gov_co_rues]`: rojo → verde.
+7. **Registro y contrato:** cambio de `dataset`/`filtros`/`trae` y `habilitado: false → true` en `fuentes.yaml`, en el mismo commit, alta en el catálogo, `test_registro.py` y `test_seleccion_fuentes.py` actualizados, suite de contrato con `[datos_gov_co_rues]`: rojo → verde. Todo test de la 003 o la 005 que arme el registro desde el YAML del repo (por ejemplo, si `test_icp_colombia_completo_usa_las_dos_fuentes` lo hace) pasa a esperar también `datos_gov_co_rues` en este paso; los que usan un registro en memoria no cambian.
 8. **Migración `busquedas.naturales_por_fuente`**, CLI con `FUENTES_YAML` e integración `test_conectar_desconectar.py` (con `test_naturales_se_guardan_como_conteo`) y `test_rls.py`: rojo → verde.
 9. **Tablero:** `test_tablero_trae_naturales_por_fuente`, `test_tablero_trae_atribucion_completa` y `Tablero.test.tsx` en rojo → verde.
-10. **Una corrida real**, avisada antes, con el YAML de la demo (CO/4711/11), sin token y contra Postgres de desarrollo. Se anotan los segundos de cada request, las filas, los descartados, las naturales y el `as_of`. Si la forma difiere de la fixture, se corrige la fixture y se vuelve al paso 6. La respuesta real **no se commitea** (trae NITs reales), y solo se anotan conteos.
+10. **Una corrida real**, avisada antes, con el YAML del repo (CO/4711/11), sin token y contra Postgres de desarrollo. Se anotan los segundos de cada request, las filas, los descartados, las naturales y el `as_of`. Si la forma difiere de la fixture, se corrige la fixture y se vuelve al paso 6. La respuesta real **no se commitea** (trae NITs reales), y solo se anotan conteos.
 11. **`docs/arquitectura-backend.md`:** cómo conectar o desconectar una fuente, con este adaptador como ejemplo, y por qué la persona natural se filtra en el servidor y se cuenta. Es lo primero que se recorta.
 
 **Cuándo cortar:** si a la 1,5 h falta algo, se corta en este orden, y cada corte baja exactamente estos tests:
@@ -269,14 +271,14 @@ GET https://www.datos.gov.co/resource/c82u-588k.json
 | 4 | Las 58 cámaras | `test_yaml_real_cubre_58_camaras_y_33_departamentos` | Solo las cámaras de 11 y 25 (04, 14, 47, 58), más `test_bogota_y_cundinamarca`. Un departamento sin cámara lanza `CriterioNoSoportado`, el lado seguro. |
 | 5 | Caché | `test_cache_hit_no_hace_request`, `test_cache_no_guarda_lo_descartado`, `test_conteo_fallido_no_se_cachea` | Una request por búsqueda. La API es gratis, y el costo de cómputo queda en `costos` igual. Sin caché no hay nada guardado que filtrar. |
 
-**No se cortan:** el filtro jurídico en el servidor y su defensa en el cliente, la lista blanca del `$select`, sus tests y el de logs (principio VII); el conteo de naturales en `busquedas`; la suite de contrato; `habilitado: false` en el repo; la fixture sin red; el costo por intento (principio VIII); el token fuera de los logs; la fila de `cumplimiento` con CC BY-SA, y la atribución de la regla 11 (`test_tablero_trae_atribucion_completa` y `muestra_atribucion_odbl_y_cc_by_sa`).
+**No se cortan:** el filtro jurídico en el servidor y su defensa en el cliente, la lista blanca del `$select`, sus tests y el de logs (principio VII); el conteo de naturales en `busquedas`; la suite de contrato; `habilitado: true` en el repo y su par deshabilitado por YAML temporal; la fixture sin red; el costo por intento (principio VIII); el token fuera de los logs; la fila de `cumplimiento` con CC BY-SA, y la atribución de la regla 11 (`test_tablero_trae_atribucion_completa` y `muestra_atribucion_odbl_y_cc_by_sa`).
 
 ## Riesgos
 - **Calidad de `organizacion_juridica`:** lo declara cada cámara. Si una matriculara a una persona natural con otra organización jurídica, entraría. No es una heurística nuestra: es el dato oficial de la naturaleza de la matrícula, el mismo que decide si la persona está bajo la Ley 1581. La corrida del paso 10 revisa a mano 20 razones sociales al azar, contando cuántas parecen un nombre propio sin forma societaria (sin `S.A.S.`, `LTDA`, `S.A.` ni similares), y anota solo ese conteo. Si aparece alguna, se para y se revisa.
 - **Esquema o datos que cambian:** Confecámaras actualiza el dataset y puede renombrar columnas. La suite corre con fixture y no lo detectaría. La corrida del paso 10 es el chequeo, y el `as_of` del header queda en `cumplimiento`.
 - **Latencia de SODA:** los `count(*)` variaron entre 1 y 10 s, y cualquier `$order` pasa el minuto. Con 30 s de timeout y un reintento, el peor caso de `buscar` son ~2 min, y por eso `costo_maximo_llamada` lo refleja. Si en la demo tarda, el caché del ensayo previo la sirve.
 - **Throttling de SODA sin token:** en la verificación no apareció. Si aparece en la demo, se carga `DATOS_GOV_CO_APP_TOKEN` en el entorno local; nunca en el repo.
-- **Leads sin contacto:** como fuente sola de descubrimiento, todo lo que trae es `sin_canal_publicado`. Sirve para respaldar el descubrimiento y para la demo de conectar y desconectar, no para llenar el embudo de llamadas. Se ve en el tablero (columna `con_telefono` de la 006) y no se esconde.
+- **Leads sin contacto:** como fuente sola de descubrimiento, todo lo que trae es `sin_canal_publicado`. Aporta volumen y cobertura de pymes que Supersociedades no tiene, no contactabilidad: esa la dan OSM y `sitio_web` (006). No llena el embudo de llamadas por sí sola. Se ve en el tablero (columna `con_telefono` de la 006) y no se esconde.
 - **Sobreinclusión geográfica:** con un ICP de Cundinamarca entran negocios de Bogotá (cámara 04). El encaje ICP del 006 puede bajarlos, pero el conteo de la vista previa los incluye.
-- **Share-alike:** si la fuente se conecta, la base derivada mezcla datos CC BY-SA. Se exporta y se publica con atribución y la misma licencia (PRD:164). La 008 tiene que respetarlo antes de habilitarla.
-- **Tiempo:** el PRD le da 1 h. El conteo de naturales y las cámaras la llevan a ~2 h completa. Los cortes de la tabla la devuelven a ~1,5 h sin tocar el principio VII.
+- **Share-alike:** con la fuente habilitada, la base derivada mezcla datos CC BY-SA. Se exporta y se publica con atribución y la misma licencia (PRD:164). Con la fuente habilitada, la 008 tiene que respetarlo antes de exportar esos leads.
+- **Tiempo:** el PRD le da ~1,5–2 h, sin holgura. Completa, con el conteo de naturales y las cámaras, son ~2 h; los cortes de la tabla la dejan en ~1,5 h sin tocar el principio VII.

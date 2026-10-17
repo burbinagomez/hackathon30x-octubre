@@ -441,7 +441,7 @@ Los `ALTER DEFAULT PRIVILEGES … ON TABLES` del 002 ya cubren las vistas nuevas
 12. **`docs/arquitectura-backend.md` y `-frontend.md`:** vistas, lote = búsqueda, auth y cómo se agrega una columna al tablero. En `-frontend.md`, también la estructura por feature, la regla de límites y cuándo algo pasa a `compartido/`. También la corrección de PRD §4.
 
 **Orden de corte**, si no alcanza el tiempo:
-1. **10, la cola de revisión:** pasa al hueco de la 011 (datos.gov.co, 1 h, con holgura). Mientras tanto se resuelve por SQL, como en el 003.
+1. **10, la cola de revisión:** pasa al primer hueco libre del domingo (ya no al de la 011, que se construye el sábado antes de esta spec). Mientras tanto se resuelve por SQL, como en el 003.
 2. **9, el E2E:** pasa a la 012.
 3. **4b, palabras clave y exclusiones:** pasa a la 010. El formulario no muestra esos campos.
 4. **`v_costo_por_canal`:** pasa a la 007. La 0004 queda con 7 vistas y `test_costo_por_canal` se va con ella.
