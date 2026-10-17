@@ -149,25 +149,35 @@ def _codeql_pinneado_por_sha():
     assert not sin_sha, f"github/codeql-action sin pinnear por SHA de commit: {sin_sha}"
 
 
-ACCIONES_CI = ("actions/checkout", "actions/setup-node", "actions/upload-artifact")
+FIJADOS = ("ci.yml", "codeql.yml")
+# e2e.yml choca con el criterio de la 014, que no está en main: spec 012, Fuera del alcance, "e2e.yml sin fijar".
+SIN_FIJAR_TODAVIA = {"e2e.yml"}
 
 
 def _ci_acciones_pinneadas():
-    # Sobre el texto: el `# vX.Y.Z` es un comentario y yaml lo descarta.
-    usos = re.findall(r"uses:\s*(\S+)(.*)", (WORKFLOWS / "ci.yml").read_text())
-    nuestros = [(u, resto) for u, resto in usos if u.split("@")[0] in ACCIONES_CI]
-    assert nuestros, f"ci.yml no usa {ACCIONES_CI}"
-    sin_sha = [u for u, resto in nuestros
-               if not (re.fullmatch(r"[^@]+@[0-9a-f]{40}", u) and re.fullmatch(r"\s*#\s*v\d+\.\d+\.\d+\s*", resto))]
-    assert not sin_sha, f"sin pinnear por SHA de commit con `# vX.Y.Z` al lado: {sin_sha}"
+    # Explícito: un workflow nuevo no queda afuera en silencio.
+    todos = {w.name for w in WORKFLOWS.glob("*.yml")}
+    assert todos == set(FIJADOS) | SIN_FIJAR_TODAVIA, f"workflows sin clasificar: {sorted(todos - set(FIJADOS) - SIN_FIJAR_TODAVIA)}"
+    sin_sha = []
+    for nombre in FIJADOS:
+        for n, linea in enumerate((WORKFLOWS / nombre).read_text().splitlines(), 1):
+            # Sobre el texto: el `# vX.Y.Z` es un comentario y yaml lo descarta.
+            m = re.search(r"uses:\s*['\"]?([^\s'\"]+)['\"]?(.*)", linea)
+            if not m or m[1].startswith("./"):
+                continue
+            if not (re.fullmatch(r"[^@]+@[0-9a-f]{40}", m[1]) and re.fullmatch(r"\s*#\s*v\d+\.\d+\.\d+\s*", m[2])):
+                sin_sha.append(f"{nombre}:{n} {m[1]}")
+    assert not sin_sha, f"uses: sin SHA de commit con `# vX.Y.Z` al lado: {sin_sha}"
 
 
 def _ci_checkout_sin_credenciales():
-    checkouts = [s for s in _steps(_workflow("ci.yml")) if s.get("uses", "").startswith("actions/checkout@")]
-    assert checkouts, "ci.yml no usa actions/checkout"
-    # yaml lee `false` como bool: el string "false" no cuenta.
-    con = [s["uses"] for s in checkouts if (s.get("with") or {}).get("persist-credentials") is not False]
-    assert not con, f"{len(con)} checkout sin persist-credentials: false"
+    con = []
+    for nombre in FIJADOS:
+        checkouts = [s for s in _steps(_workflow(nombre)) if s.get("uses", "").startswith("actions/checkout@")]
+        assert checkouts, f"{nombre} no usa actions/checkout"
+        # yaml lee `false` como bool: el string "false" no cuenta.
+        con += [nombre for s in checkouts if (s.get("with") or {}).get("persist-credentials") is not False]
+    assert not con, f"checkout sin persist-credentials: false en {con}"
 
 
 # Lo que la spec promete del agente en CI: sin Bash, sin red y sin escritura.
