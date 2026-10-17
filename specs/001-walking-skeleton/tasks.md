@@ -100,7 +100,7 @@
 **Objetivo:** el back consulta la DB y el front muestra "API: ok · DB: ok".
 **Prueba independiente:** `test_health_consulta_db` + `App.test.tsx` en verde, en local.
 
-- [ ] T021 [P] [US1] 🤖 **Rojo:** `backend/tests/integration/test_health.py` contra `contracts/health.md`:
+- [X] T021 [P] [US1] 🤖 **Rojo:** `backend/tests/integration/test_health.py` contra `contracts/health.md`:
   - `::test_health_consulta_db`: como `app_rt`, 200 y `{"status":"ok","db":"ok"}`;
   - `::test_health_db_caida`: 503 y `{"status":"error","db":"error"}`, sin texto de la excepción en el body.
 - [ ] T022 [US1] 🤖 **Verde:** `/health` real en `backend/app/main.py` (`SELECT 1` por `db.py`) + CORS solo para `CORS_ORIGINS`. Borrar `backend/tests/unit/test_health_stub.py`.
