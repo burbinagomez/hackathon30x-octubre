@@ -3,7 +3,7 @@
 **Input**: [spec.md](./spec.md), [plan.md](./plan.md)
 **Prerequisites**:
 - La 002 y la 003 mergeadas en `main`, y `main` mergeado en esta rama (con merge, no rebase).
-- Las preguntas D1 a D12 de `plan.md` respondidas. D7 está pendiente del dueño, y solo bloquea T035 y T047–T049.
+- D1–D12 resueltas salvo D7 (dueño), que bloquea solo T035 (parte 005) y T047–T049.
 
 > Formato de `/speckit-tasks` aplicado a mano: `setup-plan.sh` no resuelve el feature.
 
@@ -122,7 +122,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Pa
 - [ ] T020 [Paso 5] **Verde:** en `descubrimiento/dominio/`, los campos aditivos con default:
   - `PaginaEmpresas.descartados_no_juridica: int = 0`;
   - `PaginaEmpresas.naturales_no_descargadas: int | None = None`;
-  - `MetaFuente.cuenta_naturales: bool = False`, con su origen según D2 (si va en el YAML, el loader le da default `False`).
+  - `MetaFuente.cuenta_naturales: bool = False`, leído del YAML. El loader le da default `False` si la entrada no lo declara.
   - Croma y OSM no cambian.
 - [ ] T021 [Paso 5] **Rojo:**
   - `::test_conteo_de_naturales_sin_filas`: la segunda request con `count(*)` y el `$where` de naturales sin `nit IS NOT NULL`, más `== 26304`.
@@ -166,7 +166,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Pa
 - [ ] T036 [Paso 6] **Guarda (advisor):** `backend/tests/integration/test_costos_repo.py::test_socrata_descarga_escribe_fila_en_costos`, con `postgres_costos` real, rol `app_rt` y `SET LOCAL` del tenant.
   - Valida `unidades == Decimal(2)`, el `costo_unitario` como `numeric`, `gratis=false` y el `tenant_id`.
   - **Nace verde**, porque el CHECK de `costos.tipo` de la 002 ya incluye `socrata_descarga` (plan 002, línea 210) y el adaptador ya registra desde T030.
-  - **Mutación:** registrar `unidades` como `float` (falla `== Decimal(2)`) o un `tipo` fuera del CHECK (falla la constraint) tiene que ponerlo en rojo. Se revierte.
+  - **Mutación:** registrar `unidades=0` (falla `== Decimal(2)`) o un `tipo` fuera del CHECK (falla la constraint) tiene que ponerlo en rojo. Se revierte.
 - [ ] T037 [Paso 6] El advisor revisa la guarda T036 y su mutación, hasta APRUEBA. No hay código nuevo.
 
 **Checkpoint**: `test_datos_gov_co.py` y `test_costos_repo.py` en verde. Lo que dependa de la 005 queda en xfail.
@@ -180,7 +180,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Pa
   - `test_seleccion_fuentes.py::test_datos_gov_co_habilitada_recibe_ciiu_y_departamento`, con un registro en memoria. Si nace verde, porque la 003 ya trata `departamento` como geografía, se comprueba por mutación quitando `departamento` de los filtros, lo que da `sin_geografia`.
 - [ ] T039 [P] [Paso 7] Fábrica `datos_gov_co_rues` en `backend/tests/contratos/fabricas.py`, con `MockTransport`, `filas.json` y `conteo_naturales.json`.
 - [ ] T040 [Paso 7] **Verde, en UN commit:**
-  - `fuentes.yaml` con `habilitado: true`, `dataset: c82u-588k`, `filtros: [ciiu, departamento]` y `trae: [nit, nombre, ciiu, ciudad_camara]` (más `cuenta_naturales: true` si así lo resuelve D2);
+  - `fuentes.yaml` con `habilitado: true`, `dataset: c82u-588k`, `filtros: [ciiu, departamento]`, `trae: [nit, nombre, ciiu, ciudad_camara]` y `cuenta_naturales: true`;
   - el alta en el catálogo;
   - los tests de la 003 y la 005 que leen el YAML real, actualizados según D10.
 
