@@ -334,13 +334,20 @@ def _api(**cambios) -> dict:
 
 CASOS_PROTECCION = {
     "ok": (lambda: _api(), None),
-    "falta-un-check": (lambda: _api(contexts=_requeridos()[1:]), lambda: _requeridos()[0]),
-    "sobra-un-check": (lambda: _api(contexts=[*_requeridos(), "Vercel"]), lambda: "Vercel"),
-    "sin-proteccion": (lambda: _api(sin_proteccion=True), lambda: "protection"),
-    "secret-scanning-apagado": (lambda: _api(secret_scanning="disabled"), lambda: "secret_scanning:"),
+    # La frase entera, no solo el nombre: con `comm -23` y `comm -13` invertidos, `back` sale como "sobra".
+    "falta-un-check": (lambda: _api(contexts=_requeridos()[1:]),
+                       lambda: [f"falta el required check: {_requeridos()[0]}"]),
+    "sobra-un-check": (lambda: _api(contexts=[*_requeridos(), "Vercel"]),
+                       lambda: ["sobra el required check (no está en required-checks.txt): Vercel"]),
+    "sin-proteccion": (lambda: _api(sin_proteccion=True), lambda: ["branches/main/protection: no se pudo leer"]),
+    "secret-scanning-apagado": (lambda: _api(secret_scanning="disabled"), lambda: ["secret_scanning: disabled"]),
     "push-protection-apagado": (lambda: _api(secret_scanning_push_protection="disabled"),
-                                lambda: "secret_scanning_push_protection:"),
-    "default-setup-prendido": (lambda: _api(default_setup="configured"), lambda: "default-setup"),
+                                lambda: ["secret_scanning_push_protection: disabled"]),
+    "default-setup-prendido": (lambda: _api(default_setup="configured"),
+                               lambda: ["code-scanning/default-setup: configured"]),
+    # Reporta cada motivo, no solo el primero.
+    "dos-fallas": (lambda: _api(contexts=_requeridos()[1:], default_setup="configured"),
+                   lambda: [f"falta el required check: {_requeridos()[0]}", "code-scanning/default-setup: configured"]),
 }
 
 
@@ -367,4 +374,5 @@ def test_verificar_proteccion(api, motivo, tmp_path):
     else:
         assert r.returncode != 0, f"tenía que fallar por {motivo!r} y salió 0: {salida}"
         # Que falle por esto y no por otra cosa: la salida se pega en docs/seguridad.
-        assert motivo in salida, f"falló sin nombrar {motivo!r}: {salida}"
+        faltan = [m for m in motivo if m not in salida]
+        assert not faltan, f"falló sin nombrar {faltan!r}: {salida}"
