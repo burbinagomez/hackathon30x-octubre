@@ -303,4 +303,4 @@ Está ordenado por corte: las tareas 1–8 son el mínimo (corte 1), y cada bloq
 
 ## Pendiente al implementar
 - **"Se aplica hasta la `0005`"** (tests de migración): el test copia `0001`–`0005` a `tmp_path` y migra con `_migrar(url, migraciones)` de `tests/arquitectura/test_migraciones.py`, que pasa `MIGRACIONES`. Después suma la `0006`, y en el merge 2 la `0007`. `migrar_local.sh` aplica todo lo que encuentra en el directorio.
-- **Perfil del remitente:** `sembrar_tenant.py` suma `--firmante` y `--finalidad`, que entran por prompt, sobre un tenant que ya existe. Depende de que el script de la 002 haga upsert por `id`.
+- **Perfil del remitente:** `sembrar_tenant.py` suma `--firmante` y `--finalidad`, que entran por prompt, sobre un tenant que ya existe. Depende de que el script de la 002 haga upsert por `id`. Ese upsert pisa `nombre` e `idioma`: la corrida que suma el perfil los repite, o el upsert pasa a `SET col = COALESCE(EXCLUDED.col, tenants.col)` para los campos que no se pasan.

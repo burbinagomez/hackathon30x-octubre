@@ -115,7 +115,10 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
   - `::test_tenant_no_sobrevive_al_commit`: usa la unidad de trabajo real sobre el engine de `app_rt`, no un `SET LOCAL` escrito en el test. Dentro de la unidad de trabajo, `current_setting('app.tenant_id', true)` es el tenant; después del commit, en la misma conexión, es vacío o `NULL`. Prueba que el código usa `SET LOCAL` y no `SET` de sesión.
   - Que `app_rt` no tiene `BYPASSRLS` ya lo prueba `test_rol_runtime` del 001.
 - `backend/tests/arquitectura/test_migraciones.py::test_migrar_local_desde_vacio_dos_veces_sin_drift` (del 001): hoy afirma `_aplicadas(base_vacia) == "0001"`, así que la `0002` lo pone en rojo. Se cambia ese assert para comparar contra las versiones de `supabase/migrations/*.sql`, ordenadas y unidas por coma. Así ninguna migración siguiente lo vuelve a romper. Lo que prueba no cambia: desde vacío, dos corridas, sin drift y todas las migraciones registradas.
-- `backend/tests/integration/test_sembrar_tenant.py::test_sembrar_dos_veces_mismo_id_actualiza`: con `postgres`, sembrar el mismo `id` dos veces con otro `nombre` deja 1 fila en `tenants` con el `nombre` nuevo, y la segunda corrida no falla. El test llama a la función de siembra con una conexión, no al prompt de `getpass`.
+  - La ruta sale del mismo default que `migrar_local.sh` (`BACKEND.parent / "supabase" / "migrations"`, sin pasar `MIGRACIONES`); la versión es lo que va antes del primer `_`, y el orden es de texto, como el `ORDER BY version` de `_aplicadas`.
+- `backend/tests/integration/test_sembrar_tenant.py`:
+  - `::test_sembrar_dos_veces_mismo_id_actualiza`: con `postgres`, la segunda siembra del mismo `id` cambia `nombre` e `idioma` (`'es'` → `'en'`) y no falla. Queda 1 fila con ese `id`, con el `nombre` y el `idioma` nuevos. El test llama a la función de siembra con una conexión, no al prompt de `getpass`.
+  - `::test_no_imprime_la_url_de_postgres`: `getpass` se reemplaza con monkeypatch por una URL con una password marcadora y host inalcanzable, y se corre el `main`. El exit code es distinto de 0 y la password no aparece ni en stdout ni en stderr (`capsys`).
 
 ## Fuera del alcance
 - **003:** OSM, normalización entre fuentes, dedup por dominio, teléfono o nombre difuso, y DIAN Trade.
@@ -189,7 +192,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUEN
    - `supabase_simulado.sql` en CI primero, para que los tests de privilegios nazcan en rojo;
    - `test_unico_…`, `test_lead_persistido_conserva_tipo_titular`, `test_rls[…]` y los 3 de `test_privilegios_supabase.py` en rojo → verde;
    - con la `0002` en el repo, `test_migrar_local_desde_vacio_dos_veces_sin_drift` queda en rojo por el `== "0001"`; se cambia el assert a las versiones de `supabase/migrations/*.sql` y vuelve a verde;
-   - `test_sembrar_dos_veces_mismo_id_actualiza` en rojo → `sembrar_tenant.py` con upsert → verde;
+   - los 2 de `test_sembrar_tenant.py` en rojo → `sembrar_tenant.py` con upsert → verde;
    - el **advisor revisa los tests de RLS y de privilegios antes de aceptarlos**.
 4. **`postgres_costos`:** `test_todo_adaptador_de_registro_recibe_registro_costos` en rojo → verde.
 5. **Adaptador `croma_supersociedades_co`** con la fixture sintética:
