@@ -35,6 +35,8 @@ jobs:
         run: |
           psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f scripts/roles.sql
           psql -h localhost -U postgres -v ON_ERROR_STOP=1 -c "ALTER ROLE app_rt PASSWORD 'rt-ci'"
+      - name: supabase_simulado.sql (anon y authenticated, peor caso)
+        run: psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f scripts/supabase_simulado.sql
       # Como superusuario, igual que `supabase db push` en prod (corre como postgres).
       - name: supabase/migrations desde vacío
         run: scripts/migrar_local.sh postgresql://postgres@localhost:5432/postgres
