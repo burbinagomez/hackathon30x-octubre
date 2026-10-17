@@ -1,11 +1,14 @@
 import base64
 import json
 import os
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+
+DOCKERFILE_WEB = Path(__file__).resolve().parents[3] / "frontend" / "Dockerfile"
 
 
 def _jwt(payload: dict) -> str:
@@ -64,3 +67,10 @@ def test_jwt_malformado_no_filtra_el_valor(entorno, caplog, capsys):
 
 def test_app_arranca_con_entorno_limpio(entorno):
     _arrancar()
+
+
+def test_dockerfile_web_solo_recibe_vite_api_url():
+    # Railway solo pasa al build lo declarado como ARG: lo único que puede llegar al bundle.
+    lineas = DOCKERFILE_WEB.read_text().splitlines()
+    args = {l.split()[1].split("=")[0] for l in lineas if l.strip().upper().startswith("ARG ")}
+    assert args == {"VITE_API_URL"}
