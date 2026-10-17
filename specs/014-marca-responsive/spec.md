@@ -8,11 +8,11 @@
 - **El equipo:** los slices con UI arrancan con tokens, tipografía y una regla responsive ya escrita y con su test, en vez de decidir colores y breakpoints cada uno.
 
 ## Qué hace
-- **Tokens** de Dapta como variables CSS en `:root`, en `frontend/src/tokens.css`: acento `#CBE850`, oscuro `#1A1A1C`, fondo `#FFFFFF`, gris `#9B9999`. Ningún archivo de `src/` fuera de `tokens.css` escribe estos hex: usa la variable. `tokens.css` se importa en `main.tsx`, no en `App.tsx`.
-- **Tipografía:** DM Sans para texto (en `body`) y Poppins para títulos, con la regla `h1, h2, h3, h4, h5, h6 { font-family: Poppins, … }`. La página de health no suma título visible: la regla queda lista para los slices siguientes. Las fuentes se cargan desde Google Fonts en `frontend/index.html`, con `<link rel="preconnect">` y `display=swap`.
+- **Tokens** de Dapta como variables CSS en `:root`, en `frontend/src/tokens.css`: `--color-acento: #CBE850`, `--color-oscuro: #1A1A1C`, `--color-fondo: #FFFFFF`, `--color-gris: #9B9999`, `--fuente-titulos` (Poppins) y `--fuente-texto` (DM Sans). Ningún archivo de `src/` fuera de `tokens.css` escribe estos hex: usa la variable. `tokens.css` se importa en `main.tsx`, no en `App.tsx`.
+- **Tipografía:** DM Sans para texto (en `body`) y Poppins para títulos, con la regla `h1, h2, h3, h4, h5, h6 { font-family: var(--fuente-titulos) }`. La página de health no suma título visible: la regla queda lista para los slices siguientes. Las fuentes se cargan desde Google Fonts en `frontend/index.html`, con `<link rel="preconnect">` y `display=swap`.
 - **Viewport:** `index.html` suma `<meta name="viewport" content="width=device-width, initial-scale=1">`. Sin esa línea, un navegador móvil dibuja la página en un layout de ~980 px y el test de móvil no mide lo que debe.
 - **Contraste:** el lima nunca va como color de texto sobre blanco (no llega a contraste legible). Va de fondo con texto `#1A1A1C` encima, o como texto/acento sobre el oscuro.
-- **`body`** usa los tokens: fondo `var(--…fondo)`, texto `var(--…oscuro)`, fuente DM Sans. El texto visible no cambia ("API: ok · DB: ok"): `App.test.tsx` y `e2e/health.spec.ts` siguen pasando sin tocarlos.
+- **`body`** usa los tokens: `background: var(--color-fondo)`, `color: var(--color-oscuro)`, `font-family: var(--fuente-texto)`. El texto visible no cambia ("API: ok · DB: ok"): `App.test.tsx` y `e2e/health.spec.ts` siguen pasando sin tocarlos.
 - **`vite.config.ts`** suma `test.css: { include: [/\?raw/] }`. Con la config actual, el plugin `vitest:css-disable` vacía todo CSS, así que `import t from "./tokens.css?raw"` da vacío y cualquier aserción negativa nacería verde. Sin dependencias nuevas.
 
 ## Regla transversal: responsive en todo slice con UI
@@ -42,9 +42,9 @@ Vale para este slice y para todos los siguientes que toquen UI. Cada uno la cump
   - **canario:** `page.evaluate` agrega un `div` de 2000 px de ancho y se espera `scrollWidth > clientWidth`. Prueba que la medición detecta el desborde.
   - En `test.use` van solo `viewport`, `isMobile` y `hasTouch`, sin spread de `devices[...]`: trae `defaultBrowserType: "webkit"` y el único proyecto es chromium. Nada se fija en `playwright.config.ts`.
 - `frontend/src/marca.test.ts` (archivo nuevo, Vitest), solo lo estático:
-  - `tokens.css` (vía `?raw`) define en `:root` las cuatro variables con sus hex;
+  - `tokens.css` (vía `?raw`) define en `:root` las seis variables: los cuatro `--color-*` con sus hex, `--fuente-titulos` con Poppins y `--fuente-texto` con DM Sans;
   - `index.html` (vía `?raw`) tiene el meta viewport, el `preconnect` y los `<link>` de Poppins y DM Sans con `display=swap`;
-  - la regla de `h1`–`h6` con Poppins existe en el CSS;
+  - la regla de `h1`–`h6` usa `var(--fuente-titulos)`;
   - **hex prohibidos:** `import.meta.glob("./**/*.{ts,tsx,css}", { query: "?raw", import: "default", eager: true })`, sin `tokens.css` ni el propio `marca.test.ts`; ningún archivo matchea `/#(cbe850|1a1a1c|fff(fff)?|9b9999)\b/i` (cubre `#fff` corto).
   - Hoy falla: `tokens.css` no existe y `index.html` no tiene ni meta ni fuentes.
 
@@ -58,7 +58,7 @@ E2E_BASE_URL=http://localhost:4173 npx playwright test e2e/marca-responsive.spec
 Solo ese archivo: `health.spec.ts` contra `vite preview` falla porque no hay API detrás. Sin API, la página muestra "API: error · DB: error": coincide con `/^API:/` y para medir el layout alcanza. En `e2e.yml`, el archivo nuevo corre también contra Railway, junto a `health.spec.ts`.
 
 ## Criterios de aceptación
-- [ ] `frontend/src/tokens.css` existe, define en `:root` las cuatro variables y se importa en `main.tsx`.
+- [ ] `frontend/src/tokens.css` existe, define en `:root` las seis variables y se importa en `main.tsx`.
 - [ ] `index.html` tiene el `<meta name="viewport">`, el `preconnect` y los `<link>` de Poppins y DM Sans con `display=swap`.
 - [ ] `vite.config.ts` tiene `test.css: { include: [/\?raw/] }`.
 - [ ] `marca-responsive.spec.ts` pasa en los tres viewports, con el canario; antes del cambio falló en los móviles.
@@ -85,6 +85,7 @@ Solo ese archivo: `health.spec.ts` contra `vite preview` falla porque no hay API
 5. **Contraste:** en el e2e, ningún texto visible en `rgb(203, 232, 80)`.
 6. **Google Fonts:** aceptable para el demo, con `preconnect` y `display=swap`; lo revisa `security` en el PR.
 7. **Título:** sin título visible; regla `h1`–`h6` con Poppins, asertada en Vitest.
+8. **Nombres de las variables:** en español, con prefijo por tipo: `--color-acento`, `--color-oscuro`, `--color-fondo`, `--color-gris`, `--fuente-titulos`, `--fuente-texto`.
 
 ## Preguntas abiertas
-1. **Nombres de las variables CSS.** La spec fija los cuatro valores pero no los nombres (`--color-acento`, `--dapta-lima`…). `marca.test.ts` los asierta, así que hay que fijarlos antes del test rojo.
+Ninguna.
