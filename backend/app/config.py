@@ -2,6 +2,7 @@ import base64
 import binascii
 import json
 import os
+from urllib.parse import urlsplit
 
 from pydantic_settings import BaseSettings
 
@@ -30,13 +31,25 @@ def _rol_jwt(valor: str) -> str | None:
     return payload.get("role") if isinstance(payload, dict) else None
 
 
+def _es_postgres(valor: str) -> bool:
+    # postgres o postgres.<ref> (pooler): el superusuario de `supabase db push`, que saltea RLS.
+    try:
+        url = urlsplit(valor)
+    except ValueError:
+        return False
+    return url.scheme.startswith("postgres") and (url.username or "").split(".")[0] == "postgres"
+
+
 def verificar_entorno() -> None:
     """Corta el arranque si api ve un secret que no le corresponde. Nombra la variable, nunca el valor."""
     for nombre, valor in os.environ.items():
         if (
+            # Nombre de la era app_mig: se queda por si llega desde una guía o un Railway viejo.
             nombre == "MIGRATION_DATABASE_URL"
             or nombre.startswith("SUPABASE_")
             or valor.startswith(PREFIJOS_PROHIBIDOS)
             or _rol_jwt(valor) in ROLES_SUPABASE
+            # Solo la conexión de api: los tests de integración tienen su admin en otra variable.
+            or (nombre == "DATABASE_URL" and _es_postgres(valor))
         ):
             raise SecretProhibido(f"{nombre} no puede estar en el entorno de api")
