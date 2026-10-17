@@ -214,3 +214,10 @@ Vuelta sobre el rojo de T020 (`6fd7c09`, APRUEBA, sin HIGH):
 - [X] H6 MEDIUM (`test_leads_repo.py:85-93`, `EMPRESA` en :13-17): un Verde con `'juridica'` fijo pasaba `test_lead_persistido_conserva_tipo_titular`. Ahora se parametriza `tipo_titular` en `juridica` y `desconocido`, y se aserta que se guarda tal cual. Absorbido en T020 antes del Verde.
 - [ ] H7 MEDIUM (`repositorio_leads.py:24-25`): `cerrar_busqueda` no tenía test de integración, y un no-op dejaba verde toda la suite. Va como `test_cerrar_busqueda_guarda_estado` en T021, con su rojo antes de implementarlo.
 - [X] H8 LOW (`test_leads_repo.py:90` y :93): el SELECT de `cumplimiento` no leía `as_of`, y un Verde con `now()` pasaba. Ahora se lee y se compara con `EMPRESA.as_of`. Absorbido en T020.
+
+Vuelta sobre el rojo de T024 (`0fd2b05`, APRUEBA, sin HIGH):
+
+- [X] H9 MEDIUM (`test_costos_repo.py:59-62` y :65-68): un Verde sin `WHERE proveedor` pasaba los contadores. Ahora cada contador siembra una fila de `proveedor='osm'` dentro de la ventana o del mes, y los esperados siguen siendo 1 y 11. Absorbido en T024.
+- [X] H10 MEDIUM (:69-75): nada probaba que el `SET TIME ZONE` del listener se aplicara. Ahora se aserta `SHOW TIME ZONE == 'America/Bogota'` antes del assert del contador. Absorbido en T024.
+- [X] H11 LOW (:93-96): la verificación de `registrar` no leía `canal` ni `lead_id`. Ahora se leen, con un `lead_id` no nulo en la operación. Absorbido en T024.
+- [ ] H12 LOW (borde de cambio de mes): si el test corre justo en el cambio de mes UTC, entre la siembra y la consulta, el inicio de mes calculado puede cambiar. Se anota y no se arregla.
