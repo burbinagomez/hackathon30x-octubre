@@ -148,22 +148,69 @@ def _codeql_pinneado_por_sha():
     assert not sin_sha, f"github/codeql-action sin pinnear por SHA de commit: {sin_sha}"
 
 
+# Lo que la spec promete del agente en CI: sin Bash, sin red y sin escritura.
+PROHIBIDAS = {"Bash", "Edit", "Write", "WebFetch", "WebSearch"}
+
+
+def _problemas_revision(job: dict) -> list[str]:
+    """Reglas del job revision-seguridad. Cada problema empieza con su clave, para que el test sepa cuál saltó."""
+    problemas = []
+    cond = " ".join(str(job.get("if", "")).split())
+    cond = re.sub(r"^\$\{\{\s*(.*?)\s*\}\}$", r"\1", cond)  # `${{ x }}` y `x` son el mismo if para GitHub
+    runs = "\n".join(s.get("run", "") for s in job.get("steps", []))
+    permitidas = re.findall(r"--allowedTools[ =]['\"]?([^\s'\"]+)", runs)
+    # --allowedTools solo preaprueba: no saca nada. Lo que no se puede usar lo saca --disallowedTools.
+    prohibidas = {t for v in re.findall(r"--disallowedTools[ =]['\"]?([^\s'\"]+)", runs) for t in v.split(",")}
+    bypass = [b for b in ("dangerously-skip-permissions", "bypassPermissions") if b in runs]
+    if cond != "github.event_name == 'pull_request'":
+        problemas.append(f"if: tiene que correr solo en PR, es {cond!r}")
+    if "veredicto_security.sh" not in runs:
+        problemas.append("veredicto: la salida no pasa por veredicto_security.sh")
+    if permitidas != ["Read,Grep,Glob"]:
+        problemas.append(f"allowed: --allowedTools tiene que ser Read,Grep,Glob: {permitidas}")
+    if not PROHIBIDAS <= prohibidas:
+        problemas.append(f"disallowed: --disallowedTools sin {sorted(PROHIBIDAS - prohibidas)}")
+    if bypass:
+        problemas.append(f"bypass: no puede saltear permisos: {bypass}")
+    if not re.search(r"@anthropic-ai/claude-code@\d+\.\d+\.\d+(?![\w.-])", runs):
+        problemas.append("pin: la CLI de claude no está pinneada a versión exacta")
+    return problemas
+
+
+def _job_revision(si="github.event_name == 'pull_request'", instalar="@anthropic-ai/claude-code@2.1.0",
+                  permitidas="--allowedTools Read,Grep,Glob",
+                  prohibidas="--disallowedTools Bash,Edit,Write,WebFetch,WebSearch",
+                  extra="", veredicto="| .github/scripts/veredicto_security.sh") -> dict:
+    return {"if": si, "steps": [
+        {"run": f"npm install -g {instalar}"},
+        {"run": f'claude -p "$PROMPT" {permitidas} {prohibidas} {extra} {veredicto}'},
+    ]}
+
+
+CASOS_REVISION = {
+    "bueno": (_job_revision(), []),
+    "if-con-push": (_job_revision(si="github.event_name == 'push'"), ["if"]),
+    "if-envuelto-con-and": (_job_revision(si="${{ github.event_name == 'pull_request' && true }}"), ["if"]),
+    "sin-veredicto": (_job_revision(veredicto="> reporte.md"), ["veredicto"]),
+    "allowed-con-bash": (_job_revision(permitidas="--allowedTools Read,Grep,Glob,Bash"), ["allowed"]),
+    "sin-disallowed": (_job_revision(prohibidas=""), ["disallowed"]),
+    "disallowed-solo-bash": (_job_revision(prohibidas="--disallowedTools Bash"), ["disallowed"]),
+    "bypass": (_job_revision(extra="--permission-mode bypassPermissions"), ["bypass"]),
+    "cli-latest": (_job_revision(instalar="@anthropic-ai/claude-code@latest"), ["pin"]),
+}
+
+
+@pytest.mark.parametrize("job, esperado", CASOS_REVISION.values(), ids=CASOS_REVISION.keys())
+def test_reglas_de_revision_seguridad(job, esperado):
+    # Cada caso malo rompe una sola regla: si la regla se borra, su caso falla.
+    assert [p.split(":")[0] for p in _problemas_revision(job)] == esperado
+
+
 def _revision_seguridad():
     job = _workflow("ci.yml")["jobs"].get("revision-seguridad")
     assert job, "ci.yml no tiene el job revision-seguridad"
-    cond = " ".join(str(job.get("if", "")).split())
-    cond = re.sub(r"^\$\{\{\s*(.*?)\s*\}\}$", r"\1", cond)  # `${{ x }}` y `x` son el mismo if para GitHub
-    assert cond == "github.event_name == 'pull_request'", f"revision-seguridad tiene que correr solo en PR: if={cond!r}"
-    runs = "\n".join(s.get("run", "") for s in job.get("steps", []))
-    assert "veredicto_security.sh" in runs, "revision-seguridad no pasa la salida por veredicto_security.sh"
-    herramientas = re.findall(r"--allowedTools[ =]['\"]?([^\s'\"]+)", runs)
-    assert herramientas == ["Read,Grep,Glob"], f"--allowedTools tiene que ser Read,Grep,Glob, sin Bash: {herramientas}"
-    # --allowedTools solo preaprueba: no saca Bash. Lo saca --disallowedTools, y ningún bypass lo reabre.
-    prohibidas = re.findall(r"--disallowedTools[ =]['\"]?([^\s'\"]+)", runs)
-    assert any("Bash" in p.split(",") for p in prohibidas), f"--disallowedTools tiene que incluir Bash: {prohibidas}"
-    bypass = [b for b in ("dangerously-skip-permissions", "bypassPermissions") if b in runs]
-    assert not bypass, f"revision-seguridad no puede saltear permisos: {bypass}"
-    assert re.search(r"@anthropic-ai/claude-code@\d+\.\d+\.\d+(?![\w.-])", runs), "la CLI de claude no está pinneada a versión exacta"
+    problemas = _problemas_revision(job)
+    assert not problemas, f"revision-seguridad: {problemas}"
 
 
 @pytest.mark.parametrize("chequeo", [

@@ -151,7 +151,7 @@ Sin evals nuevos: la 012 no suma componentes con LLM al producto. El job `revisi
   - `dependabot.yml` tiene los 4 ecosistemas (uv, npm, github-actions, docker);
   - `ci.yml` corre `pip-audit`, `npm audit --audit-level=high` y gitleaks (repuesto por la 012, ver Decisiones técnicas). Nace rojo en `main`, porque el step no está;
   - `codeql.yml` analiza `python` y `javascript-typescript`;
-  - `revision-seguridad` existe y corre solo en `pull_request`.
+  - `revision-seguridad` existe y corre solo en `pull_request`. Su `run` pasa la salida por `veredicto_security.sh`, usa `--allowedTools Read,Grep,Glob` exacto y `--disallowedTools` con al menos `Bash,Edit,Write,WebFetch,WebSearch`, no lleva `dangerously-skip-permissions` ni `bypassPermissions`, y la CLI va pinneada a versión exacta (`@anthropic-ai/claude-code@X.Y.Z`). Las reglas viven en `_problemas_revision` y se prueban con un job fijo por regla (`::test_reglas_de_revision_seguridad`).
 - `::test_revision_seguridad_es_fail_closed`: el script de parseo del veredicto (`.github/scripts/veredicto_security.sh`) sale 0 solo con una línea exacta `Veredicto: PASA` o `Veredicto: PASA CON OBSERVACIONES`. Con `BLOQUEA`, sin línea, con salida vacía, con el veredicto dentro de un bloque de código o con dos líneas `Veredicto:` (aunque una diga `PASA`), sale ≠ 0.
   - Contrato: lee el reporte por **stdin** (`claude -p ... | .github/scripts/veredicto_security.sh`) y CI lo invoca directo, con shebang y `+x`, como `check_imagen.sh`.
   - Una línea `Veredicto:` dentro de un bloque de código (cercado con ``` o con 4 espacios de sangría) no cuenta, ni para pasar ni para bloquear.
@@ -249,7 +249,7 @@ Va en el job `seguridad`, que ya es required check. No se reemplaza por otra her
 **`revision-seguridad`** (job nuevo en `ci.yml`, solo en `pull_request`):
 - Corre `claude -p` en modo headless, con la CLI pinneada a una versión exacta `# [VALIDAR]` la del día.
 - El prompt es el del agente `security` (`.claude/agents/security.md`) sobre `git diff ${BASE}..${HEAD}`.
-- Usa `--allowedTools Read,Grep,Glob`: **sin Bash, sin red y sin escritura**. Un diff con prompt injection puede, como mucho, torcer el veredicto. No puede exfiltrar `ANTHROPIC_API_KEY` ni tocar el repo.
+- Usa `--allowedTools Read,Grep,Glob` y `--disallowedTools Bash,Edit,Write,WebFetch,WebSearch`, sin `--dangerously-skip-permissions` ni `--permission-mode bypassPermissions`: **sin Bash, sin red y sin escritura**. `--allowedTools` solo preaprueba herramientas y no saca ninguna; las saca `--disallowedTools`. Un diff con prompt injection puede, como mucho, torcer el veredicto. No puede exfiltrar `ANTHROPIC_API_KEY` ni tocar el repo.
 - Es fail-closed: `veredicto_security.sh` pasa solo con la línea exacta (ver Terminado cuando). El reporte completo queda como artefacto del job y en el summary.
 - `ANTHROPIC_API_KEY` es de una **cuenta nueva del evento** (CLAUDE.md: nada de otros proyectos), como secret del repo.
 - Los PRs desde forks no reciben secrets y el job falla cerrado. Es aceptable: en el evento no hay forks.
