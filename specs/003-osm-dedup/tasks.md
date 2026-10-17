@@ -1,7 +1,7 @@
 # Tasks: 003 — OSM Overpass, normalización común y dedup en 4 niveles
 
 **Input**: [spec.md](./spec.md), [plan.md](./plan.md)
-**Prerequisites**: ya no es "002 mergeado entero". Cada tarea [MIN] dice de qué tareas de la 002 depende (IDs de `specs/002-puertos-registro-supersociedades/tasks.md` en `08c2835`), o "ya" si arranca hoy. Las preguntas P1–P11 están cerradas en `plan.md` (sección Preguntas abiertas), contra el plan 002 en `89d3e59` y las enmiendas de la spec 003 §Puertos.
+**Prerequisites**: ya no es "002 mergeado entero". Cada tarea [MIN] dice de qué tareas de la 002 depende (IDs de `specs/002-puertos-registro-supersociedades/tasks.md` en `main` `168f4b9`), o "ya" si arranca hoy. Las preguntas P1–P11 están cerradas en `plan.md` (sección Preguntas abiertas), contra el plan 002 en `89d3e59` y las enmiendas de la spec 003 §Puertos.
 
 > Formato de `/speckit-tasks` aplicado a mano (`setup-plan.sh` no resuelve el feature).
 
@@ -68,7 +68,7 @@ Dudosa: **limitador y reintento a Pulido.** El [MIN] hace una sola query por bú
 
 ## Fase 4: Registro y contrato (Paso 8)
 
-- [ ] T047 [MIN] [Paso 8] **Rojo:** `backend/tests/unit/descubrimiento/test_registro.py::test_osm_overpass_carga_con_el_catalogo_real`. Con `fuentes.yaml` real y el catálogo real, `osm_overpass` tiene que estar en `registro.fuentes` y no en `sin_implementacion`. Falla por assert mientras no esté en el catálogo. Es un test nuevo, porque `test_carga_config_fuentes_yaml_real_sin_error` sigue en `xfail(strict)` hasta 002 T031 (Croma, al final); su cambio va a `T047p`. — ya (002 T009)
+- [ ] T047 [MIN] [Paso 8] **Rojo:** `backend/tests/unit/descubrimiento/test_registro.py::test_osm_overpass_carga_con_el_catalogo_real`. Con `fuentes.yaml` real y el catálogo real, `osm_overpass` tiene que estar en `registro.fuentes` y no en `sin_implementacion`. Falla por assert mientras no esté en el catálogo. Es un test nuevo, porque `test_carga_config_fuentes_yaml_real_sin_error` sigue en `xfail(strict)` hasta 002 T031 (Croma); su cambio va a `T047p`. — ya (002 T009)
 - [ ] T048 [MIN] [Paso 8] **Verde:** `osm_overpass` en el catálogo de `infraestructura/adaptadores/__init__.py`. `config/fuentes.yaml` no cambia (la entrada ya está con `habilitado: true`). El `xfail(strict)` del 002 sigue en xfail, porque Croma todavía falta. Si 002 T034 ya existe, `test_hay_fabrica_para_cada_clave_del_catalogo` pasa a rojo hasta T048b. Choca con 002 T031 en una línea del mismo dict: se resuelve dejando las dos claves. — ya
 - [ ] T048b [MIN] [Paso 8] **Verde:** fábrica `osm_overpass` en `backend/tests/contratos/fabricas.py` (`fabrica(transporte, registro)`, con transporte falso sobre la fixture de `tests/fixtures/osm/`). Corren los tres tests de contrato con `[osm_overpass]`; `::test_rechaza_criterio_no_soportado[osm_overpass]` usa la centinela `"__criterio_inexistente__"` del 002 (002 plan:160). — 002: T034, T035
 
@@ -89,7 +89,7 @@ Dudosa: **T048b es [MIN] aunque el flujo funcione sin ella**, porque todo adapta
 
 ## Fase 6: CLI y corrida real (Paso 10)
 
-- [ ] T052 [MIN] [Paso 10] **Rojo + Verde:** `backend/tests/unit/test_cli.py::test_ciudad_llega_a_los_criterios`. Con `catalogo={"osm_overpass": FuenteFalsa}`, `--ciudad Bogotá` llega en `criterios.filtros["ciudad"]`. El rojo es por mutación: primero `--ciudad` entra en `argparse` sin pasar a los criterios, y falla el assert. Después, el verde en `app/cli.py`. El resumen detallado va a `T052p`. — 002: T040, T041, y T047 (tarifa en `Decimal`; T047 solo depende de T041)
+- [ ] T052 [MIN] [Paso 10] **Rojo + Verde:** `backend/tests/unit/test_cli.py::test_ciudad_llega_a_los_criterios`. Con `catalogo={"osm_overpass": FuenteFalsa}`, `--ciudad Bogotá` llega en `criterios.filtros["ciudad"]`. El rojo es por mutación: primero `--ciudad` entra en `argparse` sin pasar a los criterios, y falla el assert. Después, el verde en `app/cli.py`. El resumen detallado va a `T052p`. — 002: T040, T041 (en `main`, T041 ya lee `tarifas.yaml` con `Decimal(str(v))`)
 - [ ] T053 [MIN] [Paso 10] **Una** corrida real contra Overpass (Bogotá, 4711), **avisada antes**. Se anotan los segundos, los elementos y el `name` real de la relación de Bogotá, sin copiar ningún dato de contacto. Si difiere de la fixture, se corrige la fixture y se vuelve a la Fase 3. Dudosa: es [MIN] porque la fixture es sintética, y sin una corrida real no está probado que OSM devuelva leads. — 002: T041 (vía T052)
 
 ---
@@ -153,7 +153,7 @@ Va después del [MIN], en este orden de bloques. **El bloque P1 entra entero o n
 - [ ] T044p [Paso 7] **Verde:** limitador con reloj y `sleep` inyectables, un reintento ante 429/504, `PaginaEmpresas` con `truncado` y `descartados_sin_nombre` (con default).
 - [ ] T052p [Paso 10] Resumen por fuente completo en la CLI (fusionados por regla, en revisión, descartados, truncado, "0 elementos: revisar `--ciudad`").
 
-### P4: Croma (va al final, como la 002)
+### P4: Croma (después de 002 T030/T031)
 
 - [ ] T045 [P] [Paso 7] **Rojo:** `test_croma_supersociedades.py::test_mapea_geo` y `::test_registro_no_trae_canal_publicado` (con sabotaje). — 002: T030
 - [ ] T046 [Paso 7] **Verde:** `croma_supersociedades.py` mapea `geo` y deja los canales en `None`.
@@ -174,14 +174,15 @@ Va después del [MIN], en este orden de bloques. **El bloque P1 entra entero o n
   - T016a y T016b esperan 002 T038 y T039.
   - T051 va después de T016b.
   - T048b espera 002 T034 y T035, o que se adelanten con OSM (ver la dudosa de la Fase 4).
-  - T052 espera 002 T040, T041 y T047.
+  - T052 espera 002 T040 y T041.
+  - En `main`, 002 T038 depende de T021 **y de T031 (Croma)**, así que T016a/b, T049, T051, T052 y T053 esperan a Croma de forma indirecta. Esto cambia si la 002 reordena para que su caso de uso no espere a Croma.
   - T053 va después de T052.
   - T055 cierra.
 - **Dónde se pueden pisar con la 002:**
   - `adaptadores/__init__.py` (T048 y 002 T031): una línea, se dejan las dos claves.
   - `cubre()` y `ejecutar_busqueda.py` (T016a/b y 002 T038/T039): por eso T016a/b esperan.
   - `test_costos_repo.py` (T042 y 002 T024/T026/T032): T042 suma un test al archivo de la 002, no lo crea.
-  - `test_cli.py` (T052 y 002 T040/T046): T052 suma un test.
+  - `test_cli.py` (T052 y 002 T040): T052 suma un test.
 - **Pulido:**
   - P1 entra entero, y T040p necesita T007 de P2 para el host compartido.
   - En P2, T021a–T022, T019–T020 y T023a (P1) van en la misma `0003`: una migración en el PR de Pulido.
