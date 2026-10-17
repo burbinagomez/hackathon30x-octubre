@@ -112,3 +112,10 @@ def test_crear_busqueda_se_confirma_antes(rt, admin, tenants):
         fila = c.execute(text("SELECT tenant_id, pais, estado FROM busquedas WHERE id = :id"),
                          {"id": busqueda_id}).one_or_none()
     assert fila == (tenants["a"], "CO", "creada")
+
+
+def test_cerrar_busqueda_guarda_estado(rt, admin, tenants):
+    repo = RepositorioLeadsPostgres(rt, tenants["a"])
+    busqueda_id = repo.crear_busqueda(CriteriosICP(pais="CO", filtros={}))
+    repo.cerrar_busqueda(busqueda_id, "con_errores")
+    assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=busqueda_id) == "con_errores"
