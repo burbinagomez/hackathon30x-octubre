@@ -37,7 +37,7 @@
 **⚠️ Ningún trabajo de US1 empieza antes de que esta fase esté verde.**
 
 ### Tarea 1: import-linter
-- [ ] T008 🤖 **Rojo:** `backend/tests/arquitectura/test_import_linter.py::test_detecta_import_prohibido`. Un canario en `tmp_path` con `import googlemaps`, corrido con `lint-imports --config <tmp>`, debe dar exit ≠ 0 nombrando el contrato `forbidden`. Junto a `::test_repo_cumple_contratos` (el repo real da exit 0).
+- [X] T008 🤖 **Rojo:** `backend/tests/arquitectura/test_import_linter.py::test_detecta_import_prohibido`. Un canario en `tmp_path` con `import googlemaps`, corrido con `lint-imports --config <tmp>`, debe dar exit ≠ 0 nombrando el contrato `forbidden`. Junto a `::test_repo_cumple_contratos` (el repo real da exit 0).
 - [ ] T009 🤖 **Verde:** contrato `forbidden` en `[tool.importlinter]` de `backend/pyproject.toml`, sobre `app`, contra `googlemaps`, `linkedin*`, `instaloader` y `facebook*`, con `include_external_packages = true`. Verificar contra la versión instalada que los wildcards andan; si no, nombres explícitos (R4).
 
 ### Tarea 2: guard de arranque y Dockerfile de `web`
