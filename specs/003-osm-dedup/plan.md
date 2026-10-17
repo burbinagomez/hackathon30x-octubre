@@ -164,6 +164,8 @@ docs/arquitectura-backend.md
 
 ## Orden de tareas (TDD)
 
+> El orden de ejecución que vale es el de `tasks.md`: primero las tareas [MIN] y después la Fase Pulido. Lo que sigue es el orden por pasos de la spec, y sirve de referencia para el contenido de cada paso.
+
 El de la spec (§Plan de tareas), con la puerta del 002 adelante:
 
 0. **Puerta:** el 002 mergeado en `main` y esta rama al día con `main`.
