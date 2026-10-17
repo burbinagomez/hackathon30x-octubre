@@ -139,7 +139,7 @@
   - "Wait for CI" activado en los dos servicios;
   - `web` con root `frontend/`.
 - [ ] T032 [US1] 🤖 **Rojo:** `frontend/e2e/health.spec.ts` + `frontend/playwright.config.ts`. Contra la URL pública, la página muestra "DB: ok". Lo corrés con `gh workflow run e2e.yml -f base_url=…` después del deploy, y ahí pasa a verde.
-- [ ] T033 🤖 `README.md`: cómo correr, variables (nombres), badge de CI, riesgo del pooler expuesto, atribuciones. Más `docs/arquitectura-backend.md` (incluye expand/contract y `SET LOCAL`) y `docs/arquitectura-frontend.md`.
+- [X] T033 🤖 `README.md`, versión mínima: cómo levantar el proyecto, cómo migrar con `supabase/migrations` y cómo correr los tests. `docs/arquitectura-backend.md` y `docs/arquitectura-frontend.md` no se crean acá: los consolida la spec 013 (otra rama), junto con badge de CI, riesgo del pooler expuesto, expand/contract y `SET LOCAL`.
 - [ ] T034 🧑B Protección de `main`: required checks `back`, `front`, `seguridad`, `evals` e `imagenes`, más 1 aprobación. Verificar con `gh api repos/:owner/:repo/branches/main/protection`.
 
 ## Dependencias
