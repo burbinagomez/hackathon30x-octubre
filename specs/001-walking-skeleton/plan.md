@@ -98,7 +98,7 @@ docs/{arquitectura-backend.md, arquitectura-frontend.md}
    - `migrar`: solo en `main`, con environment `produccion` y `needs` de `back`, `front`, `seguridad` e `imagenes`.
 
    Más `dependabot.yml` (incluye `docker`) → push (con aviso previo) → CI verde.
-8. Railway: variables (`DATABASE_URL` del pooler en modo transacción solo en `api`; `VITE_API_URL` solo en `web`), dominios, `CORS_ORIGINS`, "Wait for CI". `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD` y `SUPABASE_PROJECT_REF` en el Environment `produccion`. **Rojo:** `e2e/health.spec.ts` contra la URL pública, vía `workflow_dispatch` → verde.
+8. Railway: variables (`DATABASE_URL` del pooler en modo transacción solo en `api`; `VITE_API_URL` solo en `web`), dominios, `CORS_ORIGINS`, "Wait for CI". `SUPABASE_DB_URL` (pooler en modo sesión) en el Environment `produccion`. **Rojo:** `e2e/health.spec.ts` contra la URL pública, vía `workflow_dispatch` → verde.
 9. Protección de `main` + required checks (`back`, `front`, `seguridad`, `evals`, `imagenes`) + README con badge + los dos docs de arquitectura.
 
 ## Complexity Tracking

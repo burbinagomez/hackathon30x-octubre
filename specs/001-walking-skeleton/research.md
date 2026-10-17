@@ -1,7 +1,7 @@
 # Research — 001 Walking skeleton
 
 ## R1. Dónde corren las migraciones
-- **Decision:** job `migrar` en GitHub Actions, solo en push a `main` y después de `back`, `front`, `seguridad` e `imagenes`. Lo corre el GitHub Environment `produccion`, restringido a la rama `main`: `supabase/setup-cli` (pineado) → `supabase link --project-ref $SUPABASE_PROJECT_REF` → `supabase db push`. Secrets `SUPABASE_ACCESS_TOKEN` y `SUPABASE_DB_PASSWORD`; variable `SUPABASE_PROJECT_REF`. Railway tiene **"Wait for CI"** activado: despliega solo si CI pasó, migración incluida. El detalle de la tubería está en R-migraciones.
+- **Decision:** job `migrar` en GitHub Actions, solo en push a `main` y después de `back`, `front`, `seguridad` e `imagenes`. Lo corre el GitHub Environment `produccion`, restringido a la rama `main`: `supabase/setup-cli` (pineado por SHA) → `supabase db push --db-url "$SUPABASE_DB_URL" --yes`. Un solo secret, `SUPABASE_DB_URL` (pooler en modo sesión), visible solo en ese step; sin `link` ni access token. Verificado en el CLI v2.119.0: `--yes` no pregunta nada y cada archivo va en una transacción, salvo las sentencias de la lista de pendientes para la 013 en `tasks.md`. Railway tiene **"Wait for CI"** activado: despliega solo si CI pasó, migración incluida. El detalle de la tubería está en R-migraciones.
 - **Rationale:** las credenciales de migraciones nunca existen en el entorno de `api` ni de `web` (principio III); el job `migrar` nunca levanta la app. El orden queda garantizado: esquema antes que código.
 - **Consecuencia:** las migraciones corren antes que el código nuevo, así que deben ser compatibles hacia atrás (expand/contract). Queda escrito en `docs/arquitectura-backend.md`.
 - **Alternatives:** pre-deploy command en `api` (las credenciales se filtran al runtime); un 3.er servicio `migrate` (la spec fija 2); correr a mano (no es reproducible).
@@ -109,7 +109,7 @@
 
 ## R-migraciones. `supabase/migrations`, `migrar_local.sh` y drift
 - **Decision (equipo, 2026-10-17):** la fuente de verdad del esquema es `supabase/migrations/NNNN_nombre.sql`, SQL escrito a mano y revisado por un humano. Nada de `supabase db diff` commiteado sin revisar (principio IV). Reemplaza a Alembic: una sola herramienta de esquema, la del proveedor de la base. El dominio no cambia.
-- **Prod:** el job `migrar` (R1) corre `supabase db push`, que aplica en orden lo que falta y lo registra en `supabase_migrations.schema_migrations`. Corre como `postgres`. `supabase/config.toml` lleva solo `project_id`; `supabase/.temp` y `supabase/.branches` van al `.gitignore`. CLI pineado en `ci.yml` (`supabase/setup-cli` + `version`).
+- **Prod:** el job `migrar` (R1) corre `supabase db push`, que aplica en orden lo que falta y lo registra en `supabase_migrations.schema_migrations`. Corre como `postgres`. `supabase/config.toml` lleva solo `project_id`; `supabase/.temp` y `supabase/.branches` van al `.gitignore`. CLI pineado en `ci.yml` (`supabase/setup-cli` por SHA + `version`).
 - **CI y local:** `backend/scripts/migrar_local.sh <url de superusuario>` aplica los `.sql` en orden con `psql` contra `postgres:16`, como superusuario del servicio (igual que prod). Imita al CLI:
   - registra cada archivo en `supabase_migrations.schema_migrations (version, name)` y saltea lo ya aplicado;
   - el nombre tiene que matchear `^[0-9]+_[a-z0-9_]+$`, o falla (deja `version` y `name` seguros para interpolar);

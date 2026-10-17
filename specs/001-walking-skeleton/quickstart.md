@@ -28,7 +28,7 @@ psql "postgresql://postgres.<ref>@aws-0-<region>.pooler.supabase.com:5432/postgr
 \password app_rt
 ```
 Después hay que cargar:
-- en el GitHub Environment `produccion`: secrets `SUPABASE_ACCESS_TOKEN` (Account → Access Tokens) y `SUPABASE_DB_PASSWORD` (la password de `postgres` del proyecto), variable `SUPABASE_PROJECT_REF`. Con eso el job `migrar` corre `supabase db push`;
+- en el GitHub Environment `produccion`: secret `SUPABASE_DB_URL`, que es la URL de arriba (pooler en modo sesión, 5432) con la password de `postgres` en `usuario:password@`. Con eso el job `migrar` corre `supabase db push --db-url … --yes`;
 - `DATABASE_URL` en el servicio `api` de Railway: `postgresql+psycopg://app_rt.<ref>@aws-0-<region>.pooler.supabase.com:6543/postgres?sslmode=require` (modo transacción).
 
 La password que pusiste con `\password app_rt` va después del usuario (`usuario:password@`) **solo en el valor de la variable de Railway**. No se escribe acá ni en ningún otro archivo.

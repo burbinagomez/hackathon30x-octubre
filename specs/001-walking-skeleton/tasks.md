@@ -131,10 +131,10 @@
   - `front`: `npm ci`, `vitest`, build;
   - `seguridad`: pip-audit, `npm audit --audit-level=high`, binario de gitleaks;
   - `evals`;
-  - `migrar`: solo en push a `main`, con `environment: produccion` y `needs` de `back`, `front`, `seguridad` e `imagenes`; `supabase/setup-cli` pineado → `supabase link` → `supabase db push`.
+  - `migrar`: solo en push a `main`, con `environment: produccion` y `needs` de `back`, `front`, `seguridad` e `imagenes`; `supabase/setup-cli` pineado por SHA → `supabase db push --db-url "$SUPABASE_DB_URL" --yes`, con el secret solo en ese step.
 
   Más `.github/workflows/e2e.yml` (`workflow_dispatch`, input `base_url` → `E2E_BASE_URL`) y `.github/dependabot.yml` (pip/uv, npm, github-actions y docker).
-- [ ] T030 🧑B GitHub: crear el Environment `produccion`, limitado a `main`, con los secrets `SUPABASE_ACCESS_TOKEN` (access token de la cuenta, `sbp_…`) y `SUPABASE_DB_PASSWORD` (password de `postgres` del proyecto), y la variable `SUPABASE_PROJECT_REF`. Activar CodeQL default setup.
+- [ ] T030 🧑B GitHub: crear el Environment `produccion`, limitado a `main`, con el secret `SUPABASE_DB_URL`: URL del pooler en modo sesión (puerto 5432, usuario `postgres.<ref>`, `sslmode=require`) con la password de `postgres` adentro. Sin access token ni project ref. Activar CodeQL default setup.
 - [ ] T031 🧑A Railway:
   - `api`: `DATABASE_URL` (pooler en modo transacción, `app_rt.<ref>`, 6543) y `CORS_ORIGINS` (dominio de `web`);
   - `web`: solo `VITE_API_URL`;
