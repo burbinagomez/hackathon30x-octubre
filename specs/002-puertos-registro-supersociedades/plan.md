@@ -191,7 +191,7 @@ Orden dentro de `buscar`:
 3. Caché: `hash_params = sha256(json.dumps(body, sort_keys=True))` sobre `(proveedor, endpoint, hash_params)`. Hay hit: devuelve desde `respuesta`, con su `as_of`, sin request y sin fila en `costos`.
 4. Antes de **cada** intento: si `requests_24h("croma") >= limites.croma_requests_por_24h`, `LimiteFuenteAgotado`. Con 99 previas, un 502 deja 100 y el reintento no se hace.
 5. Request con timeout 10 s. Ante 502, 503 o timeout, un reintento con backoff. 429: `LimiteFuenteAgotado` sin reintento. Otro 4xx: `FuenteNoDisponible` sin reintento. Cada intento escribe su fila.
-6. Solo en 200: upsert en `fuente_cache` y mapeo a `EmpresaCruda`. Ni 4xx ni 5xx se cachean.
+6. Solo en 200: primero el parseo y el mapeo a `EmpresaCruda`, después el upsert en `fuente_cache`. Un 200 que no parsea falla sin cachear. Ni 4xx ni 5xx se cachean.
 
 Contadores en `costos/infraestructura/postgres_costos.py`, sobre `costos` filtrado por `proveedor`:
 - `requests_24h`: `COUNT(*)` con `ts > now() - interval '24 hours'`.
