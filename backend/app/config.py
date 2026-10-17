@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 
 from pydantic_settings import BaseSettings
 
-# sbp_: access token del CLI, la credencial del job `migrar`.
+# sbp_: access token del CLI. `migrar` ya no lo usa (usa SUPABASE_DB_URL), pero en la api sigue prohibido.
 PREFIJOS_PROHIBIDOS = ("sb_publishable_", "sb_secret_", "sbp_")
 ROLES_SUPABASE = {"anon", "service_role"}
 
