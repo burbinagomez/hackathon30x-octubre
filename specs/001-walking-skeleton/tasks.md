@@ -58,7 +58,7 @@
   - sitio `:{$PORT:8080}`;
   - `handle /health { respond 200 }`;
   - `handle { root * /srv; try_files {path} /index.html; file_server }`.
-- [ ] T014 🤖 `.env.example`: sumar `CORS_ORIGINS=` y `E2E_BASE_URL=`, solo nombres.
+- [X] T014 🤖 `.env.example`: sumar `CORS_ORIGINS=` y `E2E_BASE_URL=`, solo nombres.
 
 ### Tarea 3: roles, Alembic, drift y engine
 - [ ] T015 🤖 `backend/scripts/roles.sql`, idempotente y sin passwords (R3):
