@@ -159,6 +159,8 @@ jobs:
             --allowedTools Read,Grep,Glob \
             --disallowedTools Bash,Edit,Write,WebFetch,WebSearch \
             --output-format json > revision.json
+          # Read no está restringido por ruta: si una injection le hace volcar el secret, el reporte no sale del job.
+          grep -qF "$ANTHROPIC_API_KEY" revision.json && { rm -f revision.*; echo "BLOQUEA: el reporte contiene el secret" >&2; exit 1; }
           jq -r .result revision.json > revision.md
           { cat revision.md; echo; echo "Costo de la revisión (USD): $(jq -r .total_cost_usd revision.json)"; } >> "$GITHUB_STEP_SUMMARY"
           .github/scripts/veredicto_security.sh < revision.md

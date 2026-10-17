@@ -4,6 +4,7 @@ Lee los archivos de `.github/` y nunca toca la API de GitHub: la protección de 
 compara `verificar_proteccion.sh`, que corre el dueño del repo (el token de Actions no es admin).
 """
 import itertools
+import json
 import os
 import re
 import subprocess
@@ -149,6 +150,9 @@ def _codeql_pinneado_por_sha():
 
 
 # Lo que la spec promete del agente en CI: sin Bash, sin red y sin escritura.
+# Read no se restringe por ruta: el agente puede leer /proc/self/environ. Lo que garantiza el job es este corte,
+# que borra el reporte y falla si trae el secret, antes de que llegue al summary o al artifact.
+CORTE = re.compile(r'grep -qF "\$ANTHROPIC_API_KEY" revision\.json && \{ rm -f revision\.\*;[^}]*exit 1; \}')
 PROHIBIDAS = {"Bash", "Edit", "Write", "WebFetch", "WebSearch"}
 
 
@@ -174,17 +178,43 @@ def _problemas_revision(job: dict) -> list[str]:
         problemas.append(f"bypass: no puede saltear permisos: {bypass}")
     if not re.search(r"@anthropic-ai/claude-code@\d+\.\d+\.\d+(?![\w.-])", runs):
         problemas.append("pin: la CLI de claude no está pinneada a versión exacta")
+    if fuga := _fuga_del_secret(job.get("steps", [])):
+        problemas.append(f"fuga: {fuga}")
     return problemas
+
+
+def _fuga_del_secret(steps: list[dict]) -> str:
+    """Qué saca el reporte del job antes del corte por `grep -qF` del secret ("" si nada)."""
+    corte = next(((i, m.start()) for i, s in enumerate(steps) if (m := CORTE.search(s.get("run", "")))), None)
+    if corte is None:
+        return "falta el corte por grep -qF del secret en revision.json"
+    i_corte, pos = corte
+    for i, s in enumerate(steps[:i_corte + 1]):
+        run = s.get("run", "")[:pos] if i == i_corte else s.get("run", "")
+        if "GITHUB_STEP_SUMMARY" in run:
+            return "escribe GITHUB_STEP_SUMMARY antes del corte"
+        if "upload-artifact" in s.get("uses", ""):
+            return "sube el artifact antes del corte"
+    return ""
 
 
 def _job_revision(si="github.event_name == 'pull_request'", instalar="@anthropic-ai/claude-code@2.1.0",
                   permitidas="--allowedTools Read,Grep,Glob",
                   prohibidas="--disallowedTools Bash,Edit,Write,WebFetch,WebSearch",
-                  extra="", veredicto="| .github/scripts/veredicto_security.sh") -> dict:
+                  extra="", veredicto="| .github/scripts/veredicto_security.sh",
+                  despues=None, artifact_primero=False) -> dict:
+    despues = (CORTE_OK, RESUMEN) if despues is None else despues
+    artifact = [{"uses": "actions/upload-artifact@v7", "if": "always()"}]
     return {"if": si, "steps": [
         {"run": f"npm install -g {instalar}"},
-        {"run": f'claude -p "$PROMPT" {permitidas} {prohibidas} {extra} {veredicto}'},
+        *(artifact if artifact_primero else []),
+        {"run": "\n".join([f'claude -p "$PROMPT" {permitidas} {prohibidas} {extra} {veredicto}', *despues])},
+        *([] if artifact_primero else artifact),
     ]}
+
+
+CORTE_OK = 'grep -qF "$ANTHROPIC_API_KEY" revision.json && { rm -f revision.*; echo "BLOQUEA" >&2; exit 1; }'
+RESUMEN = 'cat revision.md >> "$GITHUB_STEP_SUMMARY"'
 
 
 CASOS_REVISION = {
@@ -198,6 +228,10 @@ CASOS_REVISION = {
     "disallowed-solo-bash": (_job_revision(prohibidas="--disallowedTools Bash"), ["disallowed"]),
     "bypass": (_job_revision(extra="--permission-mode bypassPermissions"), ["bypass"]),
     "cli-latest": (_job_revision(instalar="@anthropic-ai/claude-code@latest"), ["pin"]),
+    "sin-corte": (_job_revision(despues=(RESUMEN,)), ["fuga"]),
+    "corte-sin-exit": (_job_revision(despues=(CORTE_OK.replace(" exit 1;", ""), RESUMEN)), ["fuga"]),
+    "summary-antes-del-corte": (_job_revision(despues=(RESUMEN, CORTE_OK)), ["fuga"]),
+    "artifact-antes-del-corte": (_job_revision(artifact_primero=True), ["fuga"]),
 }
 
 
@@ -259,3 +293,75 @@ def test_revision_seguridad_es_fail_closed(reporte, esperado):
         assert r.returncode == 0, f"tenía que pasar y salió {r.returncode}: {r.stdout}{r.stderr}"
     else:
         assert r.returncode != 0, "tenía que bloquear y salió 0"
+
+
+VERIFICAR = GITHUB / "scripts" / "verificar_proteccion.sh"
+# `gh` falso: `gh api <ruta>` devuelve el fixture de esa ruta, o sale 1 como un 404. Sin red ni token.
+GH_FALSO = """#!/usr/bin/env bash
+[ "$1" = api ] || exit 2
+f="$GH_FIXTURES/$(printf %s "$2" | tr / _)"
+[ -f "$f" ] || { echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
+cat "$f"
+"""
+PROTECCION = "repos/o/r/branches/main/protection"
+REPO = "repos/o/r"
+DEFAULT_SETUP = "repos/o/r/code-scanning/default-setup"
+
+
+def _api(**cambios) -> dict:
+    api = {
+        PROTECCION: {"required_status_checks": {"contexts": _requeridos()}},
+        REPO: {"security_and_analysis": {
+            "secret_scanning": {"status": "enabled"},
+            "secret_scanning_push_protection": {"status": "enabled"},
+        }},
+        DEFAULT_SETUP: {"state": "not-configured"},
+    }
+    if "contexts" in cambios:
+        api[PROTECCION]["required_status_checks"]["contexts"] = cambios["contexts"]
+    if "sin_proteccion" in cambios:
+        api[PROTECCION] = None
+    for clave in ("secret_scanning", "secret_scanning_push_protection"):
+        if clave in cambios:
+            api[REPO]["security_and_analysis"][clave]["status"] = cambios[clave]
+    if "default_setup" in cambios:
+        api[DEFAULT_SETUP]["state"] = cambios["default_setup"]
+    return api
+
+
+CASOS_PROTECCION = {
+    "ok": (lambda: _api(), None),
+    "falta-un-check": (lambda: _api(contexts=_requeridos()[1:]), lambda: _requeridos()[0]),
+    "sobra-un-check": (lambda: _api(contexts=[*_requeridos(), "Vercel"]), lambda: "Vercel"),
+    "sin-proteccion": (lambda: _api(sin_proteccion=True), lambda: "protection"),
+    "secret-scanning-apagado": (lambda: _api(secret_scanning="disabled"), lambda: "secret_scanning:"),
+    "push-protection-apagado": (lambda: _api(secret_scanning_push_protection="disabled"),
+                                lambda: "secret_scanning_push_protection:"),
+    "default-setup-prendido": (lambda: _api(default_setup="configured"), lambda: "default-setup"),
+}
+
+
+@pytest.mark.parametrize("api, motivo", CASOS_PROTECCION.values(), ids=CASOS_PROTECCION.keys())
+def test_verificar_proteccion(api, motivo, tmp_path):
+    # Perezosos: _requeridos() asserta el archivo, y en la colección rompería todo el módulo.
+    api, motivo = api(), motivo and motivo()
+    assert VERIFICAR.is_file(), "falta .github/scripts/verificar_proteccion.sh"
+    assert os.access(VERIFICAR, os.X_OK), "verificar_proteccion.sh sin permiso de ejecución"
+    bin_ = tmp_path / "bin"
+    bin_.mkdir()
+    (bin_ / "gh").write_text(GH_FALSO)
+    (bin_ / "gh").chmod(0o755)
+    fixtures = tmp_path / "api"
+    fixtures.mkdir()
+    for ruta, cuerpo in api.items():
+        if cuerpo is not None:
+            (fixtures / ruta.replace("/", "_")).write_text(json.dumps(cuerpo))
+    env = {**os.environ, "PATH": f"{bin_}{os.pathsep}{os.environ['PATH']}", "GH_FIXTURES": str(fixtures)}
+    r = subprocess.run([str(VERIFICAR), "o/r"], capture_output=True, text=True, env=env)
+    salida = r.stdout + r.stderr
+    if motivo is None:
+        assert r.returncode == 0, f"tenía que pasar y salió {r.returncode}: {salida}"
+    else:
+        assert r.returncode != 0, f"tenía que fallar por {motivo!r} y salió 0: {salida}"
+        # Que falle por esto y no por otra cosa: la salida se pega en docs/seguridad.
+        assert motivo in salida, f"falló sin nombrar {motivo!r}: {salida}"
