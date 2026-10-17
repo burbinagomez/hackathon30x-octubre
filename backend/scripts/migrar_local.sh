@@ -12,6 +12,11 @@ psql=(psql "$url" -X -q -v ON_ERROR_STOP=1)
 "${psql[@]}" -c "CREATE SCHEMA IF NOT EXISTS supabase_migrations" \
   -c "CREATE TABLE IF NOT EXISTS supabase_migrations.schema_migrations (version text PRIMARY KEY, name text)"
 
+# Sin esto, el segundo archivo de una versión repetida se saltearía en silencio (ya registrada).
+for v in $(for f in "$dir"/*.sql; do b="$(basename "$f")"; echo "${b%%_*}"; done | sort | uniq -d); do
+  echo "migrar_local: versión repetida $v:" "$dir/$v"_*.sql >&2; exit 1
+done
+
 for f in "$dir"/*.sql; do
   base="$(basename "$f" .sql)"
   # El mismo patrón que el CLI; además deja version y name seguros para interpolar en SQL.
