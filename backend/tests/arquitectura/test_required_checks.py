@@ -27,6 +27,11 @@ def _workflow(nombre: str) -> dict:
     return yaml.safe_load(ruta.read_text())
 
 
+def _workflows() -> list[Path]:
+    # GitHub corre los .yml y los .yaml de .github/workflows/.
+    return sorted(p for p in WORKFLOWS.iterdir() if p.suffix in {".yml", ".yaml"})
+
+
 def _eventos(wf: dict) -> set[str]:
     # PyYAML 1.1 lee la clave `on` como True.
     on = wf.get("on", wf.get(True))
@@ -87,7 +92,7 @@ def test_cada_check_requerido_existe_como_job():
     # Solo workflows que corren en PR: un required que nunca reporta en un PR traba el merge.
     derivados = {
         nombre
-        for ruta in WORKFLOWS.glob("*.yml")
+        for ruta in _workflows()
         if "pull_request" in _eventos(wf := yaml.safe_load(ruta.read_text()))
         for job_id, job in wf["jobs"].items()
         if (ruta.name, job_id) not in EXCLUIDOS
@@ -142,13 +147,6 @@ def _codeql_analiza():
     assert {"Analyze (python)", "Analyze (javascript-typescript)"} <= runs, f"check-runs de codeql.yml: {runs}"
 
 
-def _codeql_pinneado_por_sha():
-    usos = [s["uses"] for s in _steps(_workflow("codeql.yml")) if s.get("uses", "").startswith("github/codeql-action/")]
-    assert usos, "codeql.yml no usa github/codeql-action"
-    sin_sha = [u for u in usos if not re.fullmatch(r"[^@]+@[0-9a-f]{40}", u)]
-    assert not sin_sha, f"github/codeql-action sin pinnear por SHA de commit: {sin_sha}"
-
-
 FIJADOS = ("ci.yml", "codeql.yml")
 # e2e.yml choca con el criterio de la 014, que no está en main: specs/012-seguridad/spec.md:168, "e2e.yml sin fijar".
 SIN_FIJAR_TODAVIA = {"e2e.yml"}
@@ -156,7 +154,7 @@ SIN_FIJAR_TODAVIA = {"e2e.yml"}
 
 def _ci_acciones_pinneadas():
     # Explícito: un workflow nuevo no queda afuera en silencio.
-    todos = {w.name for w in WORKFLOWS.glob("*.yml")}
+    todos = {w.name for w in _workflows()}
     assert todos == set(FIJADOS) | SIN_FIJAR_TODAVIA, f"workflows sin clasificar: {sorted(todos - set(FIJADOS) - SIN_FIJAR_TODAVIA)}"
     sin_sha = []
     for nombre in FIJADOS:
@@ -297,7 +295,6 @@ def _revision_seguridad():
     # Repuesto con el PR #19: versión fija, descarga verificada, --redact (spec 012, Gitleaks).
     pytest.param(_ci_corre("sha256sum --check", "gitleaks git", "--redact"), id="gitleaks"),
     pytest.param(_codeql_analiza, id="codeql-lenguajes"),
-    pytest.param(_codeql_pinneado_por_sha, id="codeql-pinneado"),
     pytest.param(_revision_seguridad, id="revision-seguridad"),
     pytest.param(_ci_acciones_pinneadas, id="ci-acciones-pinneadas"),
     pytest.param(_ci_checkout_sin_credenciales, id="ci-checkout-sin-credenciales"),
