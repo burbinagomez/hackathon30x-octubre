@@ -94,7 +94,7 @@ jobs:
           else
             rango="$ANTES..$GITHUB_SHA"
           fi
-          ./gitleaks git --log-opts="$rango" --redact --no-banner -v
+          ./gitleaks git --config .gitleaks.toml --log-opts="$rango" --redact --no-banner -v
 
   evals:
     runs-on: ubuntu-24.04
