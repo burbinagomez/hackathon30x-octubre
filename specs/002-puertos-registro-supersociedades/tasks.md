@@ -2,12 +2,12 @@
 
 **Input**: [spec.md](./spec.md), [plan.md](./plan.md)
 **Tests**: obligatorios (constitución II). Cada **Rojo** se corre y se ve fallar **por la razón esperada** antes de su **Verde**. `ImportError` o `UndefinedTable` no cuentan como rojo de un test de comportamiento: donde la tabla o el módulo tienen que existir primero, el rojo es por **mutación** (se escribe la versión sin la propiedad, se ve el rojo, se agrega). Un test que nace verde se reescribe.
-**Esqueleto antes del rojo:** en T006, T008, T020, T022, T024, T026, T029, T038 y T040 se crea primero el esqueleto vacío de lo que se prueba (clase o función con `raise NotImplementedError` o retorno vacío) y cada test tiene que fallar por **su aserción**. Un `ImportError` no cuenta como rojo.
+**Esqueleto antes del rojo:** en T006, T008, T020, T022, T024, T026, T029, T038, T040 y T046 se crea primero el esqueleto vacío de lo que se prueba (clase o función con `raise NotImplementedError` o retorno vacío) y cada test tiene que fallar por **su aserción**. Un `ImportError` no cuenta como rojo.
 **Revisión**: el `advisor` revisa los tests marcados *(advisor)* antes de escribir su Verde.
 
 Formato: `- [ ] T0NN [P] [US1] Rojo/Verde: qué, en qué archivo`. `[P]` = archivo distinto y sin dependencia de una tarea abierta. Rutas relativas a la raíz del repo.
 
-La spec tiene una sola historia (US1: una búsqueda por CLI deja leads deduplicados con su costo y su cumplimiento). Las fases siguen los pasos 1 a 9 de la spec.
+La spec tiene una sola historia (US1: una búsqueda por CLI deja leads deduplicados con su costo y su cumplimiento). Las fases siguen el orden que fijó el dueño, no el número de paso: 1, 2, 3, 4, 7, 8, bloque Croma (5 + T035 + T046-T047 + T042), 6 y 9. Los IDs no se renumeran: el archivo se lee en orden de ejecución. El CLI arranca **sin adaptadores registrados**: el catálogo real queda `{}` hasta T031.
 
 ## Fase 1: Setup
 
@@ -57,14 +57,37 @@ La spec tiene una sola historia (US1: una búsqueda por CLI deja leads deduplica
 - [ ] T026 [P] Rojo: `backend/tests/integration/test_costos_repo.py`, `test_cache_misma_clave_pisa_respuesta` (misma `(proveedor, endpoint, hash_params)` → 1 fila con la segunda respuesta) y `test_cache_lectura_devuelve_respuesta_y_as_of`.
 - [ ] T027 Verde: `backend/app/modulos/descubrimiento/infraestructura/persistencia/repositorio_cache.py`, con transacción propia por upsert.
 
-**Checkpoint**: dominio, registro, migración y persistencia en verde. Recién acá arranca US1.
+**Checkpoint**: dominio, registro, migración y persistencia en verde.
 
-## Fase 3: US1, búsqueda por CLI con Supersociedades
+## Fase 3: US1 sin adaptadores, caso de uso y CLI
 
-**Objetivo**: `uv run python -m app.cli buscar --tenant <id> --pais CO --ciiu 4711 --departamento 11` deja leads deduplicados, con costo y cumplimiento.
-**Prueba independiente**: los tests de esta fase, sin red; más una corrida real en T042.
+**Objetivo**: `uv run python -m app.cli buscar --tenant <id> --pais CO --ciiu 4711 --departamento 11` corre de punta a punta con el catálogo vacío. Crea y cierra la búsqueda y reporta `sin_fuente_para` y `sin_implementacion`. Con una fuente falsa inyectada, deja leads deduplicados, con costo y cumplimiento.
+**Prueba independiente**: los tests de esta fase, sin red y sin Croma.
+
+### Paso 7: caso de uso
+
+- [ ] T038 [US1] Rojo *(advisor)*: `backend/tests/unit/descubrimiento/test_ejecutar_busqueda.py`, los 8 tests de la spec con fuentes y repositorio falsos (los falsos en memoria de `RepositorioLeads`, `RegistroCostos` y caché van en `backend/tests/falsos.py`, porque T040 los reusa): `test_mismo_nit_de_dos_fuentes_queda_en_un_lead`, `test_misma_fuente_repetida_no_duplica_lead_fuentes`, `test_nit_con_y_sin_formato_es_el_mismo_lead`, `test_mismo_nit_distinto_pais_son_dos_leads`, `test_lead_existente_en_segunda_busqueda_no_duplica_cumplimiento`, `test_cada_lead_nuevo_tiene_fila_en_cumplimiento`, `test_sin_fuente_para_el_pais_se_reporta` (con una fuente falsa que solo cubre `CO`; no necesita el catálogo real) y el octavo, `test_error_de_fuente_se_reporta_y_busqueda_queda_con_errores`: el resultado reporta `LimiteFuenteAgotado`/`FuenteNoDisponible` por fuente sin tragarlos y la búsqueda cierra `con_errores` (pregunta 11). La fuente falsa devuelve el NIT **sin** normalizar (`900.123.456-7`), así que la clave de dedup tiene que pasar por `normalizar_nit` en el caso de uso; si no, `test_nit_con_y_sin_formato_es_el_mismo_lead` queda rojo.
+- [ ] T039 [US1] Verde: `backend/app/modulos/descubrimiento/aplicacion/ejecutar_busqueda.py` (`crear_busqueda` → adaptadores → `obtener_o_crear_lead` + `agregar_lead_fuente` → `cerrar_busqueda`), sin importar `infraestructura` (lo cuida T005).
+
+### Paso 8: CLI sin adaptadores
+
+- [ ] T040 [US1] Rojo: `backend/tests/unit/test_cli.py`, sin red y sin Postgres. El esqueleto es `main(argv=None, *, catalogo=catalogo, persistencia=None) -> int`, que devuelve 0 sin imprimir. `catalogo` por defecto es el real de `infraestructura/adaptadores` y `persistencia=None` arma `postgres_costos` y los repositorios de Postgres desde `settings`. Los tests pasan los falsos de `backend/tests/falsos.py` (T038) por `persistencia`, y la fuente falsa por `catalogo`. **Ningún falso vive en `app/`.** Los 4 tests:
+  - `test_buscar_sin_tenant_falla`;
+  - `test_buscar_imprime_resumen`: `fuentes.yaml` real y `catalogo={"croma_supersociedades_co": FuenteFalsa}`. Como la entrada es `proveedor: croma`, el test pone una `CROMA_API_KEY` falsa por monkeypatch. `FuenteFalsa` vive en `test_cli.py`, acepta los kwargs del constructor que arma el CLI, registra 1 fila en el `RegistroCostos` que recibe y devuelve 2 `EmpresaCruda` con el mismo NIT (`900.123.456-7` y `900123456`). Imprime encontrados 2 · únicos 1 · nuevos 1 · créditos 1 · `sin_implementacion` `croma_dian_trade_co, osm_overpass`;
+  - `test_buscar_sin_adaptadores_reporta_sin_fuente_y_sin_implementacion`: `fuentes.yaml` real y `catalogo={}` explícito, no el real, así sigue verdadero después de T031. Con `--pais CO --ciiu 4711 --departamento 11` sale con código 0 y la búsqueda queda `terminada`, no `con_errores`, porque no falló ninguna fuente. Imprime `sin_fuente_para: CO` y `sin_implementacion: croma_dian_trade_co, croma_supersociedades_co, osm_overpass`, ordenado. El `RegistroCostos` falso tiene 0 filas y el repositorio, 0 leads. No exige `croma_api_key`: `settings` sin key;
+  - `test_salida_no_contiene_secretos`: ni API key ni `DATABASE_URL`.
+  Rojo: con el esqueleto, cada uno falla por su aserción. `test_buscar_sin_tenant_falla` falla porque el esqueleto sale con 0, y los demás porque no imprime nada. `test_salida_no_contiene_secretos` asierta además que hay salida, así no nace verde.
+- [ ] T041 [US1] Verde: `backend/app/cli.py`, raíz de composición. Lee `fuentes.yaml` (registro y `limites`), arma los adaptadores por búsqueda con `lote_id = busqueda_id` y les pasa `limites`. Todavía no lee `tarifas.yaml`, porque eso llega con T046-T047. La `croma_api_key` se lee solo si hay que construir un adaptador de `proveedor: croma`. Sin key y con uno de esos en `registro.fuentes`, sale con código ≠ 0 y un mensaje sin secretos.
+
+**Checkpoint (MVP)**: T041 en verde. Ver Estrategia.
+
+## Fase 4: bloque Croma
+
+**Objetivo**: el mismo comando trae leads reales de Supersociedades.
+**Prueba independiente**: los tests de esta fase, sin red, y al final una corrida real en T042.
 
 ### Paso 5: adaptador Croma
+
 
 - [ ] T028 [P] [US1] Crear la respuesta sintética `backend/tests/fixtures/croma_supersociedades_sintetica.json` (forma de la respuesta de Croma, datos inventados, sin NIT reales).
 - [ ] T029 [US1] Rojo *(advisor)*: `backend/tests/unit/descubrimiento/test_croma_supersociedades.py` con `httpx.MockTransport` y un `RegistroCostos` falso:
@@ -85,28 +108,26 @@ La spec tiene una sola historia (US1: una búsqueda por CLI deja leads deduplica
 - [ ] T032 [US1] Rojo *(advisor)*: en `backend/tests/integration/test_costos_repo.py`, `test_croma_consulta_escribe_fila_en_costos` (adaptador con transporte falso + `postgres_costos` real: 1 fila con `tipo='croma_consulta'`, `unidades=1`, `costo_unitario=0.00099`, `gratis=true`, `tenant_id` del contexto) y `test_reintento_cuenta_para_el_limite` (98 filas previas de `unidades=1`; 502 con `unidades=0` + 200 con `unidades=1` → 100 filas, `requests_24h == 100`, `creditos_mes` de 98 a 99, la siguiente búsqueda lanza `LimiteFuenteAgotado`). Rojo por mutación: con `registrar` del adaptador comentado, 0 filas; y con `requests_24h` contando `SUM(unidades)` en vez de `COUNT(*)`, el contador da 99 y la búsqueda siguiente no corta.
 - [ ] T033 [US1] Verde: lo que T032 exija en el adaptador o en `postgres_costos`, sin tocar los tests unitarios.
 
-### Paso 6: contrato y adaptadores declarados
+### Contrato de Croma y tarifa
 
-- [ ] T034 [P] [US1] Rojo: `backend/tests/contratos/test_fuente_descubrimiento.py` parametrizado sobre `catalogo`, con `assert catalogo` a nivel de módulo, `test_hay_fabrica_para_cada_clave_del_catalogo` y los 3 tests de la spec (plan.md, sección Suite de contrato). Criterio no soportado con la clave centinela `"__criterio_inexistente__"`, no una real. Rojo real de cada uno, corriéndolo una vez con una fábrica de adaptador falso:
+- [ ] T035 [US1] Verde (se adelanta al paso 6; el rojo de su contrato lo da T034): `backend/tests/contratos/fabricas.py` con la fábrica de `croma_supersociedades_co` (transporte falso + fixture de T028).
+- [ ] T046 [US1] Rojo: `backend/tests/unit/test_cli.py::test_tarifa_croma_es_decimal_exacto`, sacado de T040. Con `catalogo={"croma_supersociedades_co": FuenteFalsa}`, que captura el `costo_unitario` que le pasa el CLI, `costo_unitario == Decimal("0.00099")` y `isinstance(costo_unitario, Decimal)`. El rojo es real: la primera versión lee `tarifas.yaml` con `yaml.safe_load` y pasa el valor tal cual, un `float`, así que `isinstance` falla y `0.00099 != Decimal("0.00099")`.
+- [ ] T047 [US1] Verde: `app/cli.py` carga `tarifas.yaml` una vez, con cada valor como `Decimal(str(v))`, y le pasa al adaptador el `costo_unitario` ya resuelto.
+
+### Corrida real
+
+- [ ] T042 [US1] Cierra el bloque, después de T033 y T047. Una corrida real contra Croma, avisada antes (1 request de 100, 1 crédito). Confirmar: forma de `departamento` (pregunta 9), NIT con o sin DV (pregunta 8), 4xx/5xx cobrados (pregunta 5). Segunda corrida idéntica: 0 créditos. Lo que cambie vuelve como Rojo en T029, no como parche.
+
+## Fase 5: Paso 6, contrato y adaptadores declarados
+
+- [ ] T034 [P] [US1] Rojo: `backend/tests/contratos/test_fuente_descubrimiento.py` parametrizado sobre `catalogo`, con `assert catalogo` a nivel de módulo, `test_hay_fabrica_para_cada_clave_del_catalogo` y los 3 tests de la spec (plan.md, sección Suite de contrato). Criterio no soportado con la clave centinela `"__criterio_inexistente__"`, no una real. Va después del bloque Croma: con el catálogo vacío, el `assert catalogo` rompe la colección. Rojo real de cada uno, corriéndolo una vez con una fábrica de adaptador falso en lugar de la de T035:
   - `test_devuelve_empresas_normalizadas`: `as_of` sin zona, o `fuente` distinta de la clave;
   - `test_registra_costo_antes_de_devolver`: el adaptador no llama a `registrar`;
   - `test_rechaza_criterio_no_soportado`: el adaptador hace el request antes de validar.
-- [ ] T035 [US1] Verde: `backend/tests/contratos/fabricas.py` con la fábrica de `croma_supersociedades_co` (transporte falso + fixture de T028).
 - [ ] T036 [P] [US1] Rojo: `backend/tests/arquitectura/test_registro_adaptadores.py` (`test_todo_adaptador_de_registro_esta_declarado` y `test_persistencia_solo_contiene_excluidos_y_no_importa_http`, con `EXCLUIDOS` de la spec ya enmendado a `costos/infraestructura/postgres_costos.py`) y `backend/tests/arquitectura/test_costos_por_adaptador.py::test_todo_adaptador_de_registro_recibe_registro_costos`. Los dos recorridos afirman que encontraron **al menos una** clase antes de chequearla. Solo chequean puertos que existen hoy. Las funciones de recorrido reciben la raíz por parámetro (el test real pasa `app/modulos`), así el rojo en `tmp_path` corre el mismo código: una clase fuera del catálogo / sin `RegistroCostos` / un archivo extra en `persistencia/` → rojo.
 - [ ] T037 [US1] Verde: lo que T036 exija sobre el código real.
 
-### Paso 7: caso de uso
-
-- [ ] T038 [US1] Rojo *(advisor)*: `backend/tests/unit/descubrimiento/test_ejecutar_busqueda.py`, los 8 tests de la spec con fuentes y repositorio falsos: `test_mismo_nit_de_dos_fuentes_queda_en_un_lead`, `test_misma_fuente_repetida_no_duplica_lead_fuentes`, `test_nit_con_y_sin_formato_es_el_mismo_lead`, `test_mismo_nit_distinto_pais_son_dos_leads`, `test_lead_existente_en_segunda_busqueda_no_duplica_cumplimiento`, `test_cada_lead_nuevo_tiene_fila_en_cumplimiento`, `test_sin_fuente_para_el_pais_se_reporta` y el octavo, `test_error_de_fuente_se_reporta_y_busqueda_queda_con_errores`: el resultado reporta `LimiteFuenteAgotado`/`FuenteNoDisponible` por fuente sin tragarlos y la búsqueda cierra `con_errores` (pregunta 11). La fuente falsa devuelve el NIT **sin** normalizar (`900.123.456-7`), así que la clave de dedup tiene que pasar por `normalizar_nit` en el caso de uso; si no, `test_nit_con_y_sin_formato_es_el_mismo_lead` queda rojo.
-- [ ] T039 [US1] Verde: `backend/app/modulos/descubrimiento/aplicacion/ejecutar_busqueda.py` (`crear_busqueda` → adaptadores → `obtener_o_crear_lead` + `agregar_lead_fuente` → `cerrar_busqueda`), sin importar `infraestructura` (lo cuida T005).
-
-### Paso 8: CLI y corrida real
-
-- [ ] T040 [US1] Rojo: `backend/tests/unit/test_cli.py`, los 4 de la spec: `test_buscar_sin_tenant_falla`; `test_buscar_imprime_resumen` (transporte falso inyectado); `test_salida_no_contiene_secretos` (ni API key ni `DATABASE_URL`); `test_tarifa_croma_es_decimal_exacto`: la tarifa que el CLI pasa al adaptador `== Decimal("0.00099")` y es `Decimal`. Rojo real: primera versión que carga la tarifa como `float` → `Decimal(0.00099) != Decimal("0.00099")`.
-- [ ] T041 [US1] Verde: `backend/app/cli.py`, raíz de composición (lee `fuentes.yaml` y `tarifas.yaml` con cada tarifa como `Decimal(str(v))`, arma adaptadores por búsqueda con `lote_id = busqueda_id`, pasa `limites`).
-- [ ] T042 [US1] Una corrida real contra Croma, avisada antes (1 request de 100, 1 crédito). Confirmar: forma de `departamento` (pregunta 9), NIT con o sin DV (pregunta 8), 4xx/5xx cobrados (pregunta 5). Segunda corrida idéntica: 0 créditos. Lo que cambie vuelve como Rojo en T029, no como parche.
-
-## Fase 4: Pulido
+## Fase 6: Pulido
 
 - [ ] T043 [P] `docs/arquitectura-backend.md`: módulos `descubrimiento` y `costos`, puerto, registro, suite de contrato y cómo sumar un adaptador (pregunta abierta 12).
 - [ ] T044 [P] `.claude/skills/slice-tdd/SKILL.md`: prefijo de rama `slice/` → `feature/`, como pide la spec.
@@ -114,23 +135,45 @@ La spec tiene una sola historia (US1: una búsqueda por CLI deja leads deduplica
 
 ## Dependencias
 
-- Setup (T001-T003) → Fundacional → US1 → Pulido.
-- T004 → T005. T006 → T007 → T008 → T009 (T008 YAML real queda rojo hasta T031).
+- Setup (T001-T003) → Fundacional (pasos 1-4) → US1 sin adaptadores (pasos 7-8) → bloque Croma → paso 6 → Pulido.
+- T004 → T005. T006 → T007 → T008 → T009.
+- `test_carga_config_fuentes_yaml_real_sin_error` (T008) sigue en rojo hasta T031, y T031 cae en el bloque Croma, al final. Mientras tanto queda marcado `xfail(strict=True, raises=AssertionError, reason="rojo hasta T031: el catálogo todavía no tiene croma_supersociedades_co")`, sin cambios en el código.
+  - `strict` hace que, si algo lo pone verde antes de tiempo, la suite falle y obligue a sacar la marca.
+  - `raises=AssertionError` hace que cualquier otra excepción falle de verdad. Un ejemplo es `RegistroInvalido`, por una clave del catálogo que falte en el YAML.
+  - T031 le saca la marca. Las fases 3 y 4 no lo tocan: T040 inyecta su catálogo, no usa el real.
 - T010 → T011 → T012 → T014 → T013.
 - T013 → T015 → T016 → T017/T018 → T019.
 - T019 → T020 → T021; T019 → T022 → T023; T019 → T024 → T025; T019 → T026 → T027.
-- T007, T009, T025, T027 → T029 → T030 → T031 → T032 → T033 → T034-T037.
-- T021, T031 → T038 → T039 → T040 → T041 → T042.
+- T007, T009, T021 → T038 → T039. T038 ya no depende de T031.
+- T039 → T040 → T041; T025, T027 → T041 (la `persistencia` por defecto). T040 depende de T039.
+- T007, T009, T025, T027 → T029 → T030 → T031 → T032 → T033 → T035. T028 se escribe junto con T029.
+- T041 → T046 → T047. El test de tarifa necesita el CLI, no el adaptador.
+- T033, T047 → T042. La corrida real lleva el adaptador y la tarifa en `Decimal`.
+- T031, T035 → T034; T031 → T036 → T037. El paso 6 va después del bloque Croma: con el catálogo vacío, `assert catalogo` y "al menos una clase" no tienen qué recorrer.
 - T043-T045 al final.
 
 ## Paralelo
 
 - Setup: T002 y T003 juntos.
 - Paso 2: T006 y T008 (tests) en paralelo; sus Verde en orden.
-- Paso 3: T010 en paralelo con el paso 2; T017 y T018 juntos; después de T019, T020, T022, T024 y T026 en paralelo.
-- US1: T028 mientras se escribe T029; T034 y T036 en paralelo.
+- Paso 3: T010 en paralelo con el paso 2. T017 y T018 juntos. Después de T019, T020, T022, T024 y T026 en paralelo.
+- Pasos 7-8: T038 puede escribirse en cuanto T021 esté verde, en paralelo con T024-T027. T040 espera a T039.
+- Bloque Croma: T028 mientras se escribe T029. T046 en paralelo con T029-T033, porque solo depende de T041.
+- Paso 6: T034 y T036 en paralelo.
 - Pulido: T043 y T044.
 
 ## Estrategia
 
-MVP = la fase 3 completa: es el único incremento con valor (una búsqueda real deja leads). No hay entrega parcial útil antes de T041. Si el tiempo no alcanza, se corta T042 (la corrida real) y se anota, nunca un test de RLS, costos o dedup. `docs/arquitectura-backend.md` (T043) se puede reducir a un párrafo.
+Incremento tras T041, sin Croma:
+- el CLI corre de punta a punta contra Postgres con RLS por tenant;
+- crea y cierra la búsqueda;
+- reporta `sin_fuente_para` y `sin_implementacion` con el `fuentes.yaml` real.
+
+Con una fuente falsa inyectada, ya está probado lo que cualquier fuente va a heredar: dedup por `(pais, id_fiscal)`, `lead_fuentes`, `cumplimiento` en la misma transacción que el lead, y la fila de `costos` escrita por el adaptador. No trae leads reales: eso es el bloque Croma.
+
+Si el tiempo no alcanza, se corta en este orden:
+1. T043 se reduce a un párrafo. Después, T044.
+2. T042, la corrida real, y se anota que no se hizo.
+3. El bloque Croma entero (T028-T033, T035, T046, T047, T042) junto con el paso 6 (T034-T037). Van juntos: sin adaptador, el contrato no tiene qué recorrer, y la constitución no deja registrar un adaptador sin su suite de contrato. Si Croma entra, entran con él T046-T047 (sin `Decimal`, el libro de costos queda mal) y el paso 6.
+
+Nunca se corta un test de RLS, de costos ni de dedup.

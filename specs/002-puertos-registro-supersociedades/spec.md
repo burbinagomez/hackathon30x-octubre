@@ -58,7 +58,7 @@ Ninguno: este slice no usa IA. Las empresas que encuentra alimentan `backend/eva
   - `::test_normalizar_nit[…]`: `"900.123.456-7"` → `"900123456"`; `"900123456"` → `"900123456"`; `"9001234567"` → `"9001234567"` (sin guion no se corta el DV).
   - `::test_cubre[…]`: `cubre(meta, criterios)` es verdadero por país y por `"*"`, y falso con un filtro fuera de `meta.filtros`.
 - `backend/tests/unit/descubrimiento/test_registro.py`:
-  - `::test_carga_config_fuentes_yaml_real_sin_error`: carga el `config/fuentes.yaml` del repo, devuelve `croma_supersociedades_co` y deja `sin_implementacion == {"croma_dian_trade_co", "osm_overpass"}`.
+  - `::test_carga_config_fuentes_yaml_real_sin_error`: carga el `config/fuentes.yaml` del repo, devuelve `croma_supersociedades_co` y deja `sin_implementacion == {"croma_dian_trade_co", "osm_overpass"}`. Queda `xfail(strict=True)` hasta T031, en el bloque Croma: antes, el catálogo real está vacío.
   - `::test_solo_carga_adaptadores_habilitados`: con un YAML de prueba que tiene un adaptador `true` y uno `false`, devuelve solo el primero.
   - `::test_habilitado_sin_implementacion_se_reporta`: la clave aparece en `sin_implementacion` y la carga no lanza.
   - `::test_fuente_habilitada_sin_paises_o_filtros_falla`: una entrada de `fuentes_descubrimiento` con `habilitado: true` y sin `paises` o sin `filtros` lanza `RegistroInvalido`.
@@ -103,14 +103,15 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
 - `::test_mismo_nit_distinto_pais_son_dos_leads`.
 - `::test_lead_existente_en_segunda_busqueda_no_duplica_cumplimiento`: dos búsquedas con el mismo NIT dan 1 lead, 1 `cumplimiento` y 2 `lead_fuentes` (una por `busqueda_id`).
 - `::test_cada_lead_nuevo_tiene_fila_en_cumplimiento`: con fuente, licencia y `as_of`.
-- `::test_sin_fuente_para_el_pais_se_reporta`: un ICP con `pais=BR`, teniendo solo Croma en el catálogo, devuelve `sin_fuente_para("BR", …)` y 0 leads.
+- `::test_sin_fuente_para_el_pais_se_reporta`: un ICP con `pais=BR`, con una fuente falsa que solo cubre `CO`, devuelve `sin_fuente_para("BR", …)` y 0 leads.
 - `::test_error_de_fuente_se_reporta_y_busqueda_queda_con_errores`: una fuente que lanza `LimiteFuenteAgotado` o `FuenteNoDisponible` aparece en el resultado con su error, sin tragarlo, y la búsqueda cierra `con_errores`.
 
 **CLI** (`backend/tests/unit/test_cli.py`)
 - `::test_buscar_sin_tenant_falla`: `buscar` sin `--tenant` sale con error.
-- `::test_buscar_imprime_resumen`: con transporte falso inyectado, imprime el resumen.
+- `::test_buscar_imprime_resumen`: con `catalogo={"croma_supersociedades_co": FuenteFalsa}` y persistencia falsa inyectados en `main(argv, *, catalogo, persistencia)`, imprime el resumen. Los falsos viven en `tests/`; los valores por defecto de `main` son el catálogo real y Postgres.
+- `::test_buscar_sin_adaptadores_reporta_sin_fuente_y_sin_implementacion`: con el `fuentes.yaml` real y `catalogo={}`, sale con código 0, la búsqueda cierra `terminada`, imprime `sin_fuente_para: CO` y las 3 claves habilitadas en `sin_implementacion`, y no escribe ninguna fila en `costos`.
 - `::test_salida_no_contiene_secretos`: ni la API key ni la `DATABASE_URL` aparecen en stdout o stderr.
-- `::test_tarifa_croma_es_decimal_exacto`: la tarifa que el CLI le pasa al adaptador es exactamente `Decimal("0.00099")`. Rojo si se carga como `float`.
+- `::test_tarifa_croma_es_decimal_exacto` (bloque Croma, T046, después del CLI): la tarifa que el CLI le pasa al adaptador es exactamente `Decimal("0.00099")`. Rojo si se carga como `float`.
 
 **Integración** (Postgres de prueba, rol `app_rt`)
 - `backend/tests/integration/test_leads_repo.py`:
@@ -217,9 +218,10 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUEN
 
 **Tarifas:** `config/tarifas.yaml` se carga una vez, cada valor como `Decimal(str(v))` (nunca `float`), y el adaptador recibe el `costo_unitario` ya resuelto.
 
-## Plan de tareas (TDD, en orden)
+## Plan de tareas (TDD)
+Se ejecutan en el orden 1, 2, 3, 4, 7, 8, 5, 6, 9, el que fijó el dueño, detallado en tasks.md. El CLI (paso 8) arranca sin adaptadores registrados. El paso 5 y el 6 van juntos al final.
 1. **Canario `layers`:** test en rojo → contrato en `pyproject.toml` → verde.
-2. **Dominio + registro:** `EmpresaCruda`, `CriteriosICP`, `normalizar_nit`, los Protocols y `cargar_registro`. Los de `test_dominio.py` en rojo → verde. De los 4 de `test_registro.py`, el primero que se escribe es el del YAML real y **queda en rojo hasta T031**, cuando el catálogo registra `croma_supersociedades_co` (paso 5); los otros 3 pasan a verde en este paso.
+2. **Dominio + registro:** `EmpresaCruda`, `CriteriosICP`, `normalizar_nit`, los Protocols y `cargar_registro`. Los de `test_dominio.py` en rojo → verde. De los 6 de `test_registro.py`, el primero que se escribe es el del YAML real y **queda en rojo hasta T031**, cuando el catálogo registra `croma_supersociedades_co` (paso 5, al final). Mientras tanto, `xfail(strict=True, raises=AssertionError)`. Los otros 5 pasan a verde en este paso.
 3. **Migración `0002` + `persistencia/`:**
    - `supabase_simulado.sql` en CI primero, para que los tests de privilegios nazcan en rojo;
    - `test_unico_…`, `test_lead_persistido_conserva_tipo_titular`, `test_lead_nuevo_y_cumplimiento_en_una_transaccion`, `test_crear_busqueda_se_confirma_antes`, `test_rls[…]` y los 3 de `test_privilegios_supabase.py` en rojo → verde;
@@ -229,11 +231,11 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUEN
 4. **`postgres_costos`:** contadores y `test_registrar_sobrevive_al_rollback_de_otra_transaccion` en rojo → verde. `test_todo_adaptador_de_registro_recibe_registro_costos` pasa al paso 6 (T036): antes del adaptador recorrería una lista vacía.
 5. **Adaptador `croma_supersociedades_co`** con la fixture sintética:
    - mapeo, crédito, gratis/no gratis, 24 h, reintento y caché en rojo → verde;
-   - después, `test_costos_repo.py`;
+   - después, `test_costos_repo.py`, y `test_tarifa_croma_es_decimal_exacto` sobre el CLI ya hecho (T046-T047);
    - el **advisor revisa los tests de costos**.
 6. **Suite de contrato** (con `test_hay_fabrica_para_cada_clave_del_catalogo`) + `test_todo_adaptador_de_registro_esta_declarado`, `test_persistencia_solo_contiene_excluidos_y_no_importa_http` y `test_todo_adaptador_de_registro_recibe_registro_costos`: rojo → verde.
 7. **`EjecutarBusqueda`:** los 8 tests del caso de uso en rojo → verde. El **advisor revisa los tests de dedup**.
-8. **CLI `app.cli buscar`:** los 4 de `test_cli.py` en rojo → verde. Después, **una** corrida real contra Croma: 1 request, avisada antes, anotando los créditos, la forma real de la respuesta y si Croma cobra los 5xx (lo dice su doc o el saldo antes y después). Si la forma difiere de la fixture, se corrige la fixture y se vuelve al paso 5.
+8. **CLI `app.cli buscar`, sin adaptadores:** los 4 de `test_cli.py` en rojo → verde (el de tarifa va con el paso 5). La corrida real contra Croma pasa al final del paso 5 (T042): **una** corrida: 1 request, avisada antes, anotando los créditos, la forma real de la respuesta y si Croma cobra los 5xx (lo dice su doc o el saldo antes y después). Si la forma difiere de la fixture, se corrige la fixture y se vuelve al paso 5.
 9. **`docs/arquitectura-backend.md`:** módulo, puerto, registro y cómo agregar un adaptador. Si el tiempo aprieta, es lo primero que se recorta (queda en un párrafo).
 
 ## Riesgos
