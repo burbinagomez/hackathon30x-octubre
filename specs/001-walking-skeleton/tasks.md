@@ -61,7 +61,7 @@
 - [X] T014 🤖 `.env.example`: sumar `CORS_ORIGINS=` y `E2E_BASE_URL=`, solo nombres.
 
 ### Tarea 3: roles, Alembic, drift y engine
-- [ ] T015 🤖 `backend/scripts/roles.sql`, idempotente y sin passwords (R3):
+- [X] T015 🤖 `backend/scripts/roles.sql`, idempotente y sin passwords (R3):
   - `app_mig` y `app_rt` con `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB`, dentro de un `DO … IF NOT EXISTS`;
   - `GRANT app_mig TO CURRENT_USER`;
   - `ALTER SCHEMA public OWNER TO app_mig`;
