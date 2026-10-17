@@ -41,7 +41,7 @@
 - [X] T009 🤖 **Verde:** contrato `forbidden` en `[tool.importlinter]` de `backend/pyproject.toml`, sobre `app`, contra `googlemaps`, `linkedin*`, `instaloader` y `facebook*`, con `include_external_packages = true`. Verificar contra la versión instalada que los wildcards andan; si no, nombres explícitos (R4).
 
 ### Tarea 2: guard de arranque y Dockerfile de `web`
-- [ ] T010 [P] 🤖 **Rojo:** `backend/tests/arquitectura/test_secrets.py`:
+- [X] T010 [P] 🤖 **Rojo:** `backend/tests/arquitectura/test_secrets.py`:
   - `::test_app_no_arranca_con_secret_prohibido[…]`, un caso por parámetro:
     - `MIGRATION_DATABASE_URL`;
     - un nombre `SUPABASE_*`;
