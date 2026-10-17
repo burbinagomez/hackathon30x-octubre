@@ -35,6 +35,7 @@ def _arrancar():
     ("SUPABASE_SERVICE_ROLE_KEY", "valor-secreto-2"),
     ("API_KEY", "sb_publishable_valorsecreto3"),
     ("OTRA_KEY", "sb_secret_valorsecreto4"),
+    ("TOKEN_CLI", "sbp_valorsecreto5"),
     ("ANON_TOKEN", _jwt({"role": "anon"})),
     ("ADMIN_TOKEN", _jwt({"role": "service_role"})),
 ])
