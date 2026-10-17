@@ -47,4 +47,4 @@ gh workflow run e2e.yml -f base_url=https://<web>.up.railway.app
 - Setear `MIGRATION_DATABASE_URL` o cualquier key de Supabase en `api` hace que el deploy falle al arrancar.
 - `railway variables --service web` muestra solo `VITE_API_URL` (más las `RAILWAY_*` del sistema). Es manual: no hay token de Railway en CI.
 - `curl https://<ref>.supabase.co/rest/v1/` con la publishable key no lista nada de `public`.
-- `gh api repos/:owner/:repo/branches/main/protection` lista `back`, `front`, `seguridad` y `evals` como required.
+- `gh api repos/:owner/:repo/branches/main/protection` lista `back`, `front`, `seguridad`, `evals` e `imagenes` como required.
