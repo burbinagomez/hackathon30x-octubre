@@ -105,7 +105,7 @@
   - `::test_health_db_caida`: 503 y `{"status":"error","db":"error"}`, sin texto de la excepción en el body.
 - [X] T022 [US1] 🤖 **Verde:** `/health` real en `backend/app/main.py` (`SELECT 1` por `db.py`) + CORS solo para `CORS_ORIGINS`. Borrar `backend/tests/unit/test_health_stub.py`.
 - [X] T023 [P] [US1] 🤖 Esqueleto del front: `frontend/package.json`, `vite.config.ts`, `tsconfig.json`, `src/main.tsx`; Vitest + Testing Library + MSW.
-- [ ] T024 [US1] 🤖 **Rojo:** `frontend/src/App.test.tsx`:
+- [X] T024 [US1] 🤖 **Rojo:** `frontend/src/App.test.tsx`:
   - `muestra estado de la API`: `/health` mockeado en ok → "API: ok · DB: ok";
   - con la llamada caída → "API: error";
   - con `db` distinto de ok → "DB: error".
