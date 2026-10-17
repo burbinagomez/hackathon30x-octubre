@@ -1,0 +1,207 @@
+# Spec 002 — Puertos, registro de adaptadores y Supersociedades
+
+**Slice:** 002 · **Rama:** `feature/002-puertos-registro-supersociedades` · **Tiempo:** sábado AM/PM (≤ 4 h)
+**Depende de:** 001. **Desbloquea:** 003, 004, 005, 006 (todo lo que consume `leads`).
+
+> Las ramas son `feature/NNN-…` por decisión del dueño, igual que el 001. `slice-tdd` todavía dice `slice/` y se alinea en el PR de este slice.
+
+## Para quién
+- **El equipo:** el patrón puerto + registro + suite de contrato queda puesto, y todos los adaptadores siguientes lo copian.
+- **La pyme usuaria (o Dapta operando por ella):** con un ICP de prueba (CIIU + departamento) obtiene empresas colombianas reales, cada una con su fuente, su costo y su fila de cumplimiento. En este slice se usa por CLI; la pantalla llega en 005.
+
+## Qué hace
+El primer módulo de negocio, `descubrimiento`, trae cuatro piezas:
+- el puerto `FuenteDescubrimiento`;
+- la carga de `config/fuentes.yaml`, que decide qué adaptadores existen;
+- la suite de contrato, parametrizada sobre el registro;
+- el primer adaptador real, `croma_supersociedades_co`.
+
+Una búsqueda (ICP = país + CIIU + departamento) produce filas en `leads`, `lead_fuentes` y `cumplimiento`, deduplicadas por `(pais, NIT)` y con `tipo_titular=juridica`. Cada request HTTP a Croma escribe su fila en `costos` antes de devolver.
+
+## Puertos y adaptadores que toca (`config/fuentes.yaml`)
+- **`fuentes_descubrimiento.croma_supersociedades_co`** (`habilitado: true`): implementa `FuenteDescubrimiento`. En este slice usa los filtros `ciiu` y `departamento`.
+- **`limites.croma_requests_por_24h`** (100): si se agota, el adaptador se niega a llamar.
+- **`limites.croma_creditos_gratis_mes`** (1.500): si se agota, el adaptador sigue llamando pero registra `gratis=false`. El tope de gasto real lo pone el 005.
+- **`RegistroCostos` ← `postgres_costos`** (PRD §3): en este slice solo se escriben filas. Las fórmulas, el prorrateo y el tablero son del 005.
+- **Sección `fuentes_descubrimiento` del registro:** es la única que este slice carga y valida.
+  - Las claves con `habilitado: true` que todavía no tienen implementación (`croma_dian_trade_co`, `osm_overpass`) se reportan como `sin_implementacion`; no rompen la carga.
+  - `enriquecedores`, `canales_contacto`, `calificadores` y `clasificadores` se cargan en los slices de su puerto (006, 007, 008).
+
+## Skills que aplican
+- `fuentes-publicas`: puerto, normalización a `EmpresaCruda`, paso 1 del dedup, límites de Croma, no redistribuir.
+- `libro-costos`: `OperacionCosto` de tipo `croma_consulta` y el campo `gratis`.
+- `cumplimiento-datos`: `tipo_titular` y fila en `cumplimiento`.
+- `slice-tdd`.
+
+## Evals
+Ninguno: este slice no usa IA. Las empresas que encuentra alimentan `backend/evals/dataset.json` en el 004.
+
+## Flujo principal
+1. `uv run python -m app.cli buscar --tenant <id> --pais CO --ciiu 4711 --departamento 11` crea una fila en `busquedas` con el ICP.
+2. El orquestador lee el registro y toma los adaptadores habilitados e implementados cuyos `paises` y `filtros` cubren el ICP. A cada uno le llama `buscar(criterios, pagina)`. Si ninguno cubre el ICP, devuelve `sin_fuente_para(pais, criterio)`.
+3. El adaptador consulta `fuente_cache`:
+   - **Hay hit:** no gasta crédito.
+   - **No hay hit y queda límite:** hace `POST /co/supersociedades/companies-search/v1` con `per_page=100`. Escribe una fila en `costos` por cada intento HTTP enviado, reintentos incluidos, y guarda la respuesta cruda en el caché.
+   - En ambos casos devuelve `EmpresaCruda` normalizada, con el NIT en solo dígitos (sin puntos ni DV).
+4. `EjecutarBusqueda` deduplica por `(pais, id_fiscal)`:
+   - **Lead nuevo:** se inserta con `tipo_titular` y se crea su fila en `cumplimiento` (fuente, licencia, `url_origen`, `as_of`, base legal pendiente).
+   - **Lead existente:** se reutiliza y no se toca `cumplimiento`.
+   - En los dos casos se agrega una fila en `lead_fuentes` por `(lead, fuente, búsqueda)`.
+5. La CLI imprime el resumen: encontrados · únicos · nuevos · créditos gastados · fuentes sin implementación.
+
+## Terminado cuando (tests que hoy fallan)
+
+**Arquitectura y registro**
+- `backend/tests/arquitectura/test_import_linter.py::test_detecta_violacion_de_capas`: un canario en `tmp_path` donde `descubrimiento/dominio` importa `descubrimiento/infraestructura` hace que `lint-imports` salga con código ≠ 0 y nombre el contrato `layers`. Sobre el repo real sale con 0.
+- `backend/tests/unit/descubrimiento/test_registro.py`:
+  - `::test_carga_config_fuentes_yaml_real_sin_error`: carga el `config/fuentes.yaml` del repo, devuelve `croma_supersociedades_co` y deja `sin_implementacion == {"croma_dian_trade_co", "osm_overpass"}`.
+  - `::test_solo_carga_adaptadores_habilitados`: con un YAML de prueba que tiene un adaptador `true` y uno `false`, devuelve solo el primero.
+  - `::test_habilitado_sin_implementacion_se_reporta`: la clave aparece en `sin_implementacion` y la carga no lanza.
+  - `::test_fuente_habilitada_sin_paises_o_filtros_falla`: una entrada de `fuentes_descubrimiento` con `habilitado: true` y sin `paises` o sin `filtros` lanza `RegistroInvalido`. Las deshabilitadas no se validan.
+- `backend/tests/arquitectura/test_registro_adaptadores.py::test_todo_adaptador_de_registro_esta_declarado`: toda clase en `infraestructura/adaptadores/` que implementa un puerto del registro (`FuenteDescubrimiento`, `Enriquecedor`, `CanalContacto`, `Calificador`, `Clasificador`) está en el catálogo, y su clave existe en `config/fuentes.yaml`.
+  - **Exclusión:** una lista cerrada, `EXCLUIDOS = {persistencia/postgres_costos.py, persistencia/repositorio_leads.py, persistencia/repositorio_cache.py}`. Razón: son repositorios de la DB propia, y no hay registro que los conecte o desconecte.
+  - `::test_persistencia_solo_contiene_excluidos_y_no_importa_http`: falla si en `persistencia/` aparece un archivo fuera de `EXCLUIDOS`, o si alguno importa `httpx`, `requests` o `urllib`. Así un cliente HTTP no puede esconderse ahí.
+- `backend/tests/arquitectura/test_costos_por_adaptador.py::test_todo_adaptador_de_registro_recibe_registro_costos`: toda clase de `infraestructura/adaptadores/` que implementa un puerto del registro, con el mismo criterio del test anterior, tiene `RegistroCostos` en su constructor. Las excepciones y los helpers quedan fuera.
+  - **Exclusión:** la misma lista `EXCLUIDOS`. Razón: el I/O externo es la red, no la base propia, y `postgres_costos` es el registro mismo.
+
+**Contrato del puerto** (`backend/tests/contratos/test_fuente_descubrimiento.py`, parametrizado sobre el catálogo, con transporte falso)
+- `::test_devuelve_empresas_normalizadas[croma_supersociedades_co]`: cada empresa trae `pais`, `nombre`, `fuente`, `url_origen`, `as_of` y `actividad` con su `sistema`.
+- `::test_registra_costo_antes_de_devolver[…]`: hay una fila por intento HTTP en el `RegistroCostos` falso, escrita antes de que `buscar` retorne.
+- `::test_rechaza_criterio_no_soportado[…]`: un criterio fuera de `filtros` lanza `CriterioNoSoportado` y no se hace ningún request.
+
+**Adaptador Croma** (`backend/tests/unit/descubrimiento/test_croma_supersociedades.py`, con fixture JSON **sintética**: Croma no se redistribuye)
+- `::test_mapea_respuesta_a_empresa_cruda`:
+  - `900.123.456-7` queda como `id_fiscal == "900123456"`;
+  - `tipo_titular == "juridica"`;
+  - `actividad == ("4711", "CIIU")`;
+  - ciudad y dirección presentes.
+- `::test_registra_un_credito_por_request`: la fila tiene `tipo="croma_consulta"`, `unidades=1`, `costo_unitario == tarifas.croma.usd_por_credito`, `proveedor="croma"`, `fuente="croma_supersociedades_co"`, `lead_id=None` y el `lote_id` de la corrida.
+Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `RegistroCostos.creditos_mes(proveedor)`. Acá el falso devuelve números fijos y se prueba la decisión del adaptador. El SQL de los contadores se prueba en integración.
+- `::test_dentro_del_cupo_mensual_registra_gratis`: con `creditos_mes=1499`, la fila sale con `gratis=True`.
+- `::test_cupo_mensual_agotado_registra_no_gratis`: con `creditos_mes=1500`, la fila sale con `gratis=False` y el mismo `costo_unitario`.
+- `::test_no_llama_si_se_agoto_el_limite_de_24h`: con `requests_24h=100` y `creditos_mes=0`, lanza `LimiteFuenteAgotado` y el transporte recibe 0 requests.
+- `::test_limite_de_24h_usa_requests_no_creditos`: con `requests_24h=99` y `creditos_mes=990`, no lanza y se hace la request.
+- `::test_reintento_tras_502_registra_cada_intento`: un 502 seguido de un 200 da 2 requests y 2 filas en el registro falso. La del 502 lleva `unidades=0` y `costo_unitario=0`; la del 200, `unidades=1`. El gasto suma 1 crédito y la búsqueda devuelve las empresas.
+- `::test_respuesta_cacheada_no_gasta_credito`: la segunda búsqueda idéntica hace 0 requests y escribe 0 filas nuevas.
+
+**Caso de uso** (`backend/tests/unit/descubrimiento/test_ejecutar_busqueda.py`, con repositorio falso)
+- `::test_mismo_nit_de_dos_fuentes_queda_en_un_lead`: dos `EmpresaCruda` `(CO, 900123456)` de **fuentes distintas** dan 1 lead con 2 `lead_fuentes`.
+- `::test_misma_fuente_repetida_no_duplica_lead_fuentes`: la misma empresa dos veces, de la misma fuente y en la misma búsqueda, da 1 lead con 1 `lead_fuentes`.
+- `::test_nit_con_y_sin_formato_es_el_mismo_lead`: `900.123.456-7` y `900123456` dan 1 lead.
+- `::test_mismo_nit_distinto_pais_son_dos_leads`.
+- `::test_lead_existente_en_segunda_busqueda_no_duplica_cumplimiento`: dos búsquedas con el mismo NIT dan 1 lead, 1 `cumplimiento` y 2 `lead_fuentes` (una por `busqueda_id`).
+- `::test_cada_lead_nuevo_tiene_fila_en_cumplimiento`: con fuente, licencia y `as_of`.
+- `::test_sin_fuente_para_el_pais_se_reporta`: un ICP con `pais=BR`, teniendo solo Croma en el catálogo, devuelve `sin_fuente_para("BR", …)` y 0 leads.
+
+**Integración** (Postgres de prueba, rol `app_rt`)
+- `backend/tests/integration/test_leads_repo.py`:
+  - `::test_unico_por_tenant_pais_id_fiscal`: un segundo INSERT con el mismo `(tenant_id, pais, id_fiscal)` viola la restricción.
+  - `::test_unico_lead_fuente_busqueda`: un segundo INSERT en `lead_fuentes` con el mismo `(lead_id, fuente, busqueda_id)` viola la restricción, y `EjecutarBusqueda` lo resuelve con `ON CONFLICT DO NOTHING`.
+  - `::test_lead_persistido_conserva_tipo_titular`: una `EmpresaCruda` de Supersociedades, guardada y releída, tiene `tipo_titular == 'juridica'`.
+- `backend/tests/integration/test_costos_repo.py::test_croma_consulta_escribe_fila_en_costos`: el adaptador, con transporte falso y `postgres_costos` real, deja en `costos` 1 fila con `tipo='croma_consulta'`, `unidades=1`, `costo_unitario=0.00099`, `gratis=true` y el `tenant_id` del contexto. Es el chequeo del principio VIII.
+- Contadores contra Postgres real, también en `test_costos_repo.py`. Siembran relativo a `now()` de la DB y usan `unidades` 0, 1 y 10:
+  - `::test_requests_24h_cuenta_filas_en_ventana`: una fila a 23 h 59 min y otra a 24 h 01 min dan `requests_24h == 1`, aunque la fila de adentro tenga `unidades=0`.
+  - `::test_creditos_mes_suma_unidades_del_mes_calendario_utc`: filas de 10 créditos a las 23:59 UTC del último día del mes anterior, y filas de 1 y 10 a las 00:01 UTC del primero del actual. Solo suman las del mes actual. El test corre con `SET TIME ZONE 'America/Bogota'` para probar que se usa UTC y no la zona de la sesión.
+  - `::test_reintento_cuenta_para_el_limite`: con 98 filas previas, un 502 seguido de un 200 deja `requests_24h == 100` y `creditos_mes` sube en 1. La búsqueda siguiente lanza `LimiteFuenteAgotado`.
+- `backend/tests/integration/test_rls.py::test_tenant_b_no_accede_a_datos_de_a[tabla]`, sobre `tenants`, `busquedas`, `leads`, `lead_fuentes`, `cumplimiento` y `costos`. En `tenants` la política es `id = app.tenant_id`, y `app_rt` no tiene `INSERT`: la siembra corre con `app_mig`. Como tenant B:
+  - SELECT devuelve vacío;
+  - UPDATE y DELETE afectan 0 filas de A;
+  - un INSERT con el `tenant_id` de A es rechazado.
+
+  `fuente_cache` va en la lista de exclusiones, con su razón (ver Decisiones técnicas).
+- `backend/tests/integration/test_privilegios_supabase.py` (los dos primeros corren con `app_mig`, que puede leer el catálogo):
+  - `::test_anon_y_authenticated_sin_privilegios[rol-tabla]`: para `anon` y `authenticated`, sobre cada tabla de `public` (`fuente_cache` incluida), `has_table_privilege(rol, tabla, priv)` es `false` para `SELECT`, `INSERT`, `UPDATE` y `DELETE`. La lista de tablas sale de `pg_tables WHERE schemaname='public'`, no de una lista fija: una tabla nueva entra sola. Un assert previo exige que la lista contenga al menos `leads` y `alembic_version`, para que una lista vacía no deje la suite verde sin correr nada.
+  - `::test_default_privileges_no_conceden_a_anon_ni_authenticated`: después de `upgrade head`, `app_mig` crea una tabla **regular** `public.x` dentro de una transacción con rollback, y `anon`/`authenticated` no tienen ningún privilegio sobre ella. No una `TEMP TABLE`: esa va a `pg_temp` y no le aplican los defaults de `public`.
+  - `::test_tenant_no_sobrevive_al_commit`: usa la unidad de trabajo real sobre el engine de `app_rt`, no un `SET LOCAL` escrito en el test. Dentro de la unidad de trabajo, `current_setting('app.tenant_id', true)` es el tenant; después del commit, en la misma conexión, es vacío o `NULL`. Prueba que el código usa `SET LOCAL` y no `SET` de sesión.
+  - Que `app_rt` no tiene `BYPASSRLS` ya lo prueba `test_rol_runtime` del 001.
+
+## Fuera del alcance
+- **003:** OSM, normalización entre fuentes, dedup por dominio, teléfono o nombre difuso, y DIAN Trade.
+- **005:** fórmulas de CPL, prorrateo, costo de cómputo, tablero, formulario, endpoint HTTP de búsqueda, auth de usuarios (llega con el primer endpoint que gasta créditos) y tope de gasto en USD.
+- **006:** carga de `enriquecedores`, `contactable` y cifrado del contacto. Este slice no agrega ninguna columna sensible: NIT, razón social y dirección de una persona jurídica no son datos personales.
+- Paginación más allá de la página 1. El puerto ya trae el parámetro `pagina`.
+
+## Decisiones técnicas
+
+**Módulo** `backend/app/modulos/descubrimiento/`:
+- `dominio/`: `EmpresaCruda`, `CriteriosICP`, `MetaFuente`, `normalizar_nit` y los Protocols `FuenteDescubrimiento`, `RegistroCostos` y `RepositorioLeads`.
+- `aplicacion/`: `EjecutarBusqueda` y `cargar_registro`.
+- `infraestructura/adaptadores/croma_supersociedades.py`.
+- `infraestructura/persistencia/{postgres_costos,repositorio_leads,repositorio_cache}.py`.
+
+**import-linter:** contrato `layers` (`infraestructura > aplicacion > dominio`) para `app.modulos.*`, con el canario. Paga la deuda que dejó el 001.
+
+**Registro:**
+- `cargar_registro(ruta_yaml, catalogo)` lee solo `fuentes_descubrimiento`. Si el catálogo tiene una clave que no está en el YAML, lanza `RegistroInvalido`.
+- `catalogo` es un dict `clave → clase` en `infraestructura/adaptadores/__init__.py`. Es el único lugar que conoce las clases concretas.
+- El dominio recibe instancias ya construidas.
+- `# ponytail:` una sección por slice. Cuando haya un segundo puerto cargado (006), el loader se generaliza por sección.
+
+**Tablas** (migración `0002_descubrimiento`, a mano, con `GRANT` a `app_rt` según la plantilla del 001):
+
+| Tabla | Columnas | Restricciones |
+|---|---|---|
+| `tenants` | `id`, `nombre`, `creado_en` | Se siembra con el tenant del evento, por script. |
+| `busquedas` | `pais`, `criterios jsonb`, `estado`, `canal_preferido`, `tope_gasto_usd`, `mensaje_base` | — |
+| `leads` | `pais`, `id_fiscal`, `nombre`, `tipo_titular`, `ciudad`, `direccion`, `actividad_codigo`, `actividad_sistema`, `web` | `id_fiscal` nullable (por OSM). `tipo_titular` ∈ `juridica`/`natural`/`desconocido`, NOT NULL, default `desconocido`. UNIQUE `(tenant_id, pais, id_fiscal)`. |
+| `lead_fuentes` | `lead_id`, `busqueda_id`, `fuente`, `encontrado_en`, `url_origen`, `licencia` | UNIQUE `(lead_id, fuente, busqueda_id)`. |
+| `cumplimiento` | `lead_id`, `fuente`, `licencia`, `url_origen`, `base_legal`, `as_of`, `opt_out_at`, `solicitudes jsonb` | `lead_id` UNIQUE. `base_legal` nullable hasta el 007 (la setea `AprobarMensaje`). |
+| `costos` | las columnas de `OperacionCosto` + `gratis` | `gratis bool NOT NULL`. |
+
+Todas menos `tenants` llevan `tenant_id` y RLS con `USING/WITH CHECK (tenant_id = current_setting('app.tenant_id')::uuid)`. `tenants` tiene RLS con `USING (id = current_setting('app.tenant_id')::uuid)`, solo `GRANT SELECT` a `app_rt`, y se siembra con `app_mig`. La unidad de trabajo abre la transacción y hace `SET LOCAL app.tenant_id` (o `set_config(..., true)`) como primera sentencia. **Nunca `SET` de sesión:** `api` entra por el pooler de Supabase en modo transacción, y una conexión con el tenant de otro cliente puede llegar a la request siguiente.
+
+**Roles de Supabase** (en la misma `0002`, al final):
+```sql
+REVOKE ALL ON ALL TABLES    IN SCHEMA public FROM anon, authenticated;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
+ALTER DEFAULT PRIVILEGES FOR ROLE app_mig IN SCHEMA public REVOKE ALL ON TABLES    FROM anon, authenticated;
+ALTER DEFAULT PRIVILEGES FOR ROLE app_mig IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated;
+```
+- Si el `pg_default_acl` verificado en la tarea 0a del 001 muestra grants por defecto de `postgres` hacia `anon`/`authenticated` en `public`, se agrega el mismo `ALTER DEFAULT PRIVILEGES FOR ROLE postgres …` (lo corre `postgres` desde el SQL editor, porque `app_mig` no puede alterar los defaults de otro rol) y se anota en el quickstart.
+- La migración no puede fallar en Postgres vanilla: el bloque va dentro de un `DO` que solo corre si existen `anon` y `authenticated` (`pg_roles`).
+- **CI y local:** `backend/scripts/supabase_simulado.sql` corre después de `roles.sql` y antes de `upgrade head`. Crea `anon` y `authenticated` `NOLOGIN` y simula el peor caso de Supabase: `ALTER DEFAULT PRIVILEGES FOR ROLE app_mig IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated`. Sin ese script, el test de privilegios nacería verde en vanilla y no probaría nada.
+
+**`fuente_cache`** (`proveedor`, `endpoint`, `hash_params`, `respuesta jsonb`, `as_of`) es **global, sin `tenant_id`**:
+- Guarda datos públicos de gobierno, no datos del tenant. Por eso queda excluida del test de RLS.
+- Las respuestas cacheadas son de uso propio y no se exponen por API.
+
+**Límites:**
+- Los dos son métodos de `postgres_costos` (`requests_24h`, `creditos_mes`) y se cuentan desde `costos` (`proveedor='croma'`), sin tabla nueva. El adaptador solo decide con lo que le devuelven:
+  - **Límite de 24 h:** `COUNT(*)` de las filas en `ts > now() - interval '24 hours'`. Cuenta requests.
+  - **Cupo mensual:** `SUM(unidades)` dentro del mes calendario UTC (`ts >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`; un `date_trunc` sobre `timestamptz` usaría la zona de la sesión). Cuenta créditos.
+- Cada intento HTTP enviado escribe su fila, porque Croma limita por requests.
+  - **Intento fallido** (5xx o timeout): `unidades=0` y `costo_unitario=0`. Cuenta para el límite de 24 h, pero no infla el gasto ni el CPL.
+  - Si Croma cobra los 5xx, se corrige en el paso 8.
+- `# ponytail:` por RLS, la cuenta es por tenant. Con un solo tenant en el evento coincide con la cuenta de Croma; con varios tenants pasa a un contador global.
+
+**HTTP:**
+- `httpx`, con `MockTransport` en los tests.
+- Timeout de 10 s y un reintento con backoff ante 502, 503 o timeout.
+- `CROMA_API_KEY` viene del entorno vía el `config` de la app; el dominio nunca la ve.
+
+**Tarifas:** `config/tarifas.yaml` se carga una vez, y el adaptador recibe el `costo_unitario` ya resuelto.
+
+## Plan de tareas (TDD, en orden)
+1. **Canario `layers`:** test en rojo → contrato en `pyproject.toml` → verde.
+2. **Dominio + registro:** `EmpresaCruda`, `CriteriosICP`, `normalizar_nit`, los Protocols y `cargar_registro`. Los 4 tests de `test_registro.py` en rojo → verde; el primero que se escribe es el del YAML real.
+3. **Migración `0002` + `persistencia/`:**
+   - `supabase_simulado.sql` en CI primero, para que los tests de privilegios nazcan en rojo;
+   - `test_unico_…`, `test_lead_persistido_conserva_tipo_titular`, `test_rls[…]` y los 3 de `test_privilegios_supabase.py` en rojo → verde;
+   - el **advisor revisa los tests de RLS y de privilegios antes de aceptarlos**.
+4. **`postgres_costos`:** `test_todo_adaptador_de_registro_recibe_registro_costos` en rojo → verde.
+5. **Adaptador `croma_supersociedades_co`** con la fixture sintética:
+   - mapeo, crédito, gratis/no gratis, 24 h, reintento y caché en rojo → verde;
+   - después, `test_costos_repo.py`;
+   - el **advisor revisa los tests de costos**.
+6. **Suite de contrato** + `test_todo_adaptador_de_registro_esta_declarado`: rojo → verde.
+7. **`EjecutarBusqueda`:** los 7 tests del caso de uso en rojo → verde. El **advisor revisa los tests de dedup**.
+8. **CLI `app.cli buscar`** y **una** corrida real contra Croma: 1 request, avisada antes, anotando los créditos, la forma real de la respuesta y si Croma cobra los 5xx (lo dice su doc o el saldo antes y después). Si la forma difiere de la fixture, se corrige la fixture y se vuelve al paso 5.
+9. **`docs/arquitectura-backend.md`:** módulo, puerto, registro y cómo agregar un adaptador. Si el tiempo aprieta, es lo primero que se recorta (queda en un párrafo).
+
+## Riesgos
+- **La forma real de la respuesta de Croma no está verificada.** La fixture sale de `docs.usecroma.com` y el paso 8 la contrasta con la respuesta real.
+- **La cuota (100 req/24 h) se quema en desarrollo.** Los tests nunca tocan la red y el caché cubre las corridas manuales.
+- **Croma devuelve 502 o tarda.** Hay un reintento, y queda registrado. Si también falla, el error se reporta en la búsqueda; no se traga.
+- **Sesgo de Supersociedades:** solo trae medianas y grandes que reportan, así que con un ICP de micro-pymes rinde poco. Lo compensa OSM en el 003, y el sesgo se muestra en el tablero.
+- **DV del NIT:** se guarda sin DV y `normalizar_nit` lo corta. Lo cubren el test de mapeo y el de dedup.
+- **CI corre contra `postgres:16`, no contra Supabase.** `supabase_simulado.sql` emula `anon`/`authenticated` y sus default privileges, pero no `service_role` (que tiene `BYPASSRLS`) ni el resto del dashboard. Lo que la emulación no cubre se verifica a mano en producción tras el primer deploy: `has_table_privilege` desde `psql` y `curl /rest/v1/` sin `public` (quickstart del 001).
