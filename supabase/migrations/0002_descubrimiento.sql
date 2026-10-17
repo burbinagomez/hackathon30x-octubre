@@ -16,7 +16,8 @@ CREATE TABLE public.busquedas (
   canal_preferido text,
   tope_gasto_usd  numeric,
   mensaje_base    text,
-  creado_en       timestamptz NOT NULL DEFAULT now()
+  creado_en       timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT busquedas_tenant_id_id_key UNIQUE (tenant_id, id)
 );
 
 CREATE TABLE public.leads (
@@ -36,25 +37,31 @@ CREATE TABLE public.leads (
     CASE pais WHEN 'CO' THEN 'es' WHEN 'MX' THEN 'es' WHEN 'PE' THEN 'es' WHEN 'BR' THEN 'pt' END
   ) STORED,
   creado_en         timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT leads_tenant_pais_id_fiscal_key UNIQUE (tenant_id, pais, id_fiscal)
+  CONSTRAINT leads_tenant_pais_id_fiscal_key UNIQUE (tenant_id, pais, id_fiscal),
+  CONSTRAINT leads_tenant_id_id_key UNIQUE (tenant_id, id)
 );
+
+-- FK compuestas (tenant_id, x_id): una FK no pasa por RLS, y con una simple un tenant que conozca
+-- el uuid de un lead o una búsqueda ajenos le cuelga filas.
 
 CREATE TABLE public.lead_fuentes (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id     uuid NOT NULL REFERENCES public.tenants(id),
-  lead_id       uuid NOT NULL REFERENCES public.leads(id),
-  busqueda_id   uuid NOT NULL REFERENCES public.busquedas(id),
+  lead_id       uuid NOT NULL,
+  busqueda_id   uuid NOT NULL,
   fuente        text NOT NULL,
   encontrado_en timestamptz NOT NULL DEFAULT now(),
   url_origen    text NOT NULL,
   licencia      text NOT NULL,
-  CONSTRAINT lead_fuentes_lead_fuente_busqueda_key UNIQUE (lead_id, fuente, busqueda_id)
+  CONSTRAINT lead_fuentes_lead_fuente_busqueda_key UNIQUE (lead_id, fuente, busqueda_id),
+  FOREIGN KEY (tenant_id, lead_id) REFERENCES public.leads (tenant_id, id),
+  FOREIGN KEY (tenant_id, busqueda_id) REFERENCES public.busquedas (tenant_id, id)
 );
 
 CREATE TABLE public.cumplimiento (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id   uuid NOT NULL REFERENCES public.tenants(id),
-  lead_id     uuid NOT NULL REFERENCES public.leads(id),
+  lead_id     uuid NOT NULL,
   fuente      text NOT NULL,
   licencia    text NOT NULL,
   url_origen  text NOT NULL,
@@ -62,7 +69,8 @@ CREATE TABLE public.cumplimiento (
   as_of       timestamptz NOT NULL,
   opt_out_at  timestamptz,
   solicitudes jsonb NOT NULL DEFAULT '[]'::jsonb,
-  CONSTRAINT cumplimiento_lead_id_key UNIQUE (lead_id)
+  CONSTRAINT cumplimiento_lead_id_key UNIQUE (lead_id),
+  FOREIGN KEY (tenant_id, lead_id) REFERENCES public.leads (tenant_id, id)
 );
 
 -- lead_id y lote_id sin FK: un costo no se pierde porque se borre un lead.
@@ -101,3 +109,34 @@ GRANT SELECT ON public.tenants TO app_rt;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.busquedas, public.leads, public.lead_fuentes,
   public.cumplimiento, public.costos TO app_rt;
 GRANT SELECT, INSERT, UPDATE ON public.fuente_cache TO app_rt;
+
+-- RLS por tenant. app_rt no es dueño, así que la política lo alcanza sin FORCE. Sin app.tenant_id
+-- la sentencia falla (current_setting sin missing_ok): falla cerrada.
+ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_aislado ON public.tenants
+  USING (id = current_setting('app.tenant_id')::uuid);
+
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['busquedas', 'leads', 'lead_fuentes', 'cumplimiento', 'costos'] LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('CREATE POLICY tenant_aislado ON public.%I '
+                   'USING (tenant_id = current_setting(''app.tenant_id'')::uuid) '
+                   'WITH CHECK (tenant_id = current_setting(''app.tenant_id'')::uuid)', t);
+  END LOOP;
+END
+$$;
+
+-- Roles de Supabase: sin acceso a public. Solo si existen; en Postgres vanilla no hay nada que revocar.
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon')
+     AND EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON ALL TABLES    IN SCHEMA public FROM anon, authenticated;
+    REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
+    ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES    FROM anon, authenticated;
+    ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated;
+  END IF;
+END
+$$;

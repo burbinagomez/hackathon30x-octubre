@@ -4,6 +4,7 @@ from sqlalchemy import (
     Computed,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     MetaData,
     Numeric,
@@ -48,6 +49,7 @@ busquedas = Table(
     Column("tope_gasto_usd", Numeric),
     Column("mensaje_base", Text),
     Column("creado_en", DateTime(timezone=True), nullable=False, server_default=_AHORA),
+    UniqueConstraint("tenant_id", "id", name="busquedas_tenant_id_id_key"),
 )
 
 leads = Table(
@@ -68,24 +70,27 @@ leads = Table(
     )),
     Column("creado_en", DateTime(timezone=True), nullable=False, server_default=_AHORA),
     UniqueConstraint("tenant_id", "pais", "id_fiscal", name="leads_tenant_pais_id_fiscal_key"),
+    UniqueConstraint("tenant_id", "id", name="leads_tenant_id_id_key"),
 )
 
 lead_fuentes = Table(
     "lead_fuentes", metadata,
     _id(), _tenant(),
-    Column("lead_id", UUID(as_uuid=True), ForeignKey("leads.id"), nullable=False),
-    Column("busqueda_id", UUID(as_uuid=True), ForeignKey("busquedas.id"), nullable=False),
+    Column("lead_id", UUID(as_uuid=True), nullable=False),
+    Column("busqueda_id", UUID(as_uuid=True), nullable=False),
     Column("fuente", Text, nullable=False),
     Column("encontrado_en", DateTime(timezone=True), nullable=False, server_default=_AHORA),
     Column("url_origen", Text, nullable=False),
     Column("licencia", Text, nullable=False),
     UniqueConstraint("lead_id", "fuente", "busqueda_id", name="lead_fuentes_lead_fuente_busqueda_key"),
+    ForeignKeyConstraint(["tenant_id", "lead_id"], ["leads.tenant_id", "leads.id"]),
+    ForeignKeyConstraint(["tenant_id", "busqueda_id"], ["busquedas.tenant_id", "busquedas.id"]),
 )
 
 cumplimiento = Table(
     "cumplimiento", metadata,
     _id(), _tenant(),
-    Column("lead_id", UUID(as_uuid=True), ForeignKey("leads.id"), nullable=False),
+    Column("lead_id", UUID(as_uuid=True), nullable=False),
     Column("fuente", Text, nullable=False),
     Column("licencia", Text, nullable=False),
     Column("url_origen", Text, nullable=False),
@@ -94,6 +99,7 @@ cumplimiento = Table(
     Column("opt_out_at", DateTime(timezone=True)),
     Column("solicitudes", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
     UniqueConstraint("lead_id", name="cumplimiento_lead_id_key"),
+    ForeignKeyConstraint(["tenant_id", "lead_id"], ["leads.tenant_id", "leads.id"]),
 )
 
 costos = Table(
