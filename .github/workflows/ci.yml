@@ -22,7 +22,6 @@ jobs:
       # Passwords de test, solo para este Postgres efímero (R6).
       PGPASSWORD: postgres-ci
       TEST_DATABASE_URL: postgresql+psycopg://app_rt:rt-ci@localhost:5432/postgres
-      TEST_MIGRATION_DATABASE_URL: postgresql+psycopg://app_mig:mig-ci@localhost:5432/postgres
       TEST_ADMIN_DATABASE_URL: postgresql+psycopg://postgres:postgres-ci@localhost:5432/postgres
     defaults:
       run:
@@ -32,18 +31,16 @@ jobs:
       - uses: astral-sh/setup-uv@v10.2.0
         with:
           version: "0.12.1"
-      - name: roles.sql + passwords de test
+      - name: roles.sql + password de test
         run: |
           psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f scripts/roles.sql
-          psql -h localhost -U postgres -v ON_ERROR_STOP=1 \
-            -c "ALTER ROLE app_rt PASSWORD 'rt-ci'" -c "ALTER ROLE app_mig PASSWORD 'mig-ci'"
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 -c "ALTER ROLE app_rt PASSWORD 'rt-ci'"
+      # Como superusuario, igual que `supabase db push` en prod (corre como postgres).
+      - name: supabase/migrations desde vacío
+        run: scripts/migrar_local.sh postgresql://postgres@localhost:5432/postgres
       - run: uv sync --frozen
       - run: uv run pytest -q
       - run: uv run lint-imports
-      - name: alembic desde cero + check
-        env:
-          MIGRATION_DATABASE_URL: ${{ env.TEST_MIGRATION_DATABASE_URL }}
-        run: uv run alembic downgrade base && uv run alembic upgrade head && uv run alembic check
 
   front:
     runs-on: ubuntu-24.04
@@ -116,16 +113,13 @@ jobs:
     concurrency:
       group: migrar
       cancel-in-progress: false
-    defaults:
-      run:
-        working-directory: backend
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
         with:
-          version: "0.12.1"
-      - run: uv sync --frozen --no-dev
-      - name: alembic upgrade head contra Supabase (pooler en modo sesión)
+          version: 2.119.0
+      # Sin link ni access token: --db-url va directo al pooler en modo sesión; --yes evita el prompt en el runner.
+      # La credencial vive solo en este step, en un job que nunca levanta la app (III).
+      - run: supabase db push --db-url "$SUPABASE_DB_URL" --yes
         env:
-          MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
-        run: uv run --no-dev alembic upgrade head
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}

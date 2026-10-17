@@ -238,7 +238,7 @@ Tests:
 
 **La transferencia a Dapta** queda trazada en `calificaciones.exportado_en`, por lead. La pantalla de cumplimiento de la 012 la lee.
 
-**Migración `0008_calificaciones.py`** (a mano, con `GRANT` a `app_rt`):
+**Migración `supabase/migrations/0008_calificaciones.sql`** (a mano, con `GRANT` a `app_rt`):
 
 | Tabla / vista | Definición |
 |---|---|

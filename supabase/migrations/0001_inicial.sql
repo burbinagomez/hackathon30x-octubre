@@ -1,0 +1,3 @@
+-- Sin tablas de negocio en el 001. Plantilla para las que siguen: SQL a mano, revisado por un
+-- humano, y los GRANT a app_rt en la misma migración (db push corre como postgres, que es el dueño):
+--   GRANT SELECT, INSERT, UPDATE, DELETE ON public.<tabla> TO app_rt;
