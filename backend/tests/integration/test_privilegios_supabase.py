@@ -2,7 +2,7 @@ import os
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 
 from app import db
 
@@ -31,3 +31,42 @@ def test_tenant_no_sobrevive_al_commit():
             assert c.execute(text(TENANT)).scalar() in ("", None)
     finally:
         engine.dispose()
+
+
+ROLES_SUPABASE = ["anon", "authenticated"]
+PRIVILEGIOS = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE"]
+
+
+def _concedidos(c, rol, tablas):
+    return [(t, p) for t in tablas for p in PRIVILEGIOS
+            if c.execute(text("SELECT has_table_privilege(:rol, :t, :p)"),
+                         {"rol": rol, "t": f"public.{t}", "p": p}).scalar()]
+
+
+@pytest.fixture
+def admin():
+    engine = create_engine(_url("TEST_ADMIN_DATABASE_URL"))
+    try:
+        with engine.connect() as c:
+            yield c
+    finally:
+        engine.dispose()
+
+
+# ponytail: un caso por rol y no por rol-tabla; la lista sale de pg_tables en runtime y el assert nombra
+# cada (tabla, privilegio) concedido. Parametrizar por tabla exigiría consultar la base al colectar.
+@pytest.mark.parametrize("rol", ROLES_SUPABASE)
+def test_anon_y_authenticated_sin_privilegios(admin, rol):
+    tablas = list(admin.execute(text("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")).scalars())
+    assert "leads" in tablas  # una lista vacía dejaría el test verde sin probar nada
+    assert _concedidos(admin, rol, tablas) == []
+
+
+def test_default_privileges_no_conceden_a_anon_ni_authenticated(admin):
+    # Tabla regular, no TEMP: una TEMP va a pg_temp y no le aplican los defaults de public.
+    transaccion = admin.begin()
+    try:
+        admin.execute(text("CREATE TABLE public.x (id int)"))
+        assert {rol: _concedidos(admin, rol, ["x"]) for rol in ROLES_SUPABASE} == {"anon": [], "authenticated": []}
+    finally:
+        transaccion.rollback()
