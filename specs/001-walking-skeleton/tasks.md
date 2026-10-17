@@ -30,7 +30,7 @@
   - `USER app`;
   - `HEALTHCHECK` con `python -c urllib…` sobre `${PORT:-8000}`;
   - `CMD exec uvicorn … --port ${PORT:-8000}`.
-- [ ] T007 🧑A Railway: crear el proyecto con 2 servicios (`api`, `web`) conectados al repo, `api` con root `backend/` y Dockerfile, y lanzar el primer deploy de `api` desde `feature/001-walking-skeleton`. Que construya mientras sigo con T008–T026.
+- [X] T007 🧑A Railway: crear el proyecto con 2 servicios (`api`, `web`) conectados al repo, `api` con root `backend/` y Dockerfile, y lanzar el primer deploy de `api` desde `feature/001-walking-skeleton`. Que construya mientras sigo con T008–T026.
 
 ## Fase 2: Fundacional — barandales (tareas 1–3)
 
