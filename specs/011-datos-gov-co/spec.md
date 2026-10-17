@@ -59,10 +59,10 @@ Ninguno: este slice no usa IA.
    - **conteo de naturales:** consulta `fuente_cache` con su propia clave. Si no hay hit, hace `GET` con `$select=count(*)` y el `$where` de naturales. También registra el costo por intento y lo cachea;
    - mapea a `EmpresaCruda`, marca `truncado` si llegaron 5.000 filas y devuelve `naturales_no_descargadas`.
    - Con `pagina > 1` devuelve una página vacía sin hacer requests: hay una sola página (ver Decisiones técnicas).
-5. `EjecutarBusqueda` (002/003) deduplica y persiste, igual que antes. Un NIT que ya existe por Supersociedades se fusiona por la regla 1, y `cumplimiento` no cambia. Un lead nuevo lleva su `cumplimiento` (`fuente='datos_gov_co_rues'`, `licencia='CC-BY-SA-4.0'`, `url_origen`, `as_of` del header) y su `lead_fuentes`. **El único cambio** es que guarda `{fuente: naturales_no_descargadas}` en `busquedas.naturales_por_fuente`, solo para las fuentes con `meta().cuenta_naturales=True`.
+5. `EjecutarBusqueda` (002/003) deduplica y persiste, igual que antes. Un NIT que ya existe por Supersociedades se fusiona por la regla 1, y `cumplimiento` no cambia. Un lead nuevo lleva su `cumplimiento` (`fuente='datos_gov_co_rues'`, `licencia='CC-BY-SA-4.0'`, `url_origen`, `as_of` del header) y su `lead_fuentes`. **El único cambio** es que guarda `{fuente: naturales_no_descargadas}` en `busquedas.naturales_por_fuente`, solo para las fuentes con `meta.cuenta_naturales=True`.
 6. La CLI imprime el resumen por fuente de la 003, más `naturales (encontradas, no contactables)` y `descartados_no_juridica`. La respuesta de ejecutar de la 005 suma el mismo campo por fuente.
 7. **Vista previa (005):** `contar` hace un `count(*)` con el mismo `$where` de jurídicas. Es exacto, porque hay una fila por NIT (ver Decisiones técnicas). Su costo es el de la 005 para fuentes de cómputo: los segundos medidos × `computo_seg_usd`.
-8. **Tablero:** `GET /tablero/fuentes` suma `cuenta_naturales` (de `meta()`) y `naturales_no_descargadas` por fuente, tomado de la última búsqueda completada del tenant que la consultó. Si la fuente no cuenta, el valor es "no aplica" y nunca `0`.
+8. **Tablero:** `GET /tablero/fuentes` suma `cuenta_naturales` (de `meta`) y `naturales_no_descargadas` por fuente, tomado de la última búsqueda completada del tenant que la consultó. Si la fuente no cuenta, el valor es "no aplica" y nunca `0`.
 
 ## Terminado cuando (tests que hoy fallan)
 
@@ -73,7 +73,7 @@ Ninguno: este slice no usa IA.
 
 **Contrato del puerto** (`backend/tests/contratos/test_fuente_descubrimiento.py`)
 - Los seis tests (los tres de la 002 y los tres de `contar` de la 005) corren también con `[datos_gov_co_rues]`, con transporte falso. La suite no se toca: lo único nuevo es que el adaptador entra al catálogo.
-- `::test_campos_aditivos_del_resultado`, nuevo y parametrizado sobre **todos** los adaptadores: `descartados_no_juridica` es un `int >= 0`. Si `meta().cuenta_naturales` es `False`, `naturales_no_descargadas is None`; si es `True`, vale `int >= 0` o `None`. Nace rojo porque los campos no existen. Croma y OSM lo pasan con los defaults (`0`, `None` y `cuenta_naturales=False`).
+- `::test_campos_aditivos_del_resultado`, nuevo y parametrizado sobre **todos** los adaptadores: `descartados_no_juridica` es un `int >= 0`. Si `meta.cuenta_naturales` es `False`, `naturales_no_descargadas is None`; si es `True`, vale `int >= 0` o `None`. Nace rojo porque los campos no existen. Croma y OSM lo pasan con los defaults (`0`, `None` y `cuenta_naturales=False`).
 - `backend/tests/arquitectura/test_registro_adaptadores.py::test_todo_adaptador_de_registro_esta_declarado` y `test_costos_por_adaptador.py::test_todo_adaptador_de_registro_recibe_registro_costos` lo cubren sin tocarlos.
 
 **Adaptador** (`backend/tests/unit/descubrimiento/test_datos_gov_co.py`, con fixtures **sintéticas** en `backend/tests/fixtures/datos_gov_co/`: `filas.json`, con el esquema real y NITs ficticios, y `conteo_naturales.json`, `[{"count": "26304"}]`)
@@ -86,12 +86,13 @@ Ninguno: este slice no usa IA.
 - `::test_departamento_se_traduce_a_camaras`: 11 → `in('04')`; 25 → `in('04','14','47','58')`. Un departamento que no está en `camaras_co.yaml`, o un CIIU que no cumple `^\d{4}$` (`"47' OR '1'='1"`), lanza `CriterioNoSoportado` y el transporte recibe 0 requests.
 - `::test_cliente_descarta_lo_que_no_debio_llegar`: la fixture trae, además de las empresas válidas, una fila de cada caso, y ninguna da `EmpresaCruda`:
   - (a) `organizacion_juridica == "PERSONA NATURAL"`;
+  - (a') `organizacion_juridica == "Persona Natural "`: el cliente compara con `strip().upper()`;
   - (b) `nit` nulo;
   - (c) `nit` que no cumple `^[89]\d{8}$` (`"12345678"`);
   - (d) `razon_social` vacía.
 
-  Resultado: `descartados_no_juridica == 4`. El servidor ya filtra (a) y (b); el test prueba que el cliente no confía en eso.
-- `::test_descartados_no_se_loguean`: con `caplog` en `DEBUG` sobre todos los loggers (`httpx` incluido), ningún registro contiene el `nit` ni la `razon_social` de los casos (a) a (d). **Es una guarda: nace verde** apenas el adaptador importa. Se comprueba poniendo a mano un `logger.debug(fila)` en el descarte y viendo que pasa a rojo.
+  Resultado: `descartados_no_juridica == 5`. El servidor ya filtra (a) y (b); el test prueba que el cliente no confía en eso.
+- `::test_descartados_no_se_loguean`: con `caplog` en `DEBUG` sobre todos los loggers (`httpx` incluido), ningún registro contiene el `nit` ni la `razon_social` de los casos (a), (a') y (b) a (d). **Es una guarda: nace verde** apenas el adaptador importa. Se comprueba poniendo a mano un `logger.debug(fila)` en el descarte y viendo que pasa a rojo.
 - `::test_mapea_fila_a_empresa_cruda`:
   - `id_fiscal == nit`, `nombre == razon_social`, `pais == "CO"`;
   - `ciudad` = `municipio_sede` de la cámara (`"Bogotá"` para la 04);
@@ -99,7 +100,7 @@ Ninguno: este slice no usa IA.
   - `url_origen == "https://www.datos.gov.co/resource/c82u-588k.json?nit=900123456"`;
   - `direccion`, `telefono`, `email`, `web`, `geo`, `telefono_canal` y `email_canal` en `None`.
 - `::test_as_of_sale_del_header`: `X-SODA2-Truth-Last-Modified: Fri, 02 Oct 2026 21:39:26 GMT` → `as_of == datetime(2026, 10, 2, 21, 39, 26, tzinfo=UTC)`. Sin el header, `as_of` es la hora de la consulta según el reloj inyectable.
-- `::test_cinco_mil_filas_marca_truncado`: `truncado` se mide sobre las filas **crudas** que llegaron, antes del filtro del cliente. Con 5.000 filas, 3 de ellas descartables, `truncado is True`; con 4.999, `False`.
+- `::test_cinco_mil_filas_marca_truncado`: `truncado` se mide sobre las filas **crudas** que llegaron, antes del filtro del cliente. Con 5.000 filas, 3 de ellas descartables, `truncado is True`; con 4.999, `False`. En los dos casos, `total is None`: el total exacto lo da `contar`.
 - `::test_pagina_2_vacia_sin_request`: `buscar(criterios, pagina=2)` devuelve 0 empresas y `truncado is False`, con 0 requests y 0 filas de costo.
 - `::test_contar_usa_count_con_el_mismo_where`: `$select=count(*)` y el mismo `$where` de la request de filas. La respuesta `[{"count": "2015"}]` devuelve `2015`.
 - `::test_contar_registra_socrata_descarga`: `contar` deja 1 fila `socrata_descarga` con los segundos medidos y el `lote_id` de la vista previa.
@@ -107,9 +108,9 @@ Ninguno: este slice no usa IA.
 - `::test_segundo_fallo_lanza_fuente_no_disponible`: dos 503 (o dos timeouts) en las filas → `FuenteNoDisponible`, 2 filas de costo, ninguna request de conteo y un mensaje que no incluye el cuerpo de la respuesta.
 - `::test_cache_hit_no_hace_request`: un segundo `buscar` con los mismos criterios da 0 requests y 0 filas nuevas de costo, con el mismo resultado, `naturales_no_descargadas` incluido.
 - `::test_conteo_fallido_no_se_cachea`: si el conteo falló en el primer `buscar` (`None`), el segundo `buscar` sirve las filas desde el caché y reintenta solo el conteo. Hace 1 request en lugar de 0: está declarado.
-- `::test_cache_no_guarda_lo_descartado`: después de un `buscar` con la fixture de los casos (a) a (d), el `payload` de `fuente_cache` no contiene el `nit` ni la `razon_social` de ninguno de ellos.
-- `::test_costo_maximo_llamada`: `meta().costo_maximo_llamada == 2 * 2 * 30 * computo_seg_usd`, porque son dos requests de dos intentos con 30 s de timeout cada uno.
-- `::test_app_token_va_en_header_y_nunca_en_logs`: con `DATOS_GOV_CO_APP_TOKEN=tok-falso-123`, las dos requests llevan `X-App-Token: tok-falso-123` y, con `caplog` en `DEBUG`, ningún registro contiene `tok-falso-123`. Sin la variable, no se manda el header. La parte del header nace roja. La de "nunca en logs" **es una guarda**: se comprueba con un `logger.debug(headers)` puesto a mano.
+- `::test_cache_no_guarda_lo_descartado`: después de un `buscar` con la fixture de los casos (a), (a') y (b) a (d), la `respuesta` de `fuente_cache` no contiene el `nit` ni la `razon_social` de ninguno de ellos.
+- `::test_costo_maximo_llamada`: `meta.costo_maximo_llamada == 2 * 2 * 30 * computo_seg_usd`, porque son dos requests de dos intentos con 30 s de timeout cada uno.
+- `::test_app_token_va_en_header_y_nunca_en_logs`: con `DATOS_GOV_CO_APP_TOKEN=tok-falso-123`, las dos requests llevan `X-App-Token: tok-falso-123` y, con `caplog` en `DEBUG`, ningún registro contiene `tok-falso-123`, y tampoco lo contiene ningún `url_origen`. Sin la variable, no se manda el header. La parte del header nace roja. La de "nunca en logs" **es una guarda**: se comprueba con un `logger.debug(headers)` puesto a mano.
 - `::test_url_se_puede_sobrescribir`: con `DATOS_GOV_CO_URL=http://stub.local`, la request va a ese host.
 
 **Cámaras** (`backend/tests/unit/descubrimiento/test_camaras_co.py`)
@@ -190,7 +191,7 @@ GET https://www.datos.gov.co/resource/c82u-588k.json
 
 **Persona jurídica (principio VII), en dos capas:**
 - **La autoridad es el servidor**, con `organizacion_juridica` declarada por la cámara. En el país hay 52 valores, y solo `PERSONA NATURAL` es una persona natural. Los demás son sociedades, ESAL, cooperativas y empresas unipersonales, que en Colombia son personas jurídicas (Ley 222 de 1995, art. 71).
-- **El cliente es la defensa en profundidad:** descarta lo que no debió llegar, que son los casos (a) a (d) del test. No lo persiste ni lo loguea, y solo lo suma a `descartados_no_juridica`.
+- **El cliente es la defensa en profundidad:** descarta lo que no debió llegar, que son los casos (a), (a') y (b) a (d) del test. No lo persiste ni lo loguea, y solo lo suma a `descartados_no_juridica`.
 - **Qué deja de existir respecto de la versión anterior:** la regla NIT + DV como criterio jurídico, `dominio/nit.py`, el `$group` y el colapso NIT+DV. El DV no se valida: ya no decide nada, y la cámara lo entrega con el NIT.
 - **El `$select` es una lista blanca.** Las columnas de nombres y apellidos, la del representante legal y su identificación no se piden nunca, ni siquiera para las jurídicas: no hacen falta para el lead, y una consulta que no las trae no las puede filtrar.
 - `tipo_titular = "juridica"`. El 006 no lo vuelve a verificar contra `croma_rues_co`, porque solo verifica los `desconocido`.

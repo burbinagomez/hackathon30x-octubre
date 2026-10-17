@@ -3,7 +3,7 @@
 **Input**: [spec.md](./spec.md), [plan.md](./plan.md)
 **Prerequisites**:
 - La 002 y la 003 mergeadas en `main`, y `main` mergeado en esta rama (con merge, no rebase).
-- Las preguntas D1 a D11 de `plan.md` respondidas.
+- Las preguntas D1 a D12 de `plan.md` respondidas. D7 está pendiente del dueño, y solo bloquea T035 y T047–T049.
 
 > Formato de `/speckit-tasks` aplicado a mano: `setup-plan.sh` no resuelve el feature.
 
@@ -29,7 +29,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Pa
 - [ ] T002 Se confirma que `pyyaml` y `httpx` ya están en `[project].dependencies` (`pyyaml` lo agrega la 002). **No se toca `pyproject.toml`.** `uv run lint-imports` en verde.
 - [ ] T003 [P] Fixtures sintéticas en `backend/tests/fixtures/datos_gov_co/`. Las tres usan el esquema real de `c82u-588k`, NITs ficticios con el formato `9\d{8}` y ninguna razón social real.
   - `filas.json`: empresas válidas con las 7 columnas del `$select`.
-  - `filas_descartables.json`: las válidas más un caso de cada tipo, de (a) a (d).
+  - `filas_descartables.json`: las válidas más un caso de cada tipo, de (a) a (d), más (a'), una natural escrita `"Persona Natural "` (mayúsculas mezcladas y un espacio al final).
   - `conteo_naturales.json`, con `[{"count": "26304"}]`.
 
 **Checkpoint**: la rama está al día con `main` y la suite de la 002 y la 003 está en verde sin cambios.
@@ -91,22 +91,23 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Pa
   - `buscar` devuelve `PaginaEmpresas` vacía y no hace requests.
   - **Todavía no** entra al catálogo: eso es T040.
 - [ ] T013 [Paso 4] **Rojo (advisor):** `backend/tests/unit/descubrimiento/test_datos_gov_co.py::test_query_filtra_juridicas_en_servidor`.
-  - Captura la primera request del `MockTransport` y afirma cada cláusula del `$where` de la spec, `$limit=5000` y que no haya `$order`, `$offset` ni `$group`.
-  - Falla por aserción: hay 0 requests capturadas.
+  - Arranca con `assert len(capturadas) == 1`, antes de indexar, para que el rojo sea una aserción y no un `IndexError`.
+  - Después toma la request de filas y afirma cada cláusula del `$where` de la spec, `$limit=5000` y que no haya `$order`, `$offset` ni `$group`.
+  - Falla por aserción en el `len`: hay 0 requests capturadas.
 - [ ] T014 [Paso 4] **Rojo (advisor):** `::test_select_no_pide_columnas_de_personas`.
   - `$select` igual a la lista exacta de 7 columnas.
   - Un `for` sobre las 8 columnas prohibidas, enumeradas en el test, que afirma que ninguna está.
 - [ ] T015 [Paso 4] **Rojo (advisor):** `::test_cliente_descarta_lo_que_no_debio_llegar`, con `filas_descartables.json`.
-  - Ningún `id_fiscal` ni `nombre` de los casos (a) a (d) aparece en `empresas`.
+  - Ningún `id_fiscal` ni `nombre` de los casos (a), (a'), (b), (c) ni (d) aparece en `empresas`.
   - La cantidad de empresas es igual a la cantidad de válidas.
-  - El assert de `descartados_no_juridica == 4` se suma en T021, cuando el campo exista.
+  - El assert de `descartados_no_juridica == 5` se suma en T021, cuando el campo exista.
 - [ ] T016 [Paso 4] **Guarda (advisor):** `::test_descartados_no_se_loguean`.
-  - `caplog.set_level(DEBUG)` sobre el root, que incluye `httpx`. Ningún `record.getMessage()` ni `record.args` contiene el `nit` ni la `razon_social` de (a) a (d).
+  - `caplog.set_level(DEBUG)` sobre el root, que incluye `httpx`. Ningún `record.getMessage()` ni `record.args` contiene el `nit` ni la `razon_social` de (a), (a') a (d).
   - **Mutación:** un `logger.debug(fila)` en el descarte → rojo. Se revierte.
 - [ ] T017 [Paso 4] **Advisor:** revisa T013–T016 antes del verde. Sus hallazgos se aplican y se vuelve a pedir revisión hasta APRUEBA.
 - [ ] T018 [Paso 4] **Verde:**
   - armado del SoQL desde criterios ya validados;
-  - `_es_juridica_valida(fila)` pura;
+  - `_es_juridica_valida(fila)` pura, que en (a) compara con `strip().upper()`;
   - mapeo mínimo para que las válidas salgan.
 
 **Checkpoint**: el principio VII queda cubierto en las dos capas.
@@ -126,7 +127,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Pa
 - [ ] T021 [Paso 5] **Rojo:**
   - `::test_conteo_de_naturales_sin_filas`: la segunda request con `count(*)` y el `$where` de naturales sin `nit IS NOT NULL`, más `== 26304`.
   - `::test_conteo_de_naturales_falla_y_las_filas_siguen`: el conteo da dos 503, las empresas salen igual con `None`, y quedan 2 filas de costo del conteo. Con un `RegistroCostos` en memoria, porque las filas de costo se cierran en T030.
-  - En T015 se suma `descartados_no_juridica == 4`, que ahora es rojo real.
+  - En T015 se suma `descartados_no_juridica == 5`, que ahora es rojo real.
 - [ ] T022 [Paso 5] **Verde:** la request de conteo después de las filas, y el contador de descartes.
 
 ---
@@ -137,9 +138,9 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Pa
   - 25 → `in('04','14','47','58')`.
   - Un departamento fuera del YAML y el CIIU `"47' OR '1'='1"` → `CriterioNoSoportado` y 0 requests.
   - Si el caso 11 → `'04'` ya pasa por T018, se comprueba por mutación.
-- [ ] T024 [P] [Paso 6] **Rojo (D4):** `::test_mapea_fila_a_empresa_cruda`. Afirma solo los campos que existan en `EmpresaCruda` después de la 003. `licencia` va donde diga D4.
+- [ ] T024 [P] [Paso 6] **Rojo:** `::test_mapea_fila_a_empresa_cruda`. Afirma los campos de la spec que existan en `EmpresaCruda` después de la 003, más `adaptador.meta.licencia == "CC-BY-SA-4.0"`. La licencia va en `meta`, no en `EmpresaCruda` (D4).
 - [ ] T025 [P] [Paso 6] **Rojo:** `::test_as_of_sale_del_header`, con el header y sin él (reloj inyectable).
-- [ ] T026 [P] [Paso 6] **Rojo:** `::test_cinco_mil_filas_marca_truncado`. Con 5.000 filas crudas y 3 descartables, `True`. Con 4.999, `False`.
+- [ ] T026 [P] [Paso 6] **Rojo:** `::test_cinco_mil_filas_marca_truncado`. Con 5.000 filas crudas y 3 descartables, `True`. Con 4.999, `False`. En los dos casos, `pagina.total is None` (D3): el total exacto lo da `contar`.
 - [ ] T027 [P] [Paso 6] **Rojo:** `::test_pagina_2_vacia_sin_request`. Afirma 0 requests y 0 filas de costo.
 - [ ] T028 [Paso 6] **Verde** de T023 a T027.
 - [ ] T029 [Paso 6] **Rojo (advisor):** dos tests de costos.
@@ -156,16 +157,17 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Pa
   - `::test_cache_no_guarda_lo_descartado`: lee la columna de D5.
 - [ ] T032 [Paso 6] **Verde:** las tres claves (`filas`, `naturales` y `contar`) con el discriminador dentro del hash. Se guardan las filas ya filtradas, y un `None` no se cachea.
 - [ ] T033 [Paso 6] **Rojo (D9):**
-  - `::test_app_token_va_en_header_y_nunca_en_logs`. La parte del header es rojo real. La de "nunca en logs" es una guarda: la mutación `logger.debug(headers)` la pone en rojo y se revierte.
+  - `::test_app_token_va_en_header_y_nunca_en_logs`. La parte del header es rojo real. Las de "nunca en logs" y "`tok-falso-123` no aparece en ningún `empresa.url_origen`" son guardas: la mutación `logger.debug(headers)`, o meter el token en la query de `url_origen`, las pone en rojo y se revierte.
   - `::test_url_se_puede_sobrescribir`.
 - [ ] T034 [Paso 6] **Verde:** campos `datos_gov_co_url` y `datos_gov_co_app_token` en `settings` (sin literales: el default de la URL es la constante pública del dataset). La fábrica se los pasa al adaptador.
 - [ ] T035 [Paso 6] **Rojo y verde de `contar` (D7):**
   - `::test_contar_usa_count_con_el_mismo_where` y `::test_contar_registra_socrata_descarga` son rojo real. Su verde es `DatosGovCoRues.contar(criterios) -> int`, un método del adaptador que no necesita que el puerto lo declare todavía.
   - `::test_costo_maximo_llamada` y los 3 tests de `contar` de la suite de contrato de la 005 se escriben con `xfail(strict=True, reason="depende de 005")` si la 005 no está en `main`, según lo que se resuelva en D7.
-- [ ] T036 [Paso 6] **Rojo (advisor):** `backend/tests/integration/test_costos_repo.py::test_socrata_descarga_escribe_fila_en_costos`, con `postgres_costos` real, rol `app_rt` y `SET LOCAL` del tenant.
+- [ ] T036 [Paso 6] **Guarda (advisor):** `backend/tests/integration/test_costos_repo.py::test_socrata_descarga_escribe_fila_en_costos`, con `postgres_costos` real, rol `app_rt` y `SET LOCAL` del tenant.
   - Valida `unidades == Decimal(2)`, el `costo_unitario` como `numeric`, `gratis=false` y el `tenant_id`.
-  - Si `costos.tipo` tiene un CHECK sin `socrata_descarga` (ver la P9 de la 003), el rojo es esa violación y el verde va en la migración de T041.
-- [ ] T037 [Paso 6] **Verde** de T036.
+  - **Nace verde**, porque el CHECK de `costos.tipo` de la 002 ya incluye `socrata_descarga` (plan 002, línea 210) y el adaptador ya registra desde T030.
+  - **Mutación:** registrar `unidades` como `float` (falla `== Decimal(2)`) o un `tipo` fuera del CHECK (falla la constraint) tiene que ponerlo en rojo. Se revierte.
+- [ ] T037 [Paso 6] El advisor revisa la guarda T036 y su mutación, hasta APRUEBA. No hay código nuevo.
 
 **Checkpoint**: `test_datos_gov_co.py` y `test_costos_repo.py` en verde. Lo que dependa de la 005 queda en xfail.
 
@@ -197,7 +199,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Pa
   ALTER TABLE busquedas ADD COLUMN naturales_por_fuente jsonb NOT NULL DEFAULT '{}';
   ```
 
-  Si hace falta según T036, la misma migración suma `socrata_descarga` al CHECK de `costos.tipo`. `scripts/migrar_local.sh` se corre dos veces y el drift check queda en verde.
+  La migración trae **solo** esa columna. `costos.tipo` no se toca. `scripts/migrar_local.sh` se corre dos veces y el drift check queda en verde.
 - [ ] T043 [Paso 8] **Rojo (D11):** `backend/tests/integration/test_conectar_desconectar.py`, los 5 tests de la spec. `test_naturales_se_guardan_como_conteo` es el rojo real: hoy `naturales_por_fuente` queda en `{}`. Los otros 4 se comprueban por mutación si nacen verdes, poniendo `habilitado: false` en el YAML real o quitando la fila de `cumplimiento`.
 - [ ] T044 [Paso 8] **Verde:** `EjecutarBusqueda` guarda `{clave: naturales_no_descargadas}` solo para las fuentes con `meta.cuenta_naturales`.
 - [ ] T045 [P] [Paso 8] **Rojo:** `test_cli.py::test_respeta_fuentes_yaml_del_entorno`. La parte con `FUENTES_YAML` es rojo real. La de "sin la variable carga el del repo" es una guarda.
@@ -236,7 +238,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Pa
 ## Fase 12: Doc y cierre (Paso 11)
 
 - [ ] T051 [Paso 11] `docs/arquitectura-backend.md`: cómo conectar o desconectar una fuente, con este adaptador como ejemplo, y por qué la natural se filtra en el servidor y se cuenta. El mínimo si se corta son 5 líneas.
-- [ ] T052 [P] [Paso 11] `spec.md` alineada con lo que se resolvió en D1 (`meta`) y D5 (columna del caché), en el mismo PR.
+- [ ] T052 [P] [Paso 11] Se revisa que `spec.md` siga alineada con el plan. D1 (`meta`) y D5 (`respuesta`) ya se corrigieron en el commit de docs; D7 se aplica cuando el dueño decida.
 - [ ] T053 [Paso 11] Cierre:
   - la suite completa, `lint-imports` y `npm test` en verde;
   - el agente `security` sobre el diff (OWASP y principios V a VII), donde CRITICAL o HIGH bloquean;
