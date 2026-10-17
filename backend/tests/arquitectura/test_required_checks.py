@@ -150,7 +150,7 @@ def _codeql_pinneado_por_sha():
 
 
 FIJADOS = ("ci.yml", "codeql.yml")
-# e2e.yml choca con el criterio de la 014, que no está en main: spec 012, Fuera del alcance, "e2e.yml sin fijar".
+# e2e.yml choca con el criterio de la 014, que no está en main: specs/012-seguridad/spec.md:168, "e2e.yml sin fijar".
 SIN_FIJAR_TODAVIA = {"e2e.yml"}
 
 
