@@ -59,7 +59,6 @@ describe("index.html", () => {
     ).filter((h) => h.includes("fonts.googleapis.com"));
     expect(hojas.some((h) => h.includes("family=Poppins"))).toBe(true);
     expect(hojas.some((h) => h.includes("family=DM+Sans"))).toBe(true);
-    expect(hojas.length).toBeGreaterThan(0);
     expect(hojas.every((h) => h.includes("display=swap"))).toBe(true);
   });
 });
@@ -71,6 +70,7 @@ test("ningún archivo fuera de tokens.css escribe los hex de marca", () => {
   );
   // Sin esto, un glob vacío o un CSS vaciado por vitest harían pasar la negativa.
   expect(Object.keys(archivos)).toContain("./App.tsx");
+  expect(archivos["./main.tsx"]).toMatch(/import\s+["']\.\/tokens\.css["']/);
   for (const [ruta, contenido] of Object.entries(archivos)) {
     expect(typeof contenido, ruta).toBe("string");
     expect(contenido.length, ruta).toBeGreaterThan(0);

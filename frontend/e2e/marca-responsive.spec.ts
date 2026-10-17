@@ -41,20 +41,19 @@ for (const v of VIEWPORTS) {
         expect.soft(body.fuente, "fuente del body").toContain("DM Sans");
 
         // Mira solo el color, porque hoy todo es fondo blanco; cuando haya superficies oscuras, tiene que mirar el fondo efectivo.
-        const enLima = await page.evaluate(
-          (lima) =>
-            Array.from(document.body.querySelectorAll("*"))
-              .filter(
-                (el) =>
-                  Array.from(el.childNodes).some(
-                    (n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim(),
-                  ) &&
-                  el.checkVisibility() &&
-                  getComputedStyle(el).color === lima,
-              )
-              .map((el) => el.tagName),
-          LIMA,
+        const colores = await page.evaluate(() =>
+          Array.from(document.body.querySelectorAll("*"))
+            .filter(
+              (el) =>
+                Array.from(el.childNodes).some(
+                  (n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim(),
+                ) && el.checkVisibility(),
+            )
+            .map((el) => ({ tag: el.tagName, color: getComputedStyle(el).color })),
         );
+        // Sin candidatos, la negativa pasaría vacía.
+        expect.soft(colores.length, "elementos con texto visible").toBeGreaterThan(0);
+        const enLima = colores.filter((c) => c.color === LIMA).map((c) => c.tag);
         expect.soft(enLima, "texto en lima").toEqual([]);
 
         // Canario, última aserción: prueba que la medición detecta un desborde. Después no se mide nada.
