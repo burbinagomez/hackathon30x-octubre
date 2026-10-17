@@ -145,6 +145,10 @@
 - [X] T033 🤖 `README.md`, versión mínima: cómo levantar el proyecto, cómo migrar con `supabase/migrations` y cómo correr los tests. `docs/arquitectura-backend.md` y `docs/arquitectura-frontend.md` no se crean acá: los consolida la spec 013 (otra rama), junto con badge de CI, riesgo del pooler expuesto, expand/contract y `SET LOCAL`.
 - [ ] T034 🧑B Protección de `main`: required checks `back`, `front`, `seguridad`, `evals` e `imagenes`, más 1 aprobación. Verificar con `gh api repos/:owner/:repo/branches/main/protection`.
 
+### Pendientes para la 013 (advisor del PR #16, no se tocan acá)
+- [ ] `migrar_local.sh`: una migración con su propio `BEGIN`/`COMMIT` rompe el `-1`. El `COMMIT` interno confirma lo anterior y el registro queda afuera. Rechazarlo en el script o dejarlo escrito en la plantilla.
+- [ ] `migrar_local.sh`: aplica en silencio una pendiente con versión menor que la última registrada, y `db push` la rechaza sin `--include-all`. Local y CI dan verde, y `migrar` falla en `main`. Que el script falle igual.
+
 ## Dependencias
 
 - T001–T003 (Supabase) y T004–T006 (stub) van en paralelo. T007 necesita T006 en la rama remota, así que es **el primer push** (te aviso antes).
