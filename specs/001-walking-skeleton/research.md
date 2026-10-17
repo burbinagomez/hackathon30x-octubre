@@ -117,8 +117,9 @@
 - **Drift:** `alembic.autogenerate.compare_metadata` contra `app/modelos.py`, con Alembic solo como librería de test (grupo dev; se borraron `alembic.ini`, `alembic/` y `env.py`). La conexión hace `SET search_path TO public, extensions` antes de comparar: con esquema `None`, la reflexión mira el esquema por defecto, que así queda `public` pase lo que pase con el `search_path` del rol. Los esquemas de Supabase (`auth`, `storage`, `graphql`…) y `supabase_migrations` no entran.
 - **Límite conocido:** la reflexión con esquema `None` usa `pg_table_is_visible`, así que también ve `extensions`, que está en el `search_path`. Hoy no trae tablas; el slice 3 necesita `extensions` en el path para `gin_trgm_ops`, así que se deja así.
 - **En los tests (`test_migraciones.py`, T017):** cada test crea una base nueva (`DROP/CREATE DATABASE … WITH (FORCE)` + `roles.sql`), así que "desde vacío" es cierto.
-  - `test_migrar_local_desde_vacio_dos_veces_sin_drift`: dos corridas en 0 y drift vacío.
+  - `test_migrar_local_desde_vacio_dos_veces_sin_drift`: dos corridas en 0, drift vacío y `0001` registrada.
   - `test_aplica_solo_lo_que_falta_y_en_orden`: el caso de prod. `0001` (un `CREATE TABLE` sin `IF NOT EXISTS`) se aplica y se registra; se suma `0002` que altera esa tabla, y la segunda corrida da 0 solo si no reaplica `0001` y aplica `0002` después.
+  - `test_aplica_varias_pendientes_en_orden_en_una_corrida`: `0001` y `0002` pendientes a la vez sobre una base vacía; da 0 solo si las aplica en orden.
   - `test_migracion_rota_falla_claro_y_no_deja_nada`: `CREATE TABLE public.u; SELECT 1/0;` → exit ≠ 0, stderr nombra el archivo, `public.u` no existe y no queda la fila `0001` (si quedara, la corrida siguiente saltearía el archivo roto).
   - `test_version_repetida_falla_y_nombra_los_dos`: dos archivos con la misma versión fallan antes de aplicar nada; sin eso, el segundo se saltearía en silencio por estar la versión registrada.
   - `test_nombre_invalido_falla`: prueba el patrón que vuelve seguro interpolar el nombre.

@@ -58,6 +58,7 @@ def test_migrar_local_desde_vacio_dos_veces_sin_drift(base_vacia):
     assert _migrar(base_vacia).returncode == 0
     assert _migrar(base_vacia).returncode == 0
     assert _drift(base_vacia) == []
+    assert _aplicadas(base_vacia) == "0001"
 
 
 def _consultar(url, sql):
@@ -80,6 +81,15 @@ def test_aplica_solo_lo_que_falta_y_en_orden(base_vacia, tmp_path):
     (tmp_path / "0002_y.sql").write_text("ALTER TABLE public.t ADD COLUMN y int;")
     segunda = _migrar(base_vacia, tmp_path)
     assert segunda.returncode == 0, segunda.stderr
+    assert _aplicadas(base_vacia) == "0001,0002"
+
+
+def test_aplica_varias_pendientes_en_orden_en_una_corrida(base_vacia, tmp_path):
+    # 0002 depende de 0001: si se aplicaran fuera de orden, la corrida fallaría.
+    (tmp_path / "0001_t.sql").write_text("CREATE TABLE public.t (id int);")
+    (tmp_path / "0002_y.sql").write_text("ALTER TABLE public.t ADD COLUMN y int;")
+    r = _migrar(base_vacia, tmp_path)
+    assert r.returncode == 0, r.stderr
     assert _aplicadas(base_vacia) == "0001,0002"
 
 

@@ -80,8 +80,9 @@
 
   Más `::test_api_no_arranca_con_un_rol_que_saltea_rls`: con un rol `SUPERUSER` o `BYPASSRLS` que no se llama `postgres`, la app no arranca y el error nombra `DATABASE_URL`. Lo cubre `db.verificar_rol()` en el lifespan, que le pregunta a la base `rolsuper OR rolbypassrls` de `current_user`: el chequeo del string en `config.py` es solo un barandal barato.
 - [X] T017 [P] 🤖 **Rojo:** `backend/tests/arquitectura/test_migraciones.py` (R-migraciones). Cada test arranca de una base nueva con `roles.sql`:
-  - `::test_migrar_local_desde_vacio_dos_veces_sin_drift`: `scripts/migrar_local.sh` dos veces, las dos en 0, y `compare_metadata` contra `app/modelos.py` da vacío;
+  - `::test_migrar_local_desde_vacio_dos_veces_sin_drift`: `scripts/migrar_local.sh` dos veces, las dos en 0, `compare_metadata` contra `app/modelos.py` da vacío y queda registrada `0001`;
   - `::test_aplica_solo_lo_que_falta_y_en_orden`: `0001` con un `CREATE TABLE` sin `IF NOT EXISTS` → la tabla existe y `0001` queda registrada; se suma `0002` que la altera → la segunda corrida da 0 y quedan `0001,0002`;
+  - `::test_aplica_varias_pendientes_en_orden_en_una_corrida`: `0001` y `0002` (que depende de `0001`) sobre una base vacía, en una sola corrida → 0 y quedan `0001,0002`;
   - `::test_migracion_rota_falla_claro_y_no_deja_nada`: exit ≠ 0, stderr nombra el archivo, la tabla del archivo roto no existe y no queda fila en `schema_migrations`;
   - `::test_version_repetida_falla_y_nombra_los_dos`: `0001_a` y `0001_b` → exit ≠ 0 y stderr nombra los dos;
   - `::test_nombre_invalido_falla`: un nombre fuera de `^[0-9]+_[a-z0-9_]+$` → exit ≠ 0;

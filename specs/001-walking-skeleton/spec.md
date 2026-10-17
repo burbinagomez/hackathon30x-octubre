@@ -19,6 +19,7 @@ Un repo con back y front **desplegados en Railway** y la base **Postgres en Supa
 - `backend/tests/arquitectura/test_import_linter.py::test_detecta_import_prohibido` → un paquete canario con `import googlemaps` hace fallar `lint-imports` nombrando el contrato `forbidden`; `::test_repo_cumple_contratos` → el repo real pasa.
 - `backend/tests/arquitectura/test_migraciones.py::test_migrar_local_desde_vacio_dos_veces_sin_drift` → `scripts/migrar_local.sh` aplica `supabase/migrations/*.sql` sobre una base nueva, la segunda corrida también termina en 0 y `compare_metadata` contra `app/modelos.py` no detecta drift.
 - `::test_aplica_solo_lo_que_falta_y_en_orden` → una migración ya registrada en `supabase_migrations.schema_migrations` no se vuelve a aplicar y la nueva se aplica después.
+- `::test_aplica_varias_pendientes_en_orden_en_una_corrida` → varias pendientes en una sola corrida se aplican en orden de versión.
 - `::test_migracion_rota_falla_claro_y_no_deja_nada` → una migración que falla corta con exit ≠ 0, el error nombra el archivo y no queda nada a medias, ni su registro.
 - `::test_version_repetida_falla_y_nombra_los_dos` y `::test_nombre_invalido_falla` → dos archivos con la misma versión o un nombre fuera del patrón cortan con exit ≠ 0.
 - `::test_drift_mira_solo_public_aunque_cambie_search_path` → con una tabla `ajeno.t` que no está en los modelos y la conexión con `-c search_path=ajeno,public`, el drift da vacío. Con una tabla extra en `public`, no.
