@@ -8,11 +8,11 @@
 - **El equipo:** los slices con UI arrancan con tokens, tipografía y una regla responsive ya escrita y con su test, en vez de decidir colores y breakpoints cada uno.
 
 ## Qué hace
-- **Tokens** de Dapta como variables CSS en `:root`, en `frontend/src/tokens.css`: `--color-acento: #CBE850`, `--color-oscuro: #1A1A1C`, `--color-fondo: #FFFFFF`, `--color-gris: #9B9999`, `--fuente-titulos` (Poppins) y `--fuente-texto` (DM Sans). Ningún archivo de `src/` fuera de `tokens.css` escribe estos hex: usa la variable. `tokens.css` se importa en `main.tsx`, no en `App.tsx`.
-- **Tipografía:** DM Sans para texto (en `body`) y Poppins para títulos, con la regla `h1, h2, h3, h4, h5, h6 { font-family: var(--fuente-titulos) }`. La página de health no suma título visible: la regla queda lista para los slices siguientes. Las fuentes se cargan desde Google Fonts en `frontend/index.html`, con `<link rel="preconnect">` y `display=swap`.
+- **Tokens** de Dapta como variables CSS en `:root`, en `frontend/src/tokens.css`: `--color-acento: #CBE850`, `--color-oscuro: #1A1A1C`, `--color-fondo: #FFFFFF`, `--color-gris: #9B9999`, `--fuente-titulos` (Poppins) y `--fuente-texto` (DM Sans). Ningún archivo de `src/` fuera de `tokens.css` escribe estos hex: usa la variable. `tokens.css` también lleva las reglas de `body` y `h1`–`h6`, así lo que lee Vitest es lo mismo que carga la app. Se importa en `main.tsx`, no en `App.tsx`.
+- **Tipografía:** DM Sans para texto (en `body`) y Poppins para títulos, con la regla `h1, h2, h3, h4, h5, h6 { font-family: var(--fuente-titulos) }` en `tokens.css`. La página de health no suma título visible: la regla queda lista para los slices siguientes. Las fuentes se cargan desde Google Fonts en `frontend/index.html`, con `<link rel="preconnect">` y `display=swap`.
 - **Viewport:** `index.html` suma `<meta name="viewport" content="width=device-width, initial-scale=1">`. Sin esa línea, un navegador móvil dibuja la página en un layout de ~980 px y el test de móvil no mide lo que debe.
 - **Contraste:** el lima nunca va como color de texto sobre blanco (no llega a contraste legible). Va de fondo con texto `#1A1A1C` encima, o como texto/acento sobre el oscuro.
-- **`body`** usa los tokens: `background: var(--color-fondo)`, `color: var(--color-oscuro)`, `font-family: var(--fuente-texto)`. El texto visible no cambia ("API: ok · DB: ok"): `App.test.tsx` y `e2e/health.spec.ts` siguen pasando sin tocarlos.
+- **`body`** usa los tokens, con la regla en `tokens.css`: `background: var(--color-fondo)`, `color: var(--color-oscuro)`, `font-family: var(--fuente-texto)`. El texto visible no cambia ("API: ok · DB: ok"): `App.test.tsx` y `e2e/health.spec.ts` siguen pasando sin tocarlos.
 - **`vite.config.ts`** suma `test.css: { include: [/\?raw/] }`. Con la config actual, el plugin `vitest:css-disable` vacía todo CSS, así que `import t from "./tokens.css?raw"` da vacío y cualquier aserción negativa nacería verde. Sin dependencias nuevas.
 
 ## Regla transversal: responsive en todo slice con UI
@@ -34,18 +34,21 @@ Vale para este slice y para todos los siguientes que toquen UI. Cada uno la cump
 - **Google Fonts:** aceptable para el demo (le pasa a Google la IP del visitante). Lo revisa `security` en el PR.
 
 ## Terminado cuando (tests que hoy fallan)
-- `frontend/e2e/marca-responsive.spec.ts` (archivo nuevo). Por cada ruta de `RUTAS` y cada viewport, 360×640 y 375×812 (`isMobile: true`, `hasTouch: true`) y 1280×800, carga la ruta y mide **recién cuando el texto `/^API:/` está visible**:
+- `frontend/e2e/marca-responsive.spec.ts` (archivo nuevo). Un `test.describe` por viewport, 360×640 y 375×812 (`isMobile: true`, `hasTouch: true`) y 1280×800, cada uno con su `test.use`. Adentro, un loop sobre `RUTAS`: carga la ruta y mide **recién cuando el texto `/^API:/` está visible**, en este orden:
   - `document.documentElement.scrollWidth <= document.documentElement.clientWidth`;
   - en los viewports móviles, `clientWidth` igual al ancho del viewport (360, 375). Hoy falla: sin `<meta name="viewport">` el layout móvil mide ~980 px;
   - `getComputedStyle(document.body)`: `backgroundColor === "rgb(255, 255, 255)"`, `color === "rgb(26, 26, 28)"` y `fontFamily` contiene `"DM Sans"`. Hoy falla: no hay estilos;
   - ningún elemento con texto visible tiene `color` `rgb(203, 232, 80)`. Cuando haya superficies oscuras, este chequeo tiene que mirar el fondo efectivo, no solo el color;
-  - **canario:** `page.evaluate` agrega un `div` de 2000 px de ancho y se espera `scrollWidth > clientWidth`. Prueba que la medición detecta el desborde.
-  - En `test.use` van solo `viewport`, `isMobile` y `hasTouch`, sin spread de `devices[...]`: trae `defaultBrowserType: "webkit"` y el único proyecto es chromium. Nada se fija en `playwright.config.ts`.
+  - **canario, última aserción:** `page.evaluate` agrega un `div` de 2000 px de ancho y se espera `scrollWidth > clientWidth`. Prueba que la medición detecta el desborde. Va después del chequeo de lima y del `clientWidth`; después del canario no se mide nada.
+  - En cada `test.use` van solo `viewport`, `isMobile` y `hasTouch`, sin spread de `devices[...]`: trae `defaultBrowserType: "webkit"` y el único proyecto es chromium. Nada se fija en `playwright.config.ts`.
 - `frontend/src/marca.test.ts` (archivo nuevo, Vitest), solo lo estático:
   - `tokens.css` (vía `?raw`) define en `:root` las seis variables: los cuatro `--color-*` con sus hex, `--fuente-titulos` con Poppins y `--fuente-texto` con DM Sans;
   - `index.html` (vía `?raw`) tiene el meta viewport, el `preconnect` y los `<link>` de Poppins y DM Sans con `display=swap`;
-  - la regla de `h1`–`h6` usa `var(--fuente-titulos)`;
-  - **hex prohibidos:** `import.meta.glob("./**/*.{ts,tsx,css}", { query: "?raw", import: "default", eager: true })`, sin `tokens.css` ni el propio `marca.test.ts`; ningún archivo matchea `/#(cbe850|1a1a1c|fff(fff)?|9b9999)\b/i` (cubre `#fff` corto).
+  - la regla de `h1`–`h6` existe en `src/tokens.css` y usa `var(--fuente-titulos)`;
+  - **hex prohibidos:** con esta llamada exacta:
+    `import.meta.glob(["./**/*.{ts,tsx,css}", "!./tokens.css", "!./marca.test.ts"], { query: "?raw", import: "default", eager: true })`.
+    Antes de la aserción negativa, el test verifica `expect(Object.keys(archivos)).toContain("./App.tsx")` y que cada valor sea un string no vacío. Hoy no hay otro `.css` en `src/`, y sin `css.include` un CSS llegaría vacío y la negativa pasaría igual.
+    Después, ningún archivo matchea `/#(cbe850|1a1a1c|fff(fff)?|9b9999)\b/i` (cubre `#fff` corto).
   - Hoy falla: `tokens.css` no existe y `index.html` no tiene ni meta ni fuentes.
 
 **Qué nace verde (y está bien):** el caso de 1280×800 en layout, la aserción de scroll sola (la página actual no desborda) y el chequeo de lima (hoy no hay color). El rojo vive en el `clientWidth` móvil, en los estilos computados del `body` y en `marca.test.ts`. El canario es el que prueba que la aserción de scroll no es decorativa.
