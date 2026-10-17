@@ -142,7 +142,7 @@ Ninguno: este slice no usa IA.
 - **Contacto.** El dataset no trae teléfono, correo, dirección ni web. Un lead solo de datos.gov.co queda `sin_canal_publicado` hasta que se fusione con OSM (regla 4 → revisión) o el 006 le encuentre un sitio.
 - **Guardar personas naturales**, aunque sea sin contactarlas: se cuentan, no se descargan (ver Skills).
 - **Paginación.** Una sola página de 5.000 (ver Decisiones técnicas).
-- **Export a Dapta con atribución (008):** con la fuente habilitada, la base que se exporta lleva datos CC BY-SA y tiene que ir con atribución y la misma licencia. Queda escrito como contrato para la 008, que hoy no lo menciona: al estar habilitada, aplica desde que la 008 exporte un lead con `lead_fuentes` de datos.gov.co.
+- **Export a Dapta con atribución.** Ya lo cubre la 008: columnas `fuentes`/`licencia` desde `lead_fuentes` y línea de atribución por fuente presente. Esta spec no suma tests de export.
 - **Otros países.** El dataset es solo de CO.
 - **Tamaño (`ingresos_min`).** El dataset no lo trae; queda en `ignorados`.
 - **El E2E de la búsqueda** que la 005 delegó: es de la 012.
@@ -277,5 +277,5 @@ GET https://www.datos.gov.co/resource/c82u-588k.json
 - **Throttling de SODA sin token:** en la verificación no apareció. Si aparece en la demo, se carga `DATOS_GOV_CO_APP_TOKEN` en el entorno local; nunca en el repo.
 - **Leads sin contacto:** como fuente sola de descubrimiento, todo lo que trae es `sin_canal_publicado`. Aporta volumen y cobertura de pymes que Supersociedades no tiene, no contactabilidad: esa la dan OSM y `sitio_web` (006). No llena el embudo de llamadas por sí sola. Se ve en el tablero (columna `con_telefono` de la 006) y no se esconde.
 - **Sobreinclusión geográfica:** con un ICP de Cundinamarca entran negocios de Bogotá (cámara 04). El encaje ICP del 006 puede bajarlos, pero el conteo de la vista previa los incluye.
-- **Share-alike:** con la fuente habilitada, la base derivada mezcla datos CC BY-SA. Se exporta y se publica con atribución y la misma licencia (PRD:164). Con la fuente habilitada, la 008 tiene que respetarlo antes de exportar esos leads.
+- **Share-alike en el export.** La base derivada mezcla datos CC BY-SA; exportarla con atribución y licencia lo cubre la 008 (`fuentes`/`licencia` desde `lead_fuentes`). La 008 depende de la 005, que depende de esta spec (orden 002 → 003 → 011 → 004 → 005), así que no hay export de datos.gov.co sin este slice implementado antes.
 - **Tiempo:** el PRD le da ~1,5–2 h, sin holgura. Completa, con el conteo de naturales y las cámaras, son ~2 h; los cortes de la tabla la dejan en ~1,5 h sin tocar el principio VII.

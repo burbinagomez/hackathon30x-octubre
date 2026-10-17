@@ -11,7 +11,7 @@
 - **Jurado:** CPQL calculado desde `costos`, con la cuenta hecha a mano en un test, y la cobertura de teléfono como métrica (sin teléfono = `no_calificable`).
 
 ## Qué hace
-1. Lista los elegibles para llamada (`v_elegibles_dapta`) y los exporta a CSV para Dapta; cada exportado deja una fila en `calificaciones`.
+1. Lista los elegibles para llamada (`v_elegibles_dapta`) y los exporta a CSV para Dapta, con `fuentes` y `licencia` por lead y una línea de atribución al principio; cada exportado deja una fila en `calificaciones`.
 2. Importa el CSV de resultados de Dapta: guarda el resultado, escribe `dapta_llamada` en `costos` y da de baja si el lead lo pide.
 3. Atribuye a fuentes los costos con `lead_id` y sin `fuente` (enriquecimiento, contacto, LLM, Dapta), repartidos entre las fuentes del lead.
 4. Suma al tablero `no_calificables`, `calificados`, `costo_embudo`, `cpql` y `tasa_calificacion`, y expone `v_cpql` por (fuente, canal).
@@ -27,7 +27,7 @@
 
 ## Skills que aplican
 - `libro-costos`: `dapta_llamada` con `lead_id`; CPQL(fuente, canal) = Σ costos (descubrimiento + enriquecimiento + contacto + dapta) / demos agendadas; divisor 0 → "sin dato"; el test con el fixture de 10 leads, 2 fuentes y 2 canales, a mano.
-- `cumplimiento-datos`: regla 2 (contactable por llamada = `juridica` y `telefono_canal` publicado), opt-out en todos los canales, la exportación como transferencia a un encargado (Dapta) con traza.
+- `cumplimiento-datos`: regla 2 (contactable por llamada = `juridica` y `telefono_canal` publicado), opt-out en todos los canales, la exportación como transferencia a un encargado (Dapta) con traza. Licencias: al compartir con un tercero datos derivados de OSM (ODbL) o de datos.gov.co (CC BY-SA 4.0), el archivo lleva atribución y licencia.
 - `fuentes-publicas`: el teléfono `whatsapp_osm` cuenta como publicado (decisión del usuario) pero sale marcado con `origen_telefono` para que el operador lo vea.
 - `slice-tdd`.
 
@@ -62,8 +62,13 @@ El JSON pasa `test_jsons_de_evals_sin_datos_de_contacto`. El primer baseline se 
       4. `INSERT INTO calificaciones (estado='exportada', exportado_en=now(), canal_origen, origen_telefono)`, con `id` por `gen_random_uuid()`: no es secuencial.
       5. Arma el CSV con `Calificador.preparar`.
 
-      Un teléfono inválido no sale ni crea fila: se cuenta como `telefono_invalido`.
-   2. Columnas: `ref` (el `calificacion_id`), `empresa`, `telefono`, `ciudad`, `sector` (descripción del CIIU), `origen_telefono`. Sin `lead_id` ni email.
+      Un teléfono inválido no sale ni crea fila: se cuenta como `telefono_invalido`. Un lead sin ninguna `licencia` en `lead_fuentes` tampoco sale: se cuenta como `sin_licencia`.
+   2. Columnas: `ref` (el `calificacion_id`), `empresa`, `telefono`, `ciudad`, `sector` (descripción del CIIU), `origen_telefono`, `fuentes` y `licencia`. Sin `lead_id` ni email. Las dos salen de `lead_fuentes`, no de `cumplimiento`: `fuentes` lista las distintas del lead, en orden alfabético y unidas con `; `; `licencia` es una sola, la más restrictiva presente. Ver Decisiones: licencia en el export.
+   2b. **Línea de atribución**, antes del encabezado: una fila de un solo campo, que va entre comillas porque lleva comas. Se arma con las fuentes presentes en los leads de **este** archivo, en este orden:
+       - `datos_gov_co_rues` → "Datos: Confecámaras vía datos.gov.co, CC BY-SA 4.0";
+       - `osm_overpass` → "© OpenStreetMap contributors, ODbL".
+
+       Si están las dos, van unidas con `; `. Si ningún lead viene de esas fuentes (por ejemplo, solo Croma), la línea no va. Un export sin elegibles no la lleva.
    3. Contra CSV injection, todo campo de texto que empiece con `= + - @`, tab o CR se prefija con `'`. El teléfono no se toca: lo garantiza el regex.
    4. Respuesta en stream, con `Content-Disposition: attachment` y `Cache-Control: no-store`. No queda archivo en el server. El log dice cuántas filas y quién exportó, nada más.
 2. **Dapta llama.** Fuera del sistema: el operador sube el CSV a la campaña de Dapta.
@@ -120,6 +125,12 @@ El JSON pasa `test_jsons_de_evals_sin_datos_de_contacto`. El primer baseline se 
 - `::test_csv_tiene_columnas_ref_y_telefono_e164`: 2 filas (A, E), `ref` = `calificacion_id`, sin `lead_id` ni email.
 - `::test_telefono_invalido_no_sale_y_se_cuenta`.
 - `::test_export_sin_elegibles_devuelve_solo_encabezado`.
+- `::test_export_csv_lleva_atribucion_y_licencia[caso]`: falla si falta la línea de atribución que corresponde o si alguna fila tiene `licencia` vacía. Compara la primera línea exacta y `fuentes` y `licencia` por `ref`:
+  - `cs_y_osm` (A y E del fixture, sin fusionar) → la línea dice solo "© OpenStreetMap contributors, ODbL". A sale con `fuentes='croma_supersociedades_co'` y la licencia de Croma de `fuentes.yaml`; E con `fuentes='osm_overpass'` y `licencia='ODbL'`;
+  - `fusionado_croma_y_osm`: se fusiona E en A (`E.fusionado_en = A`, sus `lead_fuentes` se mueven, como en 003). E deja de ser elegible (filtro `fusionado_en IS NULL`) y solo sale A, con `fuentes='croma_supersociedades_co; osm_overpass'` y `licencia='ODbL'` — gana sobre la de Croma, por la regla de Decisiones. La fila de `cumplimiento` de A sigue diciendo solo Croma: este caso falla si `fuentes`/`licencia` se leen de ahí. La línea de atribución lleva solo "© OpenStreetMap contributors, ODbL": no hay datos.gov.co en este caso;
+  - `fusionado_datosgov_y_osm`: se siembra en E una `lead_fuentes` de `datos_gov_co_rues` con `CC-BY-SA-4.0`, como la que deja una fusión (003). Es el caso más probable en producción, porque un lead de datos.gov.co solo es llamable cuando se fusiona con OSM (011). E sale con `fuentes='datos_gov_co_rues; osm_overpass'` y `licencia='CC-BY-SA-4.0'`, que gana sobre ODbL. La línea lleva las dos atribuciones, en orden: "Datos: Confecámaras vía datos.gov.co, CC BY-SA 4.0; © OpenStreetMap contributors, ODbL";
+  - `solo_croma` (E fuera) → sin línea de atribución, y la primera línea es el encabezado;
+  - `sin_licencia`: la `lead_fuentes` de E queda con `licencia` NULL. E no sale, se cuenta como `sin_licencia` y no crea fila en `calificaciones`.
 
 **Importar** (`backend/tests/integration/test_importar_dapta.py`, tarifa de prueba `dapta.usd_por_minuto = 0.10`)
 - `::test_demo_agendada_guarda_y_registra_dapta_llamada`: A con 3 min → 1 fila `tipo='dapta_llamada'`, `unidades=3`, `costo_unitario=0.10`, `proveedor='dapta'`, `lead_id=A`, `fuente=NULL`, `canal=NULL`, `ts = llamada_en`.
@@ -192,6 +203,8 @@ Tests:
 
 **Contratos** (`backend/tests/contratos/test_calificador.py`, parametrizado sobre `dapta_csv` y `CalificadorFalso`)
 - `::test_preparar_devuelve_una_fila_por_candidato_con_su_ref`, `::test_leer_resultados_ida_y_vuelta` (lo que sale de `preparar` + un resultado por ref vuelve mapeado), `::test_valor_desconocido_es_fila_rechazada_no_excepcion`, `::test_columnas_no_mapeadas_se_ignoran`, `::test_archivo_sobre_limite_es_entrada_invalida`.
+- `::test_preparar_lleva_fuentes_y_licencia_por_fila`: un candidato sin licencia es error de contrato. Así `dapta_api`, cuando exista, también las manda.
+- `::test_leer_resultados_ignora_lineas_antes_del_encabezado`: lo que esté antes de la fila con la columna mapeada a `ref` se ignora. Así la ida y vuelta pasa con la línea de atribución, y también si Dapta la devuelve o la saca.
 
 **Arquitectura**
 - `test_import_linter.py`: el módulo `calificacion` respeta las capas; el dominio no importa `csv` ni `fastapi`.
@@ -238,6 +251,12 @@ Tests:
 
 **La transferencia a Dapta** queda trazada en `calificaciones.exportado_en`, por lead. La pantalla de cumplimiento de la 012 la lee.
 
+**Licencia en el export.** Compartir con Dapta datos derivados de OSM o de datos.gov.co es compartirlos con un tercero, así que ODbL y CC BY-SA piden atribución y licencia. `fuentes` y `licencia` salen de `lead_fuentes` y no de `cumplimiento`. Un lead fusionado (003, 005) conserva una sola fila de `cumplimiento`, la del primero, pero suma las `lead_fuentes` del absorbido: si se leyera solo `cumplimiento`, un lead con una licencia abierta podría salir con la de Croma. Por eso existe el caso `fusionado_croma_y_osm`.
+- `fuentes` lista todas las distintas del lead en `lead_fuentes`, unidas con `; ` y en orden alfabético (`string_agg(DISTINCT fuente, '; ' ORDER BY fuente)`). Sin `ORDER BY`, Postgres no garantiza el orden y el test sería inestable.
+- `licencia` es una sola, la más restrictiva presente, en este orden: `CC-BY-SA-4.0` > `ODbL` > la de Croma ("datos públicos vía Croma; no redistribuir"). Las abiertas ganan porque imponen una obligación activa (atribuir, compartir bajo la misma licencia) que la de Croma no tiene: esa solo pide no redistribuir, y Dapta recibe los datos como encargado para llamar en nombre de la pyme, no para redistribuirlos.
+- La línea de atribución del archivo se arma con las fuentes abiertas presentes en los leads exportados (no con `licencia` por fila), con el mismo mapa y orden de `v_atribuciones` (005).
+- `# ponytail:` los dos textos de la línea viven en el dominio de `calificacion`. Son una segunda copia del mapa de `v_atribuciones` (005), con el nombre de la licencia agregado. Si se suma una tercera fuente con atribución, los dos mapas pasan a una columna `atribucion` en `config/fuentes.yaml`, como dice la 005.
+
 **Migración `0008_calificaciones.py`** (a mano, con `GRANT` a `app_rt`):
 
 | Tabla / vista | Definición |
@@ -282,6 +301,7 @@ Todas las vistas con `security_invoker = true`. No redondean.
 
 ## Riesgos
 - **El formato del CSV de Dapta es desconocido** `# [MENTORES]`. Mitigación: mapeo por config y la prueba manual del cierre del corte 1. Si Dapta no exporta resultados, el operador los carga a mano en una plantilla con las mismas columnas, y el flujo no cambia.
+- **Dapta podría exigir el encabezado en la primera línea** `# [MENTORES]`. Se ve en la prueba manual del cierre del corte 1. Si la rechaza, la línea de atribución pasa a un `atribucion.txt` que se baja junto al CSV, y `fuentes` y `licencia` siguen por fila. El test cambia en el mismo PR.
 - **Tarifa de Dapta desconocida:** sin ella no se importa. Con la provisional, las filas quedan con ese valor y el tablero lo avisa. Re-tarifar queda fuera.
 - **Pocas demos este fin de semana:** el CPQL va a salir con n = 1 o 2, o "sin dato". Se muestra `calificados` al lado y no se esconde.
 - **Teléfonos `whatsapp_osm`** (confianza baja): pueden ser celulares personales del dueño. Solo salen de un lead `juridica` que respondió `interesado`, y van marcados con `origen_telefono` para que el operador decida.
