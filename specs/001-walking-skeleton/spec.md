@@ -33,6 +33,10 @@ Un repo con back y front **desplegados en Railway** y la base **Postgres en Supa
 - `backend/tests/integration/test_rol_runtime.py::test_rol_runtime_no_es_super_ni_bypassrls_ni_puede_crear` → conectado como `app_rt`: `rolsuper`, `rolbypassrls`, `rolcreaterole` y `rolcreatedb` en false; ningún objeto de `pg_namespace` ni de `pg_class` tiene a `app_rt` como dueño; `CREATE TABLE` en `public` denegado; y `has_schema_privilege('app_rt','extensions','USAGE')` en true.
 - `frontend/src/App.test.tsx::muestra estado de la API` → con `/health` mockeado en ok, renderiza "API: ok".
 - `frontend/e2e/health.spec.ts` → contra la URL pública de Railway, la página muestra "DB: ok".
+- Job `imagenes` de `ci.yml` → construye `api` y `web` y falla si la imagen final tiene `node`/`npm`/`uv`/`pip`, si corre como root, o si pesa más de 250 MB (`api`) / 60 MB (`web`), nombrando cada motivo. Rojo: `check_imagen.sh` falla y nombra el motivo en tres casos:
+  - `python:3.12-slim` pelada → `pip` y `root`;
+  - `node:22-alpine` con `max_mb=250` → `node` y `npm`;
+  - slim con `max_mb=1` → el tamaño.
 - `.github/workflows/ci.yml` existe y es *required check* en `main` (verificado a mano una vez; luego el test de configuración del principio V).
 
 ## Fuera del alcance
@@ -49,7 +53,7 @@ Cualquier tabla de negocio, cualquier fuente, cualquier mensaje. Auth de usuario
 - **Drift check acotado a `public`:** `env.py` compara y versiona solo `public` (`alembic_version` en `public`), sin depender del `search_path` del rol. Los esquemas de Supabase (`auth`, `storage`, `extensions`…) quedan fuera.
 - **Front:** Vite + React + TypeScript, Vitest + Testing Library, Playwright. `VITE_API_URL` por entorno.
 - **Railway:** proyecto con 2 servicios (`api`, `web`). `api` con Dockerfile; `web` separado: Dockerfile multi-stage (build con node, Caddy sirve `dist/`; ver `research.md` R5). Dominios públicos generados. Misma región que el proyecto Supabase (o la más cercana).
-- **CI (`ci.yml`):** jobs `back` (uv sync, pytest, lint-imports, alembic desde cero + `alembic check` contra servicio Postgres), `front` (npm ci, vitest, build), `seguridad` (pip-audit, npm audit, gitleaks), `evals` (placeholder que pasa), `migrar` (solo push a `main`, environment `produccion`, después de los anteriores; migra Supabase). Railway con "Wait for CI". `e2e.yml` solo con `workflow_dispatch`. CodeQL y Dependabot por configuración del repo (`.github/dependabot.yml`).
+- **CI (`ci.yml`):** jobs `back` (uv sync, pytest, lint-imports, alembic desde cero + `alembic check` contra servicio Postgres), `front` (npm ci, vitest, build), `seguridad` (pip-audit, npm audit, gitleaks), `evals` (placeholder que pasa), `imagenes` (build de `api` y `web` + `check_imagen.sh`; ver `research.md` R-docker), `migrar` (solo push a `main`, environment `produccion`, después de `back`, `front`, `seguridad` e `imagenes`; migra Supabase). Railway con "Wait for CI". `e2e.yml` solo con `workflow_dispatch`. CodeQL y Dependabot por configuración del repo (`.github/dependabot.yml`).
 - **import-linter:** en este slice, contrato `forbidden` en `backend/pyproject.toml` contra `googlemaps`, `linkedin*`, `instaloader` y `facebook*`. Los contratos de capas (`dominio` no importa `aplicacion|infraestructura|fastapi|sqlalchemy|httpx`; `aplicacion` no importa `infraestructura|fastapi|sqlalchemy`) entran en el slice 2 con el primer módulo.
 - **Secrets:** `.env.example` (ya existe; se suman `CORS_ORIGINS` y `E2E_BASE_URL`) con nombres, nunca valores. Variables de Railway, solo en `api`: `DATABASE_URL`, `CORS_ORIGINS`, `CIFRADO_KEY`, `TYPESAFE_API_KEY`, `CROMA_API_KEY`, `SMTP_*` (cada una se agrega en su slice). `web` recibe solo `VITE_API_URL`. `MIGRATION_DATABASE_URL` vive solo en el GitHub Environment `produccion`, nunca en Railway. Ninguna key de Supabase (anon, service_role, publishable, secret) existe en Railway ni en el repo: no se usan.
 

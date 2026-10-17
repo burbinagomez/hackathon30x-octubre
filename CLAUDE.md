@@ -11,7 +11,7 @@ Lee antes de tocar nada, en este orden:
 - **Test primero, en rojo.** Back `pytest`, front `Vitest`, E2E `Playwright`. Un humano revisa los tests que generes antes de aceptarlos.
 - **Toda operación de salida escribe en `costos`** (skill `libro-costos`). Sin excepción.
 - **Solo personas jurídicas, solo canales publicados, siempre fila en `cumplimiento`** (skill `cumplimiento-datos`).
-- **Hexagonal de verdad:** toda fuente de entrada (descubrimiento, enriquecimiento) y de salida (canal, calificador, clasificador) es un **adaptador detrás de un puerto**, registrado en `config/fuentes.yaml` con `habilitado: true/false`. Se conectan y desconectan por config, nunca tocando el dominio. Todo adaptador pasa la **suite de contrato** de su puerto.
+- **Hexagonal de verdad:** toda fuente de entrada (descubrimiento, enriquecimiento) y de salida (canal, calificador, clasificador) es un **adaptador detrás de un puerto**, registrado en `backend/config/fuentes.yaml` con `habilitado: true/false`. Se conectan y desconectan por config, nunca tocando el dominio. Todo adaptador pasa la **suite de contrato** de su puerto.
 - **Fuentes permitidas:** Croma (registros de gobierno multi-país: Supersociedades, DIAN Trade, RUES, SIEM, SUNAT…), OpenStreetMap, sitio web del lead, datos.gov.co (adaptador existente, desconectado esta vez). Prohibidas: Google Maps/Places como almacén, LinkedIn, Instagram, Facebook (skill `fuentes-publicas`).
 - **Nada de otros proyectos del equipo**: ni cuentas, ni código, ni credenciales. Todo servicio se crea nuevo para el evento.
 - **Secrets en entorno.** Nunca en el repo ni en el front.
