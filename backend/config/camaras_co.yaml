@@ -1,1 +1,9 @@
-{}
+# Cámaras de comercio (codigo_camara de c82u-588k) → departamentos DIVIPOLA que cubren.
+# Una cámara no es un departamento: la 04 (Bogotá) también cubre municipios
+# de Cundinamarca. Filtrar por departamento sobreincluye; no subincluye.
+# Nombres verificados contra la API ($group=codigo_camara,camara_comercio) el 2026-10-17.
+# ponytail: solo las cámaras de 11 y 25 (corte 4 de la spec); las 58 son T054.
+"04": {nombre: "Bogotá", municipio_sede: "Bogotá", departamentos: ["11", "25"]}
+"14": {nombre: "Girardot", municipio_sede: "Girardot", departamentos: ["25"]}   # [VALIDAR] si también cubre 73
+"47": {nombre: "Facatativá", municipio_sede: "Facatativá", departamentos: ["25"]}
+"58": {nombre: "Soacha", municipio_sede: "Soacha", departamentos: ["25"]}
