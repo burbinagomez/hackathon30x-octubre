@@ -58,8 +58,8 @@ La spec tiene una sola historia (US1: una búsqueda deja leads deduplicados con 
   - `test_lead_nuevo_y_cumplimiento_en_una_transaccion`: `licencia=None` hace que el INSERT de `cumplimiento` viole `NOT NULL` → `IntegrityError` y 0 filas en `leads`. Es un fallo real de la base y no un monkeypatch, así no depende de cómo esté escrito el SQL por dentro;
   - `test_crear_busqueda_se_confirma_antes`: `crear_busqueda` deja la fila visible desde otra conexión antes de que se llame a ningún adaptador.
 - [X] T021 [MIN] Verde: `backend/app/modulos/descubrimiento/infraestructura/persistencia/repositorio_leads.py`: `obtener_o_crear_lead(e, licencia)` inserta lead + `cumplimiento` en una transacción cuando es nuevo; `crear_busqueda` y `cerrar_busqueda` en transacción propia; `agregar_lead_fuente` con `ON CONFLICT DO NOTHING`.
-- [ ] T022 [MIN] [P] Rojo: `backend/tests/integration/test_sembrar_tenant.py`, los 2 tests de la spec: `test_sembrar_dos_veces_mismo_id_actualiza` (upsert por `id` con `nombre` e `idioma` nuevos) y `test_no_imprime_la_url_de_postgres` (`getpass` con monkeypatch, exit ≠ 0, la password no aparece en stdout/stderr).
-- [ ] T023 [MIN] Verde: `backend/scripts/sembrar_tenant.py`.
+- [X] T022 [MIN] [P] Rojo: `backend/tests/integration/test_sembrar_tenant.py`, los 2 tests de la spec: `test_sembrar_dos_veces_mismo_id_actualiza` (upsert por `id` con `nombre` e `idioma` nuevos) y `test_no_imprime_la_url_de_postgres` (`getpass` con monkeypatch, exit ≠ 0, la password no aparece en stdout/stderr).
+- [X] T023 [MIN] Verde: `backend/scripts/sembrar_tenant.py`.
 
 ### Paso 4: libro de costos en Postgres
 
