@@ -5,7 +5,8 @@ import os
 
 from pydantic_settings import BaseSettings
 
-PREFIJOS_PROHIBIDOS = ("sb_publishable_", "sb_secret_")
+# sbp_: access token del CLI, la credencial del job `migrar`.
+PREFIJOS_PROHIBIDOS = ("sb_publishable_", "sb_secret_", "sbp_")
 ROLES_SUPABASE = {"anon", "service_role"}
 
 
