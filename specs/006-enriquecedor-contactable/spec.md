@@ -26,7 +26,7 @@
 - **`RepositorioLeads`** (puerto del 002) suma `sin_enriquecer()` (leads de `v_leads_icp` con `enriquecido_en IS NULL`) y `guardar_enriquecimiento(lead_id, …)`.
 
 ## Skills que aplican
-- `cumplimiento-datos`: reglas 1 (`tipo_titular`), 2 (`contactable` por canal, jerarquía `sitio_web > osm_contacto > whatsapp_osm`, el de mayor confianza reemplaza al menor, nunca al revés), 3 (contacto nominal descartado), 9 (cifrado de cualquier `email`/`telefono` nuevo que traiga `sitio_web`, mismo `Cifrador` y catálogo que la 003).
+- `cumplimiento-datos`: reglas 1 (`tipo_titular`), 2 (`contactable` por canal, jerarquía `whatsapp_comercial > sitio_web > osm_contacto > whatsapp_osm` (la de la 003), el de mayor confianza reemplaza al menor, nunca al revés), 3 (contacto nominal descartado), 9 (cifrado de cualquier `email`/`telefono` nuevo que traiga `sitio_web`, mismo `Cifrador` y catálogo que la 003).
 - `libro-costos`: `croma_consulta`, `web_fetch` y `jev_tokens` con `lead_id`, nunca prorrateados (regla de atribución: "operación con `lead_id` → al lead").
 - `fuentes-publicas`: reglas de `web_fetch` (robots.txt, SSRF, tamaño, redirecciones) y dominios prohibidos (ninguno de Google Maps/Places, LinkedIn, Instagram, Facebook — `sitio_web` solo sigue el dominio que ya trae el lead, nunca busca en esos sitios).
 - `slice-tdd`.
@@ -42,7 +42,7 @@ Este slice corre `uv run python -m evals.run --eval encaje_icp` con el `jev` rea
 1. `uv run python -m app.cli enriquecer --tenant <id> --busqueda <id>` toma los leads de `v_leads_icp` para esa búsqueda con `enriquecido_en IS NULL`.
 2. Por cada lead:
    1. Si `tipo_titular == 'desconocido'` (siempre un lead solo-OSM): consulta `croma_rues_co` por `nombre_normalizado`, filtrado en local por ciudad (RUES no busca por dominio ni por ciudad). Si matchea una sola razón social con `estado_matricula` activo, sube a `juridica`; si matchea más de una o ninguna, se queda `desconocido` (se trata como `natural`, regla 1 de `cumplimiento-datos`) y la razón queda en el log de la corrida, no en el lead.
-   2. Si el lead tiene `web_canal` (dominio): intenta `sitio_web`. Extrae email y teléfono publicados. Aplica la jerarquía de canal: si lo que trae `sitio_web` es de mayor confianza que lo que ya tenía (`osm_contacto`/`whatsapp_osm`), lo reemplaza; si falla el fetch (robots lo prohíbe, timeout, 404), el lead se queda con lo que ya tenía — no es un error del slice.
+   2. Si el lead tiene `web_canal` (dominio): intenta `sitio_web`. Extrae email y teléfono publicados. Aplica la jerarquía de canal: un `wa.me` del sitio entra como `whatsapp_comercial` y un teléfono plano como `sitio_web`; si lo que trae `sitio_web` es de mayor confianza que lo que ya tenía (`osm_contacto`/`whatsapp_osm`), lo reemplaza; si falla el fetch (robots lo prohíbe, timeout, 404), el lead se queda con lo que ya tenía — no es un error del slice.
    3. Descarta contacto nominal (regla 3): si el email extraído tiene forma `nombre.apellido@`, no se guarda y, si no queda otro canal, `razon_no_contactable = 'contacto_nominal'`.
    4. Calcula `contactable` = `tipo_titular == 'juridica' AND (telefono_canal IS NOT NULL OR email_canal IS NOT NULL)`. Si no, `razon_no_contactable` ∈ {`persona_natural`, `sin_canal_publicado`, `contacto_nominal`}, el primero que aplique en ese orden.
    5. Llama a `jev_classify(icp.descripcion, {nombre, ciudad, actividad})` → `encaje` + `probabilidad`. Preguntas estrechas, una clave por pregunta (nunca `respuestas[i]`, por el gotcha ya pagado).
@@ -68,7 +68,7 @@ Este slice corre `uv run python -m evals.run --eval encaje_icp` con el `jev` rea
 - `::test_limite_de_tamano`: una respuesta de 3 MB corta en 2 MB y no lanza; el fetch se marca `truncado`.
 - `::test_maximo_3_redirecciones`: una cadena de 4 redirecciones lanza `DemasiadasRedirecciones`; una de 3 se sigue.
 - `::test_sin_contacto_no_es_error`: HTML sin teléfono ni email → devuelve vacío, no lanza.
-- `::test_whatsapp_publicado_no_es_email_canal`: un `wa.me` en el sitio propio se guarda como teléfono con `telefono_canal='sitio_web'` (confianza alta, a diferencia del `whatsapp_osm` de la 003); nunca puebla `email_canal`.
+- `::test_whatsapp_publicado_no_es_email_canal`: un `wa.me` en el sitio propio se guarda como teléfono con `telefono_canal='whatsapp_comercial'` (confianza alta, a diferencia del `whatsapp_osm` de la 003); nunca puebla `email_canal`. Si el sitio trae también un teléfono plano, queda el `wa.me`.
 
 **`croma_rues_co`** (`backend/tests/unit/enriquecimiento/test_croma_rues.py`, con transporte falso)
 - `::test_match_unico_sube_a_juridica`: una sola razón social con `estado_matricula='activa'` → `tipo_titular='juridica'`.
@@ -112,7 +112,7 @@ Este slice corre `uv run python -m evals.run --eval encaje_icp` con el `jev` rea
 ## Fuera del alcance
 - **`croma_supersociedades_detalle_co`, `croma_sunat_pe`, `croma_siem_detalle_mx`:** siguen `sin_implementacion`. Ningún país fuera de CO tiene verificación de `tipo_titular` todavía: los solo-OSM de BR/PE se quedan `desconocido` y no contactables, como ya avisó la 003. Se reporta en el tablero, no se esconde.
 - **007:** envío real de email, plantilla del primer mensaje, respuestas, `jev_check`, opt-out. Esta spec deja `contactable` listo; no contacta a nadie.
-- **009:** WhatsApp. El teléfono que deja este slice (`sitio_web` o heredado de `whatsapp_osm`) solo habilita la llamada (regla 2 de `cumplimiento-datos`); WhatsApp exige opt-in y validación del dueño, que no existen en este slice.
+- **009:** WhatsApp. El teléfono que deja este slice (`whatsapp_comercial`, `sitio_web` o heredado de `whatsapp_osm`) solo habilita la llamada (regla 2 de `cumplimiento-datos`); WhatsApp exige opt-in y validación del dueño, que no existen en este slice.
 - **Más de un sitio por lead, subpáginas (`/contacto`, `/nosotros`):** solo la página raíz del dominio. `# ponytail:` seguir un enlace "contacto" si el dataset real lo necesita.
 - **Reintento de `sitio_web` en una corrida posterior:** un fetch fallido (robots, timeout, 404) no se reintenta automáticamente; el lead queda `contactable` según lo que ya tenía. Reprocesar es manual (borrar `enriquecido_en`), sin comando dedicado.
 - **Bajar `encaje_icp` a k=1:** se intenta (ver Evals), pero si `jev` no da determinación perfecta sobre el dataset, se queda en k=3 y no bloquea el slice.
@@ -123,7 +123,7 @@ Este slice corre `uv run python -m evals.run --eval encaje_icp` con el `jev` rea
 ## Decisiones técnicas
 
 **Módulo nuevo** `backend/app/modulos/enriquecimiento/`:
-- `dominio/`: `calcular_contactable(tipo_titular, telefono_canal, email_canal, es_nominal) -> (bool, RazonNoContactable | None)`, `CONFIANZA_CANAL` (mapa `CanalPublicado -> int`, reusa el tipo de la 003), `es_contacto_nominal(email) -> bool`. Puros, sin I/O.
+- `dominio/`: `calcular_contactable(tipo_titular, telefono_canal, email_canal, es_nominal) -> (bool, RazonNoContactable | None)`, `CONFIANZA_CANAL` (mapa `CanalPublicado -> int` con los cuatro valores, `whatsapp_comercial` arriba; reusa el tipo de la 003), `es_contacto_nominal(email) -> bool`. Puros, sin I/O.
 - `aplicacion/enriquecer_lead.py` (`EnriquecerLead`) y `clasificar_encaje.py` (`ClasificarEncajeICP`).
 - `infraestructura/adaptadores/{sitio_web.py, croma_rues.py, jev_clasificador.py}`.
 - `backend/app/seguridad/{cifrado.py,catalogo_sensibles.py}`: se reusan, no se tocan (ya están en el módulo compartido desde la 003).

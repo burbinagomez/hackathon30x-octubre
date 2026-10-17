@@ -14,7 +14,7 @@ description: Reglas de cumplimiento para encontrar, guardar y contactar leads ba
 
 ## Reglas en el código
 1. **`tipo_titular`** se determina en la ingesta desde el registro (`clase_identificacion` / `tipo_propietario`): `juridica` | `natural` | `desconocido`. `desconocido` se trata como `natural`.
-2. **Contactable por canal:** por email si `tipo_titular == 'juridica' AND email_canal IS NOT NULL`; por llamada si `tipo_titular == 'juridica' AND telefono_canal IS NOT NULL`. WhatsApp exige además opt-in registrado (y la validación del dueño, regla 8): un canal publicado no es opt-in. `CanalPublicado` (confianza): `sitio_web` (alta) > `osm_contacto` (tag `phone`/`contact:*`/`mobile`/`email`, media) > `whatsapp_osm` (número de un `website` wa.me en OSM, baja; **cuenta**, decisión del usuario). El de mayor confianza reemplaza al menor, nunca al revés. Un teléfono que solo aparece en el registro **no** es canal publicado (el registro no trae teléfono; si llegara por otra vía, igual no cuenta).
+2. **Contactable por canal:** por email si `tipo_titular == 'juridica' AND email_canal IS NOT NULL`; por llamada si `tipo_titular == 'juridica' AND telefono_canal IS NOT NULL`. WhatsApp exige además opt-in registrado (y, por API, la validación del dueño, regla 8): un canal publicado no es opt-in. `CanalPublicado` (confianza): `whatsapp_comercial` (enlace `wa.me` en el sitio propio, alta; habilita el WhatsApp asistido con opt-in, spec 009) > `sitio_web` (alta) > `osm_contacto` (tag `phone`/`contact:*`/`mobile`/`email`, media) > `whatsapp_osm` (número de un `website` wa.me en OSM, baja; **cuenta**, decisión del usuario). El de mayor confianza reemplaza al menor, nunca al revés. Un teléfono que solo aparece en el registro **no** es canal publicado (el registro no trae teléfono; si llegara por otra vía, igual no cuenta).
 3. **Contacto nominal se descarta:** si el email tiene forma `nombre.apellido@` o el teléfono está etiquetado como personal, se guarda `razon_no_contactable = 'contacto_nominal'` y no se envía. Preferir `info@`, `ventas@`, `contacto@`, línea fija comercial.
 4. **Personas naturales:** se guardan (para el embudo y la métrica "% no contactable por política"), **no se contactan**. Nunca.
 5. **Fila en `cumplimiento` antes del primer envío:** `lead_id, fuente, licencia, url_origen, base_legal ('persona_juridica_canal_publicado'), as_of, opt_out_at, solicitudes[]`. Sin fila, el caso de uso de envío lanza excepción.
@@ -22,11 +22,11 @@ description: Reglas de cumplimiento para encontrar, guardar y contactar leads ba
 7. **Plantilla del primer mensaje** (email y WhatsApp), validada por test:
    - Identificación: quién escribe y en nombre de qué pyme.
    - Finalidad en una línea.
-   - Origen del dato: "encontramos su contacto en su sitio web / en un directorio público".
+   - Origen del dato: "encontramos su contacto en su sitio web / en un directorio público". En WhatsApp tras opt-in: "nos pidió que le escribiéramos por WhatsApp" + de dónde salió el número.
    - Opt-out explícito.
    - <100 palabras, 1 pregunta, sin adjuntos, sin datos inventados.
    - Enlace a aviso de privacidad (`/privacidad`).
-8. **Volumen:** email ≤ N/día por dominio remitente (config); WhatsApp solo con validación del dueño, ≤ M/día, y tasa de bloqueo vigilada (<1%).
+8. **Volumen:** email ≤ N/día por dominio remitente (config); WhatsApp por API (`whatsapp_meta`) solo con validación escrita del dueño (constitución, reglas del proyecto); el asistido (`whatsapp_asistido`, envío humano desde el teléfono de la pyme, sin API) no la necesita. Los dos: opt-in previo, ≤ M/día y tasa de bloqueo vigilada (<1%).
 9. **Cifrado:** `email`, `telefono`, `nombre_contacto`, `respuesta_texto` pasan por `Cifrador` (AES-GCM, clave en entorno) antes de persistir. Nunca en logs, trazas ni mensajes de error. Catálogo de columnas sensibles en `backend/app/seguridad/catalogo_sensibles.py`; test que falla si una columna del catálogo no está cifrada.
 10. **Retención:** leads sin respuesta se purgan a los 90 días (documentado; job si hay tiempo). Respuestas: 180 días.
 11. **Atribución visible:** README y pie del tablero: "Datos de OpenStreetMap (ODbL) y Confecámaras/datos.gov.co (CC BY-SA 4.0)".
