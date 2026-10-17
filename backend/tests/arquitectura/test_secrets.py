@@ -38,6 +38,9 @@ def _arrancar():
     ("TOKEN_CLI", "sbp_valorsecreto5"),
     ("ANON_TOKEN", _jwt({"role": "anon"})),
     ("ADMIN_TOKEN", _jwt({"role": "service_role"})),
+    # postgres es el usuario de `supabase db push`: con él api saltea RLS.
+    ("DATABASE_URL", "postgresql://postgres:valor-secreto-6@host/db"),
+    ("DATABASE_URL", "postgresql://postgres.abcdref:valor-secreto-7@pooler.supabase.com:6543/postgres"),
 ])
 def test_app_no_arranca_con_secret_prohibido(entorno, caplog, capsys, nombre, valor):
     entorno.setenv(nombre, valor)
