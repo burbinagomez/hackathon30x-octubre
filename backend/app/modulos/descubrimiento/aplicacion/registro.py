@@ -51,4 +51,5 @@ def cargar_registro(ruta_yaml: Path, catalogo: dict[str, type]) -> Registro:
 
 def cargar_actividades(ruta_yaml: Path) -> dict[str, tuple[str, ...]]:
     """CIIU -> etiquetas OSM, desde config/actividades.yaml."""
-    return {}
+    entradas = yaml.safe_load(Path(ruta_yaml).read_text()) or {}
+    return {str(ciiu): tuple(e.get("osm") or ()) for ciiu, e in entradas.items()}
