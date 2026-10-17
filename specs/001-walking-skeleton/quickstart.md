@@ -39,8 +39,8 @@ El host exacto del pooler sale de **Connect** en el dashboard.
 
 ## Desplegado
 ```bash
-curl -s https://<api>.up.railway.app/health        # {"status":"ok","db":"ok"}
-gh workflow run e2e.yml -f base_url=https://<web>.up.railway.app
+curl -s https://api-production-92dc.up.railway.app/health        # {"status":"ok","db":"ok"}
+gh workflow run e2e.yml -f base_url=https://web-production-ce4537.up.railway.app
 ```
 **Esperado:** la página muestra `API: ok · DB: ok`.
 
