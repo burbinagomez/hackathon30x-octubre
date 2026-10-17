@@ -121,7 +121,7 @@
   - slim con `max_mb=1` → el tamaño.
 
   Después, contra las imágenes de T006 (250 MB) y T013 (60 MB) → verde.
-- [ ] T029 🤖 `.github/workflows/ci.yml` con estos jobs (además, `imagenes`: build de las dos imágenes + `check_imagen.sh`):
+- [X] T029 🤖 `.github/workflows/ci.yml` con estos jobs (además, `imagenes`: build de las dos imágenes + `check_imagen.sh`):
   - `back`: `postgres:16` + `roles.sql` + passwords de test, `uv sync`, `pytest`, `lint-imports`, alembic desde cero + `check`;
   - `front`: `npm ci`, `vitest`, build;
   - `seguridad`: pip-audit, `npm audit --audit-level=high`, binario de gitleaks;
