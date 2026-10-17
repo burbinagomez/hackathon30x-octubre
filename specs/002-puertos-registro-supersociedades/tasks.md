@@ -63,8 +63,8 @@ La spec tiene una sola historia (US1: una búsqueda deja leads deduplicados con 
 
 ### Paso 4: libro de costos en Postgres
 
-- [ ] T024 [MIN] Rojo *(advisor)*: `backend/tests/integration/test_costos_repo.py`, contadores sembrados relativo a `now()` de la DB con `unidades` 0, 1 y 10: `test_requests_24h_cuenta_filas_en_ventana` (23 h 59 min sí, 24 h 01 min no, aunque la de adentro tenga `unidades=0`); `test_creditos_mes_suma_unidades_del_mes_calendario_utc` (con `SET TIME ZONE 'America/Bogota'`); `test_registrar_sobrevive_al_rollback_de_otra_transaccion` (pregunta abierta 1).
-- [ ] T025 [MIN] Verde: `backend/app/modulos/costos/infraestructura/postgres_costos.py`, con transacción propia por `registrar`.
+- [X] T024 [MIN] Rojo *(advisor)*: `backend/tests/integration/test_costos_repo.py`, contadores sembrados relativo a `now()` de la DB con `unidades` 0, 1 y 10: `test_requests_24h_cuenta_filas_en_ventana` (23 h 59 min sí, 24 h 01 min no, aunque la de adentro tenga `unidades=0`); `test_creditos_mes_suma_unidades_del_mes_calendario_utc` (con `SET TIME ZONE 'America/Bogota'`); `test_registrar_sobrevive_al_rollback_de_otra_transaccion` (pregunta abierta 1).
+- [X] T025 [MIN] Verde: `backend/app/modulos/costos/infraestructura/postgres_costos.py`, con transacción propia por `registrar`.
 
 ## Fase 3: mínimo funcional, caso de uso
 
