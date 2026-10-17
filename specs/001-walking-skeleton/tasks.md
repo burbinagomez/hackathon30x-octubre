@@ -20,7 +20,7 @@
 ## Fase 1: Setup (tareas 0a, 0b)
 
 - [ ] T001 🧑B Verificar el proyecto Supabase del evento (ya existe). Anotar `project-ref` y región del pooler (no son secretos, pero no van al repo hasta el README de T033).
-- [ ] T002 🧑B Supabase → **Settings → API → Exposed schemas**: sacar `public`. **Database → Extensions**: habilitar `pg_trgm` y `pgcrypto` (quedan en `extensions`).
+- [ ] T002 🧑B Supabase → **Settings → Integrations → Data API**: sacar `public`. **Database → Extensions**: habilitar `pg_trgm` y `pgcrypto` (quedan en `extensions`).
 - [ ] T003 🧑B Supabase: correr `\dn+ extensions` y `SELECT * FROM pg_default_acl` desde `psql` como `postgres` por el pooler en modo sesión. Pasarme **la salida** (no tiene secretos), que define si el `GRANT USAGE ON SCHEMA extensions` de `roles.sql` va a andar.
 - [X] T004 🤖 Esqueleto del back: `backend/pyproject.toml` (`uv python pin 3.12`, sin patch; FastAPI, SQLAlchemy 2, `psycopg[binary]` 3, pydantic-settings, uvicorn; dev: pytest, httpx, import-linter, pip-audit, Alembic solo para el drift check) + `backend/uv.lock` commiteado y `backend/app/__init__.py`, `backend/app/modulos/__init__.py` vacíos.
 - [X] T005 🤖 **Rojo:** `backend/tests/unit/test_health_stub.py` (`GET /health` → 200). Verlo fallar por la ruta ausente, no por un import roto.
