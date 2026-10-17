@@ -15,6 +15,7 @@ async def lifespan(app: FastAPI):
     verificar_entorno()
     app.state.settings = Settings()
     app.state.engine = db.crear_engine(app.state.settings.database_url)
+    db.verificar_rol(app.state.engine)
     yield
 
 
