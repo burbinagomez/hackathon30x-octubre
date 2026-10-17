@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flujo Reto Dapta</title>
+<style>
+  :root { --bg:#f6f7f9; --ink:#111827; --muted:#4b5563; --box:#ffffff; --line:#9ca3af; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+  .wrap { max-width:1320px; margin:0 auto; padding:16px; }
+  svg { width:100%; height:auto; display:block; }
+  .h { font-size:14px; font-weight:700; fill:#fff; }
+  .t { font-size:12.5px; font-weight:700; }
+  .s { font-size:11px; fill:var(--muted); }
+  .k { font-size:11px; fill:var(--ink); }
+  .bad { fill:#b91c1c; }
+  .ok { fill:#15803d; }
+  .box { fill:var(--box); stroke:var(--line); stroke-width:1.2; rx:8; }
+  .door { fill:#fdf2f8; stroke:#db2777; stroke-width:1.2; rx:8; }
+  .off { fill:#f3f4f6; stroke:#d1d5db; stroke-dasharray:4 3; rx:8; }
+  .arrow { stroke:#374151; stroke-width:2; fill:none; marker-end:url(#m); }
+  .thin { stroke:#6b7280; stroke-width:1.4; fill:none; marker-end:url(#m); }
+  .dashed { stroke:#92400e; stroke-width:1.4; fill:none; stroke-dasharray:4 4; marker-end:url(#m2); }
+</style>
+</head>
+<body>
+<div class="wrap">
+<svg viewBox="0 0 1320 860" role="img" aria-label="Flujo de la plataforma del reto Dapta, desde la entrada del usuario hasta el tablero">
+  <defs>
+    <marker id="m" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#374151"/></marker>
+    <marker id="m2" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#92400e"/></marker>
+  </defs>
+
+  <text x="20" y="32" font-size="20" font-weight="800">Flujo de la plataforma — Reto Dapta: más leads, menor costo</text>
+  <text x="20" y="52" class="s">De izquierda a derecha: cómo entra la pyme, cómo se buscan las empresas, cómo se contactan y califican, y cómo se mide lo que costó. Cajas de color = etapas; debajo, adaptadores conectables por config.</text>
+
+  <!-- Ports band -->
+  <rect x="20" y="64" width="1280" height="28" rx="6" fill="#e0e7ff" stroke="#6366f1"/>
+  <text x="660" y="83" font-size="12.5" font-weight="700" fill="#3730a3" text-anchor="middle">PUERTOS: FuenteDescubrimiento · Enriquecedor · CanalContacto · Clasificador · Calificador · RegistroCostos — adaptadores en config/fuentes.yaml, se conectan y desconectan</text>
+
+  <!-- Stage headers -->
+  <rect x="20"   y="104" width="220" height="34" rx="8" fill="#db2777"/><text x="130"  y="126" class="h" text-anchor="middle">0 · ENTRADA (la pyme)</text>
+  <rect x="270"  y="104" width="200" height="34" rx="8" fill="#2563eb"/><text x="370"  y="126" class="h" text-anchor="middle">1 · ENCONTRAR</text>
+  <rect x="500"  y="104" width="180" height="34" rx="8" fill="#7c3aed"/><text x="590"  y="126" class="h" text-anchor="middle">2 · UNIFICAR</text>
+  <rect x="710"  y="104" width="180" height="34" rx="8" fill="#0891b2"/><text x="800"  y="126" class="h" text-anchor="middle">3 · ENRIQUECER</text>
+  <rect x="920"  y="104" width="190" height="34" rx="8" fill="#d97706"/><text x="1015" y="126" class="h" text-anchor="middle">4 · CONTACTAR</text>
+  <rect x="1140" y="104" width="160" height="34" rx="8" fill="#16a34a"/><text x="1220" y="126" class="h" text-anchor="middle">5 · CALIFICAR</text>
+
+  <!-- Col 0: entry doors -->
+  <rect x="20" y="152" width="220" height="62" class="door"/>
+  <text x="30" y="170" class="t">Puerta A · "Ya me compran"</text>
+  <text x="30" y="186" class="k">Pegas 5–50 clientes (o las 50</text>
+  <text x="30" y="200" class="k">del reto) → RUES → ICP propuesto</text>
+
+  <rect x="20" y="222" width="220" height="62" class="door"/>
+  <text x="30" y="240" class="t">Puerta B · "Una frase"</text>
+  <text x="30" y="256" class="k">"A quién le vendes y qué ofreces"</text>
+  <text x="30" y="270" class="k">→ 1 llamada LLM → ICP propuesto</text>
+
+  <rect x="20" y="292" width="220" height="48" class="door"/>
+  <text x="30" y="310" class="t">Puerta C · Filtros directos</text>
+  <text x="30" y="326" class="k">para quien ya sabe su ICP</text>
+
+  <!-- converge arrows to form -->
+  <path class="thin" d="M130,214 L130,220"/>
+  <path class="thin" d="M130,284 L130,290"/>
+  <path class="thin" d="M130,340 L130,352"/>
+
+  <rect x="20" y="354" width="220" height="118" class="box"/>
+  <text x="30" y="372" class="t">Formulario (prellenado)</text>
+  <text x="30" y="388" class="k">país · actividad · ciudad · tamaño</text>
+  <text x="30" y="402" class="k">palabras clave · exclusiones</text>
+  <text x="30" y="416" class="k">canal · tope de gasto · mensaje base</text>
+  <line x1="30" y1="424" x2="230" y2="424" stroke="#e5e7eb"/>
+  <text x="30" y="441" class="t ok">Vista previa antes de buscar</text>
+  <text x="30" y="456" class="k">cuántas coinciden por fuente</text>
+  <text x="30" y="469" class="k">+ costo estimado  →  [Buscar]</text>
+  <text x="130" y="492" class="s" text-anchor="middle" font-weight="700">crea una Búsqueda · el ICP del reto viene precargado</text>
+
+  <!-- Col 1: discovery adapters -->
+  <rect x="270" y="152" width="200" height="146" class="box"/>
+  <text x="282" y="170" class="t">Croma · registros de gobierno</text>
+  <text x="282" y="185" class="s">API multi-país · créditos</text>
+  <text x="282" y="203" class="k">CO Supersociedades: CIIU, dpto,</text>
+  <text x="282" y="217" class="k">   ingresos → NIT, ciudad, dirección</text>
+  <text x="282" y="233" class="k">CO DIAN Trade: import/export</text>
+  <text x="282" y="249" class="k">MX SIEM: estado + SCIAN → tel/email</text>
+  <text x="282" y="267" class="s bad">✗ RUES/SUNAT solo por nombre/NIT</text>
+  <text x="282" y="282" class="s bad">✗ BR sin registro · ~100 req/24h</text>
+
+  <rect x="270" y="310" width="200" height="82" class="box"/>
+  <text x="282" y="328" class="t">OpenStreetMap</text>
+  <text x="282" y="343" class="s">Overpass · ODbL · cualquier país</text>
+  <text x="282" y="360" class="k">Ciudad + tipo → tel, web, geo</text>
+  <text x="282" y="378" class="s ok">= la fuente gratuita de verdad</text>
+
+  <rect x="270" y="404" width="200" height="44" class="off"/>
+  <text x="282" y="422" class="t" fill="#6b7280">datos.gov.co (RUES)</text>
+  <text x="282" y="437" class="s">adaptador listo · habilitado: false</text>
+  <text x="370" y="492" class="s" text-anchor="middle" font-weight="700">el orquestador elige adaptadores por país</text>
+
+  <!-- Col 2: unify -->
+  <rect x="500" y="152" width="180" height="296" class="box"/>
+  <text x="510" y="170" class="t">Normalizar</text>
+  <text x="510" y="186" class="k">id fiscal por país · actividad</text>
+  <text x="510" y="200" class="k">CIIU/SCIAN/CNAE · tel E.164</text>
+  <line x1="510" y1="210" x2="670" y2="210" stroke="#e5e7eb"/>
+  <text x="510" y="228" class="t">Deduplicar (en orden)</text>
+  <text x="510" y="244" class="k">1. id fiscal + país</text>
+  <text x="510" y="259" class="k">2. Dominio</text>
+  <text x="510" y="274" class="k">3. Teléfono E.164</text>
+  <text x="510" y="289" class="k">4. Nombre + ciudad (difuso)</text>
+  <line x1="510" y1="299" x2="670" y2="299" stroke="#e5e7eb"/>
+  <text x="510" y="317" class="t">Filtrar por ICP</text>
+  <text x="510" y="333" class="k">país · actividad · ciudad · tamaño</text>
+  <line x1="510" y1="343" x2="670" y2="343" stroke="#e5e7eb"/>
+  <text x="510" y="361" class="t">Política de datos</text>
+  <text x="510" y="377" class="k">Solo personas jurídicas</text>
+  <text x="510" y="392" class="s">Naturales: se cuentan, no se</text>
+  <text x="510" y="406" class="s">contactan (SIC 17-96489)</text>
+  <text x="510" y="432" class="s" font-weight="700">→ tabla única de leads</text>
+
+  <!-- Col 3: enrich -->
+  <rect x="710" y="152" width="180" height="104" class="box"/>
+  <text x="720" y="170" class="t">Croma · verificación</text>
+  <text x="720" y="185" class="s">RUES CO · SUNAT PE · SIEM detalle</text>
+  <text x="720" y="203" class="k">→ matrícula activa, tipo_titular,</text>
+  <text x="720" y="218" class="k">   representantes, financieros,</text>
+  <text x="720" y="233" class="k">   SECOP, sanciones</text>
+  <text x="720" y="250" class="s ok">= score de calidad</text>
+
+  <rect x="710" y="268" width="180" height="90" class="box"/>
+  <text x="720" y="286" class="t">Sitio web del lead</text>
+  <text x="720" y="301" class="s">robots.txt · sin IPs privadas</text>
+  <text x="720" y="319" class="k">→ email genérico, WhatsApp</text>
+  <text x="720" y="334" class="k">   comercial publicado</text>
+  <text x="720" y="351" class="s ok">= contactabilidad</text>
+
+  <rect x="710" y="370" width="180" height="62" class="box"/>
+  <text x="720" y="388" class="t">Revisión de la pyme</text>
+  <text x="720" y="404" class="k">Ve la lista con fuente, score,</text>
+  <text x="720" y="418" class="k">canal y base legal · quita malos</text>
+  <text x="800" y="492" class="s" text-anchor="middle" font-weight="700">solo sobre leads ya filtrados</text>
+
+  <!-- Col 4: contact -->
+  <rect x="920" y="152" width="190" height="60" class="box"/>
+  <text x="930" y="170" class="t">Pendiente de aprobación</text>
+  <text x="930" y="186" class="k">Mensajes generados desde el</text>
+  <text x="930" y="200" class="k">mensaje base · la pyme aprueba</text>
+
+  <rect x="920" y="224" width="190" height="112" class="box"/>
+  <text x="930" y="242" class="t">Primer mensaje</text>
+  <text x="930" y="258" class="k">Email (SMTP nuevo) — primer toque</text>
+  <text x="930" y="273" class="k">WhatsApp — habilitado: false</text>
+  <text x="930" y="287" class="k">   hasta validar</text>
+  <text x="930" y="304" class="s">Verifica email/tel antes · &lt;100 palabras</text>
+  <text x="930" y="318" class="s">· opt-out · origen del dato</text>
+  <text x="930" y="331" class="s">Registra envío, entrega, respuesta, bloqueo</text>
+
+  <rect x="920" y="348" width="190" height="84" class="box"/>
+  <text x="930" y="366" class="t">Jev clasifica la respuesta</text>
+  <text x="930" y="381" class="s">en tiempo real (&lt;90 s importa)</text>
+  <text x="930" y="399" class="k">interesado · no · automática ·</text>
+  <text x="930" y="414" class="k">rebote · pide no contacto</text>
+  <text x="1015" y="492" class="s" text-anchor="middle" font-weight="700">tasa de respuesta · tasa de bloqueo</text>
+
+  <!-- Col 5: qualify -->
+  <rect x="1140" y="152" width="160" height="280" class="box"/>
+  <text x="1150" y="170" class="t">Dapta</text>
+  <text x="1150" y="186" class="s">dapta_csv [ON] · api [OFF]</text>
+  <text x="1150" y="206" class="k">Agente de voz llama:</text>
+  <text x="1150" y="221" class="k">caso de uso, tamaño de</text>
+  <text x="1150" y="236" class="k">equipo, tiempo de decisión</text>
+  <text x="1150" y="258" class="s bad">Requiere teléfono</text>
+  <line x1="1150" y1="272" x2="1290" y2="272" stroke="#e5e7eb"/>
+  <text x="1150" y="292" class="t">Calificado =</text>
+  <text x="1150" y="308" class="k">supera umbral de ICP</text>
+  <text x="1150" y="323" class="k">+ demo agendada</text>
+  <text x="1220" y="492" class="s" text-anchor="middle" font-weight="700">[MENTORES] API / costo</text>
+
+  <!-- Arrows between stages -->
+  <path class="arrow" d="M240,413 L268,300"/>
+  <path class="arrow" d="M470,225 L498,280"/>
+  <path class="arrow" d="M470,351 L498,300"/>
+  <path class="arrow" d="M680,300 L708,300"/>
+  <path class="arrow" d="M890,300 L918,300"/>
+  <path class="arrow" d="M1110,300 L1138,300"/>
+
+  <!-- Cost ledger band -->
+  <rect x="20" y="520" width="1280" height="92" rx="10" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="36" y="544" font-size="14" font-weight="800" fill="#92400e">LIBRO DE COSTOS (puerto RegistroCostos) — cada adaptador escribe lo que costó, en el momento en que ocurre</text>
+  <g font-size="11.5" fill="#78350f">
+    <text x="36"  y="570">• créditos Croma por consulta (1 dataset / 10 live)</text>
+    <text x="36"  y="590">• cómputo de Overpass / web fetch</text>
+    <text x="420" y="570">• tokens de IA (intake, redacción, enriquecimiento)</text>
+    <text x="420" y="590">• llamadas a Jev (clasificar / verificar)</text>
+    <text x="800" y="570">• mensaje de email / plantilla de WhatsApp</text>
+    <text x="800" y="590">• minutos del agente de voz de Dapta</text>
+    <text x="1100" y="570">• minutos humanos</text>
+    <text x="1100" y="590">• tier gratis = valor de lista</text>
+  </g>
+  <path class="dashed" d="M130,500 L130,518"/>
+  <path class="dashed" d="M370,500 L370,518"/>
+  <path class="dashed" d="M590,448 L590,518"/>
+  <path class="dashed" d="M800,500 L800,518"/>
+  <path class="dashed" d="M1015,500 L1015,518"/>
+  <path class="dashed" d="M1220,500 L1220,518"/>
+
+  <!-- Dashboard -->
+  <path class="arrow" d="M660,614 L660,640"/>
+  <rect x="20" y="644" width="1280" height="200" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="36" y="670" font-size="14" font-weight="800" fill="#14532d">TABLERO — por BÚSQUEDA, por PAÍS, por FUENTE (Croma Supersociedades · DIAN Trade · SIEM · OSM) y por CANAL (email · WhatsApp)</text>
+  <text x="36" y="694" font-size="12" fill="#14532d">Embudo: encontrados → únicos → encajan ICP → con teléfono → contactables (jurídicas + canal publicado) → contactados → respondieron → calificados por Dapta</text>
+  <text x="36" y="716" font-size="12" fill="#14532d">Tasas: respuesta · bloqueo · calificación · cobertura de teléfono · % no contactable por política · cobertura por país ("sin fuente para PE/BR salvo OSM")</text>
+  <rect x="36" y="734" width="1248" height="96" rx="8" fill="#ffffff" stroke="#16a34a"/>
+  <text x="52" y="756" font-size="13" font-weight="800" fill="#14532d">CPL (fuente) = costo atribuido a la fuente ÷ leads únicos que encajan con el ICP</text>
+  <text x="52" y="778" font-size="13" font-weight="800" fill="#14532d">CPQL (fuente × canal) = costo total (descubrir + enriquecer + contactar + llamada Dapta) ÷ demos agendadas   ← la métrica que decide dónde buscar</text>
+  <text x="52" y="800" font-size="11.5" fill="#166534">Lo que mide el jurado: leads del perfil encontrados · CPL por canal · % calificados por canal. Cambiar de fuente o de canal es un flag en config/fuentes.yaml.</text>
+  <text x="52" y="820" font-size="11.5" fill="#166534">Patrón de los referentes (Artisan · Apollo · Clay): ICP → filtros → vista previa → lista → quitar malos → aprobar mensajes → enviar. Lo que agregamos: el costo antes y después.</text>
+</svg>
+</div>
+</body>
+</html>

@@ -1,0 +1,33 @@
+# Tarifas para el libro de costos. Versionado a propósito: el jurado ve los supuestos.
+# Moneda: USD. Actualizar con los valores reales de cada cuenta creada para el evento.
+
+computo_seg_usd: 0.0000070          # Railway: ~ $0.000231/vCPU-min ≈ 0.0000039/s + RAM; redondeo conservador
+web_fetch_usd: 0.00001              # cómputo + ancho de banda por request
+
+llm:
+  claude-haiku-5-5:   { in_usd_por_M: 0.10, out_usd_por_M: 0.50 }
+  claude-sonnet-5-5:  { in_usd_por_M: 2.00, out_usd_por_M: 10.00 }
+  claude-opus-5-5:    { in_usd_por_M: 4.00, out_usd_por_M: 20.00 }
+
+jev:
+  in_usd_por_M: 0.042               # salida gratis
+  version: jev-1.13.0
+
+croma:
+  usd_por_credito: 0.00099          # plan Standard: $99 / 100.000 créditos (valor de lista)
+  creditos_dataset: 1
+  creditos_live: 10
+  gratis_mes: 1500                  # se registra valor de lista con gratis=true
+
+email:
+  usd_por_mensaje: 0.0              # proveedor SMTP con tier gratuito creado para el evento
+  nota: "al escalar: dominio dedicado + calentamiento + proveedor pago"
+
+whatsapp:
+  usd_por_plantilla_co: null        # [VALIDAR] tarifa Meta Colombia de la cuenta que se use; null = canal no disponible
+
+dapta:
+  usd_por_minuto: null              # [MENTORES] costo del agente de voz en el entorno de prueba
+
+humano:
+  usd_por_minuto: 0.25              # configurable; tarifa de referencia para revisión manual

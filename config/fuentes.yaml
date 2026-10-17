@@ -1,0 +1,103 @@
+# Registro de adaptadores — se conectan y desconectan aquí, no en el código.
+# Cada adaptador implementa un puerto del dominio y pasa la misma suite de contrato.
+# El orquestador solo carga los que tienen habilitado: true y cuyos `paises` y
+# `filtros` cubren el ICP. Si ningún adaptador cubre un país/criterio, se reporta,
+# no se inventa.
+
+fuentes_descubrimiento:                 # puerto: FuenteDescubrimiento
+  croma_supersociedades_co:
+    habilitado: true
+    proveedor: croma
+    endpoint: /co/supersociedades/companies-search/v1
+    tipo: dataset                        # 1 crédito
+    paises: [CO]
+    filtros: [ciiu, macrosector, departamento, region, ingresos_min]
+    trae: [nit, nombre, ciudad, direccion, geo, ciiu, ingresos, empleados]
+    tipo_titular_implicito: juridica     # todo lo supervisado es sociedad
+    sesgo: "solo empresas que reportan estados financieros (medianas/grandes)"
+    licencia: "datos públicos vía Croma; no redistribuir"
+  croma_dian_trade_co:
+    habilitado: true
+    proveedor: croma
+    endpoint: /co/dian-trade/directory-search/v1
+    tipo: dataset
+    paises: [CO]
+    filtros: [partida_arancelaria, flujo, anio]
+    trae: [nit, nombre, valor_usd, natural_person]
+    licencia: "datos públicos vía Croma; no redistribuir"
+  croma_siem_mx:
+    habilitado: false                    # activar solo si el ICP incluye MX
+    proveedor: croma
+    endpoint: /mx/siem/establishments/v1
+    tipo: live                           # 10 créditos, async
+    paises: [MX]
+    filtros: [estado, actividad_scian, nombre_obligatorio]
+    trae: [nombre_comercial, estado, camara]   # detalle: tel, email, web, dirección
+    nota: "requiere nombre (substring); descubrimiento parcial"
+  osm_overpass:
+    habilitado: true
+    proveedor: osm
+    tipo: live
+    paises: [CO, MX, PE, BR, "*"]
+    filtros: [ciudad, tipo_negocio]
+    trae: [nombre, telefono, web, email, direccion, geo]
+    licencia: ODbL
+  datos_gov_co_rues:
+    habilitado: false                    # DESCONECTADO esta vez; un flag lo vuelve a conectar
+    proveedor: datos.gov.co
+    dataset: nb3d-v3n7
+    tipo: dataset
+    paises: [CO]
+    filtros: [ciiu, camara, estado_matricula, tipo_propietario]
+    trae: [nit, nombre, ciiu, estado, tipo_titular]
+    licencia: CC-BY-SA-4.0
+
+enriquecedores:                          # puerto: Enriquecedor
+  croma_rues_co:
+    habilitado: true
+    endpoint: /co/rues/entity-by-nit/v1
+    tipo: live
+    paises: [CO]
+    trae: [estado_matricula, ciiu, representantes, financieros, renovaciones, tipo_titular]
+  croma_supersociedades_detalle_co:
+    habilitado: true
+    paises: [CO]
+    trae: [accionistas, representante_legal, email_notificacion]
+  croma_sunat_pe:
+    habilitado: false
+    paises: [PE]
+  croma_siem_detalle_mx:
+    habilitado: false
+    paises: [MX]
+    trae: [telefono, email, web, direccion, empleados]
+  sitio_web:
+    habilitado: true
+    paises: ["*"]
+    trae: [email_publicado, whatsapp_publicado, telefono_publicado]
+    reglas: [robots_txt, sin_ips_privadas, max_2mb, 3_redirecciones]
+
+canales_contacto:                        # puerto: CanalContacto
+  smtp_email:
+    habilitado: true
+    proveedor: "SMTP nuevo para el evento"
+    primer_toque: true
+  whatsapp_meta:
+    habilitado: false                    # [VALIDAR] por el dueño; mientras tanto no existe
+    solo_numeros_comerciales_publicados: true
+    tasa_bloqueo_max: 0.01
+
+calificadores:                           # puerto: Calificador
+  dapta_api:
+    habilitado: false                    # [MENTORES] hasta tener la doc
+  dapta_csv:
+    habilitado: true                     # respaldo: exportar/importar
+
+clasificadores:                          # puerto: Clasificador
+  jev:
+    habilitado: true
+    version: jev-1.13.0
+
+limites:
+  croma_requests_por_24h: 100            # según catálogo; planificar consultas
+  croma_creditos_gratis_mes: 1500
+  overpass_req_por_seg: 1
