@@ -29,7 +29,7 @@ ENTRADA = """
 """
 
 
-@pytest.mark.xfail(strict=True, reason="rojo hasta T031: el catálogo todavía no tiene croma_supersociedades_co")
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="rojo hasta T031: el catálogo todavía no tiene croma_supersociedades_co")
 def test_carga_config_fuentes_yaml_real_sin_error():
     registro = cargar_registro(FUENTES_YAML, catalogo)
     assert set(registro.fuentes) == {"croma_supersociedades_co"}
