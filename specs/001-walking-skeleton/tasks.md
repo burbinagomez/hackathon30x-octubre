@@ -49,9 +49,9 @@
     - un JWT con `role` en `{anon, service_role}`;
     - un `DATABASE_URL` con usuario `postgres` o `postgres.<ref>`.
 
-    En cada caso, el nombre de la variable aparece en `str(exc)`, y el valor no aparece en `str(exc)`, `caplog.text` ni `capsys`.
+    En cada caso sale `SecretProhibido` (no cualquier excepción), el nombre de la variable aparece en `str(exc)`, y el valor no aparece en `str(exc)`, `caplog.text` ni `capsys`.
   - `::test_jwt_malformado_no_filtra_el_valor`: con `FOO_TOKEN` la app arranca; con `SUPABASE_X` rechaza. En los dos, el valor no aparece.
-  - `::test_app_arranca_con_entorno_limpio`: con solo `DATABASE_URL` y `CORS_ORIGINS`, arranca.
+  - `::test_app_arranca_con_entorno_limpio`: con solo `DATABASE_URL` y `CORS_ORIGINS`, arranca. Uno de los casos es la forma de prod (`app_rt.<ref>`, pooler, 6543, `sslmode=require`), como control de falso positivo.
 - [X] T011 [P] 🤖 **Rojo:** `test_secrets.py::test_dockerfile_web_solo_recibe_vite_api_url`. Los `ARG` de `frontend/Dockerfile` son exactamente `{VITE_API_URL}`. Rojo porque el archivo no existe todavía.
 - [X] T012 🤖 **Verde:** el guard en `backend/app/config.py` (pydantic-settings), instanciado al crear la app en `main.py`. El JWT se decodifica sin verificar firma y el error de decodificación se traga.
 - [X] T013 🤖 **Verde:** `frontend/Dockerfile` multi-stage, `node:22-alpine` → `caddy:2-alpine` con tags fijos, `ARG VITE_API_URL` como único `ARG`, `USER` no root dueño de `/data` y `/config`, `setcap -r /usr/bin/caddy` en el build (con `libcap` instalado y borrado) y `HEALTHCHECK` con `wget`. Más `frontend/.dockerignore` y `frontend/Caddyfile` (R-docker):
