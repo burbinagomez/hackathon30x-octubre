@@ -77,7 +77,7 @@
   - `has_schema_privilege('app_rt','extensions','USAGE')` da true.
 
   Si falta `TEST_DATABASE_URL`, falla; no se salta.
-- [ ] T017 [P] 🤖 **Rojo:** `backend/tests/arquitectura/test_migraciones.py`:
+- [X] T017 [P] 🤖 **Rojo:** `backend/tests/arquitectura/test_migraciones.py`:
   - `::test_upgrade_head_desde_vacio`: `downgrade base` → `upgrade head` como `app_mig` → la revisión actual es `head` y `alembic check` da 0. `MIGRATION_DATABASE_URL` va solo en el `env=` del subproceso.
   - `::test_drift_mira_solo_public_aunque_cambie_search_path`: con `ajeno.t` creada y `PGOPTIONS="-c search_path=ajeno,public"`, `check` da 0 y `alembic_version` queda en `public`. Con una tabla extra en `public`, `check` da ≠ 0.
 - [ ] T018 [P] 🤖 **Rojo:** `backend/tests/unit/test_db.py::test_engine_desactiva_prepared_statements`: el engine de `db.py` pasa `prepare_threshold=None`.
