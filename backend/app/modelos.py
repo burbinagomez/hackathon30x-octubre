@@ -47,6 +47,7 @@ busquedas = Table(
     Column("canal_preferido", Text),
     Column("tope_gasto_usd", Numeric),
     Column("mensaje_base", Text),
+    Column("creado_en", DateTime(timezone=True), nullable=False, server_default=_AHORA),
 )
 
 leads = Table(
@@ -65,6 +66,7 @@ leads = Table(
         "CASE pais WHEN 'CO' THEN 'es' WHEN 'MX' THEN 'es' WHEN 'PE' THEN 'es' WHEN 'BR' THEN 'pt' END",
         persisted=True,
     )),
+    Column("creado_en", DateTime(timezone=True), nullable=False, server_default=_AHORA),
     UniqueConstraint("tenant_id", "pais", "id_fiscal", name="leads_tenant_pais_id_fiscal_key"),
 )
 

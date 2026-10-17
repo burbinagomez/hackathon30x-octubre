@@ -15,7 +15,8 @@ CREATE TABLE public.busquedas (
   estado          text NOT NULL DEFAULT 'creada' CHECK (estado IN ('creada', 'terminada', 'con_errores')),
   canal_preferido text,
   tope_gasto_usd  numeric,
-  mensaje_base    text
+  mensaje_base    text,
+  creado_en       timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE public.leads (
@@ -34,6 +35,7 @@ CREATE TABLE public.leads (
   idioma_contacto   text GENERATED ALWAYS AS (
     CASE pais WHEN 'CO' THEN 'es' WHEN 'MX' THEN 'es' WHEN 'PE' THEN 'es' WHEN 'BR' THEN 'pt' END
   ) STORED,
+  creado_en         timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT leads_tenant_pais_id_fiscal_key UNIQUE (tenant_id, pais, id_fiscal)
 );
 
