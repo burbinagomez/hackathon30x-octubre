@@ -103,15 +103,15 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
   - `::test_requests_24h_cuenta_filas_en_ventana`: una fila a 23 h 59 min y otra a 24 h 01 min dan `requests_24h == 1`, aunque la fila de adentro tenga `unidades=0`.
   - `::test_creditos_mes_suma_unidades_del_mes_calendario_utc`: filas de 10 créditos a las 23:59 UTC del último día del mes anterior, y filas de 1 y 10 a las 00:01 UTC del primero del actual. Solo suman las del mes actual. El test corre con `SET TIME ZONE 'America/Bogota'` para probar que se usa UTC y no la zona de la sesión.
   - `::test_reintento_cuenta_para_el_limite`: con 98 filas previas, un 502 seguido de un 200 deja `requests_24h == 100` y `creditos_mes` sube en 1. La búsqueda siguiente lanza `LimiteFuenteAgotado`.
-- `backend/tests/integration/test_rls.py::test_tenant_b_no_accede_a_datos_de_a[tabla]`, sobre `tenants`, `busquedas`, `leads`, `lead_fuentes`, `cumplimiento` y `costos`. En `tenants` la política es `id = app.tenant_id`, y `app_rt` no tiene `INSERT`: la siembra corre con `app_mig`. Como tenant B:
+- `backend/tests/integration/test_rls.py::test_tenant_b_no_accede_a_datos_de_a[tabla]`, sobre `tenants`, `busquedas`, `leads`, `lead_fuentes`, `cumplimiento` y `costos`. En `tenants` la política es `id = app.tenant_id`, y `app_rt` no tiene `INSERT`: la siembra corre con `postgres`. Como tenant B:
   - SELECT devuelve vacío;
   - UPDATE y DELETE afectan 0 filas de A;
   - un INSERT con el `tenant_id` de A es rechazado.
 
   `fuente_cache` va en la lista de exclusiones, con su razón (ver Decisiones técnicas).
-- `backend/tests/integration/test_privilegios_supabase.py` (los dos primeros corren con `app_mig`, que puede leer el catálogo):
-  - `::test_anon_y_authenticated_sin_privilegios[rol-tabla]`: para `anon` y `authenticated`, sobre cada tabla de `public` (`fuente_cache` incluida), `has_table_privilege(rol, tabla, priv)` es `false` para `SELECT`, `INSERT`, `UPDATE` y `DELETE`. La lista de tablas sale de `pg_tables WHERE schemaname='public'`, no de una lista fija: una tabla nueva entra sola. Un assert previo exige que la lista contenga al menos `leads` y `alembic_version`, para que una lista vacía no deje la suite verde sin correr nada.
-  - `::test_default_privileges_no_conceden_a_anon_ni_authenticated`: después de `upgrade head`, `app_mig` crea una tabla **regular** `public.x` dentro de una transacción con rollback, y `anon`/`authenticated` no tienen ningún privilegio sobre ella. No una `TEMP TABLE`: esa va a `pg_temp` y no le aplican los defaults de `public`.
+- `backend/tests/integration/test_privilegios_supabase.py` (los dos primeros corren con `postgres`, que puede leer el catálogo):
+  - `::test_anon_y_authenticated_sin_privilegios[rol-tabla]`: para `anon` y `authenticated`, sobre cada tabla de `public` (`fuente_cache` incluida), `has_table_privilege(rol, tabla, priv)` es `false` para `SELECT`, `INSERT`, `UPDATE` y `DELETE`. La lista de tablas sale de `pg_tables WHERE schemaname='public'`, no de una lista fija: una tabla nueva entra sola. Un assert previo exige que la lista contenga al menos `leads`, para que una lista vacía no deje la suite verde sin correr nada.
+  - `::test_default_privileges_no_conceden_a_anon_ni_authenticated`: después de aplicar `supabase/migrations`, `postgres` crea una tabla **regular** `public.x` dentro de una transacción con rollback, y `anon`/`authenticated` no tienen ningún privilegio sobre ella. No una `TEMP TABLE`: esa va a `pg_temp` y no le aplican los defaults de `public`.
   - `::test_tenant_no_sobrevive_al_commit`: usa la unidad de trabajo real sobre el engine de `app_rt`, no un `SET LOCAL` escrito en el test. Dentro de la unidad de trabajo, `current_setting('app.tenant_id', true)` es el tenant; después del commit, en la misma conexión, es vacío o `NULL`. Prueba que el código usa `SET LOCAL` y no `SET` de sesión.
   - Que `app_rt` no tiene `BYPASSRLS` ya lo prueba `test_rol_runtime` del 001.
 
@@ -148,18 +148,17 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
 | `cumplimiento` | `lead_id`, `fuente`, `licencia`, `url_origen`, `base_legal`, `as_of`, `opt_out_at`, `solicitudes jsonb` | `lead_id` UNIQUE. `base_legal` nullable hasta el 007 (la setea `AprobarMensaje`). |
 | `costos` | las columnas de `OperacionCosto` + `gratis` | `gratis bool NOT NULL`. |
 
-Todas menos `tenants` llevan `tenant_id` y RLS con `USING/WITH CHECK (tenant_id = current_setting('app.tenant_id')::uuid)`. `tenants` tiene RLS con `USING (id = current_setting('app.tenant_id')::uuid)`, solo `GRANT SELECT` a `app_rt`, y se siembra con `app_mig`. La unidad de trabajo abre la transacción y hace `SET LOCAL app.tenant_id` (o `set_config(..., true)`) como primera sentencia. **Nunca `SET` de sesión:** `api` entra por el pooler de Supabase en modo transacción, y una conexión con el tenant de otro cliente puede llegar a la request siguiente.
+Todas menos `tenants` llevan `tenant_id` y RLS con `USING/WITH CHECK (tenant_id = current_setting('app.tenant_id')::uuid)`. `tenants` tiene RLS con `USING (id = current_setting('app.tenant_id')::uuid)`, solo `GRANT SELECT` a `app_rt`, y se siembra con `postgres`. La unidad de trabajo abre la transacción y hace `SET LOCAL app.tenant_id` (o `set_config(..., true)`) como primera sentencia. **Nunca `SET` de sesión:** `api` entra por el pooler de Supabase en modo transacción, y una conexión con el tenant de otro cliente puede llegar a la request siguiente.
 
 **Roles de Supabase** (en la misma `0002`, al final):
 ```sql
 REVOKE ALL ON ALL TABLES    IN SCHEMA public FROM anon, authenticated;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
-ALTER DEFAULT PRIVILEGES FOR ROLE app_mig IN SCHEMA public REVOKE ALL ON TABLES    FROM anon, authenticated;
-ALTER DEFAULT PRIVILEGES FOR ROLE app_mig IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES    FROM anon, authenticated;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated;
 ```
-- Si el `pg_default_acl` verificado en la tarea 0a del 001 muestra grants por defecto de `postgres` hacia `anon`/`authenticated` en `public`, se agrega el mismo `ALTER DEFAULT PRIVILEGES FOR ROLE postgres …` (lo corre `postgres` desde el SQL editor, porque `app_mig` no puede alterar los defaults de otro rol) y se anota en el quickstart.
 - La migración no puede fallar en Postgres vanilla: el bloque va dentro de un `DO` que solo corre si existen `anon` y `authenticated` (`pg_roles`).
-- **CI y local:** `backend/scripts/supabase_simulado.sql` corre después de `roles.sql` y antes de `upgrade head`. Crea `anon` y `authenticated` `NOLOGIN` y simula el peor caso de Supabase: `ALTER DEFAULT PRIVILEGES FOR ROLE app_mig IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated`. Sin ese script, el test de privilegios nacería verde en vanilla y no probaría nada.
+- **CI y local:** `backend/scripts/supabase_simulado.sql` corre después de `roles.sql` y antes de aplicar `supabase/migrations`. Crea `anon` y `authenticated` `NOLOGIN` y simula el peor caso de Supabase: `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated`. Sin ese script, el test de privilegios nacería verde en vanilla y no probaría nada.
 
 **`fuente_cache`** (`proveedor`, `endpoint`, `hash_params`, `respuesta jsonb`, `as_of`) es **global, sin `tenant_id`**:
 - Guarda datos públicos de gobierno, no datos del tenant. Por eso queda excluida del test de RLS.

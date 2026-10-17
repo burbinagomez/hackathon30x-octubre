@@ -138,7 +138,7 @@ No hay baseline previo para `frase_a_icp`: el primer `--actualizar-baseline` es 
 5. Rojo: `test_resolver_lookalike.py` (con `BuscadorRazonSocial` falso) → verde con `ResolverLookalike`.
 6. Rojo: `test_interpretar_frase.py` (con `ClienteLLMFalso`) → verde con `InterpretarFrase`.
 7. Rojo: `test_api_intake.py` → verde con `POST /intake/lookalike` y `POST /intake/frase`.
-8. Migración `00XX_costos_intake.py`: `v_costo_intake` + exclusión de `fuente='intake'` en `v_prorrateo`/`v_desperdicio` → rojo `test_vistas_tablero.py` se suma → verde. `test_tablero.py::test_tablero_muestra_costo_de_intake_aparte` en rojo → verde.
+8. Migración `supabase/migrations/00XX_costos_intake.sql`: `v_costo_intake` + exclusión de `fuente='intake'` en `v_prorrateo`/`v_desperdicio` → rojo `test_vistas_tablero.py` se suma → verde. `test_tablero.py::test_tablero_muestra_costo_de_intake_aparte` en rojo → verde.
 9. Rojo: `IntakeLookalike.test.tsx` e `IntakeFrase.test.tsx` → verde. En el mismo paso, mover `CriteriosICP` y el componente de campos de `busqueda/` a `compartido/`; `limites.test.ts` se suma y confirma que ningún import queda apuntando a `busqueda/`.
 10. Eval: `dataset.json` nuevo de `frase_a_icp` (15–20 casos) + `uv run python -m evals.run --eval frase_a_icp --actualizar-baseline --motivo "primer baseline de frase_a_icp, no reemplaza nada"`.
 11. Doc: `docs/arquitectura-backend.md`, módulo `intake`, y la corrección de `-frontend.md` si el paso 9 movió archivos.

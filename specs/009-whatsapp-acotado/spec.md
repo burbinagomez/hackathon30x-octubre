@@ -316,7 +316,7 @@ El clasificador ya tiene eval, pero su set es de emails, y el texto de WhatsApp 
 - `test_costos_por_adaptador.py`: un `WhatsappMeta.enviar` que no pasa por `RegistroCostos` falla; un `marcar` o una `respuesta-pegada` del asistido que no escriben `minutos_humanos` fallan.
 - `test_import_linter.py`: `httpx` hacia la Graph API solo en `contacto/infraestructura/`. El contrato de fuentes prohibidas no se toca, porque WhatsApp no es fuente.
 - `test_migraciones.py`:
-  - `::test_migracion_0009_sobre_0008_con_datos`: con contactos `email` existentes, `upgrade` conserva todo, y `downgrade` falla si hay algún contacto `whatsapp` (no se pierde una traza en silencio);
+  - `::test_migracion_0009_sobre_0008_con_datos`: se aplica hasta la `0008`, se siembran contactos `email` → aplicar la `0009` conserva todo;
   - `::test_check_canal_admite_whatsapp_y_rechaza_sms`;
   - `::test_check_adaptador_coherente_con_canal`: `canal='email'` con `adaptador='whatsapp_asistido'` falla, y `enlace_emitido_en` en un contacto de meta falla;
   - `::test_check_via_y_registrado_por`: `via='humano'` sin `registrado_por` falla, y `via='palabra_clave'` con `registrado_por` falla.

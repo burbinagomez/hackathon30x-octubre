@@ -174,7 +174,7 @@
 - `backend/tests/arquitectura/test_contacto_no_aparece_en_logs.py::test_envio_y_respuesta_no_loguean_contacto`: `redactar` + `aprobar` + `enviar` + `leer-respuestas` con `caplog` en `DEBUG` sobre todos los loggers (incluidos `smtplib` con `set_debuglevel(0)`, `imaplib`, `httpx`): ni `ventas@ejemplo.co` ni el texto de la respuesta aparecen. Incluye el caso `SMTPRecipientsRefused`, que trae la dirección en `recipients`/`args`.
 
 **Migración**
-- `backend/tests/integration/test_migraciones.py::test_migracion_0006_con_leads_existentes`: base en `0005` con un lead con `email_cifrado` → `upgrade 0006` no falla; `app.cli rehmac-emails` completa `email_hmac`; `upgrade 0007` no falla. Sin el rehmac, `upgrade 0007` falla.
+- `backend/tests/integration/test_migraciones.py::test_migracion_0006_con_leads_existentes`: se aplica hasta la `0005`, se siembra un lead con `email_cifrado` → aplicar la `0006` no falla; `app.cli rehmac-emails` completa `email_hmac`; aplicar la `0007` no falla. Sin el rehmac, aplicar la `0007` falla.
 - `test_redactar.py::test_email_hmac_incompleto_no_redacta` y `test_envio_email.py::test_email_hmac_incompleto_no_envia`: con un lead con `email_cifrado` y `email_hmac` nulo (forzado por SQL) → `EmailHmacIncompleto`, 0 contactos, 0 envíos.
 
 **RLS**
@@ -229,7 +229,7 @@
 - `sin_plantilla_idioma` no es "política": no entra en `no_contactables_politica` de la 006, que filtra `IN ('persona_natural','contacto_nominal')`.
 - La 006 enriquece solo leads con `enriquecido_en IS NULL`, así que no lo pisa.
 
-**Perfil del remitente:** `tenants` suma `firmante text NULL` y `finalidad text NULL`, con `CHECK (char_length(...) <= 120)`. Los setea el script de siembra de la 002 con `app_mig`, porque `app_rt` solo tiene `SELECT` sobre `tenants`. Sin perfil completo → `PerfilRemitenteIncompleto`.
+**Perfil del remitente:** `tenants` suma `firmante text NULL` y `finalidad text NULL`, con `CHECK (char_length(...) <= 120)`. Los setea el script de siembra de la 002 con `postgres`, porque `app_rt` solo tiene `SELECT` sobre `tenants`. Sin perfil completo → `PerfilRemitenteIncompleto`.
 
 **Migración `supabase/migrations/0006_contacto_email.sql`** (a mano, con `GRANT` a `app_rt`):
 
@@ -260,7 +260,7 @@ Está ordenado por corte: las tareas 1–8 son el mínimo (corte 1), y cada bloq
 **Corte 1: enviar y dar de baja, sin LLM** (≈ 2 h 45)
 1. Rojo: `test_tokens.py` → verde.
 2. Rojo: los 7 tests de forma movidos (regresión, siguen verdes) + `test_plantilla.py` → verde con `plantilla.py`; el envoltorio de evals sigue verde.
-3. Migraciones `0006` + `0007` + `test_migracion_0006_con_leads_existentes` + `test_rls[contactos]`, `[respuestas]` + guarda de catálogo con `respuestas.respuesta_texto_cifrado`, `leads.email_hmac` y la excepción `respuestas.contacto_id` + `app.cli rehmac-emails`. En el deploy: `0006` → `rehmac-emails` (one-off en el servicio `api`, que tiene `CIFRADO_KEY`) → `0007`.
+3. Migraciones `0006` + `0007` + `test_migracion_0006_con_leads_existentes` + `test_rls[contactos]`, `[respuestas]` + guarda de catálogo con `respuestas.respuesta_texto_cifrado`, `leads.email_hmac` y la excepción `respuestas.contacto_id` + `app.cli rehmac-emails`. En el deploy: `0006` → `rehmac-emails` (one-off en el servicio `api`, que tiene `CIFRADO_KEY`) → `0007`. Requiere **dos merges a `main`**: `supabase db push` aplica todo lo pendiente de una vez, así que la `0007` entra recién en un segundo merge, después del rehmac.
 4. Rojo: `test_elegibles_email.py` → verde con las tres vistas.
 5. Rojo: `test_redactar.py` solo con `plantilla_fija` (incluye `test_email_hmac_incompleto_no_redacta`, `test_lead_mx_recibe_plantilla_es_con_ui_en` y `test_lead_br_queda_sin_plantilla_idioma`) + `test_idioma_de_coincide_con_la_columna_generada` + `test_redactor.py[plantilla_fija]` → verde.
 6. Rojo: `test_envio_email.py` (incluye `test_email_hmac_incompleto_no_envia`) + `test_canal_contacto.py[enviar]` → verde con `AprobarMensaje` (CLI), `EnviarAprobados` y `SmtpEmail.enviar`.

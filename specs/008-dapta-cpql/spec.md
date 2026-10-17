@@ -195,7 +195,7 @@ Tests:
 - La guarda de catálogo de la 003 sigue verde sin excepciones: `calificaciones` no guarda ningún dato de contacto.
 
 **Migración** (`backend/tests/integration/test_migraciones.py`)
-- `::test_migracion_0008_sobre_0007_con_datos`: base en `0007` con contactos y respuestas → `upgrade 0008` no falla.
+- `::test_migracion_0008_sobre_0007_con_datos`: se aplica hasta la `0007`, se siembran contactos y respuestas → aplicar la `0008` no falla.
 - `::test_v_tablero_fuentes_conserva_columnas_previas_en_orden`: las columnas de la 005–007 siguen en el mismo orden; las nuevas, al final.
 
 **RLS**

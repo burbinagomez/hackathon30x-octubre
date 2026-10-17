@@ -197,10 +197,10 @@ handle_path /api/* {
 - El resto de las rutas usa `Authorization: Bearer` desde memoria: un formulario de otro sitio no puede mandarlo, así que no hay CSRF.
 - El XSS ya no puede robar una sesión de 8 h: como mucho usa un access de 15 min mientras la pestaña está abierta. La CSP lo acota además.
 
-**`sesiones_refresco` (migración nueva del slice, `00XX_sesiones_refresco`, en el formato de migraciones que esté en `main` al empezar: hoy Alembic, o SQL del Supabase CLI si el 001 lo migró):**
+**`sesiones_refresco` (migración nueva del slice, `supabase/migrations/00XX_sesiones_refresco.sql`):**
 - Columnas: `id`, `usuario_id`, `tenant_id`, `familia uuid`, `hash bytea UNIQUE`, `expira_en`, `usado_en`, `revocado_en` y `creado_en`.
 - RLS activada **sin policies** para `app_rt`: el rol no la lee ni la escribe directo.
-- Funciones `SECURITY DEFINER` con dueño `app_mig`, `SET search_path = public, pg_temp`, `REVOKE` a `PUBLIC`/`anon`/`authenticated` y `GRANT EXECUTE` solo a `app_rt`, igual que `usuario_para_login`:
+- Funciones `SECURITY DEFINER` con dueño `postgres`, `SET search_path = public, pg_temp`, `REVOKE` a `PUBLIC`/`anon`/`authenticated` y `GRANT EXECUTE` solo a `app_rt`, igual que `usuario_para_login`:
   - `crear_refresco(usuario_id, tenant_id, hash, expira_en)`;
   - `rotar_refresco(hash_viejo, hash_nuevo, ahora, gracia)`, que devuelve el estado (`ok`, `en_curso`, `reusado` o `vencido`) y hace el `FOR UPDATE` sobre la fila;
   - `revocar_familia(hash)`.
@@ -276,7 +276,7 @@ Va en el job `seguridad`, que ya es required check. No se reemplaza por otra her
    - Deploy en Railway: `API_UPSTREAM` en `web` (probar la red privada y el `--host ::` acá), `API_BASE_URL` nuevo en `api`, borrar el dominio público de la api y cambiar la URL del webhook en Meta, si la 009 la registró.
    - Correr `e2e.yml` con `::navegar_no_viola_la_csp` contra el deploy. Si la CSP rompe algo, se sabe acá y no al final.
 5. **Sesión — dominio (≈ 20 min):** rojo `test_refresco.py` → `acceso/dominio/refresco.py` → verde.
-6. **Sesión — base y API (≈ 50 min):** migración `00XX_sesiones_refresco` → rojo los tests de `test_auth.py` (concurrencia incluida) y `test_rutas_publicas_son_exactamente_estas` → rutas `/auth/refrescar`, `/auth/salir`, `Origin` y cookie en `/auth/sesion` → verde. `SESSION_SECRET_ANTERIOR` en `verificar_entorno`.
+6. **Sesión — base y API (≈ 50 min):** migración `supabase/migrations/00XX_sesiones_refresco.sql` → rojo los tests de `test_auth.py` (concurrencia incluida) y `test_rutas_publicas_son_exactamente_estas` → rutas `/auth/refrescar`, `/auth/salir`, `Origin` y cookie en `/auth/sesion` → verde. `SESSION_SECRET_ANTERIOR` en `verificar_entorno`.
 7. **Sesión — front (≈ 35 min):** rojo `cliente.test.ts` (los 6) → access en memoria, single-flight, restaurar al cargar → verde.
 8. **Rate limiting (≈ 40 min):** rojo `test_limites.py` y `test_api_limites.py` → `limites.py` y la dependencia FastAPI en cada ruta → verde.
 9. **E2E de sesión (≈ 15 min):** el resto de `seguridad.spec.ts` contra el deploy (recargar, storage vacío, api sin dominio público).
