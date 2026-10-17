@@ -16,10 +16,8 @@ Lista de revisión, en orden:
 6. **Prompt injection:** texto de un lead (sitio web, respuesta) que llega a un LLM/Jev sin delimitar ni sanitizar; salida del modelo usada sin validar. → HIGH.
 7. **Costos:** adaptador de salida que no escribe en `costos` (fuga de dinero invisible). → MEDIUM.
 
-Formato de salida (para pegar en el PR):
-```
-## Revisión de seguridad
-Veredicto: BLOQUEA | PASA CON OBSERVACIONES | PASA
-| Sev | Archivo:línea | Hallazgo | Arreglo propuesto |
-```
+Formato de salida (para pegar en el PR), en markdown y **sin** bloque de código alrededor:
+1. Un título `## Revisión de seguridad`.
+2. Una sola línea, sin sangría ni comillas, que diga exactamente una de estas tres: Veredicto: BLOQUEA / Veredicto: PASA CON OBSERVACIONES / Veredicto: PASA. Es la única línea del reporte que empieza con "Veredicto:". CI la parsea y, si no la encuentra exacta, bloquea.
+3. La tabla con columnas Sev, Archivo:línea, Hallazgo y Arreglo propuesto.
 CRITICAL o HIGH → BLOQUEA. No inventes hallazgos para llenar la tabla; si está limpio, dilo en una línea.

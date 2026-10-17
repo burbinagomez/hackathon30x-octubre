@@ -166,6 +166,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-settings" },
+    { name = "pyyaml" },
     { name = "sqlalchemy" },
     { name = "uvicorn" },
 ]
@@ -177,7 +178,6 @@ dev = [
     { name = "import-linter" },
     { name = "pip-audit" },
     { name = "pytest" },
-    { name = "pyyaml" },
 ]
 
 [package.metadata]
@@ -185,6 +185,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.143.3" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3" },
     { name = "pydantic-settings", specifier = ">=2.16.0" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "sqlalchemy", specifier = ">=2" },
     { name = "uvicorn", specifier = ">=0.54.0" },
 ]
@@ -196,7 +197,6 @@ dev = [
     { name = "import-linter", specifier = ">=2.15" },
     { name = "pip-audit", specifier = ">=2.10.1" },
     { name = "pytest", specifier = ">=9.1.1" },
-    { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 
 [[package]]

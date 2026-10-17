@@ -153,7 +153,9 @@ Sin evals nuevos: la 012 no suma componentes con LLM al producto. El job `revisi
   - `codeql.yml` analiza `python` y `javascript-typescript`;
   - `revision-seguridad` existe y corre solo en `pull_request`.
 - `::test_revision_seguridad_es_fail_closed`: el script de parseo del veredicto (`.github/scripts/veredicto_security.sh`) sale 0 solo con una línea exacta `Veredicto: PASA` o `Veredicto: PASA CON OBSERVACIONES`. Con `BLOQUEA`, sin línea, con salida vacía, con el veredicto dentro de un bloque de código o con dos líneas `Veredicto:` (aunque una diga `PASA`), sale ≠ 0.
-- `.github/scripts/verificar_proteccion.sh`: no es test de CI, porque el token de Actions no tiene permiso de admin. Lo corre el dueño del repo y compara `gh api repos/{o}/{r}/branches/main/protection` contra `required-checks.txt`, con `security_and_analysis.secret_scanning` y `secret_scanning_push_protection` en `enabled`. La salida se pega en `docs/seguridad/revision-002-008.md`.
+  - Contrato: lee el reporte por **stdin** (`claude -p ... | .github/scripts/veredicto_security.sh`) y CI lo invoca directo, con shebang y `+x`, como `check_imagen.sh`.
+  - Una línea `Veredicto:` dentro de un bloque de código (cercado con ``` o con 4 espacios de sangría) no cuenta, ni para pasar ni para bloquear.
+- `.github/scripts/verificar_proteccion.sh`: no es test de CI, porque el token de Actions no tiene permiso de admin. Lo corre el dueño del repo y compara `gh api repos/{o}/{r}/branches/main/protection` contra `required-checks.txt`, con `security_and_analysis.secret_scanning` y `secret_scanning_push_protection` en `enabled`, y `gh api repos/{o}/{r}/code-scanning/default-setup` con `state: not-configured` (el default setup choca con `codeql.yml` y lo apaga un humano en Settings). La salida se pega en `docs/seguridad/revision-002-008.md`.
 
 **Pantalla de cumplimiento** (último del plan)
 - `backend/tests/integration/test_api_cumplimiento.py::test_cumplimiento_lista_por_lead_sin_contacto`: la respuesta trae razón social, fuentes, licencia, `base_legal`, `as_of`, `opt_out_at`, opt-in de WhatsApp y `exportado_en`, y ningún campo del catálogo de sensibles. El canario de email no aparece en el body.
@@ -235,7 +237,7 @@ Cross-Origin-Opener-Policy "same-origin"
 - El pie de atribución (005) enlaza a openstreetmap.org con un `<a>`, y eso no es `connect-src`.
 - Caddy queda **sin log de acceso**: no hay nada que filtrar, porque el body nunca se loguea y la query de `/api/baja/{token}` no tiene contacto, pero así tampoco hay nada que revisar.
 
-**CodeQL** (`.github/workflows/codeql.yml`): `github/codeql-action` pinneado por SHA, con la matriz `python` y `javascript-typescript`, en `pull_request` y `push` a `main`. El repo es **público** (verificado con `gh repo view`), así que CodeQL, secret scanning y push protection no necesitan GHAS pago.
+**CodeQL** (`.github/workflows/codeql.yml`): `github/codeql-action` pinneado por SHA, con la matriz `python` y `javascript-typescript`, en `pull_request` y `push` a `main`. El job se llama `Analyze (${{ matrix.language }})`, así los check-runs son `Analyze (python)` y `Analyze (javascript-typescript)`, los mismos que daba el default setup. El repo es **público** (verificado con `gh repo view`), así que CodeQL, secret scanning y push protection no necesitan GHAS pago.
 
 **Gitleaks, repuesto.** Se quitó el 17-oct (`02c940d`) bajo el supuesto de que GitHub secret scanning lo cubre, y no lo cubre. Secret scanning y push protection detectan **patrones de proveedores**: tokens de Anthropic, de GitHub, de Stripe. No detectan un `DATABASE_URL` con password de Supabase, un `SESSION_SECRET`, la clave de cifrado del contacto ni un HMAC de webhook, y esos son justo los secrets de este proyecto. El paso se repone igual que estaba antes de `02c940d`:
 - `GITLEAKS_VERSION` fija, con la descarga verificada por `sha256sum` contra el `checksums.txt` del release;

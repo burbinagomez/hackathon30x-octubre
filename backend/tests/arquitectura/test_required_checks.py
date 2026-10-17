@@ -4,6 +4,7 @@ Lee los archivos de `.github/` y nunca toca la API de GitHub: la protección de 
 compara `verificar_proteccion.sh`, que corre el dueño del repo (el token de Actions no es admin).
 """
 import itertools
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -15,6 +16,8 @@ GITHUB = Path(__file__).resolve().parents[3] / ".github"
 WORKFLOWS = GITHUB / "workflows"
 REQUIRED = GITHUB / "required-checks.txt"
 VEREDICTO = GITHUB / "scripts" / "veredicto_security.sh"
+# Corre solo en push a main (deploy de migraciones): en un PR nunca reporta, y como required trabaría main.
+EXCLUIDOS = {("ci.yml", "migrar")}
 
 
 def _workflow(nombre: str) -> dict:
@@ -54,12 +57,6 @@ def _check_runs(job_id: str, job: dict) -> list[str]:
     return nombres
 
 
-def _corre_en_pr(job: dict) -> bool:
-    # `migrar` tiene `if: github.event_name == 'push' ...`: en un PR nunca reporta, no puede ser required.
-    cond = str(job.get("if", ""))
-    return "event_name" not in cond or "pull_request" in cond
-
-
 def _requeridos() -> list[str]:
     assert REQUIRED.is_file(), "falta .github/required-checks.txt"
     lineas = (l.strip() for l in REQUIRED.read_text().splitlines())
@@ -84,10 +81,15 @@ def test_derivacion_de_nombres_como_github():
 
 
 def test_cada_check_requerido_existe_como_job():
+    for archivo, job_id in EXCLUIDOS:
+        assert job_id in _workflow(archivo)["jobs"], f"EXCLUIDOS nombra {archivo}:{job_id}, que ya no existe"
+    # Solo workflows que corren en PR: un required que nunca reporta en un PR traba el merge.
     derivados = {
         nombre
         for ruta in WORKFLOWS.glob("*.yml")
-        for job_id, job in yaml.safe_load(ruta.read_text())["jobs"].items()
+        if "pull_request" in _eventos(wf := yaml.safe_load(ruta.read_text()))
+        for job_id, job in wf["jobs"].items()
+        if (ruta.name, job_id) not in EXCLUIDOS
         for nombre in _check_runs(job_id, job)
     }
     requeridos = _requeridos()
@@ -102,7 +104,7 @@ def test_cada_check_requerido_existe_como_job():
             faltan.append(f"{archivo} no corre en pull_request")
             continue
         for job_id, job in wf["jobs"].items():
-            if not _corre_en_pr(job):
+            if (archivo, job_id) in EXCLUIDOS:
                 continue
             faltan += [f"{archivo}:{n}" for n in _check_runs(job_id, job) if n not in requeridos]
     assert not faltan, f"jobs de PR que no están en required-checks.txt: {faltan}"
@@ -134,6 +136,9 @@ def _codeql_analiza():
                 else:
                     lenguajes |= {l.strip() for l in pedido.split(",") if l.strip()}
     assert {"python", "javascript-typescript"} <= lenguajes, f"codeql.yml analiza {lenguajes or 'nada'}"
+    # Decisión del dueño: mismos nombres que el default setup, para que los checks no cambien.
+    runs = {n for job_id, job in wf["jobs"].items() for n in _check_runs(job_id, job)}
+    assert {"Analyze (python)", "Analyze (javascript-typescript)"} <= runs, f"check-runs de codeql.yml: {runs}"
 
 
 def _codeql_pinneado_por_sha():
@@ -141,6 +146,18 @@ def _codeql_pinneado_por_sha():
     assert usos, "codeql.yml no usa github/codeql-action"
     sin_sha = [u for u in usos if not re.fullmatch(r"[^@]+@[0-9a-f]{40}", u)]
     assert not sin_sha, f"github/codeql-action sin pinnear por SHA de commit: {sin_sha}"
+
+
+def _revision_seguridad():
+    job = _workflow("ci.yml")["jobs"].get("revision-seguridad")
+    assert job, "ci.yml no tiene el job revision-seguridad"
+    cond = " ".join(str(job.get("if", "")).split())
+    assert cond == "github.event_name == 'pull_request'", f"revision-seguridad tiene que correr solo en PR: if={cond!r}"
+    runs = "\n".join(s.get("run", "") for s in job.get("steps", []))
+    assert "veredicto_security.sh" in runs, "revision-seguridad no pasa la salida por veredicto_security.sh"
+    herramientas = re.findall(r"--allowedTools[ =]['\"]?([^\s'\"]+)", runs)
+    assert herramientas == ["Read,Grep,Glob"], f"--allowedTools tiene que ser Read,Grep,Glob, sin Bash: {herramientas}"
+    assert re.search(r"@anthropic-ai/claude-code@\d+\.\d+\.\d+(?![\w.-])", runs), "la CLI de claude no está pinneada a versión exacta"
 
 
 @pytest.mark.parametrize("chequeo", [
@@ -151,16 +168,10 @@ def _codeql_pinneado_por_sha():
     pytest.param(_ci_corre("sha256sum --check", "gitleaks git", "--redact"), id="gitleaks"),
     pytest.param(_codeql_analiza, id="codeql-lenguajes"),
     pytest.param(_codeql_pinneado_por_sha, id="codeql-pinneado"),
+    pytest.param(_revision_seguridad, id="revision-seguridad"),
 ])
 def test_constitucion_v_tiene_su_step(chequeo):
     chequeo()
-
-
-@pytest.mark.xfail(strict=True, reason="pregunta abierta: el job revision-seguridad no está pedido en este paso")
-def test_revision_seguridad_corre_solo_en_pull_request():
-    job = _workflow("ci.yml")["jobs"].get("revision-seguridad")
-    assert job, "ci.yml no tiene el job revision-seguridad"
-    assert "pull_request" in str(job.get("if", "")) and "push" not in str(job.get("if", ""))
 
 
 PASA = 0
@@ -172,6 +183,11 @@ CASOS_VEREDICTO = {
     "sin-linea": ("## Revisión de seguridad\nTodo bien, PASA.\n", FALLA),
     "vacia": ("", FALLA),
     "en-bloque-de-codigo": ("Ejemplo:\n```\nVeredicto: PASA\n```\nVeredicto pendiente.\n", FALLA),
+    # El bloque de código no cuenta, tampoco para bloquear: vale la única línea de afuera.
+    "bloque-de-codigo-y-pasa-afuera": ("```\nVeredicto: BLOQUEA\n```\nVeredicto: PASA\n", PASA),
+    # 4 espacios de sangría = bloque de código en markdown.
+    "sangria-de-4-espacios": ("    Veredicto: PASA\n", FALLA),
+    "linea-no-exacta": ("Veredicto: PASA | BLOQUEA\n", FALLA),
     "dos-lineas": ("Veredicto: BLOQUEA\nVeredicto: PASA\n", FALLA),
     # La plantilla de .claude/agents/security.md copiada sin elegir.
     "plantilla-sin-completar": ("Veredicto: BLOQUEA | PASA CON OBSERVACIONES | PASA\n", FALLA),
@@ -180,9 +196,11 @@ CASOS_VEREDICTO = {
 
 @pytest.mark.parametrize("reporte, esperado", CASOS_VEREDICTO.values(), ids=CASOS_VEREDICTO.keys())
 def test_revision_seguridad_es_fail_closed(reporte, esperado):
-    # Sin este assert, un script ausente sale 127 y los casos FALLA nacerían verdes.
+    # Sin estos asserts, un script ausente o sin +x da error (no veredicto) y los casos FALLA nacerían verdes.
     assert VEREDICTO.is_file(), "falta .github/scripts/veredicto_security.sh"
-    r = subprocess.run(["bash", str(VEREDICTO)], input=reporte, capture_output=True, text=True)
+    assert os.access(VEREDICTO, os.X_OK), "veredicto_security.sh sin permiso de ejecución: CI lo invoca directo"
+    # Directo, sin `bash`, como CI invoca check_imagen.sh: el shebang y el +x también se prueban.
+    r = subprocess.run([str(VEREDICTO)], input=reporte, capture_output=True, text=True)
     if esperado == PASA:
         assert r.returncode == 0, f"tenía que pasar y salió {r.returncode}: {r.stdout}{r.stderr}"
     else:
