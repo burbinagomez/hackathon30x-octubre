@@ -13,7 +13,7 @@ Lee antes de tocar nada, en este orden:
 - **Solo personas jurídicas, solo canales publicados, siempre fila en `cumplimiento`** (skill `cumplimiento-datos`).
 - **Hexagonal de verdad:** toda fuente de entrada (descubrimiento, enriquecimiento) y de salida (canal, calificador, clasificador) es un **adaptador detrás de un puerto**, registrado en `config/fuentes.yaml` con `habilitado: true/false`. Se conectan y desconectan por config, nunca tocando el dominio. Todo adaptador pasa la **suite de contrato** de su puerto.
 - **Fuentes permitidas:** Croma (registros de gobierno multi-país: Supersociedades, DIAN Trade, RUES, SIEM, SUNAT…), OpenStreetMap, sitio web del lead, datos.gov.co (adaptador existente, desconectado esta vez). Prohibidas: Google Maps/Places como almacén, LinkedIn, Instagram, Facebook (skill `fuentes-publicas`).
-- **Nada de otros proyectos** (ZENLO ni ninguno): ni cuentas, ni código, ni credenciales.
+- **Nada de otros proyectos del equipo**: ni cuentas, ni código, ni credenciales. Todo servicio se crea nuevo para el evento.
 - **Secrets en entorno.** Nunca en el repo ni en el front.
 - **Contacto cifrado, nunca en logs.**
 - No hagas `git push` sin avisar antes exactamente qué archivos y qué commit, y esperar el OK.

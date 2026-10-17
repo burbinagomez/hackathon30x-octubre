@@ -32,7 +32,7 @@ description: Reglas de cumplimiento para encontrar, guardar y contactar leads ba
 11. **Atribución visible:** README y pie del tablero: "Datos de OpenStreetMap (ODbL) y Confecámaras/datos.gov.co (CC BY-SA 4.0)".
 
 ## Fuentes
-Permitidas: datos.gov.co (SODA), OpenStreetMap/Overpass, sitio web del lead (robots.txt, sin IPs privadas, límite de tamaño/redirecciones), Croma.
+Permitidas (según `config/fuentes.yaml`): Croma (registros de gobierno multi-país), OpenStreetMap/Overpass, sitio web del lead (robots.txt, sin IPs privadas, límite de tamaño/redirecciones), datos.gov.co (adaptador desconectado por defecto).
 **Prohibidas** (test de `import-linter` + lista de dominios bloqueados en `web_fetch`): scraping de Google Maps, Google Places como almacén, LinkedIn, Instagram, Facebook.
 
 ## Lo que se le pregunta a los mentores (y se documenta la respuesta)

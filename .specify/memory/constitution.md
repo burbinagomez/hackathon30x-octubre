@@ -53,7 +53,7 @@ Clasificación de respuestas y encaje ICP tienen set etiquetado versionado en `e
 
 ## Reglas del proyecto (no negociables)
 
-- **Nada de otros proyectos.** Cuentas, proveedores, código o credenciales de ZENLO u otros no se reutilizan. Todo servicio se crea nuevo para el evento. Única excepción: Wazenda como canal WhatsApp **solo si el dueño lo valida por escrito**; mientras tanto, no disponible.
+- **Nada de otros proyectos.** Cuentas, proveedores, código o credenciales de otros proyectos del equipo no se reutilizan. Todo servicio se crea nuevo para el evento. Única excepción: un proveedor de WhatsApp Business API ya existente, **solo si el dueño lo valida por escrito**; mientras tanto, el canal no está disponible.
 - **Repo público y open source** desde el primer commit (regla del 30X). Base derivada de OSM/RUES bajo ODbL / CC BY-SA, con atribución.
 - **El proyecto empezó tras el kickoff** (16-oct). Nada anterior.
 - **Un flujo completo el domingo vale más que cinco a medias.** Si el domingo 3pm el slice 7 (WhatsApp) no está, se corta.

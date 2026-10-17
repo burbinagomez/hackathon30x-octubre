@@ -233,4 +233,4 @@ Si el domingo a las 3pm no está el 8, se corta: email solo. Un flujo completo v
 
 ## 12. Regla del proyecto
 
-**Nada de otros proyectos entra aquí.** Cuentas, proveedores, código o credenciales de ZENLO u otros no se reutilizan. Todo servicio externo (SMTP, WhatsApp, base de datos, CI) se crea nuevo para el evento. Única excepción posible: Wazenda como canal de WhatsApp, **solo si el dueño lo valida**; mientras tanto se trata como no disponible.
+**Nada de otros proyectos entra aquí.** Cuentas, proveedores, código o credenciales de otros proyectos del equipo no se reutilizan. Todo servicio externo (SMTP, WhatsApp, base de datos, CI) se crea nuevo para el evento. Única excepción posible: un proveedor de WhatsApp Business API ya existente, **solo si el dueño lo valida**; mientras tanto el canal se trata como no disponible.
