@@ -64,7 +64,7 @@
   - **Arranque:** usuario no root (`USER app`) y `CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}`. Va en forma shell porque la forma exec no expande `$PORT`. El `HEALTHCHECK` lee el mismo `${PORT:-8000}`.
   - **Alembic no corre en el contenedor:** migra el job `migrar` de GitHub Actions (principio IV, R1).
 - **`web`** (`frontend/Dockerfile`, completa R5):
-  - **Etapas:** `node:22-alpine` hace el build y `caddy:2-alpine` sirve `dist/`.
+  - **Etapas:** `node:22-alpine` hace el build. Un stage `caddy:2-alpine`, con el mismo tag fijo, saca la capability. El final es `alpine` con ese binario copiado, y sirve `dist/`.
   - **Caddyfile:**
     - opciones globales `{ admin off }`;
     - sitio `:{$PORT:8080}`, con valor por defecto para `docker run` local y el HEALTHCHECK;
@@ -73,7 +73,8 @@
 
     Va con `handle` porque Caddy ordena `try_files` antes que `respond`: sueltos, `/health` se reescribiría a `/index.html`. Y sin `root` + `file_server`, Caddy contesta 200 vacío a todo, aunque `dist/` no exista.
   - **Usuario:** no root, dueño de `/data` y `/config`, que Caddy necesita escribibles.
-  - **Capability:** en el build, `apk add libcap` → `setcap -r /usr/bin/caddy` → `apk del libcap`. El binario oficial trae `cap_net_bind_service`, y como no root, un runtime que bloquee file capabilities hace fallar el exec recién en Railway. Con el puerto > 1024 no hace falta.
+  - **Capability:** el stage `caddy` corre `apk add libcap` → `setcap -r /usr/bin/caddy`, y el final copia solo el binario. El binario oficial trae `cap_net_bind_service=ep`, y si el runtime no la tiene en el bounding set, el kernel rechaza el exec de un usuario no root. Medido con `--cap-drop ALL`: sin `setcap -r` da `exec /usr/bin/caddy: operation not permitted`. Con el puerto > 1024 la capability no hace falta. `setcap -r` no la otorga, la saca. El job `imagenes` levanta `web` con `--cap-drop ALL` y espera `/health` en 200.
+  - **Tamaño (medido el 2026-10-17 con `check_imagen.sh`):** `caddy:2.11.7-alpine` sola pesa 62 MB. Hacer el `setcap` en el final reescribía el binario de 46 MB en otra capa, y la imagen quedaba en 111 MB. Con el binario copiado sobre `alpine:3.23.6` pesa 56 MB, dentro del tope de 60. El final define `XDG_CONFIG_HOME=/config`, `XDG_DATA_HOME=/data` y el `CMD` de la imagen oficial. El `HEALTHCHECK` usa el `wget` de busybox, sin curl.
 - **Ambos:**
   - `.dockerignore`, que excluye `.env*`, `.venv`, `node_modules`, `dist`, `tests`, `__pycache__` y `.git`;
   - tags de imagen base fijos (versión exacta; Dependabot `docker` los sube);

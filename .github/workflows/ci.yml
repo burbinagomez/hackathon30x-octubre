@@ -125,6 +125,12 @@ jobs:
           .github/scripts/check_imagen.sh api 250 || rc=1
           .github/scripts/check_imagen.sh web 60 || rc=1
           exit $rc
+      - name: web arranca sin capabilities (R-docker, setcap -r)
+        run: |
+          docker run -d --name web-sin-caps --cap-drop ALL -e PORT=8080 -p 8080:8080 web
+          for _ in $(seq 10); do curl -sf localhost:8080/health && exit 0; sleep 1; done
+          docker logs web-sin-caps
+          exit 1
 
   migrar:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
