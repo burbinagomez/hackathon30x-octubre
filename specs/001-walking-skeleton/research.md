@@ -130,3 +130,8 @@
 - **Decision:** el tenant se fija con `SET LOCAL app.tenant_id = …` (o `set_config(..., true)`) dentro de la transacción de la unidad de trabajo. Nunca `SET` de sesión.
 - **Rationale:** en modo transacción, la conexión física vuelve al pool de Supavisor al hacer commit y la usa otro cliente. Un `SET` de sesión dejaría el tenant de un request puesto para el siguiente. `SET LOCAL` muere con la transacción.
 - **Test:** entra en el slice 2 con la unidad de trabajo. Después del commit, `current_setting('app.tenant_id', true)` en la misma conexión vuelve vacío.
+
+## R12. Vite 6 y Vitest 4 en el front
+- **Decision:** `vite@6.4.3` y `vitest@4.1.11`, pin exacto, en lugar de los `vite@5.4.11` y `vitest@2.1.8` de T023. `@vitejs/plugin-react@4.3.4` se queda (acepta `vite ^6`). La config de vitest no cambió: `environment`, `setupFiles` y el `cleanup` explícito de `setupTests.ts` siguen igual.
+- **Rationale:** `npm audit --audit-level=high` del job `seguridad` falla con tinypool crítico (≤2.1.1, RCE por prototype pollution), presente en toda la línea vitest 2. `vitest@2.1.9` + `vite@5.4.21`, el fix que sugiere el audit, siguen con tinypool 1.1.1 y suben a 6 hallazgos. Medido el 2026-10-17: la combinación mínima en 0 es vitest 4.1.11 (≤4.1.10 es vulnerable) + vite 6.4.3 (≤6.4.2 es vulnerable). Sin `--omit` ni `overrides`.
+- **Test:** `npm audit --audit-level=high` da 0. La suite da 4/4 y vuelve a rojo contra el `App.tsx` sin estado de carga. La imagen web pesa 56 MB de 60.
