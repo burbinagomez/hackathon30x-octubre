@@ -1,7 +1,23 @@
-from sqlalchemy import create_engine, event
+from collections.abc import Iterator
+from contextlib import contextmanager
+from uuid import UUID
+
+from sqlalchemy import Connection, Engine, create_engine, event, text
 from sqlalchemy.exc import OperationalError
 
 from app.config import SecretProhibido
+
+
+@contextmanager
+def unidad_de_trabajo(engine: Engine, tenant_id: UUID) -> Iterator[Connection]:
+    """Una transacción con el tenant fijado como primera sentencia; commit al salir, rollback si lanza.
+
+    set_config(..., true) = SET LOCAL: muere con la transacción. Nunca de sesión: el pooler en modo
+    transacción le pasa la conexión a otro cliente.
+    """
+    with engine.begin() as conexion:
+        conexion.execute(text("SELECT set_config('app.tenant_id', :id, true)"), {"id": str(tenant_id)})
+        yield conexion
 
 
 def crear_engine(url):
