@@ -109,7 +109,7 @@
   - `muestra estado de la API`: `/health` mockeado en ok → "API: ok · DB: ok";
   - con la llamada caída → "API: error";
   - con `db` distinto de ok → "DB: error".
-- [ ] T025 [US1] 🤖 **Verde:** `frontend/src/App.tsx` llama `${VITE_API_URL}/health`.
+- [X] T025 [US1] 🤖 **Verde:** `frontend/src/App.tsx` llama `${VITE_API_URL}/health`.
 
 ## Fase 4: higiene, CI, deploy y cierre (tareas 6–9)
 
