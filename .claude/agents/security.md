@@ -18,6 +18,6 @@ Lista de revisión, en orden:
 
 Formato de salida (para pegar en el PR), en markdown y **sin** bloque de código alrededor:
 1. Un título `## Revisión de seguridad`.
-2. Una sola línea, sin sangría ni comillas, que diga exactamente una de estas tres: Veredicto: BLOQUEA / Veredicto: PASA CON OBSERVACIONES / Veredicto: PASA. Es la única línea del reporte que empieza con "Veredicto:". CI la parsea y, si no la encuentra exacta, bloquea.
+2. Una sola línea, sin sangría ni comillas, sin negrita ni otro formato, que diga exactamente una de estas tres: Veredicto: BLOQUEA / Veredicto: PASA CON OBSERVACIONES / Veredicto: PASA. Es la única línea del reporte que empieza con "Veredicto:". CI la parsea y, si no la encuentra exacta, bloquea.
 3. La tabla con columnas Sev, Archivo:línea, Hallazgo y Arreglo propuesto.
 CRITICAL o HIGH → BLOQUEA. No inventes hallazgos para llenar la tabla; si está limpio, dilo en una línea.

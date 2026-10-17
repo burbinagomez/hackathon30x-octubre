@@ -152,11 +152,17 @@ def _revision_seguridad():
     job = _workflow("ci.yml")["jobs"].get("revision-seguridad")
     assert job, "ci.yml no tiene el job revision-seguridad"
     cond = " ".join(str(job.get("if", "")).split())
+    cond = re.sub(r"^\$\{\{\s*(.*?)\s*\}\}$", r"\1", cond)  # `${{ x }}` y `x` son el mismo if para GitHub
     assert cond == "github.event_name == 'pull_request'", f"revision-seguridad tiene que correr solo en PR: if={cond!r}"
     runs = "\n".join(s.get("run", "") for s in job.get("steps", []))
     assert "veredicto_security.sh" in runs, "revision-seguridad no pasa la salida por veredicto_security.sh"
     herramientas = re.findall(r"--allowedTools[ =]['\"]?([^\s'\"]+)", runs)
     assert herramientas == ["Read,Grep,Glob"], f"--allowedTools tiene que ser Read,Grep,Glob, sin Bash: {herramientas}"
+    # --allowedTools solo preaprueba: no saca Bash. Lo saca --disallowedTools, y ningún bypass lo reabre.
+    prohibidas = re.findall(r"--disallowedTools[ =]['\"]?([^\s'\"]+)", runs)
+    assert any("Bash" in p.split(",") for p in prohibidas), f"--disallowedTools tiene que incluir Bash: {prohibidas}"
+    bypass = [b for b in ("dangerously-skip-permissions", "bypassPermissions") if b in runs]
+    assert not bypass, f"revision-seguridad no puede saltear permisos: {bypass}"
     assert re.search(r"@anthropic-ai/claude-code@\d+\.\d+\.\d+(?![\w.-])", runs), "la CLI de claude no está pinneada a versión exacta"
 
 
@@ -190,7 +196,7 @@ CASOS_VEREDICTO = {
     "linea-no-exacta": ("Veredicto: PASA | BLOQUEA\n", FALLA),
     "dos-lineas": ("Veredicto: BLOQUEA\nVeredicto: PASA\n", FALLA),
     # La plantilla de .claude/agents/security.md copiada sin elegir.
-    "plantilla-sin-completar": ("Veredicto: BLOQUEA | PASA CON OBSERVACIONES | PASA\n", FALLA),
+    "plantilla-sin-completar": ("Veredicto: BLOQUEA / Veredicto: PASA CON OBSERVACIONES / Veredicto: PASA\n", FALLA),
 }
 
 
