@@ -364,7 +364,7 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
 
 **Auth:**
 - **`usuarios`** (`id`, `email_hmac bytea` UNIQUE, `hash_clave`, `tenant_id` FK, `idioma` NULL con `CHECK IN ('es','en')`, `creado_en`) tiene **RLS por `tenant_id`**, como toda tabla con datos de un tenant (constitución III).
-  - **El email no se guarda** (constitución VI, minimización): `email_hmac` = HMAC-SHA256 con `EMAIL_HMAC_CLAVE` (entorno, ≥ 32 bytes, por `Settings`) sobre `lower(strip(email))`. Lo calcula `acceso/dominio/email.py::hmac_email`, que comparten la API y `crear_usuario.py`. Ver plan P13.
+  - **El email no se guarda** (constitución VI, minimización): `email_hmac` = HMAC-SHA256 con `EMAIL_HMAC_CLAVE` (entorno, ≥ 32 bytes, por `Settings`) sobre `lower(strip(email))`. Lo calcula `acceso/dominio/email.py::hmac_email`, que comparten la API y `crear_usuario.py`. Lo decidió el dueño (plan P13).
   - `app_rt` no tiene ningún privilegio sobre la tabla.
   - El login, que ocurre antes de conocer el tenant, entra por la función `usuario_para_login(p_email_hmac bytea)`:
     - `SECURITY DEFINER`, con dueño `postgres`;

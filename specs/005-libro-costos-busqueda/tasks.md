@@ -12,7 +12,7 @@
 ## Fase 1: Puerta y setup
 
 - [ ] T001 [Paso 0] **Puerta.** `git fetch origin`. Confirmar que 002, 003, 011 y 004 están en `main`. Elegir el número de migración: el siguiente libre en `supabase/migrations/` (P5). Se frena en dos casos:
-  - P1 (estados, y qué deja la CLI) o P13 (email con HMAC, o enmienda de la constitución) no tienen respuesta del dueño;
+  - P1 (estados, y qué deja la CLI) no tiene respuesta del dueño;
   - los defaults de P2 y P4 no están aprobados.
 - [ ] T002 [P] [Paso 0] `backend/pyproject.toml` suma `PyJWT`. `uv lock`.
 - [ ] T003 [P] [Paso 0] `frontend/package.json` suma `react-i18next` e `i18next` como dependencias, y `eslint`, `typescript-eslint`, `eslint-plugin-boundaries`, `eslint-plugin-import`, `eslint-import-resolver-typescript` y `eslint-plugin-i18next` como devDependencies.
@@ -64,7 +64,7 @@
   - `::test_usuario_para_login_devuelve_solo_ese_email`. Con usuarios de 2 tenants, `usuario_para_login(hmac_email('a@x.co'))` devuelve 1 fila (la de A), y un HMAC inexistente devuelve 0. Rojo hoy: el stub `WHERE false` devuelve 0 filas. **Mutación:** sin el `WHERE email_hmac = p_email_hmac` → 2 filas.
   - `::test_fijar_idioma_no_cruza_tenants`. Control positivo: con el tenant de A, `fijar_idioma` sobre el usuario de A modifica 1 fila. Rojo hoy: el stub modifica 0. Después, con el tenant de B sobre el usuario de A, modifica 0. **Mutación:** sin `AND tenant_id = current_setting(...)` → B modifica 1 fila.
   - `::test_funcion_es_security_definer_con_search_path[usuario_para_login|fijar_idioma]`, con el `ALTER DEFAULT PRIVILEGES` en `supabase_simulado.sql`. **Mutación:** sin el `REVOKE` → `anon` tiene `EXECUTE`.
-- [ ] T012b [P] [Paso 1] **Rojo (security):** `backend/tests/unit/acceso/test_email_hmac.py::test_hmac_normaliza_y_depende_de_la_clave`. Reemplaza a `test_email_se_guarda_en_minusculas` (P13). El test asierta cuatro cosas:
+- [ ] T012b [P] [Paso 1] **Rojo (security):** `backend/tests/unit/acceso/test_email_hmac.py::test_hmac_normaliza_y_depende_de_la_clave`. Reemplaza a `test_email_se_guarda_en_minusculas` (P13, decidida: `email_hmac`). El test asierta cuatro cosas:
   - `hmac_email(" A@X.co ", k)` es `bytes` de 32;
   - es igual a `hmac_email("a@x.co", k)`;
   - es distinto de `hmac_email("a@x.co", otra_k)`;

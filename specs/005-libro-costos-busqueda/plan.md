@@ -53,7 +53,7 @@ Además absorbe de la 011, por la D7, seis tests y el verde del tablero de natur
 | III Tenant/RLS | Vistas `security_invoker` con `test_rls[vista]` y control positivo. `usuarios` con RLS y sin privilegios para `app_rt`. Las funciones `SECURITY DEFINER` llevan `search_path` y `REVOKE` a `PUBLIC`/`anon`/`authenticated`. `pg_views` entra en `test_privilegios_supabase`. | ✅ |
 | IV Migraciones | Una migración a mano. `app/modelos.py` suma columnas y `usuarios`, y el drift sigue vacío (las vistas no las compara `compare_metadata`; T006 lo confirma). | ✅ |
 | V Seguridad | `SESSION_SECRET` y `EMAIL_HMAC_CLAVE` (≥ 32 bytes cada una), `WEB_ORIGIN` y `CROMA_BASE_URL` por `Settings`. Docs desactivadas, CORS cerrado, clave fuera de logs y `extra='forbid'`. | ✅ |
-| VI Contacto | El formulario no pide contacto y la cola no lo expone (`test_cola_no_expone_contacto`). El email del usuario no se guarda: solo `email_hmac` (HMAC-SHA256 con clave de entorno sobre el email normalizado), por minimización. Enmendar la constitución es decisión del dueño (P13). | ⚠️ P13 |
+| VI Contacto | El formulario no pide contacto y la cola no lo expone (`test_cola_no_expone_contacto`). El email del usuario no se guarda: solo `email_hmac` (HMAC-SHA256 con clave de entorno sobre el email normalizado), por minimización. Lo decidió el dueño (P13). | ✅ |
 | VII Cumplimiento | Una empresa filtrada por palabra clave no genera lead ni `cumplimiento`. Fusionar no toca `cumplimiento`. `v_atribuciones` sale de `lead_fuentes`. | ✅ |
 | VIII Costos | `contar` registra antes de devolver o de lanzar, igual que `buscar`. Todo descubrimiento lleva `lote_id = busqueda.id`. El CPL sale solo de vistas sobre `costos`. | ✅ |
 | IX Evals | N/A (sin IA). `fuente='evals'` aparte, en `v_costo_evals`. | — |
@@ -210,7 +210,8 @@ docs/{arquitectura-backend.md, arquitectura-frontend.md, prd.md (§4)}
 ## Preguntas abiertas
 
 Ninguna se resuelve en este plan. Cada fila dice qué tareas bloquea.
-- **Bloquean la puerta T001: P1 y P13.** Las decide el dueño.
+- **Bloquea la puerta T001: P1.** La decide el dueño.
+- **P13 está decidida por el dueño:** `email_hmac`.
 - **P2 y P4** tienen default, pero falta que el dueño lo apruebe.
 - P3, P5, P7–P12 y P14 no bloquean.
 - P6 se borró: `busquedas.creado_en` ya existe (002 migración:19).
@@ -228,7 +229,7 @@ Ninguna se resuelve en este plan. Cada fila dice qué tareas bloquea.
 | P10 | **`EXCLUIDOS`** (002 spec:66, enmendado en 002 plan:297). La 005 suma `repositorio_tablero.py` y `repositorio_usuarios.py` (spec:305). | T033 | Se enmienda en el mismo commit que los crea. |
 | P11 | **`limites_app` en `tarifas.yaml`.** Hoy no existe. ¿Lo lee el cargador de tarifas de la 002 o uno aparte? | T032 | Lo lee el mismo cargador, como `Decimal(str(v))`, y llega a la API por `Settings` en la raíz de composición. |
 | P12 | **Costo de `contar` de Croma.** Si la página 1 queda en caché, `buscar` no vuelve a cobrar. ¿La fila `croma_consulta` de `contar` es la misma que la de `buscar` (1 crédito en total)? | T017 | Sí: `contar` hace la request y escribe la fila, y `buscar(1)` es cache hit y no escribe nada. Es lo que prueba `test_contar_y_buscar_hacen_una_sola_request`. |
-| P13 | **Email de `usuarios`.** El principio VI dice "correos… se cifran en reposo" (constitution.md:34), sin distinguir entre lead y operador. Guardarlo en claro y meterlo en la lista cerrada de `test_ninguna_columna_de_contacto_fuera_del_catalogo` sería saltarse la regla. | **Puerta T001.** T005, T012–T013, T029–T030 | **Se aplica HMAC:** `email_hmac bytea UNIQUE`, que es HMAC-SHA256(`EMAIL_HMAC_CLAVE`, `lower(strip(email))`), sin email en claro. Es minimización: el login solo necesita igualdad, y `usuario_para_login` recibe el HMAC. La alternativa es enmendar la constitución, y eso lo decide el dueño. Si el test de catálogo de la 003 matchea columnas por nombre (`email*`), `email_hmac` entra con la razón "HMAC no reversible, no es contacto". Lo revisa security. |
+| P13 | **Email de `usuarios`.** El principio VI dice "correos… se cifran en reposo" (constitution.md:34), sin distinguir entre lead y operador. Guardarlo en claro y meterlo en la lista cerrada de `test_ninguna_columna_de_contacto_fuera_del_catalogo` sería saltarse la regla. | — (decidida; aplica a T005, T012–T013, T029–T030) | **Decidida por el dueño: HMAC.** `email_hmac bytea UNIQUE`, que es HMAC-SHA256(`EMAIL_HMAC_CLAVE`, `lower(strip(email))`), sin email en claro. Es minimización: el login solo necesita igualdad, y `usuario_para_login` recibe el HMAC. Si el test de catálogo de la 003 matchea columnas por nombre (`email*`), `email_hmac` entra con la razón "HMAC no reversible, no es contacto". Lo revisa security. |
 | P14 | **Costo de `contar` de OSM en la vista previa de un ICP de BR o PE** (estimado de OSM como cota baja, spec:341). Sin pregunta de diseño, pero se registra para la Fase 12. | — | Se mide en la corrida real. |
 
 ## Complexity Tracking
