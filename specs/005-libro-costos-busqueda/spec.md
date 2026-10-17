@@ -403,7 +403,7 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
 | Objeto | Cambio |
 |---|---|
 | `busquedas` | `+ costo_estimado_usd numeric`, `+ costo_maximo_usd numeric`, `+ ejecutada_en`, `CHECK` de `estado` |
-| `leads` | `+ fusionado_en uuid NULL`, `+ UNIQUE (tenant_id, id)`, `FOREIGN KEY (tenant_id, fusionado_en) REFERENCES leads (tenant_id, id)` (una FK simple no pasa por RLS: `test_rls.py::test_tenant_b_no_fusiona_con_lead_de_a`) |
+| `leads` | `+ fusionado_en uuid NULL`, `FOREIGN KEY (tenant_id, fusionado_en) REFERENCES leads (tenant_id, id)` (se apoya en `leads_tenant_id_id_key` de la 002; una FK simple no pasa por RLS: `test_rls.py::test_tenant_b_no_fusiona_con_lead_de_a`) |
 | `revision_dedup` | `+ motivo text NULL` |
 | `usuarios` | nueva, con RLS e `idioma` (arriba) |
 | `usuario_para_login(text)` | función `SECURITY DEFINER` (arriba), devuelve también los dos idiomas |

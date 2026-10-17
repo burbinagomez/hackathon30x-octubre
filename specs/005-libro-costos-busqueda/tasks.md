@@ -58,7 +58,7 @@
 - [ ] T011 [Paso 1] **Verde:**
   - `security_invoker = true` en las 9 vistas;
   - la RLS de `usuarios`;
-  - `UNIQUE (tenant_id, id)` en `leads` y `FOREIGN KEY (tenant_id, fusionado_en) REFERENCES leads (tenant_id, id)`.
+  - `FOREIGN KEY (tenant_id, fusionado_en) REFERENCES leads (tenant_id, id)`, que se apoya en `leads_tenant_id_id_key` (002 migración:41).
 - [ ] T012 [Paso 1] **Rojo (security, RLS):** `backend/tests/integration/test_usuarios_repo.py`:
   - `::test_app_rt_no_lee_usuarios_directo`. **Nace verde:** `app_rt` nunca tuvo `SELECT` sobre `usuarios`. Es una guarda. **Sabotaje:** `GRANT SELECT ON usuarios TO app_rt` → rojo, y se revierte.
   - `::test_usuario_para_login_devuelve_solo_ese_email`. Con usuarios de 2 tenants, `usuario_para_login(hmac_email('a@x.co'))` devuelve 1 fila (la de A), y un HMAC inexistente devuelve 0. Rojo hoy: el stub `WHERE false` devuelve 0 filas. **Mutación:** sin el `WHERE email_hmac = p_email_hmac` → 2 filas.

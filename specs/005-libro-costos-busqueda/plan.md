@@ -7,7 +7,7 @@
 > - **003 plan** = `git show f393852:specs/003-osm-dedup/plan.md`;
 > - **011 plan** = `git show c64c5f8:specs/011-datos-gov-co/plan.md`;
 > - **011 spec** = `git show c64c5f8:specs/011-datos-gov-co/spec.md`. c64c5f8 es el commit de la 011 que aprobó el advisor, con la D7 aplicada. Las líneas citadas son las mismas que en 6c4bd7d y f8f9456.
-> - **002 migración** = `git show b651aac:supabase/migrations/0002_descubrimiento.sql`.
+> - **002 migración** = `git show 561f6c4:supabase/migrations/0002_descubrimiento.sql`.
 >
 > Lo que la 005 necesita y ninguna de esas fija va a **Preguntas abiertas**, con la sección exacta y un default propuesto, que no se aplica hasta que lo apruebe el dueño.
 >
@@ -148,7 +148,7 @@ Cada uno tiene su test en el archivo del adaptador, y `test_costo_maximo_suma_co
 
 Va un único archivo, `supabase/migrations/NNNN_libro_costos_busqueda.sql` (el número sale de P5), con la tabla de spec:398-410:
 - en `busquedas`: `+ costo_estimado_usd`, `+ costo_maximo_usd`, `+ ejecutada_en` y el `CHECK` nuevo de `estado` (P1);
-- en `leads`: `+ fusionado_en uuid NULL` con `FOREIGN KEY (tenant_id, fusionado_en) REFERENCES leads (tenant_id, id)`, más el `UNIQUE (tenant_id, id)` que esa FK necesita. Una FK simple no pasa por RLS: el tenant B podría apuntar a un lead de A (`test_tenant_b_no_fusiona_con_lead_de_a`). La 002 no tiene FKs compuestas (0002_descubrimiento.sql usa `REFERENCES leads(id)`), así que la 005 inaugura el patrón;
+- en `leads`: `+ fusionado_en uuid NULL` con `FOREIGN KEY (tenant_id, fusionado_en) REFERENCES leads (tenant_id, id)`, que se apoya en `leads_tenant_id_id_key` (002 migración:41) y sigue el patrón de las FKs compuestas de la 002 (002 migración:57). Una FK simple no pasa por RLS: el tenant B podría apuntar a un lead de A (`test_tenant_b_no_fusiona_con_lead_de_a`);
 - en `revision_dedup`: `+ motivo`;
 - la tabla `usuarios` (`email_hmac bytea UNIQUE`, sin email) con RLS;
 - las funciones `usuario_para_login(p_email_hmac bytea)` y `fijar_idioma`;
