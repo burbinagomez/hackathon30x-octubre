@@ -1,7 +1,7 @@
 # Quickstart — validar el slice 001
 
 ## Prerrequisitos
-`uv`, Node 22, Docker (solo para el Postgres local), `railway` CLI, `gh`.
+`uv`, Node 22, Docker (solo para el Postgres local), `psql`, `railway` CLI, `gh`. Acceso al dashboard del proyecto Supabase del evento.
 
 ## Local
 ```bash
@@ -16,13 +16,25 @@ cd ../frontend && npm ci && npm test
 **Esperado:** todo verde. `lint-imports` reporta el contrato `forbidden` como kept, con 0 broken.
 
 ## Producción (una vez, a mano)
+En el dashboard de Supabase:
+1. **Settings → API → Exposed schemas**: sacar `public`.
+2. **Database → Extensions**: habilitar `pg_trgm` y `pgcrypto`.
+3. **SQL editor**: pegar `backend/scripts/roles.sql` y correrlo. Sin passwords.
+
+Passwords, desde `psql` (no quedan en ningún historial):
 ```bash
-railway connect postgres            # psql como postgres
-\i backend/scripts/roles.sql
+psql "postgresql://postgres.<ref>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require"
 \password app_mig
 \password app_rt
+\dn+ public                          # dueño: app_mig
 ```
-Después hay que cargar `MIGRATION_DATABASE_URL` (`app_mig`, `?sslmode=require`) en el GitHub Environment `produccion`, y `DATABASE_URL` (`app_rt`) en el servicio `api` de Railway.
+Después hay que cargar:
+- `MIGRATION_DATABASE_URL` en el GitHub Environment `produccion`: `postgresql+psycopg://app_mig.<ref>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require` (modo sesión);
+- `DATABASE_URL` en el servicio `api` de Railway: `postgresql+psycopg://app_rt.<ref>@aws-0-<region>.pooler.supabase.com:6543/postgres?sslmode=require` (modo transacción).
+
+La password que pusiste con `\password` va después del usuario (`usuario:password@`) **solo en el valor del secret**. No se escribe acá ni en ningún otro archivo.
+
+El host exacto del pooler sale de **Connect** en el dashboard.
 
 ## Desplegado
 ```bash
@@ -32,5 +44,7 @@ gh workflow run e2e.yml -f base_url=https://<web>.up.railway.app
 **Esperado:** la página muestra `API: ok · DB: ok`.
 
 ## Barandales
-- Setear `MIGRATION_DATABASE_URL` en `api` hace que el deploy falle al arrancar.
+- Setear `MIGRATION_DATABASE_URL` o cualquier key de Supabase en `api` hace que el deploy falle al arrancar.
+- `railway variables --service web` muestra solo `VITE_API_URL` (más las `RAILWAY_*` del sistema). Es manual: no hay token de Railway en CI.
+- `curl https://<ref>.supabase.co/rest/v1/` con la publishable key no lista nada de `public`.
 - `gh api repos/:owner/:repo/branches/main/protection` lista `back`, `front`, `seguridad` y `evals` como required.
