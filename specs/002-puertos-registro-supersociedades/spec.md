@@ -67,7 +67,7 @@ Ninguno: este slice no usa IA. Las empresas que encuentra alimentan `backend/eva
 **Contrato del puerto** (`backend/tests/contratos/test_fuente_descubrimiento.py`, parametrizado sobre el catálogo, con transporte falso)
 - `::test_devuelve_empresas_normalizadas[croma_supersociedades_co]`: cada empresa trae `pais`, `nombre`, `fuente`, `url_origen`, `as_of` y `actividad` con su `sistema`.
 - `::test_registra_costo_antes_de_devolver[…]`: hay una fila por intento HTTP en el `RegistroCostos` falso, escrita antes de que `buscar` retorne.
-- `::test_rechaza_criterio_no_soportado[…]`: un criterio fuera de `filtros` lanza `CriterioNoSoportado` y no se hace ningún request.
+- `::test_rechaza_criterio_no_soportado[…]`: una clave centinela que ninguna fuente soporta (no una clave real) lanza `CriterioNoSoportado` y no se hace ningún request.
 
 **Adaptador Croma** (`backend/tests/unit/descubrimiento/test_croma_supersociedades.py`, con fixture JSON **sintética**: Croma no se redistribuye)
 - `::test_mapea_respuesta_a_empresa_cruda`:
@@ -82,7 +82,11 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
 - `::test_no_llama_si_se_agoto_el_limite_de_24h`: con `requests_24h=100` y `creditos_mes=0`, lanza `LimiteFuenteAgotado` y el transporte recibe 0 requests.
 - `::test_limite_de_24h_usa_requests_no_creditos`: con `requests_24h=99` y `creditos_mes=990`, no lanza y se hace la request.
 - `::test_reintento_tras_502_registra_cada_intento`: un 502 seguido de un 200 da 2 requests y 2 filas en el registro falso. La del 502 lleva `unidades=0` y `costo_unitario=0`; la del 200, `unidades=1`. El gasto suma 1 crédito y la búsqueda devuelve las empresas.
-- `::test_respuesta_cacheada_no_gasta_credito`: la segunda búsqueda idéntica hace 0 requests y escribe 0 filas nuevas.
+- `::test_respuesta_cacheada_no_gasta_credito`: la primera búsqueda llena el caché vía el adaptador; la segunda idéntica hace 0 requests y escribe 0 filas nuevas.
+- `::test_body_enviado_a_croma`: el body trae `ciiu_code`, `department` (desde `departamento`), `per_page=100` y `page=1`; la API key no está en el body ni en el hash del caché.
+- `::test_502_con_99_previas_no_reintenta`: con 99 requests previas, un 502 da 1 request, 1 fila escrita y `LimiteFuenteAgotado`.
+- `::test_429_lanza_limite_sin_reintento`: 1 request, 1 fila con `unidades=0` y `LimiteFuenteAgotado`.
+- `::test_error_no_se_cachea`: tras un 4xx o un 5xx agotado el caché sigue vacío y la siguiente búsqueda sí hace request.
 
 **Caso de uso** (`backend/tests/unit/descubrimiento/test_ejecutar_busqueda.py`, con repositorio falso)
 - `::test_mismo_nit_de_dos_fuentes_queda_en_un_lead`: dos `EmpresaCruda` `(CO, 900123456)` de **fuentes distintas** dan 1 lead con 2 `lead_fuentes`.
@@ -98,11 +102,14 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
   - `::test_unico_por_tenant_pais_id_fiscal`: un segundo INSERT con el mismo `(tenant_id, pais, id_fiscal)` viola la restricción.
   - `::test_unico_lead_fuente_busqueda`: un segundo INSERT en `lead_fuentes` con el mismo `(lead_id, fuente, busqueda_id)` viola la restricción, y `EjecutarBusqueda` lo resuelve con `ON CONFLICT DO NOTHING`.
   - `::test_lead_persistido_conserva_tipo_titular`: una `EmpresaCruda` de Supersociedades, guardada y releída, tiene `tipo_titular == 'juridica'`.
+  - `::test_lead_nuevo_y_cumplimiento_en_una_transaccion`: si falla el INSERT del `cumplimiento`, no queda ninguna fila en `leads`.
+  - `::test_crear_busqueda_se_confirma_antes`: la fila de `busquedas` es visible desde otra conexión antes de que se llame a ningún adaptador.
 - `backend/tests/integration/test_costos_repo.py::test_croma_consulta_escribe_fila_en_costos`: el adaptador, con transporte falso y `postgres_costos` real, deja en `costos` 1 fila con `tipo='croma_consulta'`, `unidades=1`, `costo_unitario=0.00099`, `gratis=true` y el `tenant_id` del contexto. Es el chequeo del principio VIII.
 - Contadores contra Postgres real, también en `test_costos_repo.py`. Siembran relativo a `now()` de la DB y usan `unidades` 0, 1 y 10:
   - `::test_requests_24h_cuenta_filas_en_ventana`: una fila a 23 h 59 min y otra a 24 h 01 min dan `requests_24h == 1`, aunque la fila de adentro tenga `unidades=0`.
   - `::test_creditos_mes_suma_unidades_del_mes_calendario_utc`: filas de 10 créditos a las 23:59 UTC del último día del mes anterior, y filas de 1 y 10 a las 00:01 UTC del primero del actual. Solo suman las del mes actual. El test corre con `SET TIME ZONE 'America/Bogota'` para probar que se usa UTC y no la zona de la sesión.
   - `::test_reintento_cuenta_para_el_limite`: con 98 filas previas, un 502 seguido de un 200 deja `requests_24h == 100` y `creditos_mes` sube en 1. La búsqueda siguiente lanza `LimiteFuenteAgotado`.
+  - `::test_registrar_sobrevive_al_rollback_de_otra_transaccion`: una fila registrada mientras otra transacción hace rollback queda en `costos`.
 - `backend/tests/integration/test_rls.py::test_tenant_b_no_accede_a_datos_de_a[tabla]`, sobre `tenants`, `busquedas`, `leads`, `lead_fuentes`, `cumplimiento` y `costos`. En `tenants` la política es `id = app.tenant_id`, y `app_rt` no tiene `INSERT`: la siembra corre con `postgres`. Como tenant B:
   - SELECT devuelve vacío;
   - UPDATE y DELETE afectan 0 filas de A;
@@ -140,7 +147,7 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
 - `dominio/`: `OperacionCosto` y el Protocol `RegistroCostos`.
 - `infraestructura/postgres_costos.py`.
 
-**import-linter:** contrato `layers` (`infraestructura > aplicacion > dominio`) para `app.modulos.*`, con el canario. Paga la deuda que dejó el 001.
+**import-linter:** contrato `layers` (`infraestructura > aplicacion > dominio`) para `app.modulos.*`, con el canario. Paga la deuda que dejó el 001. Más un contrato `forbidden`: `app.modulos.descubrimiento` no importa `app.modulos.costos.infraestructura`; `app.cli` es la única raíz que los une.
 
 **Registro:**
 - `cargar_registro(ruta_yaml, catalogo)` lee solo `fuentes_descubrimiento`. Si el catálogo tiene una clave que no está en el YAML, lanza `RegistroInvalido`.
@@ -157,7 +164,7 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
 | `leads` | `pais`, `id_fiscal`, `nombre`, `tipo_titular`, `ciudad`, `direccion`, `actividad_codigo`, `actividad_sistema`, `web`, `idioma_contacto` | `id_fiscal` nullable (por OSM). `tipo_titular` ∈ `juridica`/`natural`/`desconocido`, NOT NULL, default `desconocido`. UNIQUE `(tenant_id, pais, id_fiscal)`. `idioma_contacto` es `GENERATED ALWAYS AS (CASE pais WHEN 'CO' THEN 'es' WHEN 'MX' THEN 'es' WHEN 'PE' THEN 'es' WHEN 'BR' THEN 'pt' END) STORED`: el idioma del mensaje sale del país, nunca de la UI, y lo fija la base, no la app. `'pt'` es un dato, no una traducción: sin plantilla pt, el 007 lo marca `sin_plantilla_idioma`. Un país nuevo sin rama da `NULL`, que pasa a lo mismo. |
 | `lead_fuentes` | `lead_id`, `busqueda_id`, `fuente`, `encontrado_en`, `url_origen`, `licencia` | UNIQUE `(lead_id, fuente, busqueda_id)`. |
 | `cumplimiento` | `lead_id`, `fuente`, `licencia`, `url_origen`, `base_legal`, `as_of`, `opt_out_at`, `solicitudes jsonb` | `lead_id` UNIQUE. `base_legal` nullable hasta el 007 (la setea `AprobarMensaje`). |
-| `costos` | las columnas de `OperacionCosto` + `gratis` | `gratis bool NOT NULL`. |
+| `costos` | las columnas de `OperacionCosto` + `gratis` | `gratis bool NOT NULL`. CHECK de `tipo` con la lista cerrada de la skill `libro-costos`. |
 
 Todas menos `tenants` llevan `tenant_id` y RLS con `USING/WITH CHECK (tenant_id = current_setting('app.tenant_id')::uuid)`. `tenants` tiene RLS con `USING (id = current_setting('app.tenant_id')::uuid)`, solo `GRANT SELECT` a `app_rt`, y se siembra con `postgres`. La siembra la corre un humano desde local: `sembrar_tenant.py` pide la URL de `postgres` por `getpass`, nunca por argv, por `DATABASE_URL` ni por una variable en Railway (ahí `api` solo tiene `app_rt`). Hace upsert por `id` (`INSERT … ON CONFLICT (id) DO UPDATE SET nombre = EXCLUDED.nombre, idioma = EXCLUDED.idioma`), con `--id` opcional: sin `--id` genera un uuid y lo imprime. Así se puede volver a correr sobre un tenant existente, y el 007 le suma `--firmante` y `--finalidad`. La unidad de trabajo abre la transacción y hace `SET LOCAL app.tenant_id` (o `set_config(..., true)`) como primera sentencia. **Nunca `SET` de sesión:** `api` entra por el pooler de Supabase en modo transacción, y una conexión con el tenant de otro cliente puede llegar a la request siguiente.
 
@@ -180,7 +187,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUEN
   - **Límite de 24 h:** `COUNT(*)` de las filas en `ts > now() - interval '24 hours'`. Cuenta requests.
   - **Cupo mensual:** `SUM(unidades)` dentro del mes calendario UTC (`ts >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`; un `date_trunc` sobre `timestamptz` usaría la zona de la sesión). Cuenta créditos.
 - Cada intento HTTP enviado escribe su fila, porque Croma limita por requests.
-  - **Intento fallido** (5xx o timeout): `unidades=0` y `costo_unitario=0`. Cuenta para el límite de 24 h, pero no infla el gasto ni el CPL.
+  - **Intento fallido** (5xx, timeout, 429 o cualquier otro 4xx): `unidades=0` y `costo_unitario=0`. Cuenta para el límite de 24 h, pero no infla el gasto ni el CPL.
   - Si Croma cobra los 5xx, se corrige en el paso 8.
 - `# ponytail:` por RLS, la cuenta es por tenant. Con un solo tenant en el evento coincide con la cuenta de Croma; con varios tenants pasa a un contador global.
 
@@ -189,7 +196,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUEN
 - Timeout de 10 s y un reintento con backoff ante 502, 503 o timeout.
 - `CROMA_API_KEY` viene del entorno vía el `config` de la app; el dominio nunca la ve.
 
-**Tarifas:** `config/tarifas.yaml` se carga una vez, y el adaptador recibe el `costo_unitario` ya resuelto.
+**Tarifas:** `config/tarifas.yaml` se carga una vez, cada valor como `Decimal(str(v))` (nunca `float`), y el adaptador recibe el `costo_unitario` ya resuelto.
 
 ## Plan de tareas (TDD, en orden)
 1. **Canario `layers`:** test en rojo → contrato en `pyproject.toml` → verde.
@@ -200,7 +207,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUEN
    - con la `0002` en el repo, `test_migrar_local_desde_vacio_dos_veces_sin_drift` queda en rojo por el `== "0001"`; se cambia el assert a las versiones de `supabase/migrations/*.sql` y vuelve a verde;
    - los 2 de `test_sembrar_tenant.py` en rojo → `sembrar_tenant.py` con upsert → verde;
    - el **advisor revisa los tests de RLS y de privilegios antes de aceptarlos**.
-4. **`postgres_costos`:** `test_todo_adaptador_de_registro_recibe_registro_costos` en rojo → verde.
+4. **`postgres_costos`:** contadores y `test_registrar_sobrevive_al_rollback_de_otra_transaccion` en rojo → verde. `test_todo_adaptador_de_registro_recibe_registro_costos` pasa al paso 6 (T036): antes del adaptador recorrería una lista vacía.
 5. **Adaptador `croma_supersociedades_co`** con la fixture sintética:
    - mapeo, crédito, gratis/no gratis, 24 h, reintento y caché en rojo → verde;
    - después, `test_costos_repo.py`;

@@ -28,7 +28,7 @@ Primer módulo de negocio, `descubrimiento`, más el módulo `costos` que es due
 
 | Principio | Qué entrega este slice | Estado |
 |---|---|---|
-| I Hexagonal | Contrato `layers` (`infraestructura > aplicacion > dominio`) con **todos** los containers de `app.modulos.*` (hoy `descubrimiento` y `costos`), con canario. Puertos como `Protocol` en `dominio/`. Catálogo `clave → clase` solo en `infraestructura/adaptadores/__init__.py`. Suite de contrato en `tests/contratos/`. Test de que todo adaptador está declarado. | ✅ |
+| I Hexagonal | Contrato `layers` (`infraestructura > aplicacion > dominio`) con **todos** los containers de `app.modulos.*` (hoy `descubrimiento` y `costos`), con canario. Contrato `forbidden` `app.modulos.descubrimiento` ↛ `app.modulos.costos.infraestructura`, con canario: `app.cli` es la única raíz que los une. Puertos como `Protocol` en `dominio/`. Catálogo `clave → clase` solo en `infraestructura/adaptadores/__init__.py`. Suite de contrato en `tests/contratos/`. Test de que todo adaptador está declarado. | ✅ |
 | II Test primero | Cada tarea arranca en rojo por la razón correcta (mutación donde el rojo natural sería `UndefinedTable`; ver `tasks.md`). El advisor revisa RLS, privilegios, costos y dedup antes de aceptarlos. Marca "src sin tests" del 001: sigue diferida (ver Complexity). | ⚠️ |
 | III Tenant/RLS | Todas las tablas con `tenant_id` + RLS `USING/WITH CHECK`; `tenants` por `id`. Unidad de trabajo con `set_config('app.tenant_id', …, true)` como primera sentencia. `test_tenant_b_no_accede_a_datos_de_a[tabla]`, `test_privilegios_supabase.py` (con `supabase_simulado.sql`) y `test_tenant_no_sobrevive_al_commit`. `fuente_cache` sin tenant, justificada. | ✅ |
 | IV Migraciones | `0002` a mano. `test_migrar_local_desde_vacio_dos_veces_sin_drift` pasa a comparar contra las versiones de `supabase/migrations/*.sql`. `app/modelos.py` declara las 7 tablas con restricciones, índices, FKs y tipos exactos para que el drift check siga vacío. | ✅ |
@@ -55,7 +55,7 @@ TipoTitular = Literal["juridica", "natural", "desconocido"]
 @dataclass(frozen=True)
 class CriteriosICP:
     pais: str                         # ISO 3166-1 alfa-2, mayúsculas
-    filtros: Mapping[str, str]        # claves del vocabulario de fuentes.yaml: ciiu, departamento, …
+    filtros: Mapping[str, str | tuple[str, ...]]   # claves del vocabulario de fuentes.yaml: ciiu, departamento, …; tupla = varios valores
 
 @dataclass(frozen=True)
 class EmpresaCruda:
@@ -100,7 +100,7 @@ class FuenteDescubrimiento(Protocol):
 
 Funciones de dominio: `normalizar_nit(texto) -> str` y `cubre(meta, criterios) -> bool` (`pais ∈ paises` o `"*" ∈ paises`, y `set(filtros) ⊆ meta.filtros`).
 
-**Lo que los slices siguientes agregan sin tocar la firma:** campos opcionales con default `None` en `EmpresaCruda` (la 003 suma `telefono_canal` y `email_canal`, ver 003 spec.md:25; el cifrado al persistir es de la 006); nuevas claves en el catálogo y en `fuentes.yaml` (003, 011). Un cambio a `buscar` o a los tipos de retorno es cambio de puerto y pide spec.
+**Lo que los slices siguientes agregan sin tocar la firma:** campos opcionales con default `None` en `EmpresaCruda` (la 003 suma `telefono`, `email`, `geo`, `telefono_canal` y `email_canal`, ver 003 spec.md:25 y :87-92; el cifrado al persistir es de la 003/006); nuevas claves en el catálogo y en `fuentes.yaml` (003, 011). Un cambio a `buscar` o a los tipos de retorno es cambio de puerto y pide spec.
 
 `RepositorioLeads` (Protocol en `descubrimiento/dominio/`):
 
@@ -147,7 +147,7 @@ class RegistroCostos(Protocol):
   - Habilitadas sin clave en el catálogo: van a `Registro.sin_implementacion` (hoy `{"croma_dian_trade_co", "osm_overpass"}`); no rompen.
   - Clave del catálogo ausente del YAML: `RegistroInvalido`.
 - `catalogo = {"croma_supersociedades_co": CromaSupersociedades}` en `descubrimiento/infraestructura/adaptadores/__init__.py`. Es el único lugar que nombra clases concretas.
-- La raíz de composición es `app/cli.py`: lee `fuentes.yaml` (registro y `limites`) y `tarifas.yaml`, construye cada adaptador con `meta`, `RegistroCostos`, transporte `httpx`, caché, tarifa resuelta, límites, API key y `lote_id`, y le pasa a `EjecutarBusqueda` instancias ya armadas.
+- La raíz de composición es `app/cli.py`: lee `fuentes.yaml` (registro y `limites`) y `tarifas.yaml` (cada tarifa como `Decimal(str(v))`, nunca `float`), construye cada adaptador con `meta`, `RegistroCostos`, transporte `httpx`, caché, tarifa resuelta, límites, API key y `lote_id`, y le pasa a `EjecutarBusqueda` instancias ya armadas.
 - Conectar o desconectar una fuente: `habilitado: true/false` en el YAML. Sumar una fuente: clase + clave en el catálogo + entrada en el YAML + fábrica en la suite de contrato.
 
 ## Suite de contrato
@@ -155,9 +155,9 @@ class RegistroCostos(Protocol):
 `backend/tests/contratos/test_fuente_descubrimiento.py`, parametrizada sobre `catalogo` (no sobre una lista escrita a mano). Cada adaptador se construye con transporte falso y `RegistroCostos` falso por una fábrica en `backend/tests/contratos/fabricas.py` (`clave → fabrica(transporte, registro)`, con su respuesta sintética).
 
 - Guardas contra colección vacía: `assert catalogo` a nivel de módulo, y `::test_hay_fabrica_para_cada_clave_del_catalogo` (sin esto, un adaptador nuevo sin fábrica dejaría la suite verde sin correr).
-- `::test_devuelve_empresas_normalizadas[clave]`: cada empresa trae `pais`, `nombre`, `fuente == clave`, `url_origen`, `as_of` con zona, y `actividad.sistema`.
-- `::test_registra_costo_antes_de_devolver[clave]`: una fila por intento HTTP en el falso cuando `buscar` retorna. Su rojo se prueba con un adaptador falso que no llama a `registrar`.
-- `::test_rechaza_criterio_no_soportado[clave]`: una clave fuera de `meta.filtros` lanza `CriterioNoSoportado` y el transporte recibe 0 requests.
+- `::test_devuelve_empresas_normalizadas[clave]`: cada empresa trae `pais`, `nombre`, `fuente == clave`, `url_origen`, `as_of` con zona, y `actividad.sistema`. Rojo: una fábrica cuyo `as_of` no tiene zona o cuya `fuente` difiere de la clave.
+- `::test_registra_costo_antes_de_devolver[clave]`: una fila por intento HTTP en el falso cuando `buscar` retorna. Rojo: un adaptador falso que no llama a `registrar`.
+- `::test_rechaza_criterio_no_soportado[clave]`: la clave centinela `"__criterio_inexistente__"` (ninguna fuente real la soporta, a diferencia de una clave real que otra fuente sí podría tener) lanza `CriterioNoSoportado` y el transporte recibe 0 requests. Rojo: un adaptador que hace el request antes de validar.
 
 La 003 y la 011 entran a esta suite agregando su clave y su fábrica; no escriben tests de contrato propios.
 
@@ -207,6 +207,8 @@ Las tablas y restricciones son las de la spec (sección Decisiones técnicas). L
 - FKs: `lead_fuentes.lead_id`, `lead_fuentes.busqueda_id`, `cumplimiento.lead_id` → `leads`/`busquedas`. `costos.lead_id` y `costos.lote_id` sin FK: un costo no se pierde porque se borre un lead.
 - `busquedas.estado text NOT NULL DEFAULT 'creada' CHECK (estado IN ('creada','terminada','con_errores'))`.
 - `costos.ts timestamptz NOT NULL DEFAULT now()`, índice `(tenant_id, proveedor, ts)` para los contadores.
+- `costos.tipo text NOT NULL CHECK (tipo IN ('socrata_descarga','overpass_query','web_fetch','llm_tokens_in','llm_tokens_out','jev_tokens','croma_consulta','email_envio','whatsapp_plantilla','dapta_llamada','minutos_humanos'))`: la lista cerrada de la skill `libro-costos`. Un tipo nuevo es una migración, no un string libre.
+- Choque conocido con la 003: `leads.idioma_contacto` y `fuente_cache.respuesta` caen en el patrón de `test_ninguna_columna_de_contacto_fuera_del_catalogo` de la 003. Lo resuelve la 003 sumándolas a su lista cerrada; acá no se renombran.
 - `GRANT` a `app_rt`: `SELECT, INSERT, UPDATE, DELETE` en las tablas de tenant; `SELECT` en `tenants`; `SELECT, INSERT, UPDATE` en `fuente_cache`.
 - Al final, el bloque `DO` de `REVOKE` a `anon`/`authenticated` (solo si existen en `pg_roles`). El escenario sin esos roles ya lo cubre el fixture `base_vacia` de `test_migraciones.py` (vanilla, sin `supabase_simulado.sql`).
 - `backend/app/modelos.py` declara las 7 tablas en SQLAlchemy Core con lo que `compare_metadata` compara:
@@ -270,7 +272,7 @@ supabase/migrations/0002_descubrimiento.sql
 docs/arquitectura-backend.md
 ```
 
-**Structure Decision**: módulos hexagonales según el principio I. `descubrimiento/infraestructura` importa `costos/dominio` (el puerto), nunca `costos/infraestructura`. Si import-linter exige las tres capas en cada container, `costos/aplicacion/__init__.py` queda vacío hasta el 005 (se verifica en el canario).
+**Structure Decision**: módulos hexagonales según el principio I. `descubrimiento` importa `costos/dominio` (el puerto), nunca `costos/infraestructura`; lo garantiza el contrato `forbidden`, y solo `app.cli` une las dos. `costos` no tiene `aplicacion/` todavía: T005 prueba primero la capa opcional `"(aplicacion)"` en el import-linter instalado (`>=2.15` en `uv.lock`); si no anda, el respaldo es `costos/aplicacion/__init__.py` vacío hasta el 005. Este párrafo se corrige en T005 con lo que salga.
 
 ## Orden de tareas
 
