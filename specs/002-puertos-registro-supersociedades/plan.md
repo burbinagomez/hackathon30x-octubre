@@ -13,9 +13,9 @@ Primer módulo de negocio, `descubrimiento`, más el módulo `costos` que es due
 ## Technical Context
 
 **Language/Version**: Python 3.12
-**Primary Dependencies**: FastAPI (sin cambios), SQLAlchemy 2 Core + psycopg 3, pydantic-settings. **Cambian:** `httpx` sale del grupo dev a `dependencies` (lo usa el adaptador); `pyyaml` entra en `dependencies` (no está en `uv.lock`). La 004 y la 012 declaran la misma línea de `pyyaml`: el choque se resuelve en el merge que venga después.
+**Primary Dependencies**: FastAPI (sin cambios), SQLAlchemy 2 Core + psycopg 3, pydantic-settings. **Cambian:** `httpx` sale del grupo dev a `dependencies` porque el adaptador Croma lo usa en runtime, en producción. Esa es la única razón: si ningún adaptador lo usara en runtime, se quedaría en dev; `pyyaml` entra en `dependencies` (no está en `uv.lock`). La 004 y la 012 declaran la misma línea de `pyyaml`: el choque se resuelve en el merge que venga después.
 **Storage**: Postgres (Supabase en prod; `postgres:16` en CI). Migración a mano `supabase/migrations/0002_descubrimiento.sql`.
-**Testing**: pytest; `httpx.MockTransport` para Croma; import-linter (`layers` + el `forbidden` del 001).
+**Testing**: pytest; `httpx.MockTransport` para Croma; import-linter con tres contratos: el `forbidden` de fuentes prohibidas del 001, `layers` sobre `app.modulos.*` y el `forbidden` nuevo `app.modulos.descubrimiento` ↛ `app.modulos.costos.infraestructura`. Los dos nuevos tienen canario en `test_import_linter.py`.
 **Target Platform**: CLI local (`uv run python -m app.cli buscar …`); la API no expone nada nuevo.
 **Project Type**: web app (solo toca `backend/`).
 **Performance Goals**: N/A.

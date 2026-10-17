@@ -53,6 +53,10 @@ Ninguno: este slice no usa IA. Las empresas que encuentra alimentan `backend/eva
 
 **Arquitectura y registro**
 - `backend/tests/arquitectura/test_import_linter.py::test_detecta_violacion_de_capas`: un canario en `tmp_path` donde `descubrimiento/dominio` importa `descubrimiento/infraestructura` hace que `lint-imports` salga con código ≠ 0 y nombre el contrato `layers`. Sobre el repo real sale con 0.
+- `backend/tests/arquitectura/test_import_linter.py::test_descubrimiento_no_importa_costos_infraestructura`: un canario donde un módulo de `descubrimiento` importa `app.modulos.costos.infraestructura` hace que `lint-imports` salga con código ≠ 0 y nombre el contrato `forbidden`.
+- `backend/tests/unit/descubrimiento/test_dominio.py`:
+  - `::test_normalizar_nit[…]`: `"900.123.456-7"` → `"900123456"`; `"900123456"` → `"900123456"`; `"9001234567"` → `"9001234567"` (sin guion no se corta el DV).
+  - `::test_cubre[…]`: `cubre(meta, criterios)` es verdadero por país y por `"*"`, y falso con un filtro fuera de `meta.filtros`.
 - `backend/tests/unit/descubrimiento/test_registro.py`:
   - `::test_carga_config_fuentes_yaml_real_sin_error`: carga el `config/fuentes.yaml` del repo, devuelve `croma_supersociedades_co` y deja `sin_implementacion == {"croma_dian_trade_co", "osm_overpass"}`.
   - `::test_solo_carga_adaptadores_habilitados`: con un YAML de prueba que tiene un adaptador `true` y uno `false`, devuelve solo el primero.
@@ -65,9 +69,10 @@ Ninguno: este slice no usa IA. Las empresas que encuentra alimentan `backend/eva
   - **Exclusión:** la misma lista `EXCLUIDOS`. Razón: el I/O externo es la red, no la base propia, y `postgres_costos` es el registro mismo.
 
 **Contrato del puerto** (`backend/tests/contratos/test_fuente_descubrimiento.py`, parametrizado sobre el catálogo, con transporte falso)
+- `::test_hay_fabrica_para_cada_clave_del_catalogo`: toda clave del catálogo tiene fábrica en `fabricas.py`, y `assert catalogo` a nivel de módulo impide que un catálogo vacío deje la suite verde sin correr.
 - `::test_devuelve_empresas_normalizadas[croma_supersociedades_co]`: cada empresa trae `pais`, `nombre`, `fuente`, `url_origen`, `as_of` y `actividad` con su `sistema`.
 - `::test_registra_costo_antes_de_devolver[…]`: hay una fila por intento HTTP en el `RegistroCostos` falso, escrita antes de que `buscar` retorne.
-- `::test_rechaza_criterio_no_soportado[…]`: una clave centinela que ninguna fuente soporta (no una clave real) lanza `CriterioNoSoportado` y no se hace ningún request.
+- `::test_rechaza_criterio_no_soportado[…]`: la clave centinela `"__criterio_inexistente__"`, que ninguna fuente soporta (no una clave real), lanza `CriterioNoSoportado` y no se hace ningún request.
 
 **Adaptador Croma** (`backend/tests/unit/descubrimiento/test_croma_supersociedades.py`, con fixture JSON **sintética**: Croma no se redistribuye)
 - `::test_mapea_respuesta_a_empresa_cruda`:
@@ -96,6 +101,13 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
 - `::test_lead_existente_en_segunda_busqueda_no_duplica_cumplimiento`: dos búsquedas con el mismo NIT dan 1 lead, 1 `cumplimiento` y 2 `lead_fuentes` (una por `busqueda_id`).
 - `::test_cada_lead_nuevo_tiene_fila_en_cumplimiento`: con fuente, licencia y `as_of`.
 - `::test_sin_fuente_para_el_pais_se_reporta`: un ICP con `pais=BR`, teniendo solo Croma en el catálogo, devuelve `sin_fuente_para("BR", …)` y 0 leads.
+- `::test_error_de_fuente_se_reporta_y_busqueda_queda_con_errores`: una fuente que lanza `LimiteFuenteAgotado` o `FuenteNoDisponible` aparece en el resultado con su error, sin tragarlo, y la búsqueda cierra `con_errores`.
+
+**CLI** (`backend/tests/unit/test_cli.py`)
+- `::test_buscar_sin_tenant_falla`: `buscar` sin `--tenant` sale con error.
+- `::test_buscar_imprime_resumen`: con transporte falso inyectado, imprime el resumen.
+- `::test_salida_no_contiene_secretos`: ni la API key ni la `DATABASE_URL` aparecen en stdout o stderr.
+- `::test_tarifa_croma_es_decimal_exacto`: la tarifa que el CLI le pasa al adaptador es exactamente `Decimal("0.00099")`. Rojo si se carga como `float`.
 
 **Integración** (Postgres de prueba, rol `app_rt`)
 - `backend/tests/integration/test_leads_repo.py`:
@@ -108,7 +120,9 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
 - Contadores contra Postgres real, también en `test_costos_repo.py`. Siembran relativo a `now()` de la DB y usan `unidades` 0, 1 y 10:
   - `::test_requests_24h_cuenta_filas_en_ventana`: una fila a 23 h 59 min y otra a 24 h 01 min dan `requests_24h == 1`, aunque la fila de adentro tenga `unidades=0`.
   - `::test_creditos_mes_suma_unidades_del_mes_calendario_utc`: filas de 10 créditos a las 23:59 UTC del último día del mes anterior, y filas de 1 y 10 a las 00:01 UTC del primero del actual. Solo suman las del mes actual. El test corre con `SET TIME ZONE 'America/Bogota'` para probar que se usa UTC y no la zona de la sesión.
-  - `::test_reintento_cuenta_para_el_limite`: con 98 filas previas, un 502 seguido de un 200 deja `requests_24h == 100` y `creditos_mes` sube en 1. La búsqueda siguiente lanza `LimiteFuenteAgotado`.
+  - `::test_reintento_cuenta_para_el_limite`: con 98 filas previas de `unidades=1`, un 502 (fila con `unidades=0`) seguido de un 200 (fila con `unidades=1`) deja 100 filas: `requests_24h == 100` y `creditos_mes` pasa de 98 a 99. La búsqueda siguiente lanza `LimiteFuenteAgotado`. Un `SUM(unidades)` en lugar de `COUNT(*)` daría 99 y no cortaría.
+  - `::test_cache_misma_clave_pisa_respuesta`: guardar dos veces con la misma `(proveedor, endpoint, hash_params)` deja 1 fila con la segunda respuesta.
+  - `::test_cache_lectura_devuelve_respuesta_y_as_of`.
   - `::test_registrar_sobrevive_al_rollback_de_otra_transaccion`: una fila registrada mientras otra transacción hace rollback queda en `costos`.
 - `backend/tests/integration/test_rls.py::test_tenant_b_no_accede_a_datos_de_a[tabla]`, sobre `tenants`, `busquedas`, `leads`, `lead_fuentes`, `cumplimiento` y `costos`. En `tenants` la política es `id = app.tenant_id`, y `app_rt` no tiene `INSERT`: la siembra corre con `postgres`. Como tenant B:
   - SELECT devuelve vacío;
@@ -136,7 +150,7 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
 ## Decisiones técnicas
 
 **Módulo** `backend/app/modulos/descubrimiento/`:
-- `dominio/`: `EmpresaCruda`, `CriteriosICP`, `MetaFuente`, `PaginaEmpresas`, `normalizar_nit` y los Protocols `FuenteDescubrimiento` y `RepositorioLeads`.
+- `dominio/`: `EmpresaCruda`, `CriteriosICP` (`filtros: Mapping[str, str | tuple[str, ...]]`; la tupla son varios valores), `MetaFuente`, `PaginaEmpresas`, `normalizar_nit` y los Protocols `FuenteDescubrimiento` y `RepositorioLeads`.
 - `aplicacion/`: `EjecutarBusqueda` y `cargar_registro`.
 - `infraestructura/adaptadores/croma_supersociedades.py`.
 - `infraestructura/persistencia/{repositorio_leads,repositorio_cache}.py`.
@@ -164,7 +178,7 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
 | `leads` | `pais`, `id_fiscal`, `nombre`, `tipo_titular`, `ciudad`, `direccion`, `actividad_codigo`, `actividad_sistema`, `web`, `idioma_contacto` | `id_fiscal` nullable (por OSM). `tipo_titular` ∈ `juridica`/`natural`/`desconocido`, NOT NULL, default `desconocido`. UNIQUE `(tenant_id, pais, id_fiscal)`. `idioma_contacto` es `GENERATED ALWAYS AS (CASE pais WHEN 'CO' THEN 'es' WHEN 'MX' THEN 'es' WHEN 'PE' THEN 'es' WHEN 'BR' THEN 'pt' END) STORED`: el idioma del mensaje sale del país, nunca de la UI, y lo fija la base, no la app. `'pt'` es un dato, no una traducción: sin plantilla pt, el 007 lo marca `sin_plantilla_idioma`. Un país nuevo sin rama da `NULL`, que pasa a lo mismo. |
 | `lead_fuentes` | `lead_id`, `busqueda_id`, `fuente`, `encontrado_en`, `url_origen`, `licencia` | UNIQUE `(lead_id, fuente, busqueda_id)`. |
 | `cumplimiento` | `lead_id`, `fuente`, `licencia`, `url_origen`, `base_legal`, `as_of`, `opt_out_at`, `solicitudes jsonb` | `lead_id` UNIQUE. `base_legal` nullable hasta el 007 (la setea `AprobarMensaje`). |
-| `costos` | las columnas de `OperacionCosto` + `gratis` | `gratis bool NOT NULL`. CHECK de `tipo` con la lista cerrada de la skill `libro-costos`. |
+| `costos` | las columnas de `OperacionCosto` + `gratis` | `gratis bool NOT NULL`. CHECK de `tipo` con la lista cerrada de la skill `libro-costos` (`overpass_query` incluido, para la 003; lista exacta en plan.md). |
 
 Todas menos `tenants` llevan `tenant_id` y RLS con `USING/WITH CHECK (tenant_id = current_setting('app.tenant_id')::uuid)`. `tenants` tiene RLS con `USING (id = current_setting('app.tenant_id')::uuid)`, solo `GRANT SELECT` a `app_rt`, y se siembra con `postgres`. La siembra la corre un humano desde local: `sembrar_tenant.py` pide la URL de `postgres` por `getpass`, nunca por argv, por `DATABASE_URL` ni por una variable en Railway (ahí `api` solo tiene `app_rt`). Hace upsert por `id` (`INSERT … ON CONFLICT (id) DO UPDATE SET nombre = EXCLUDED.nombre, idioma = EXCLUDED.idioma`), con `--id` opcional: sin `--id` genera un uuid y lo imprime. Así se puede volver a correr sobre un tenant existente, y el 007 le suma `--firmante` y `--finalidad`. La unidad de trabajo abre la transacción y hace `SET LOCAL app.tenant_id` (o `set_config(..., true)`) como primera sentencia. **Nunca `SET` de sesión:** `api` entra por el pooler de Supabase en modo transacción, y una conexión con el tenant de otro cliente puede llegar a la request siguiente.
 
@@ -200,7 +214,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUEN
 
 ## Plan de tareas (TDD, en orden)
 1. **Canario `layers`:** test en rojo → contrato en `pyproject.toml` → verde.
-2. **Dominio + registro:** `EmpresaCruda`, `CriteriosICP`, `normalizar_nit`, los Protocols y `cargar_registro`. Los 4 tests de `test_registro.py` en rojo → verde; el primero que se escribe es el del YAML real.
+2. **Dominio + registro:** `EmpresaCruda`, `CriteriosICP`, `normalizar_nit`, los Protocols y `cargar_registro`. Los de `test_dominio.py` en rojo → verde. De los 4 de `test_registro.py`, el primero que se escribe es el del YAML real y **queda en rojo hasta T031**, cuando el catálogo registra `croma_supersociedades_co` (paso 5); los otros 3 pasan a verde en este paso.
 3. **Migración `0002` + `persistencia/`:**
    - `supabase_simulado.sql` en CI primero, para que los tests de privilegios nazcan en rojo;
    - `test_unico_…`, `test_lead_persistido_conserva_tipo_titular`, `test_rls[…]` y los 3 de `test_privilegios_supabase.py` en rojo → verde;
@@ -212,9 +226,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUEN
    - mapeo, crédito, gratis/no gratis, 24 h, reintento y caché en rojo → verde;
    - después, `test_costos_repo.py`;
    - el **advisor revisa los tests de costos**.
-6. **Suite de contrato** + `test_todo_adaptador_de_registro_esta_declarado`: rojo → verde.
-7. **`EjecutarBusqueda`:** los 7 tests del caso de uso en rojo → verde. El **advisor revisa los tests de dedup**.
-8. **CLI `app.cli buscar`** y **una** corrida real contra Croma: 1 request, avisada antes, anotando los créditos, la forma real de la respuesta y si Croma cobra los 5xx (lo dice su doc o el saldo antes y después). Si la forma difiere de la fixture, se corrige la fixture y se vuelve al paso 5.
+6. **Suite de contrato** (con `test_hay_fabrica_para_cada_clave_del_catalogo`) + `test_todo_adaptador_de_registro_esta_declarado`, `test_persistencia_solo_contiene_excluidos_y_no_importa_http` y `test_todo_adaptador_de_registro_recibe_registro_costos`: rojo → verde.
+7. **`EjecutarBusqueda`:** los 8 tests del caso de uso en rojo → verde. El **advisor revisa los tests de dedup**.
+8. **CLI `app.cli buscar`:** los 4 de `test_cli.py` en rojo → verde. Después, **una** corrida real contra Croma: 1 request, avisada antes, anotando los créditos, la forma real de la respuesta y si Croma cobra los 5xx (lo dice su doc o el saldo antes y después). Si la forma difiere de la fixture, se corrige la fixture y se vuelve al paso 5.
 9. **`docs/arquitectura-backend.md`:** módulo, puerto, registro y cómo agregar un adaptador. Si el tiempo aprieta, es lo primero que se recorta (queda en un párrafo).
 
 ## Riesgos
