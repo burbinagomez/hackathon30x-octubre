@@ -263,7 +263,7 @@ Está ordenado por corte: las tareas 1–8 son el mínimo (corte 1), y cada bloq
 16. Doc, en el mismo cambio que cada bloque: `docs/arquitectura-backend.md`, módulo `contacto`; `docs/arquitectura-frontend.md`, páginas nuevas.
 
 **Orden de corte**, si no alcanza el tiempo (lo que se corta, a dónde va):
-1. **Corte 4, evals:** pasa a la 012. El tablero de evals de la 004 muestra los dos como "sin baseline".
+1. **Corte 4, evals:** quedan pendientes y la 013 los lista en "qué es real y qué es simulado". El tablero de evals de la 004 muestra los dos como "sin baseline".
 2. **Corte 3** (`Privacidad` ya está en el corte 1): la aprobación sigue por CLI (aprueba un humano igual) y los interesados se listan con `GET /respuestas`. El front de Mensajes y Respuestas pasa a la 010 y las columnas del tablero y `costo_por_respuesta`, a la 008, que las necesita para el CPQL.
 3. **Corte 2, LLM:** los mensajes salen con `plantilla_fija`, `respuestas` queda en el adaptador `sin_clasificar` y un humano resuelve cada una (y da de baja con `POST /respuestas/{id}/baja` si corresponde). Pasa a la 008.
 4. **El corte 1 no se corta.** Sin envío con opt-out completo (enlace, `mailto:`, BAJA por respuesta y baja manual de un humano) no sale ningún email.

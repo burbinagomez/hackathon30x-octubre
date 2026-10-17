@@ -456,10 +456,10 @@ Los `ALTER DEFAULT PRIVILEGES … ON TABLES` del 002 ya cubren las vistas nuevas
 
 **Orden de corte**, si no alcanza el tiempo:
 1. **10, la cola de revisión:** pasa al primer hueco libre del domingo (ya no al de la 011, que se construye el sábado antes de esta spec). Mientras tanto se resuelve por SQL, como en el 003.
-2. **9, el E2E:** pasa a la 012.
+2. **9, el E2E:** queda pendiente y la 013 lo lista en "qué es real y qué es simulado". La 012 no lo absorbe (es seguridad, no búsqueda).
 3. **4b, palabras clave y exclusiones:** pasa a la 010. El formulario no muestra esos campos.
 4. **`v_costo_por_canal`:** pasa a la 007. La 0004 queda con 8 vistas y `test_costo_por_canal` se va con ella.
-5. **Cobertura por país y revisiones pendientes en el tablero:** pasan a la 012.
+5. **Cobertura por país y revisiones pendientes en el tablero:** quedan pendientes y la 013 las lista en "qué es real y qué es simulado".
 
 **Mínimo para la demo:** 1, 2, 3, 4a, 5, 6, 7 y 8, con el tablero mostrando solo encontrados, únicos, ICP, costo lista y real, desperdicio, CPL, costo de evals y atribución. PRD §9 pone 003, 004 y 005 juntos el sábado a la tarde. Si la 003 o la 004 se pasan, la 005 arranca con el mínimo y el resto entra por el orden de corte.
 

@@ -145,7 +145,7 @@ Ninguno: este slice no usa IA.
 - **Export a Dapta con atribución.** Ya lo cubre la 008: columnas `fuentes`/`licencia` desde `lead_fuentes` y línea de atribución por fuente presente. Esta spec no suma tests de export.
 - **Otros países.** El dataset es solo de CO.
 - **Tamaño (`ingresos_min`).** El dataset no lo trae; queda en `ignorados`.
-- **El E2E de la búsqueda** que la 005 delegó: es de la 012.
+- **El E2E de la búsqueda** que la 005 cortó: queda pendiente y la 013 lo lista.
 
 ## Decisiones técnicas
 

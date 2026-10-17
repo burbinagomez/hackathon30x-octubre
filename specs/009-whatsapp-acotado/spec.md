@@ -108,7 +108,7 @@
 
 No hay eval nuevo. La plantilla de meta es fija: no usa LLM y la cubre `plantilla.validar`, que es determinista. El borrador del asistido usa el `Redactor` de la 007, que ya tiene su eval, y pasa por el mismo `validar`. La baja y el `WHATSAPP` también son deterministas. Las respuestas pegadas son texto de WhatsApp: las cubren los mismos 6 casos.
 
-El clasificador ya tiene eval, pero su set es de emails, y el texto de WhatsApp es más corto y más ambiguo. Por eso el set suma 6 casos. Cambia el fingerprint del dataset y el baseline se regenera en el mismo PR, con la justificación (principio IX). Si la 007 dejó ese eval para la 012, los 6 casos se van con él.
+El clasificador ya tiene eval, pero su set es de emails, y el texto de WhatsApp es más corto y más ambiguo. Por eso el set suma 6 casos. Cambia el fingerprint del dataset y el baseline se regenera en el mismo PR, con la justificación (principio IX). Si la 007 cortó ese eval, los 6 casos quedan pendientes con él y la 013 los lista.
 
 ## Flujo principal
 1. **Gate al arrancar.** Con `whatsapp_meta.habilitado: true`, la app no arranca (`ConfigInvalida`) en cualquiera de estos casos:
@@ -375,7 +375,7 @@ Tests:
 - **Varios números o varios tenants con WhatsApp.** Un número por despliegue (`WHATSAPP_TENANT_ID`). `# ponytail: tabla de ruteo phone_number_id → tenant cuando haya un segundo tenant`.
 - **Medios, botones, plantillas con imagen.** Solo texto.
 - **Opt-in fuera de una respuesta** (formulario web, QR). Lo ve la 010 si llega.
-- **Rate limiting del webhook.** 012.
+- **Rate limiting del webhook.** La 012 decide sin contador: HMAC antes de parsear y body con tope de 1 MB en Caddy.
 
 ## Decisiones técnicas
 **Módulo** `backend/app/modulos/contacto/` (el de la 007):
@@ -485,8 +485,8 @@ Cierre del corte 2, solo con la validación del dueño: la misma prueba manual c
 
 **Orden de corte**, si no alcanza el tiempo (qué se corta y a dónde va):
 1. **Corte 4:** sin meta prendido no hace falta su pantalla. La doc pasa a la 013.
-2. **Corte 2:** `whatsapp_meta` queda en `habilitado: false` y la demo muestra su gate (`canal_no_disponible`, webhook 404). La rama de meta pasa a la 012.
-3. **Corte 3:** las respuestas pegadas que no son BAJA/NO/STOP quedan `sin_clasificar` y un humano las resuelve con la baja manual de la 007 (`POST /respuestas/{id}/baja`). Los casos del eval pasan a la 012.
+2. **Corte 2:** `whatsapp_meta` queda en `habilitado: false` y la demo muestra su gate (`canal_no_disponible`, webhook 404). La rama de meta queda pendiente y la 013 la lista.
+3. **Corte 3:** las respuestas pegadas que no son BAJA/NO/STOP quedan `sin_clasificar` y un humano las resuelve con la baja manual de la 007 (`POST /respuestas/{id}/baja`). Los casos del eval quedan pendientes y la 013 los lista.
 4. **El corte 1 no se corta.**
    - Si el corte 1 no arranca antes de las **12:45 del domingo**, no se empieza. Con ≈ 2 h 15 no llega verde a las 3pm (PRD §9).
    - Si a las 3pm el corte 1 no está verde, se corta el slice entero: la rama no se mergea, los dos adaptadores quedan en `habilitado: false` y el MVP es solo email.

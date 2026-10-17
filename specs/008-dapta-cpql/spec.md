@@ -295,7 +295,7 @@ Todas las vistas con `security_invoker = true`. No redondean.
 13. Doc, en el mismo cambio que cada bloque: `docs/arquitectura-backend.md`, módulo `calificacion` y la fórmula del CPQL; `docs/arquitectura-frontend.md`, página Calificación. En `docs/prd.md` l.149, la fórmula del CPQL suma "enriquecimiento", como ya dicen la skill `libro-costos` y esta spec.
 
 **Orden de corte**, si no alcanza el tiempo (lo que se corta, a dónde va):
-1. **Corte 3, eval:** pasa a la 012. El README dice "match_dapta: sin medir".
+1. **Corte 3, eval:** queda pendiente y la 013 lo lista. El README dice "match_dapta: sin medir".
 2. **Corte 2:** la exportación y la importación siguen por CLI, y el CPQL se lee de `v_cpql` con `psql` o con `GET /tablero/fuentes` sin front. El front pasa a la 010.
 3. **El corte 1 no se corta.** Sin CPQL calculado desde `costos` no hay respuesta a la pregunta del reto.
 
