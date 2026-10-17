@@ -59,7 +59,7 @@ Ninguno: este slice no usa IA. Las empresas que encuentra alimentan `backend/eva
   - `::test_habilitado_sin_implementacion_se_reporta`: la clave aparece en `sin_implementacion` y la carga no lanza.
   - `::test_fuente_habilitada_sin_paises_o_filtros_falla`: una entrada de `fuentes_descubrimiento` con `habilitado: true` y sin `paises` o sin `filtros` lanza `RegistroInvalido`. Las deshabilitadas no se validan.
 - `backend/tests/arquitectura/test_registro_adaptadores.py::test_todo_adaptador_de_registro_esta_declarado`: toda clase en `infraestructura/adaptadores/` que implementa un puerto del registro (`FuenteDescubrimiento`, `Enriquecedor`, `CanalContacto`, `Calificador`, `Clasificador`) está en el catálogo, y su clave existe en `config/fuentes.yaml`.
-  - **Exclusión:** una lista cerrada, `EXCLUIDOS = {persistencia/postgres_costos.py, persistencia/repositorio_leads.py, persistencia/repositorio_cache.py}`. Razón: son repositorios de la DB propia, y no hay registro que los conecte o desconecte.
+  - **Exclusión:** una lista cerrada, `EXCLUIDOS = {costos/infraestructura/postgres_costos.py, descubrimiento/infraestructura/persistencia/repositorio_leads.py, descubrimiento/infraestructura/persistencia/repositorio_cache.py}`. Razón: son repositorios de la DB propia, y no hay registro que los conecte o desconecte.
   - `::test_persistencia_solo_contiene_excluidos_y_no_importa_http`: falla si en `persistencia/` aparece un archivo fuera de `EXCLUIDOS`, o si alguno importa `httpx`, `requests` o `urllib`. Así un cliente HTTP no puede esconderse ahí.
 - `backend/tests/arquitectura/test_costos_por_adaptador.py::test_todo_adaptador_de_registro_recibe_registro_costos`: toda clase de `infraestructura/adaptadores/` que implementa un puerto del registro, con el mismo criterio del test anterior, tiene `RegistroCostos` en su constructor. Las excepciones y los helpers quedan fuera.
   - **Exclusión:** la misma lista `EXCLUIDOS`. Razón: el I/O externo es la red, no la base propia, y `postgres_costos` es el registro mismo.
@@ -129,10 +129,16 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
 ## Decisiones técnicas
 
 **Módulo** `backend/app/modulos/descubrimiento/`:
-- `dominio/`: `EmpresaCruda`, `CriteriosICP`, `MetaFuente`, `normalizar_nit` y los Protocols `FuenteDescubrimiento`, `RegistroCostos` y `RepositorioLeads`.
+- `dominio/`: `EmpresaCruda`, `CriteriosICP`, `MetaFuente`, `PaginaEmpresas`, `normalizar_nit` y los Protocols `FuenteDescubrimiento` y `RepositorioLeads`.
 - `aplicacion/`: `EjecutarBusqueda` y `cargar_registro`.
 - `infraestructura/adaptadores/croma_supersociedades.py`.
-- `infraestructura/persistencia/{postgres_costos,repositorio_leads,repositorio_cache}.py`.
+- `infraestructura/persistencia/{repositorio_leads,repositorio_cache}.py`.
+
+**Puerto:** `buscar(criterios, pagina)` devuelve `PaginaEmpresas(empresas, total)`, no una lista suelta de `EmpresaCruda`: el 005 necesita `total` para la vista previa. Decidido en el plan (pregunta abierta 15) y aprobado por el dueño.
+
+**Módulo** `backend/app/modulos/costos/` (dueño del libro de costos; el 005 le suma fórmulas y tablero):
+- `dominio/`: `OperacionCosto` y el Protocol `RegistroCostos`.
+- `infraestructura/postgres_costos.py`.
 
 **import-linter:** contrato `layers` (`infraestructura > aplicacion > dominio`) para `app.modulos.*`, con el canario. Paga la deuda que dejó el 001.
 
