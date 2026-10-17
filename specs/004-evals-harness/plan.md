@@ -11,7 +11,7 @@ Paquete `backend/evals/`, hermano de `app`, que arma el ciclo de PRD §6b: datas
 ## Technical Context
 
 **Language/Version**: Python 3.12 (el del back)
-**Primary Dependencies**: `anthropic` (nueva, con `http_client` de `httpx` inyectable), `httpx` (ya está en dev), `pyyaml` para `evals.yaml` (hoy no está en `uv.lock`; si la 002 no la agrega para `fuentes.yaml`, la agrega este slice), stdlib (`hashlib`, `json`, `re`, `secrets`, `argparse`)
+**Primary Dependencies**: `anthropic` (nueva, con `http_client` de `httpx` inyectable), `httpx` (ya está en dev), `pyyaml` en `dependencies` (la 002 la usa en runtime para `fuentes.yaml`; la 002 y la 012 declaran la misma línea), stdlib (`hashlib`, `json`, `re`, `secrets`, `argparse`)
 **Storage**: archivos JSON/YAML versionados en `backend/evals/`; filas en `costos` (Postgres, RLS) vía `postgres_costos` del 002
 **Testing**: `pytest` (unit, contratos, arquitectura, integración con rol `app_rt`); `httpx.MockTransport` para el juez; `import-linter` para `app` ↛ `evals`
 **Target Platform**: local del desarrollador (la corrida real); CI corre solo `pytest` con juez y transporte falsos
@@ -34,7 +34,7 @@ Paquete `backend/evals/`, hermano de `app`, que arma el ciclo de PRD §6b: datas
 | VI Contacto cifrado | No persiste contacto: la whitelist + regex de `esquema.py` impiden que entre a cualquier JSON de `evals/`. | ✅ |
 | VII Cumplimiento | Nombre solo para `juridica` de OSM; Croma sin nombre ni NIT, id aleatorio (`c-` + 12 hex). Atribución ODbL en `evals/LICENCIA.md`. | ✅ |
 | VIII Costos | Cada `juzgar` escribe `llm_tokens_in` + `llm_tokens_out` antes de devolver, también cuando la salida es inválida. Test de arquitectura `test_todo_juez_recibe_registro_costos` + integración contra `postgres_costos`. | ✅ (dep. 002) |
-| IX Evals | Runner con un comando, PASS^3, `determinacion`, baseline versionado, salida ≠ 0 si baja. **Desvío:** IX dice "CI invoca ese mismo comando" y la spec deja el paso de CI fuera del alcance (ver Complexity Tracking y Pregunta abierta 1). | ⚠️ |
+| IX Evals | Runner con un comando, PASS^3, `determinacion`, baseline versionado, salida ≠ 0 si baja. **Desvío:** IX dice "CI invoca ese mismo comando" y la spec deja el paso de CI fuera del alcance : el job `evals` corre los tests del harness con el juez falso (decisión Q1, ver Complexity Tracking). | ⚠️ |
 | X Doc viva | Sección de evals en `docs/arquitectura-backend.md` + dos filas en `docs/decisiones.md`. | ✅ |
 
 Re-chequeo post-diseño: sin violaciones nuevas.
@@ -60,9 +60,9 @@ La 002 todavía no tiene plan ni código en `main` (`backend/app/modulos/` está
 ### Puerto y jueces
 - `jueces/puerto.py`: `Juez` (Protocol) con `juzgar(tarea, caso) -> Veredicto`; `Veredicto(probabilidad: float, razon: str)` frozen; excepción `SalidaJuezInvalida`.
 - `jueces/__init__.py`: `CATALOGO = {"claude": JuezClaude, "falso": JuezFalso}`. Es el único lugar que conoce clases concretas, igual que el catálogo de adaptadores del 002. `jev` se suma en la 006.
-- `JuezFalso`: devuelve una secuencia programada por caso y cuenta llamadas por `id`. Sin red, sin `RegistroCostos` (exclusión cerrada del test de arquitectura). Acepta `determinista_si_se_demuestra` en el constructor para el test de k=1.
+- `JuezFalso`: devuelve una secuencia programada por caso y cuenta llamadas por `id`. Sin red, sin `RegistroCostos` (exclusión cerrada del test de arquitectura).
 - `JuezClaude(registro_costos, tarifa, modelo, prompt, http_client)`: SDK `anthropic`, `tool_choice` forzado con `input_schema {probabilidad: number, razon: string}`, temperatura 0. Escribe las 2 filas de costo con `usage` **antes** de validar la salida; después valida y, si no cumple, lanza `SalidaJuezInvalida`.
-- `determinista_si_se_demuestra` es atributo de clase del juez (`False` en `claude`); el runner lo lee del catálogo.
+- `determinista_si_se_demuestra` vive en **un solo lugar**: es atributo de clase del juez (`False` en `JuezClaude` y en `JuezFalso`). El runner lo lee del juez que devuelve `fabrica_juez(nombre)`, nunca del `CATALOGO`: el catálogo existe recién en T017 y los tests del runner son de la Fase 2. El test de k=1 usa una subclase de `JuezFalso` con el atributo en `True`.
 
 ### Lo que ya costó con Jev (CLAUDE.md), aplicado desde hoy
 - **Un caso por llamada.** El runner nunca manda un array de casos al juez ni pide "el ítem 3". Cada `juzgar` recibe un solo caso como objeto con clave; la respuesta es de ese caso.
@@ -70,14 +70,14 @@ La 002 todavía no tiene plan ni código en `main` (`backend/app/modulos/` está
 - La versión de Jev queda pineada en `jev-1.13.0` (`config/tarifas.yaml` y `config/fuentes.yaml`). Cuando la 006 agregue `juez: jev`, su `modelo: jev-1.13.0` entra en el fingerprint: cambiar de versión deja el baseline obsoleto, como debe.
 
 ### Runner (`run.py`)
-- `main(argv, entorno, fabrica_juez=None, registro_costos=None) -> int`. Los tests inyectan juez y registro falsos; `__main__` arma los reales (D2, D3). El entorno se lee del mapeo inyectado (default `os.environ`), nunca se imprime.
+- `main(argv, entorno, fabrica_juez=None, registro_costos=None) -> int`. Los tests inyectan juez y registro falsos. Solo en la rama por defecto (`fabrica_juez is None`) `run.py` importa `evals.jueces` y arma los reales (D2, D3). El entorno se lee del mapeo inyectado (default `os.environ`), nunca se imprime.
 - Orden, tal cual la spec (Flujo principal §3): validar entorno y `evals.yaml` (sale **2** sin construir el juez) → fingerprint por eval → por caso: forma primero, juez k veces solo si la forma pasa → PASS^k → `agregado`, `determinacion`, `fallidos` → comparar con baseline → reporte JSON por stdout → código 0/1/2.
 - `lote_id` = un `uuid4` por corrida, el mismo para todas las filas de costo.
 - Fórmulas (las revisa el advisor):
   - `agregado = casos_que_pasan / todos_los_casos`;
   - `determinacion = juzgados_con_k_resultados_iguales / juzgados`, `null` si `juzgados == 0`;
   - "pasa la corrida i" = (`probabilidad_i ≥ corte`) == (`etiqueta` positiva).
-- k=1 solo si el juez del catálogo tiene `determinista_si_se_demuestra` **y** el baseline vigente, con el mismo fingerprint, es de k=3 con `determinacion == 1.0`. Si no, `ConfigInvalida` → 2. `--actualizar-baseline` con k < 3 → 2.
+- k=1 solo si el juez que devuelve `fabrica_juez` tiene `determinista_si_se_demuestra` **y** el baseline vigente, con el mismo fingerprint, es de k=3 con `determinacion == 1.0`. Si no, `ConfigInvalida` → 2. `--actualizar-baseline` con k < 3 → 2.
 
 ### Fingerprint (`fingerprint.py`)
 `sha256` sobre el JSON canónico (`sort_keys=True`) de: bytes del archivo de casos, bytes del prompt, `modelo`, `corte`, `umbral`. Sin `k` ni `tolerancia`.
@@ -86,13 +86,13 @@ La 002 todavía no tiene plan ni código en `main` (`backend/app/modulos/` está
 Una whitelist de claves por archivo (`dataset.json`, `casos/calibracion_mensajes.json`, `baseline.json`), las dos regex (email; teléfono = 7+ dígitos con separadores opcionales) aplicadas a strings **y** a números, exentos cerrados (`id`, `fingerprint`, y `as_of`/`fecha` solo si parsean como ISO 8601), enum `rango_ingresos` y sus cortes en COP. La lista exacta de claves la revisa el advisor (T005).
 
 ### Reporte (stdout, JSON)
-`{"lote_id", "evals": {"<nombre>": {"agregado", "determinacion", "k", "n", "fingerprint", "umbral", "baseline", "estado", "fallidos": [{"id", "motivo"}]}}, "mejora_sin_fijar": [...]}`. `estado` ∈ `ok`, `bajo_umbral`, `regresion`, `sin_baseline`, `baseline_obsoleto`. Motivos de caso: `forma:<regla>`, `juez_salida_invalida` y, para el caso que falla alguna de las k corridas sin otro motivo, `fallo_corrida` (nombre propuesto; la spec no lo fija).
+`{"lote_id", "evals": {"<nombre>": {"agregado", "determinacion", "k", "n", "fingerprint", "umbral", "baseline", "estado", "fallidos": [{"id", "motivo"}]}}, "mejora_sin_fijar": [...]}`. `estado` ∈ `ok`, `bajo_umbral`, `regresion`, `sin_baseline`, `baseline_obsoleto`. Motivos de caso: `forma:<regla>`, `juez_salida_invalida` y `fallo_corrida`. `estado` y `fallo_corrida` quedan fijados en la spec (Flujo principal, paso 3, y el test de fingerprint).
 
 ### Estructura
 
 ```text
 backend/
-├── pyproject.toml                  # + anthropic; contrato forbidden app ↛ evals (root_packages = ["app", "evals"] si hace falta)
+├── pyproject.toml                  # + anthropic (dev), pyyaml (dependencies); contrato forbidden app ↛ evals (root_packages lo decide el canario de T002)
 ├── evals/
 │   ├── run.py                      # reemplaza el placeholder
 │   ├── config.py · fingerprint.py · esquema.py · exportar_candidatos.py
@@ -118,20 +118,20 @@ El de la spec, partido por dependencias (detalle en `tasks.md`):
 1. **Sin dependencias (Fase 2):** contrato `app` ↛ `evals` → esquema/whitelist (advisor) → scorers de forma → puerto + `JuezFalso` + runner (advisor).
 2. **Con D1–D5 (US1):** `JuezClaude` + contrato + arquitectura (advisor de costos) → integración → exportación → etiquetado humano (D6) → primera corrida y baseline de `encaje_icp`.
 3. **US2, cortable:** calibración sintética + etiquetado + `mensaje_v1.md` + baseline de `juez_mensaje_calibracion`. Si no entra, pasa a la 007 con `test_calibracion_valida`.
-4. **Cierre:** docs, decisiones, job `evals` de CI (Pregunta abierta 1).
+4. **Cierre:** docs, decisiones, job `evals` de CI (Q1), merge de `main` tras la 002 (Q5).
 
 ## Complexity Tracking
 
 | Desvío | Por qué | Alternativa descartada |
 |---|---|---|
-| El job `evals` de CI no corre la corrida real (IX dice "CI invoca ese mismo comando") | La spec lo deja fuera: la corrida real necesita `ANTHROPIC_API_KEY`, una base con `costos` y un tenant, y gasta. Los tests del harness sí corren en `back` con juez falso | Poner la API key y una base en CI ahora: más secrets y gasto por push para un chequeo que este fin de semana es local + baseline commiteado (PRD §6b) |
+| El job `evals` de CI no corre la corrida real (IX dice "CI invoca ese mismo comando") | Decisión Q1: el job sigue como required check y corre los tests del harness con el juez falso, sin API key; opcionalmente, un chequeo offline de que el fingerprint de `baseline.json` coincide con los archivos actuales. La corrida real necesita `ANTHROPIC_API_KEY`, una base con `costos` y un tenant, y gasta | Poner la API key y una base en CI ahora: más secrets y gasto por push para un chequeo que este fin de semana es local + baseline commiteado (PRD §6b) |
 | Juez fuera de `config/fuentes.yaml` | Es tooling: nunca corre en el pipeline de leads. Igual tiene puerto, contrato y `RegistroCostos` (spec) | Registrarlo como `clasificadores.*`: mezclaría producto con medición |
 | `JuezFalso` exento de `RegistroCostos` | No sale a la red; exclusión cerrada y nombrada en el test | Darle un registro que nunca escribe: test de arquitectura que nace verde |
 
-## Preguntas abiertas
+## Decisiones del dueño (Q1–Q5, a recomendación del advisor)
 
-1. **Job `evals` de CI (bloquea el merge, no el arranque).** Hoy corre `uv run python -m evals.run` sobre el placeholder y es required check. Con el runner real sale 2 (sin API key ni tenant) y deja `main` en rojo. Hay que elegir entre que el job pase a correr los tests del harness con juez falso, que el job se quite de los required checks hasta que haya corrida en CI, o que se le dé a CI la key y una base. La spec no lo decide.
-2. **`anthropic` en `dev` o en `dependencies`.** Por defecto va en `dev`: `evals/` no entra en la imagen de `api`. La 007 lo mueve a `dependencies` cuando el redactor lo use desde `app`.
-3. **Qué archivo de casos usa cada eval.** La spec lista las claves de `evals.yaml` sin `casos`. Por defecto se agrega `casos: <ruta>` por eval: el runner lo necesita y el fingerprint ya hashea el contenido. Si el dueño prefiere un mapa fijo en código, es un cambio de una línea.
-4. **`docs/arquitectura-backend.md` no existe en `main`.** El 001 dejó su creación a la 013. Por defecto la 004 lo crea con solo la sección de evals, y la 013 lo consolida.
-5. **Orden de merge con la 002** (D7): las dos tocan `[tool.importlinter]`. Lo simple es que la 004 se rebasee sobre la 002.
+1. **Job `evals` de CI:** sigue como required check y corre los tests del harness con el juez falso, sin API key. Opcional: chequeo offline de que el fingerprint de `baseline.json` coincide con los archivos actuales. La desviación del principio IX está en Complexity Tracking.
+2. **`anthropic`** va en el grupo `dev`: `evals/` no entra en la imagen de `api`. La 007 lo mueve a `dependencies` cuando el redactor lo use desde `app`. `pyyaml` va en `dependencies`, no en dev.
+3. **Archivo de casos por eval:** clave `casos: <ruta>` en `evals.yaml` (enmendado en la spec).
+4. **`docs/arquitectura-backend.md`:** la 004 lo crea solo con la sección de evals; la 013 lo consolida.
+5. **Orden de merge con la 002** (D7): primero se mergea la 002. Después la 004 hace `git merge main` (no rebase), resuelve `[tool.importlinter]` a mano y corre `uv run lint-imports` antes de commitear el merge. El choque de `pyyaml` en `pyproject.toml`/`uv.lock` se resuelve en ese mismo merge.
