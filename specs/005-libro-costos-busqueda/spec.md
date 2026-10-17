@@ -32,7 +32,7 @@
 ## Skills que aplican
 - `libro-costos`: tipos `croma_consulta` y `overpass_query`, `gratis`, atribución, prorrateo, desperdicio, fórmulas, "sin dato" y fixture de 10 leads.
 - `fuentes-publicas`:
-  - atribución ODbL en el pie del tablero;
+  - atribución en el pie del tablero, solo de las fuentes que aportaron leads: "© OpenStreetMap contributors" (OSM, ODbL) y "Datos: Confecámaras vía datos.gov.co (CC BY-SA 4.0)" (011);
   - Croma no se redistribuye: la API no expone `fuente_cache` ni respuestas crudas, solo conteos, costos y los leads del propio tenant.
 - `cumplimiento-datos`:
   - el formulario no pide ni muestra contacto;
@@ -65,12 +65,12 @@ Ninguno: este slice no usa IA. La medición es el test de fórmulas, con número
      - las empresas pasan por el post-filtro de palabras clave y exclusiones **antes** de persistir: una empresa filtrada no genera lead ni `cumplimiento`, pero lo que costó traerla queda en el lote;
      - estado final: `completada` | `tope_alcanzado` | `error`.
    - Responde encontrados · únicos · nuevos · en revisión · gasto lista y real.
-5. **Tablero:** `GET /tablero/fuentes` devuelve las filas de `v_tablero_fuentes`, la fila TOTAL, el costo de evals, la cobertura por país (sale del registro: qué fuentes cubren cada país), las revisiones pendientes y la atribución. El front solo formatea.
+5. **Tablero:** `GET /tablero/fuentes` devuelve las filas de `v_tablero_fuentes`, la fila TOTAL, el costo de evals, la cobertura por país (sale del registro: qué fuentes cubren cada país), las revisiones pendientes y `atribuciones` (las filas de `v_atribuciones`: una por fuente que aportó leads, con texto y enlace). El front solo formatea.
 6. **Cola de revisión:** `GET /dedup/revision` lista los pares pendientes (nombre, ciudad, fuentes, similitud). `POST /dedup/revision/{id} {accion: fusionar|separar}` los resuelve.
 
 ## Terminado cuando (tests que hoy fallan)
 
-**Fórmulas** (`backend/tests/integration/test_vistas_costos.py`, Postgres real con rol `app_rt`; el fixture se siembra con `app_mig`)
+**Fórmulas** (`backend/tests/integration/test_vistas_costos.py`, Postgres real con rol `app_rt`; el fixture se siembra con `postgres`)
 
 Fixture: 10 leads A–J, 2 fuentes (`croma_supersociedades_co` = **cs**, `osm_overpass` = **osm**), 2 canales. Las tarifas son sintéticas y redondas: la vista no lee `tarifas.yaml`.
 
@@ -124,7 +124,7 @@ Costo por canal: email 0.05, whatsapp 0.30. Costo de evals: 1.00.
 - `::test_lead_fusionado_no_cuenta`: si se marca `H.fusionado_en = G` y se mueven sus `lead_fuentes`, osm queda con únicos = 6 y encontrados = 7, y el prorrateo de L2 pasa a 0.20 por lead (4 leads). El CPL de osm no se asierta exacto, porque 1.40/6 es periódico. Es el comportamiento buscado: el CPL se recalcula con los leads reales.
 
 **Aislamiento y privilegios de las vistas**
-- `backend/tests/integration/test_rls.py::test_tenant_b_no_accede_a_datos_de_a[vista]`, sobre cada `v_*`: con datos solo de A, el tenant B ve 0 filas. Esto exige `security_invoker`: una vista común corre con los permisos de su dueño, `app_mig`, que es dueño de las tablas, así que la RLS no le aplica.
+- `backend/tests/integration/test_rls.py::test_tenant_b_no_accede_a_datos_de_a[vista]`, sobre cada `v_*`: con datos solo de A, el tenant B ve 0 filas. Control positivo en el mismo test: como A, cada vista devuelve ≥ 1 fila. Si no, el 0 de B no prueba nada. Por eso la siembra de A trae `costos`, leads y una `lead_fuentes` de `osm_overpass`; sin ella, `v_atribuciones` da 0 filas a cualquiera. Esto exige `security_invoker`: una vista común corre con los permisos de su dueño, `postgres`, que es dueño de las tablas, así que la RLS no le aplica.
 - `::test_toda_vista_es_security_invoker`: toda vista de `pg_class` en `public` tiene `security_invoker=true` en `reloptions`. Sale del catálogo, así que una vista nueva entra sola.
 - `test_rls.py::test_usuarios_tiene_rls`: en `pg_class`, `usuarios` tiene `relrowsecurity = true` y una política por `tenant_id` en `pg_policies`. `usuarios` **no** entra a la lista fija de `test_tenant_b_no_accede_a_datos_de_a[tabla]` del 002: `app_rt` no tiene privilegios sobre ella, así que el test daría `permission denied` y no probaría RLS. El aislamiento por rol lo cubre `test_app_rt_no_lee_usuarios_directo`, y el de RLS, este test.
 - `test_rls.py::test_tenant_b_no_accede_a_datos_de_a[vista]`: B también ve 0 filas en la fila `TOTAL`, que solo existe si hay datos (`HAVING count(*) > 0`).
@@ -132,9 +132,9 @@ Costo por canal: email 0.05, whatsapp 0.30. Costo de evals: 1.00.
 - `backend/tests/integration/test_usuarios_repo.py`:
   - `::test_app_rt_no_lee_usuarios_directo`: un `SELECT`, INSERT, UPDATE o DELETE de `app_rt` sobre `usuarios` falla por privilegios;
   - `::test_usuario_para_login_devuelve_solo_ese_email`: con usuarios de 2 tenants, `usuario_para_login('a@x.co')` devuelve 1 fila (`id`, `tenant_id`, `hash_clave`), `usuario_para_login('A@X.co')` devuelve la misma fila y un email inexistente devuelve 0;
-  - `::test_email_se_guarda_en_minusculas`: con `app_mig` (no `app_rt`, que no tiene `INSERT` sobre `usuarios` y fallaría por privilegios sin probar nada), un `INSERT` con `email='A@X.co'` falla con sqlstate `23514` (violación de `CHECK`);
+  - `::test_email_se_guarda_en_minusculas`: con `postgres` (no `app_rt`, que no tiene `INSERT` sobre `usuarios` y fallaría por privilegios sin probar nada), un `INSERT` con `email='A@X.co'` falla con sqlstate `23514` (violación de `CHECK`);
   - `::test_fijar_idioma_no_cruza_tenants`: con `app.tenant_id` de B, `fijar_idioma(<id de A>, 'en')` modifica 0 filas y el `idioma` de A no cambia;
-  - `::test_funcion_es_security_definer_con_search_path[usuario_para_login|fijar_idioma]`: en `pg_proc`, `prosecdef = true`, `proconfig` contiene `search_path=` y `has_function_privilege` da `app_rt` sí y `anon`/`authenticated` no. Para que no nazca verde por la razón equivocada, `supabase_simulado.sql` (002) suma `ALTER DEFAULT PRIVILEGES FOR ROLE app_mig IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, authenticated`, que es lo que hace Supabase real. Sin el `REVOKE` de la 0004, el test falla.
+  - `::test_funcion_es_security_definer_con_search_path[usuario_para_login|fijar_idioma]`: en `pg_proc`, `prosecdef = true`, `proconfig` contiene `search_path=` y `has_function_privilege` da `app_rt` sí y `anon`/`authenticated` no. Para que no nazca verde por la razón equivocada, `supabase_simulado.sql` (002) suma `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, authenticated`, que es lo que hace Supabase real. Sin el `REVOKE` de la 0004, el test falla.
 
 **Libro y lote** (`backend/tests/integration/test_costos_repo.py`)
 - `::test_gasto_busqueda_suma_lista_del_lote`: con filas `gratis` true y false en el lote, y filas de otro lote, `gasto_busqueda` da la Σ a valor de lista solo de su lote.
@@ -200,7 +200,12 @@ Costo por canal: email 0.05, whatsapp 0.30. Costo de evals: 1.00.
   - `::test_validacion[caso]` → 422 con: `ciiu` que no tiene 4 dígitos, país fuera del enum, `tope_gasto_usd` ≤ 0 o > `TOPE_MAXIMO_USD`, `mensaje_base` > 1000 caracteres, más de 10 palabras clave o alguna de más de 40 caracteres, y `canal_preferido` deshabilitado en el registro;
   - `::test_tablero_devuelve_null_para_cpl_sin_divisor`;
   - `::test_vista_previa_devuelve_motivos_como_codigo`: los motivos de fuente descartada y los errores de validación son códigos (`sin_mapeo_actividad`, nombre de la regla), nunca una frase;
-  - `::test_actividades_trae_ambos_nombres`: `GET /actividades` devuelve `codigo`, `nombre_es` y `nombre_en` (que puede ser `null`) de cada entrada de `config/actividades.yaml`.
+  - `::test_actividades_trae_ambos_nombres`: `GET /actividades` devuelve `codigo`, `nombre_es` y `nombre_en` (que puede ser `null`) de cada entrada de `config/actividades.yaml`;
+  - `::test_tablero_atribucion_solo_de_fuentes_presentes[caso]`: siembra `lead_fuentes` directo con `postgres` (no hace falta el adaptador de la 011) y compara `atribuciones` exacto y en orden, cada elemento `{fuente, texto, url}`:
+    - `solo_osm` → solo `osm_overpass`, "© OpenStreetMap contributors", `https://www.openstreetmap.org/copyright`;
+    - `osm_y_datos_gov` → `osm_overpass` y `datos_gov_co_rues`, "Datos: Confecámaras vía datos.gov.co (CC BY-SA 4.0)", `https://creativecommons.org/licenses/by-sa/4.0/`;
+    - `solo_croma` → `[]`;
+    - `sin_leads` → `[]`.
 
 **Cola de revisión** (`backend/tests/integration/test_revision_dedup.py`)
 - `::test_fusionar_mueve_lead_fuentes_y_marca_absorbido`: el absorbido queda con `fusionado_en` = superviviente y sin `lead_fuentes`.
@@ -255,7 +260,10 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
   - `::cpl_null_se_muestra_sin_dato`: nunca `0` ni `∞`;
   - `::muestra_costo_lista_y_real`;
   - `::costo_de_evals_va_aparte`;
-  - `::muestra_atribucion_odbl`;
+  - `::muestra_atribucion_de_las_fuentes_presentes[caso]`: el pie pinta un enlace por elemento de `atribuciones`, con el `texto` y el `href` de la API:
+    - `ambas` → se ven "© OpenStreetMap contributors" (enlace a `/copyright`) y "Datos: Confecámaras vía datos.gov.co (CC BY-SA 4.0)";
+    - `solo_osm` → se ve la de OSM y no la de datos.gov.co;
+    - `ninguna` → no hay atribución. Con este caso y el anterior, un texto hardcodeado en el front falla;
   - `::muestra_cobertura_por_pais`;
   - `::muestra_revisiones_pendientes`.
 - `frontend/src/api/cliente.test.ts::un_401_lleva_al_login_y_borra_el_token`.
@@ -317,6 +325,12 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
   - costos lista y real;
   - desperdicio lista y real;
   - `cpl_lista` = costo_lista / NULLIF(icp, 0), e igual `cpl_real`.
+- `v_atribuciones(fuente, texto, url, orden)`: un `VALUES` con las fuentes cuya licencia pide atribución, filtrado por `EXISTS` de al menos una fila en `lead_fuentes` del tenant con esa `fuente`:
+  - `osm_overpass` → "© OpenStreetMap contributors" y `https://www.openstreetmap.org/copyright`, que es lo que pide la OSMF: el aviso más el enlace a `/copyright`;
+  - `datos_gov_co_rues` → "Datos: Confecámaras vía datos.gov.co (CC BY-SA 4.0)" y el enlace a la licencia;
+  - Croma no lleva fila: no tiene licencia abierta que pida atribución, y no se redistribuye.
+  - Sale de `lead_fuentes` y no de `cumplimiento`, porque un lead fusionado tiene una sola fila de cumplimiento (la de su origen) y las `lead_fuentes` de todas sus fuentes. Tampoco mira `habilitado`: una fuente desconectada que ya aportó leads sigue en la base y sigue debiendo atribución.
+  - `# ponytail:` el mapa vive en la vista. Si se suma una tercera fuente con atribución, se mueve a una columna `atribucion` en `config/fuentes.yaml`.
 - **El CPL incluye el desperdicio en el numerador:** el costo de adquirir leads incluye las búsquedas que no rindieron (fórmula de la skill: Σ costos(fuente)). Por eso el CPL no es el promedio de `v_costo_por_lead`, y el test de conservación cierra la cuenta.
 - La API serializa `numeric` como string decimal y `NULL` como `null`. El front formatea; no calcula.
 
@@ -350,13 +364,13 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
 - **`usuarios`** (`id`, `email` UNIQUE con `CHECK (email = lower(email))`, `hash_clave`, `tenant_id` FK, `idioma` NULL con `CHECK IN ('es','en')`, `creado_en`) tiene **RLS por `tenant_id`**, como toda tabla con datos de un tenant (constitución III).
   - `app_rt` no tiene ningún privilegio sobre la tabla.
   - El login, que ocurre antes de conocer el tenant, entra por la función `usuario_para_login(email text)`:
-    - `SECURITY DEFINER`, con dueño `app_mig`;
+    - `SECURITY DEFINER`, con dueño `postgres`;
     - `SET search_path = public, pg_temp`;
     - compara contra `lower(email)` y devuelve `id`, `tenant_id`, `hash_clave`, `usuarios.idioma` y `tenants.idioma` (por separado: el front necesita saber si hubo elección) de **ese** email y nada más (`crear_usuario.py` también guarda `lower()`, y acepta `--idioma es|en` opcional);
     - `REVOKE EXECUTE … FROM PUBLIC, anon, authenticated` (Postgres da `EXECUTE` a `PUBLIC` por defecto y Supabase a `anon`/`authenticated`; la 0004 trae su propio `DO` con el mismo guard de `pg_roles` del 002, para no fallar en vanilla; no toca la 0002, que ya está aplicada) y `GRANT EXECUTE` solo a `app_rt`.
   - Así un `SELECT` de `app_rt` no puede volcar los hashes de todos los tenants.
-  - La elección del selector entra por `fijar_idioma(p_usuario uuid, p_idioma text)`, con el mismo patrón (`SECURITY DEFINER`, `search_path`, `REVOKE`/`GRANT` solo a `app_rt`). Hace `UPDATE usuarios SET idioma = p_idioma WHERE id = p_usuario AND tenant_id = current_setting('app.tenant_id')::uuid`. El filtro por tenant va escrito porque el dueño `app_mig` no pasa por RLS. Así `app_rt` sigue sin ningún privilegio sobre la tabla. `PATCH /usuarios/me` la llama con el `sub` del token.
-  - Se siembra con `app_mig` desde `backend/scripts/crear_usuario.py`, que lee la clave por `getpass` (nunca por argv, para que no quede en el historial).
+  - La elección del selector entra por `fijar_idioma(p_usuario uuid, p_idioma text)`, con el mismo patrón (`SECURITY DEFINER`, `search_path`, `REVOKE`/`GRANT` solo a `app_rt`). Hace `UPDATE usuarios SET idioma = p_idioma WHERE id = p_usuario AND tenant_id = current_setting('app.tenant_id')::uuid`. El filtro por tenant va escrito porque el dueño `postgres` no pasa por RLS. Así `app_rt` sigue sin ningún privilegio sobre la tabla. `PATCH /usuarios/me` la llama con el `sub` del token.
+  - Se siembra con `postgres` desde `backend/scripts/crear_usuario.py`, que corre un humano desde local, igual que `sembrar_tenant.py` de la 002: lee la URL de `postgres` y la clave del usuario por `getpass` (nunca por argv, para que no queden en el historial), nunca por `DATABASE_URL` ni por una variable en Railway.
 - **Clave:** `hashlib.scrypt` (n=2¹⁷, r=8, p=1, sal de 16 bytes, `maxmem=2²⁸`, porque con n=2¹⁷ el default de `maxmem` no alcanza) y `hmac.compare_digest`. El n es el mínimo de OWASP. Son ~128 MiB por login, y `security` lo confirma contra la memoria del servicio en Railway. Ante un email inexistente se calcula igual un scrypt de relleno, para no filtrar qué emails existen por timing.
 - **JWT:** HS256 con **PyJWT** (dependencia nueva), `algorithms=["HS256"]` explícito (rechaza `alg=none`) y `options={"require": ["exp", "sub", "tenant_id"]}`, porque PyJWT no exige `exp` si el token no lo trae. Razón: firmar y verificar a mano es justo donde se cuelan los bugs de verificación.
 - **`/docs`, `/redoc` y `/openapi.json` desactivados** (`docs_url=None`, etc.): describen la API pública y no los necesita nadie en el evento. Así el test de 401 sobre `app.routes` no tiene excepciones escondidas.
@@ -393,7 +407,7 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
 | `fijar_idioma(uuid, text)` | función `SECURITY DEFINER` (arriba) |
 | `costos` | índice `(tenant_id, lote_id)` |
 | `lead_fuentes` | índice `(busqueda_id, fuente)` |
-| vistas | las 8 de arriba, `security_invoker` |
+| vistas | las 9 de arriba, `security_invoker` |
 
 Los `ALTER DEFAULT PRIVILEGES … ON TABLES` del 002 ya cubren las vistas nuevas para `anon`/`authenticated`, y el test de privilegios lo confirma.
 
@@ -483,11 +497,11 @@ Los `ALTER DEFAULT PRIVILEGES … ON TABLES` del 002 ya cubren las vistas nuevas
 12. **`docs/arquitectura-backend.md` y `-frontend.md`:** vistas, lote = búsqueda, auth y cómo se agrega una columna al tablero. En `-frontend.md`, también la estructura por feature, la regla de límites y cuándo algo pasa a `compartido/`. También la corrección de PRD §4.
 
 **Orden de corte**, si no alcanza el tiempo:
-1. **10, la cola de revisión:** pasa al hueco de la 011 (datos.gov.co, 1 h, con holgura). Mientras tanto se resuelve por SQL, como en el 003.
-2. **9, el E2E:** pasa a la 012.
+1. **10, la cola de revisión:** pasa al primer hueco libre del domingo (ya no al de la 011, que se construye el sábado antes de esta spec). Mientras tanto se resuelve por SQL, como en el 003.
+2. **9, el E2E:** queda pendiente y la 013 lo lista en "qué es real y qué es simulado". La 012 no lo absorbe (es seguridad, no búsqueda).
 3. **4b, palabras clave y exclusiones:** pasa a la 010. El formulario no muestra esos campos.
-4. **`v_costo_por_canal`:** pasa a la 007. La 0004 queda con 7 vistas y `test_costo_por_canal` se va con ella.
-5. **Cobertura por país y revisiones pendientes en el tablero:** pasan a la 012.
+4. **`v_costo_por_canal`:** pasa a la 007. La 0004 queda con 8 vistas y `test_costo_por_canal` se va con ella.
+5. **Cobertura por país y revisiones pendientes en el tablero:** quedan pendientes y la 013 las lista en "qué es real y qué es simulado".
 
 **Mínimo para la demo:** 1, 2, 3, 4a, 5, 6, 7 y 8, con el tablero mostrando solo encontrados, únicos, ICP, costo lista y real, desperdicio, CPL, costo de evals y atribución. PRD §9 pone 003, 004 y 005 juntos el sábado a la tarde. Si la 003 o la 004 se pasan, la 005 arranca con el mínimo y el resto entra por el orden de corte.
 
