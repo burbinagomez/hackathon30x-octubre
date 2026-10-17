@@ -96,7 +96,7 @@ Arma el ciclo de PRD §6b: casos → agente → scorers → baseline → verde/r
 - `::test_salida_invalida_falla_el_caso_con_motivo`: el caso queda en fallidos con `motivo="juez_salida_invalida"` y la corrida sigue con el resto.
 - `::test_reporta_fallidos_con_id_y_motivo`.
 - `::test_k_menor_a_3_con_juez_llm_es_config_invalida`: `k: 1` con `juez: claude` sale 2 con `ConfigInvalida`.
-- `::test_k1_solo_con_determinacion_demostrada`: con un juez marcado `determinista_si_se_demuestra: true` (lo usará `jev` en la 006), `k: 1` sale 2 si el baseline a k=3 tiene `determinacion < 1.0`, o si no hay baseline a k=3; con `determinacion == 1.0` a k=3, se acepta. Secuencia en un mismo test: k=3 con `--actualizar-baseline` (sale 0), después k=1 (sale 0, no `baseline_obsoleto`) y otra vez k=1 (sale 0). Además, k=1 con `--actualizar-baseline` sale 2 y no escribe.
+- `::test_k1_solo_con_determinacion_demostrada`: con un juez cuyo atributo de clase `determinista_si_se_demuestra` es `True` (lo usará `jev` en la 006), `k: 1` sale 2 si el baseline a k=3 tiene `determinacion < 1.0`, o si no hay baseline a k=3; con `determinacion == 1.0` a k=3, se acepta. Secuencia en un mismo test: k=3 con `--actualizar-baseline` (sale 0), después k=1 (sale 0, no `baseline_obsoleto`) y otra vez k=1 (sale 0). Además, k=1 con `--actualizar-baseline` sale 2 y no escribe.
 - `::test_igual_al_baseline_sale_0`.
 - `::test_baja_respecto_al_baseline_sale_1`: baseline 0.80, corrida 0.75, tolerancia 0 → 1, y el reporte nombra el eval.
 - `::test_bajo_umbral_sale_1_aunque_no_baje`: baseline 0.60, corrida 0.60, umbral 0.70 → 1.
@@ -131,7 +131,7 @@ Arma el ciclo de PRD §6b: casos → agente → scorers → baseline → verde/r
 ## Decisiones técnicas
 
 **Ubicación:** `backend/evals/` es un paquete de primer nivel, hermano de `app`:
-- `run.py` (`main(argv, entorno)`, inyectable para los tests), `config.py` (carga y valida `evals.yaml`), `fingerprint.py`, `exportar_candidatos.py`, `esquema.py` (whitelist y validación de los JSON);
+- `run.py` (`main(argv, entorno, fabrica_juez=None, registro_costos=None)`, inyectable para los tests), `config.py` (carga y valida `evals.yaml`), `fingerprint.py`, `exportar_candidatos.py`, `esquema.py` (whitelist y validación de los JSON);
 - `scorers/forma.py`;
 - `jueces/puerto.py` (Protocol `Juez`: `juzgar(tarea, caso) -> Veredicto`), `jueces/claude.py`, `jueces/falso.py`, `jueces/encaje_v1.md`, `jueces/mensaje_v1.md`;
 - `dataset.json`, `casos/calibracion_mensajes.json`, `baseline.json`, `evals.yaml`, `LICENCIA.md`.
@@ -166,7 +166,7 @@ Arma el ciclo de PRD §6b: casos → agente → scorers → baseline → verde/r
 2. **Esquema y whitelist:** `test_dataset.py` contra fixtures en `tmp_path` en rojo → `esquema.py` → verde. El fixture con un teléfono en `notas` tiene que fallar. El **advisor revisa la whitelist y la regla del nombre** (es cumplimiento).
 3. **Scorers de forma:** los 10 tests en rojo → `scorers/forma.py` → verde.
 4. **Puerto `Juez` + `JuezFalso` + runner:** los 19 tests de `test_runner.py` en rojo → `run.py`, `config.py`, `fingerprint.py` → verde. El **advisor revisa PASS^3, determinación, k=1 y la comparación con el baseline** (son las fórmulas del eval).
-5. **`JuezClaude`:** los 5 tests con `MockTransport` + la suite de contrato + `test_todo_juez_recibe_registro_costos` en rojo → verde. Después, `test_juez_escribe_filas_llm_en_costos` en integración.
+5. **`JuezClaude`:** los 5 tests con `MockTransport`, la suite de contrato, `test_todo_juez_recibe_registro_costos` y `test_juez_escribe_filas_llm_en_costos` en integración, todos en rojo y revisados por el advisor → verde.
 6. **Exportación:** `test_exportar_candidatos.py` en rojo → verde. Se corre contra la búsqueda real del 002/003.
 7. **Tarea humana — dataset (~20 min):** etiquetar 20–40 candidatos, con mínimo 5 por etiqueta, y pasarlos a `dataset.json`. `test_dataset_real_valida_contra_esquema` pasa de rojo a verde recién acá.
 8. **Tarea humana — calibración (~15 min):** el `swarm` genera 10–12 mensajes sintéticos con la plantilla de la regla 7, 3 o más con datos inventados; un humano marca `pertinente`. `test_calibracion_valida` en verde.

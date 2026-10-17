@@ -62,7 +62,7 @@ La 002 todavía no tiene plan ni código en `main` (`backend/app/modulos/` está
 - `jueces/__init__.py`: `CATALOGO = {"claude": JuezClaude, "falso": JuezFalso}`. Es el único lugar que conoce clases concretas, igual que el catálogo de adaptadores del 002. `jev` se suma en la 006.
 - `JuezFalso`: devuelve una secuencia programada por caso y cuenta llamadas por `id`. Sin red, sin `RegistroCostos` (exclusión cerrada del test de arquitectura).
 - `JuezClaude(registro_costos, tarifa, modelo, prompt, http_client)`: SDK `anthropic`, `tool_choice` forzado con `input_schema {probabilidad: number, razon: string}`, temperatura 0. Escribe las 2 filas de costo con `usage` **antes** de validar la salida; después valida y, si no cumple, lanza `SalidaJuezInvalida`.
-- `determinista_si_se_demuestra` vive en **un solo lugar**: es atributo de clase del juez (`False` en `JuezClaude` y en `JuezFalso`). El runner lo lee del juez que devuelve `fabrica_juez(nombre)`, nunca del `CATALOGO`: el catálogo existe recién en T017 y los tests del runner son de la Fase 2. El test de k=1 usa una subclase de `JuezFalso` con el atributo en `True`.
+- `determinista_si_se_demuestra` vive en **un solo lugar**: es atributo de clase del juez (`False` en `JuezClaude` y en `JuezFalso`). El runner lo lee del juez que devuelve `fabrica_juez(nombre)`, nunca del `CATALOGO`: el catálogo existe recién en T018 y los tests del runner son de la Fase 2. El test de k=1 usa una subclase de `JuezFalso` con el atributo en `True`.
 
 ### Lo que ya costó con Jev (CLAUDE.md), aplicado desde hoy
 - **Un caso por llamada.** El runner nunca manda un array de casos al juez ni pide "el ítem 3". Cada `juzgar` recibe un solo caso como objeto con clave; la respuesta es de ese caso.
@@ -116,7 +116,7 @@ docs/{arquitectura-backend.md, decisiones.md}
 
 El de la spec, partido por dependencias (detalle en `tasks.md`):
 1. **Sin dependencias (Fase 2):** contrato `app` ↛ `evals` → esquema/whitelist (advisor) → scorers de forma → puerto + `JuezFalso` + runner (advisor).
-2. **Con D1–D5 (US1):** `JuezClaude` + contrato + arquitectura (advisor de costos) → integración → exportación → etiquetado humano (D6) → primera corrida y baseline de `encaje_icp`.
+2. **Con D1–D5 (US1):** tests de `JuezClaude`, contrato, arquitectura e integración en rojo (advisor de costos) → `JuezClaude` → composición real → exportación → etiquetado humano (D6) → primera corrida y baseline de `encaje_icp`.
 3. **US2, cortable:** calibración sintética + etiquetado + `mensaje_v1.md` + baseline de `juez_mensaje_calibracion`. Si no entra, pasa a la 007 con `test_calibracion_valida`.
 4. **Cierre:** docs, decisiones, job `evals` de CI (Q1), merge de `main` tras la 002 (Q5).
 
