@@ -208,3 +208,9 @@ Vuelta única sobre `08c2835`. Todos son MEDIUM o menores. Los marcados [X] ya e
 - [ ] H3 (T040, `backend/app/modulos/costos/dominio/puertos.py:8-14`): "1 crédito" no tiene de dónde salir, porque `RegistroCostos` no expone el total del lote; el test probaría el falso. La parte de `lote_id = busqueda_id` entró en T038 y T039 por decisión del dueño; la del total del lote queda con T040, en Pulido.
 - [ ] H4 (T040-T041): la rama de producción (`persistencia=None`, catálogo real) no la recorre ningún test. Faltan `test_cli_sin_adaptadores_contra_postgres` y un contrato `forbidden` `app` ↛ `tests`. Va con T040-T041, en Pulido.
 - [X] H5 (Estrategia de `tasks.md` en 08c2835, línea 179): "nunca se corta un test de costos" chocaba con el corte 3, que se llevaba T032 y T036. Resuelto en la Estrategia nueva.
+
+Vuelta sobre el rojo de T020 (`6fd7c09`, APRUEBA, sin HIGH):
+
+- [X] H6 MEDIUM (`test_leads_repo.py:85-93`, `EMPRESA` en :13-17): un Verde con `'juridica'` fijo pasaba `test_lead_persistido_conserva_tipo_titular`. Ahora se parametriza `tipo_titular` en `juridica` y `desconocido`, y se aserta que se guarda tal cual. Absorbido en T020 antes del Verde.
+- [ ] H7 MEDIUM (`repositorio_leads.py:24-25`): `cerrar_busqueda` no tenía test de integración, y un no-op dejaba verde toda la suite. Va como `test_cerrar_busqueda_guarda_estado` en T021, con su rojo antes de implementarlo.
+- [X] H8 LOW (`test_leads_repo.py:90` y :93): el SELECT de `cumplimiento` no leía `as_of`, y un Verde con `now()` pasaba. Ahora se lee y se compara con `EMPRESA.as_of`. Absorbido en T020.

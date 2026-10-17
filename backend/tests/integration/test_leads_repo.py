@@ -1,4 +1,5 @@
 import os
+from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -82,15 +83,17 @@ def test_unico_lead_fuente_busqueda(rt, admin, tenants):
                    l=tenants["lead"], b=tenants["busqueda"], f=EMPRESA.fuente) == 1
 
 
-def test_lead_persistido_conserva_tipo_titular(rt, admin, tenants):
-    lead_id, _ = RepositorioLeadsPostgres(rt, tenants["a"]).obtener_o_crear_lead(EMPRESA, "licencia-x")
+@pytest.mark.parametrize("tipo_titular", ["juridica", "desconocido"])
+def test_lead_persistido_conserva_tipo_titular(rt, admin, tenants, tipo_titular):
+    empresa = replace(EMPRESA, tipo_titular=tipo_titular)
+    lead_id, _ = RepositorioLeadsPostgres(rt, tenants["a"]).obtener_o_crear_lead(empresa, "licencia-x")
     with admin.connect() as c:
         fila = c.execute(text("SELECT tipo_titular, pais, id_fiscal, nombre FROM leads WHERE id = :id"),
                          {"id": lead_id}).one_or_none()
-        cumplimiento = c.execute(text("SELECT fuente, licencia, url_origen FROM cumplimiento WHERE lead_id = :id"),
+        cumplimiento = c.execute(text("SELECT fuente, licencia, url_origen, as_of FROM cumplimiento WHERE lead_id = :id"),
                                  {"id": lead_id}).one_or_none()
-    assert fila == ("juridica", "CO", "900123456", "Acme SAS")
-    assert cumplimiento == (EMPRESA.fuente, "licencia-x", EMPRESA.url_origen)
+    assert fila == (tipo_titular, "CO", "900123456", "Acme SAS")
+    assert cumplimiento == (EMPRESA.fuente, "licencia-x", EMPRESA.url_origen, EMPRESA.as_of)
 
 
 def test_lead_nuevo_y_cumplimiento_en_una_transaccion(rt, admin, tenants):
