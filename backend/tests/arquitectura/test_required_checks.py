@@ -153,7 +153,8 @@ def _codeql_pinneado_por_sha():
 # Read no se restringe por ruta: el agente puede leer /proc/self/environ. Lo que garantiza el job es este corte,
 # que borra el reporte y falla si trae el secret, antes de que llegue al summary o al artifact.
 CORTE = re.compile(r'grep -qF "\$ANTHROPIC_API_KEY" revision\.json && \{ rm -f revision\.\*;[^}]*exit 1; \}')
-PROHIBIDAS = {"Bash", "Edit", "Write", "WebFetch", "WebSearch"}
+# Read(//proc/**) es la primera capa: sin leer /proc/self/environ el agente no ve el secret. El grep es la segunda.
+PROHIBIDAS = {"Bash", "Edit", "Write", "WebFetch", "WebSearch", "Read(//proc/**)"}
 
 
 def _problemas_revision(job: dict) -> list[str]:
@@ -200,7 +201,7 @@ def _fuga_del_secret(steps: list[dict]) -> str:
 
 def _job_revision(si="github.event_name == 'pull_request'", instalar="@anthropic-ai/claude-code@2.1.0",
                   permitidas="--allowedTools Read,Grep,Glob",
-                  prohibidas="--disallowedTools Bash,Edit,Write,WebFetch,WebSearch",
+                  prohibidas='--disallowedTools "Bash,Edit,Write,WebFetch,WebSearch,Read(//proc/**)"',
                   extra="", veredicto="| .github/scripts/veredicto_security.sh",
                   despues=None, artifact_primero=False) -> dict:
     despues = (CORTE_OK, RESUMEN) if despues is None else despues
@@ -226,6 +227,8 @@ CASOS_REVISION = {
     "allowed-con-bash": (_job_revision(permitidas="--allowedTools Read,Grep,Glob,Bash"), ["allowed"]),
     "sin-disallowed": (_job_revision(prohibidas=""), ["disallowed"]),
     "disallowed-solo-bash": (_job_revision(prohibidas="--disallowedTools Bash"), ["disallowed"]),
+    "disallowed-sin-proc": (_job_revision(prohibidas="--disallowedTools Bash,Edit,Write,WebFetch,WebSearch"),
+                            ["disallowed"]),
     "bypass": (_job_revision(extra="--permission-mode bypassPermissions"), ["bypass"]),
     "cli-latest": (_job_revision(instalar="@anthropic-ai/claude-code@latest"), ["pin"]),
     "sin-corte": (_job_revision(despues=(RESUMEN,)), ["fuga"]),

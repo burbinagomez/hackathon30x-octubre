@@ -157,7 +157,7 @@ jobs:
             --append-system-prompt "$agente" \
             --model opus \
             --allowedTools Read,Grep,Glob \
-            --disallowedTools Bash,Edit,Write,WebFetch,WebSearch \
+            --disallowedTools "Bash,Edit,Write,WebFetch,WebSearch,Read(//proc/**)" \
             --output-format json > revision.json
           # Read no está restringido por ruta: si una injection le hace volcar el secret, el reporte no sale del job.
           grep -qF "$ANTHROPIC_API_KEY" revision.json && { rm -f revision.*; echo "BLOQUEA: el reporte contiene el secret" >&2; exit 1; }
