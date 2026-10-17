@@ -1,6 +1,6 @@
 # Spec 012 — Seguridad: sesión, límites, PII en logs, cabeceras y revisión
 
-**Slice:** 012 · **Rama:** `feature/012-seguridad` · **Tiempo:** domingo PM (PRD §9, item 12: "cierre dom PM"; ≈ 6 h 30 completa, ≈ 5 h 10 con los cortes 1–4)
+**Slice:** 012 · **Rama:** `feature/012-seguridad` · **Tiempo:** domingo PM (PRD §9, item 12: "cierre dom PM"; ≈ 6 h 35 completa, ≈ 5 h 15 con los cortes 1–4)
 **Depende de:** 001 (CI, `verificar_entorno`, Caddy, `check_imagen`), 005 (auth, `api/cliente.ts`, rutas de búsqueda), 007 (`RUTAS_PUBLICAS`, `API_BASE_URL`), 008 (`calificaciones.exportado_en`, `/calificaciones/importar`), 009 (`/webhooks/whatsapp`, opt-in). 010 y 011 si entraron: sus rutas se suman a los límites. **Desbloquea:** 013.
 
 > La 012 no agrega producto: cierra lo que la constitución (principios V y VI) exige y el 001 y la 005 dejaron abierto. El texto de la constitución **no cambia**: el principio V ya pide CodeQL, required checks y revisión `security` por PR. Lo que falta es implementarlos y probarlos. Cada medida nace con un test que hoy falla.
@@ -149,7 +149,7 @@ Sin evals nuevos: la 012 no suma componentes con LLM al producto. El job `revisi
   - Un job nuevo que no se suma a la lista, una lista que nombra un job borrado o un `name:` que cambia hacen fallar el test.
 - `::test_constitucion_v_tiene_su_step`:
   - `dependabot.yml` tiene los 4 ecosistemas (uv, npm, github-actions, docker);
-  - `ci.yml` corre `pip-audit`, `npm audit --audit-level=high` y gitleaks;
+  - `ci.yml` corre `pip-audit`, `npm audit --audit-level=high` y gitleaks (repuesto por la 012, ver Decisiones técnicas). Nace rojo en `main`, porque el step no está;
   - `codeql.yml` analiza `python` y `javascript-typescript`;
   - `revision-seguridad` existe y corre solo en `pull_request`.
 - `::test_revision_seguridad_es_fail_closed`: el script de parseo del veredicto (`.github/scripts/veredicto_security.sh`) sale 0 solo con una línea exacta `Veredicto: PASA` o `Veredicto: PASA CON OBSERVACIONES`. Con `BLOQUEA`, sin línea, con salida vacía, con el veredicto dentro de un bloque de código o con dos líneas `Veredicto:` (aunque una diga `PASA`), sale ≠ 0.
@@ -173,7 +173,7 @@ Sin evals nuevos: la 012 no suma componentes con LLM al producto. El job `revisi
 
 ## Decisiones técnicas
 
-**Principio V, sin cambio de texto.** Ya pide CodeQL, required checks, secret scanning y revisión `security` por PR. El 001 implementó dependabot, `pip-audit`, `npm audit`, gitleaks y `verificar_entorno`. **No implementó CodeQL** (verificado: no hay `codeql.yml` en `.github/`), ni la lista de required checks con su test, ni la revisión `security` en CI. La 012 los agrega. No toca la constitución ni ninguna migración existente.
+**Principio V, sin cambio de texto.** Ya pide CodeQL, required checks, secret scanning y revisión `security` por PR. El 001 implementó dependabot, `pip-audit`, `npm audit` y `verificar_entorno`. Gitleaks también estaba, pero se quitó el 17-oct (`02c940d`, "ya lo cubre GitHub Advanced Security"), y la 012 lo repone (ver **Gitleaks**). **No implementó CodeQL** (verificado: no hay `codeql.yml` en `.github/`), ni la lista de required checks con su test, ni la revisión `security` en CI. La 012 los agrega. No toca la constitución ni ninguna migración existente.
 
 **Proxy same-origin en Caddy:**
 ```
@@ -237,6 +237,13 @@ Cross-Origin-Opener-Policy "same-origin"
 
 **CodeQL** (`.github/workflows/codeql.yml`): `github/codeql-action` pinneado por SHA, con la matriz `python` y `javascript-typescript`, en `pull_request` y `push` a `main`. El repo es **público** (verificado con `gh repo view`), así que CodeQL, secret scanning y push protection no necesitan GHAS pago.
 
+**Gitleaks, repuesto.** Se quitó el 17-oct (`02c940d`) bajo el supuesto de que GitHub secret scanning lo cubre, y no lo cubre. Secret scanning y push protection detectan **patrones de proveedores**: tokens de Anthropic, de GitHub, de Stripe. No detectan un `DATABASE_URL` con password de Supabase, un `SESSION_SECRET`, la clave de cifrado del contacto ni un HMAC de webhook, y esos son justo los secrets de este proyecto. El paso se repone igual que estaba antes de `02c940d`:
+- `GITLEAKS_VERSION` fija, con la descarga verificada por `sha256sum` contra el `checksums.txt` del release;
+- el rango del PR (`base..head`) o del push, y todo el historial en rama nueva;
+- `--redact` para que el log de CI no imprima el secret encontrado.
+
+Va en el job `seguridad`, que ya es required check. No se reemplaza por otra herramienta: es la que ya estaba probada.
+
 **`revision-seguridad`** (job nuevo en `ci.yml`, solo en `pull_request`):
 - Corre `claude -p` en modo headless, con la CLI pinneada a una versión exacta `# [VALIDAR]` la del día.
 - El prompt es el del agente `security` (`.claude/agents/security.md`) sobre `git diff ${BASE}..${HEAD}`.
@@ -261,7 +268,7 @@ Cross-Origin-Opener-Policy "same-origin"
 ## Plan de tareas (TDD, en orden)
 0. **Precondición:** 002–008 mergeadas a `main` (009–011 si llegaron). Sin código de back en `main`, los pasos 2–8 no tienen contra qué correr.
 1. **Revisión `security` sobre 002–008 (≈ 35 min):** el agente corre sobre `git diff <tag-001>..main` por slice y deja el reporte en `docs/seguridad/revision-002-008.md`. Un CRITICAL o HIGH se arregla acá, con su test rojo, o bloquea el cierre del slice. Va primero porque puede cambiar el resto del plan.
-2. **Config del repo (≈ 35 min):** rojo `test_required_checks.py` → `required-checks.txt`, `codeql.yml` y `veredicto_security.sh` con su test → job `revision-seguridad` → verde. El dueño corre `verificar_proteccion.sh` y configura la protección de `main` con esa lista.
+2. **Config del repo (≈ 40 min):** rojo `test_required_checks.py` → `required-checks.txt`, `codeql.yml`, el step de gitleaks repuesto y `veredicto_security.sh` con su test → job `revision-seguridad` → verde. El dueño corre `verificar_proteccion.sh` y configura la protección de `main` con esa lista.
 3. **PII transversal (≈ 40 min):** rojo `test_pii_en_logs.py` y `test_api_arranca_sin_access_log`. Con las rutas existentes deberían fallar al menos `::test_error_no_manejado_no_filtra_contacto` (no hay middleware) y `::test_422_no_devuelve_ni_loguea_el_input` (FastAPI devuelve `input`) → middleware de errores, handler de 422 y `--no-access-log` → verde. Si alguna ruta filtra, se arregla en su módulo.
 4. **Proxy same-origin y deploy (≈ 60 min).** Va antes que la sesión porque la cookie depende de él.
    - Rojo `check_cabeceras.sh` (sin `/api` ni cabeceras) y `test_check_cabeceras.sh` → Caddyfile con `handle_path`, cabeceras y `request_body` → verde.
@@ -291,4 +298,4 @@ Cross-Origin-Opener-Policy "same-origin"
 3. **`SESSION_SECRET_ANTERIOR`:** en el evento nadie rota el secret. Se van su test y su chequeo en `verificar_entorno`, y la doc dice que rotar corta las sesiones vivas.
 4. **Límites por tenant de `intake/*` y `calificaciones/importar`:** quedan login, `vista-previa` y `ejecutar`, que son los que gastan más.
 
-**Nunca se cortan:** la revisión `security` de 002–008 (paso 1), CodeQL y la lista de required checks con su test, el test de PII transversal con el middleware de errores, el rate limit del login con el semáforo de scrypt, el access fuera del storage, la CSP y la cookie `HttpOnly` con `SameSite=Strict`. La cookie es la única excepción posible: si falla la red privada de Railway, se cae con la degradación escrita en la 013 (ver Riesgos).
+**Nunca se cortan:** la revisión `security` de 002–008 (paso 1), CodeQL, gitleaks y la lista de required checks con su test, el test de PII transversal con el middleware de errores, el rate limit del login con el semáforo de scrypt, el access fuera del storage, la CSP y la cookie `HttpOnly` con `SameSite=Strict`. La cookie es la única excepción posible: si falla la red privada de Railway, se cae con la degradación escrita en la 013 (ver Riesgos).
