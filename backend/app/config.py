@@ -4,6 +4,7 @@ import json
 import os
 from urllib.parse import urlsplit
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings
 
 # sbp_: access token del CLI. `migrar` ya no lo usa (usa SUPABASE_DB_URL), pero en la api sigue prohibido.
@@ -13,6 +14,8 @@ ROLES_SUPABASE = {"anon", "service_role"}
 
 class Settings(BaseSettings):
     database_url: str
+    # SecretStr: no sale en repr ni en logs. Solo la CLI de búsqueda la usa.
+    croma_api_key: SecretStr | None = None
 
 
 class SecretProhibido(RuntimeError):
