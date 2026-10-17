@@ -53,12 +53,8 @@ Vale para este slice y para todos los siguientes que toquen UI. Cada uno la cump
 
 **Qué nace verde (y está bien):** el caso de 1280×800 en layout, la aserción de scroll sola en 360×640 y en 1280×800, la aserción de que hay al menos un elemento con texto visible, el chequeo de lima (hoy no hay color) y el canario. En 375×812 el scroll nace ROJO (981 > 980): sin meta viewport el layout de 980 px desborda un píxel. El test no lleva tolerancia. El rojo vive en el `clientWidth` móvil, en los estilos computados del `body` y en `marca.test.ts`. El canario es el que prueba que la aserción de scroll no es decorativa.
 
-## Cómo se corre el e2e local
-```bash
-cd frontend && npm run build && npx vite preview --port 4173 &
-E2E_BASE_URL=http://localhost:4173 npx playwright test e2e/marca-responsive.spec.ts
-```
-Solo ese archivo: `health.spec.ts` contra `vite preview` falla porque no hay API detrás. Sin API, la página muestra "API: error · DB: error": coincide con `/^API:/` y para medir el layout alcanza. En `e2e.yml`, el archivo nuevo corre también contra Railway, junto a `health.spec.ts`.
+## Dónde corre el e2e
+El e2e de esta spec corre en `e2e.yml` contra Railway, después del deploy, junto a `health.spec.ts`. No hay corrida local que cierre el criterio. `/^API:/` matchea también "API: error", así que el layout se mide aunque `/health` falle.
 
 ## Criterios de aceptación
 - [x] `frontend/src/tokens.css` existe, define en `:root` las seis variables y se importa en `main.tsx`.
