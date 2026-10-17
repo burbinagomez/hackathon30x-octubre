@@ -272,7 +272,7 @@ supabase/migrations/0002_descubrimiento.sql
 docs/arquitectura-backend.md
 ```
 
-**Structure Decision**: módulos hexagonales según el principio I. `descubrimiento` importa `costos/dominio` (el puerto), nunca `costos/infraestructura`; lo garantiza el contrato `forbidden`, y solo `app.cli` une las dos. `costos` no tiene `aplicacion/` todavía: T005 prueba primero la capa opcional `"(aplicacion)"` en el import-linter instalado (`>=2.15` en `uv.lock`); si no anda, el respaldo es `costos/aplicacion/__init__.py` vacío hasta el 005. Este párrafo se corrige en T005 con lo que salga.
+**Structure Decision**: módulos hexagonales según el principio I. `descubrimiento` importa `costos/dominio` (el puerto), nunca `costos/infraestructura`; lo garantiza el contrato `forbidden`, y solo `app.cli` une las dos. `costos` no tiene `aplicacion/` todavía: el contrato `layers` la declara como capa opcional `"(aplicacion)"`, verificado en T005 con el import-linter instalado. No hace falta un paquete vacío.
 
 ## Orden de tareas
 
