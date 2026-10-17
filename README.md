@@ -51,6 +51,9 @@ cd ../frontend && npm test
 ```
 Los tests de integración fallan, no se saltan, si falta alguna de las dos URLs. Más detalle en [`specs/001-walking-skeleton/quickstart.md`](specs/001-walking-skeleton/quickstart.md).
 
+### CI y required checks
+Los checks que `main` exige están en [`.github/required-checks.txt`](.github/required-checks.txt), y `tests/arquitectura/test_required_checks.py` falla si la lista y los workflows se desalinean. CodeQL corre en `.github/workflows/codeql.yml`, así que el default setup de code scanning tiene que estar apagado. `revision-seguridad` corre el agente `security` sobre el diff del PR con el secret `ANTHROPIC_API_KEY`, y bloquea salvo `Veredicto: PASA` o `Veredicto: PASA CON OBSERVACIONES` (`.github/scripts/veredicto_security.sh`).
+
 ## Fuentes y licencias
 Datos de **OpenStreetMap** © colaboradores de OSM, licencia [ODbL](https://opendatacommons.org/licenses/odbl/). Registros de gobierno multi-país vía [Croma](https://usecroma.com/) (Supersociedades, DIAN, RUES, SIEM, SUNAT; datos públicos, no redistribuidos). Datos del **Registro Mercantil** vía Confecámaras / [datos.gov.co](https://www.datos.gov.co/) (dataset `nb3d-v3n7`), licencia [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Las bases derivadas publicadas por este proyecto se comparten bajo las mismas licencias.
 
