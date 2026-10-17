@@ -147,7 +147,7 @@ class RegistroCostos(Protocol):
   - Habilitadas sin clave en el catálogo: van a `Registro.sin_implementacion` (con el catálogo de T031, `{"croma_dian_trade_co", "osm_overpass"}`; antes, con el catálogo vacío, las tres habilitadas); no rompen.
   - Clave del catálogo ausente del YAML: `RegistroInvalido`.
 - `catalogo = {"croma_supersociedades_co": CromaSupersociedades}` desde T031 (hasta ahí, `{}`) en `descubrimiento/infraestructura/adaptadores/__init__.py`. Es el único lugar que nombra clases concretas.
-- La raíz de composición es `app/cli.py`, con `main(argv=None, *, catalogo=catalogo, persistencia=None)`: los tests inyectan una fuente falsa por `catalogo` y repositorios en memoria por `persistencia`. Los defaults son el catálogo real y Postgres, y ningún falso vive en `app/`. Lee `fuentes.yaml` (registro y `limites`) y, desde T047, `tarifas.yaml` (cada tarifa como `Decimal(str(v))`, nunca `float`). Construye cada adaptador con `meta`, `RegistroCostos`, transporte `httpx`, caché, tarifa resuelta, límites, API key y `lote_id`, y le pasa a `EjecutarBusqueda` instancias ya armadas.
+- La raíz de composición es `app/cli.py`, con `main(argv=None, *, catalogo=catalogo, persistencia=None)`: los tests inyectan una fuente falsa por `catalogo` y repositorios en memoria por `persistencia`. Los defaults son el catálogo real y Postgres, y ningún falso vive en `app/`. Lee `fuentes.yaml` (registro y `limites`) y, desde T047, `tarifas.yaml` (cada tarifa como `Decimal(str(v))`, nunca `float`). Construye cada adaptador con `meta`, `RegistroCostos`, transporte `httpx`, caché, tarifa resuelta, límites, API key y `lote_id`, y le pasa a `EjecutarBusqueda` **fábricas** `clave → (lote_id) -> fuente`. El caso de uso las llama con el `busqueda_id` después de `crear_busqueda` (T038).
 - Conectar o desconectar una fuente: `habilitado: true/false` en el YAML. Sumar una fuente: clase + clave en el catálogo + entrada en el YAML + fábrica en la suite de contrato.
 
 ## Suite de contrato
@@ -283,7 +283,7 @@ Pasos 1, 2, 3, 4, 7, 8, bloque Croma (paso 5 + T035 + T046-T047 + T042), 6 y 9, 
 Todas resueltas por el dueño con el default del plan, salvo donde se indica.
 
 1. **Transacción de `costos`.** `postgres_costos.registrar` abre su propia transacción corta; lo mismo el upsert de `fuente_cache`. `crear_busqueda` también se confirma antes de llamar adaptadores. El HTTP nunca corre dentro de una transacción.
-2. **`lote_id` y cómo llega al adaptador.** `lote_id = busqueda_id`, pasado al constructor; la CLI arma los adaptadores por búsqueda.
+2. **`lote_id` y cómo llega al adaptador.** `lote_id = busqueda_id`, pasado al constructor. La raíz de composición entrega fábricas y `EjecutarBusqueda` las llama con el `busqueda_id`, así lo garantiza el caso de uso y no cada raíz (T038).
 3. **Quién lee `limites`.** La CLI, y se los pasa al constructor; `cargar_registro` no cambia.
 4. **Límite entre intentos.** Se chequea antes de cada intento. Con 99 previas, un 502 deja 100 y sale `LimiteFuenteAgotado`; la fila del 502 queda escrita, con su test.
 5. **4xx.** *Cambiado por el dueño:* un 429 lanza `LimiteFuenteAgotado` sin reintento. Otro 4xx: sin reintento, fila con `unidades=0` y `costo_unitario=0`, y `FuenteNoDisponible`. Se verifica en la corrida real.

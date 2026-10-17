@@ -103,7 +103,8 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
 - `::test_mismo_nit_distinto_pais_son_dos_leads`.
 - `::test_lead_existente_en_segunda_busqueda_no_duplica_cumplimiento`: dos búsquedas con el mismo NIT dan 1 lead, 1 `cumplimiento` y 2 `lead_fuentes` (una por `busqueda_id`).
 - `::test_cada_lead_nuevo_tiene_fila_en_cumplimiento`: con fuente, licencia y `as_of`.
-- `::test_sin_fuente_para_el_pais_se_reporta`: un ICP con `pais=BR`, con una fuente falsa que solo cubre `CO`, devuelve `sin_fuente_para("BR", …)` y 0 leads.
+- `::test_sin_fuente_para_el_pais_se_reporta`: un ICP con `pais=BR`, con una fuente falsa que solo cubre `CO`, devuelve `sin_fuente_para("BR", …)` y 0 leads, y la búsqueda cierra `terminada`.
+- `::test_cada_fuente_se_arma_con_lote_id_igual_a_busqueda_id`: el caso de uso llama a cada fábrica de fuente con el `busqueda_id` de `crear_busqueda`, y toda fila de `costos` de la corrida lleva `lote_id == busqueda_id`. El CPL de la 005 depende de eso.
 - `::test_error_de_fuente_se_reporta_y_busqueda_queda_con_errores`: una fuente que lanza `LimiteFuenteAgotado` o `FuenteNoDisponible` aparece en el resultado con su error, sin tragarlo, y la búsqueda cierra `con_errores`.
 
 **CLI** (`backend/tests/unit/test_cli.py`)
@@ -234,7 +235,7 @@ Se ejecutan en el orden 1, 2, 3, 4, 7, 8, 5, 6, 9, el que fijó el dueño, detal
    - después, `test_costos_repo.py`, y `test_tarifa_croma_es_decimal_exacto` sobre el CLI ya hecho (T046-T047);
    - el **advisor revisa los tests de costos**.
 6. **Suite de contrato** (con `test_hay_fabrica_para_cada_clave_del_catalogo`) + `test_todo_adaptador_de_registro_esta_declarado`, `test_persistencia_solo_contiene_excluidos_y_no_importa_http` y `test_todo_adaptador_de_registro_recibe_registro_costos`: rojo → verde.
-7. **`EjecutarBusqueda`:** los 8 tests del caso de uso en rojo → verde. El **advisor revisa los tests de dedup**.
+7. **`EjecutarBusqueda`:** los 9 tests del caso de uso en rojo → verde. El **advisor revisa los tests de dedup**.
 8. **CLI `app.cli buscar`, sin adaptadores:** los 4 de `test_cli.py` en rojo → verde (el de tarifa va con el paso 5). La corrida real contra Croma pasa al final del paso 5 (T042): **una** corrida: 1 request, avisada antes, anotando los créditos, la forma real de la respuesta y si Croma cobra los 5xx (lo dice su doc o el saldo antes y después). Si la forma difiere de la fixture, se corrige la fixture y se vuelve al paso 5.
 9. **`docs/arquitectura-backend.md`:** módulo, puerto, registro y cómo agregar un adaptador. Si el tiempo aprieta, es lo primero que se recorta (queda en un párrafo).
 
