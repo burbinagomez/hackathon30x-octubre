@@ -141,9 +141,9 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
 
 | Tabla | Columnas | Restricciones |
 |---|---|---|
-| `tenants` | `id`, `nombre`, `creado_en` | Se siembra con el tenant del evento, por script. |
+| `tenants` | `id`, `nombre`, `idioma`, `creado_en` | Se siembra con el tenant del evento, por script. `idioma` NOT NULL DEFAULT `'es'`, CHECK `IN ('es','en')`: idioma de UI por defecto del tenant (lo usa el 005). |
 | `busquedas` | `pais`, `criterios jsonb`, `estado`, `canal_preferido`, `tope_gasto_usd`, `mensaje_base` | — |
-| `leads` | `pais`, `id_fiscal`, `nombre`, `tipo_titular`, `ciudad`, `direccion`, `actividad_codigo`, `actividad_sistema`, `web` | `id_fiscal` nullable (por OSM). `tipo_titular` ∈ `juridica`/`natural`/`desconocido`, NOT NULL, default `desconocido`. UNIQUE `(tenant_id, pais, id_fiscal)`. |
+| `leads` | `pais`, `id_fiscal`, `nombre`, `tipo_titular`, `ciudad`, `direccion`, `actividad_codigo`, `actividad_sistema`, `web`, `idioma_contacto` | `id_fiscal` nullable (por OSM). `tipo_titular` ∈ `juridica`/`natural`/`desconocido`, NOT NULL, default `desconocido`. UNIQUE `(tenant_id, pais, id_fiscal)`. `idioma_contacto` es `GENERATED ALWAYS AS (CASE pais WHEN 'CO' THEN 'es' WHEN 'MX' THEN 'es' WHEN 'PE' THEN 'es' WHEN 'BR' THEN 'pt' END) STORED`: el idioma del mensaje sale del país, nunca de la UI, y lo fija la base, no la app. `'pt'` es un dato, no una traducción: sin plantilla pt, el 007 lo marca `sin_plantilla_idioma`. Un país nuevo sin rama da `NULL`, que pasa a lo mismo. |
 | `lead_fuentes` | `lead_id`, `busqueda_id`, `fuente`, `encontrado_en`, `url_origen`, `licencia` | UNIQUE `(lead_id, fuente, busqueda_id)`. |
 | `cumplimiento` | `lead_id`, `fuente`, `licencia`, `url_origen`, `base_legal`, `as_of`, `opt_out_at`, `solicitudes jsonb` | `lead_id` UNIQUE. `base_legal` nullable hasta el 007 (la setea `AprobarMensaje`). |
 | `costos` | las columnas de `OperacionCosto` + `gratis` | `gratis bool NOT NULL`. |

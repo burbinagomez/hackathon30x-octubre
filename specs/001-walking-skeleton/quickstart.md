@@ -9,6 +9,7 @@ docker run -d --name pg001 -e POSTGRES_HOST_AUTH_METHOD=trust -p 5432:5432 postg
 psql postgresql://postgres@localhost:5432/postgres -f backend/scripts/roles.sql
 export TEST_DATABASE_URL=postgresql+psycopg://app_rt@localhost:5432/postgres
 export TEST_MIGRATION_DATABASE_URL=postgresql+psycopg://app_mig@localhost:5432/postgres
+export TEST_ADMIN_DATABASE_URL=postgresql+psycopg://postgres@localhost:5432/postgres  # solo tests: crea el esquema `ajeno` de test_drift_mira_solo_public_aunque_cambie_search_path
 
 cd backend && uv sync && uv run pytest -q && uv run lint-imports
 cd ../frontend && npm ci && npm test
@@ -38,8 +39,8 @@ El host exacto del pooler sale de **Connect** en el dashboard.
 
 ## Desplegado
 ```bash
-curl -s https://<api>.up.railway.app/health        # {"status":"ok","db":"ok"}
-gh workflow run e2e.yml -f base_url=https://<web>.up.railway.app
+curl -s https://api-production-92dc.up.railway.app/health        # {"status":"ok","db":"ok"}
+gh workflow run e2e.yml -f base_url=https://web-production-ce4537.up.railway.app
 ```
 **Esperado:** la página muestra `API: ok · DB: ok`.
 
@@ -47,4 +48,4 @@ gh workflow run e2e.yml -f base_url=https://<web>.up.railway.app
 - Setear `MIGRATION_DATABASE_URL` o cualquier key de Supabase en `api` hace que el deploy falle al arrancar.
 - `railway variables --service web` muestra solo `VITE_API_URL` (más las `RAILWAY_*` del sistema). Es manual: no hay token de Railway en CI.
 - `curl https://<ref>.supabase.co/rest/v1/` con la publishable key no lista nada de `public`.
-- `gh api repos/:owner/:repo/branches/main/protection` lista `back`, `front`, `seguridad` y `evals` como required.
+- `gh api repos/:owner/:repo/branches/main/protection` lista `back`, `front`, `seguridad`, `evals` e `imagenes` como required.

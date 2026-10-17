@@ -44,7 +44,7 @@
 Ninguno: este slice no usa IA. La medición es el test de fórmulas, con números calculados a mano (abajo). El slice separa el costo de evals del 004 para que no ensucie el CPL: `fuente='evals'` va a `v_costo_evals` y a ninguna otra vista.
 
 ## Flujo principal
-1. **Login:** `POST /auth/sesion {email, clave}` devuelve un JWT con `sub`, `tenant_id` y `exp` (8 h). El front lo guarda en `sessionStorage` y lo manda como `Authorization: Bearer`.
+1. **Login:** `POST /auth/sesion {email, clave}` devuelve un JWT con `sub`, `tenant_id` y `exp` (8 h), y, en el body junto al token (no como claim), `idioma_usuario` (la elección guardada, o `null`) e `idioma_tenant`. El front guarda los tres en `sessionStorage` y lo manda como `Authorization: Bearer`.
 2. **Formulario "Nueva búsqueda" (puerta C):**
    - filtros: país · actividad (CIIU) · departamento o ciudad · tamaño (`ingresos_min`) · palabras clave · exclusiones;
    - formulario común: canal preferido · tope de gasto (USD) · mensaje base.
@@ -133,7 +133,8 @@ Costo por canal: email 0.05, whatsapp 0.30. Costo de evals: 1.00.
   - `::test_app_rt_no_lee_usuarios_directo`: un `SELECT`, INSERT, UPDATE o DELETE de `app_rt` sobre `usuarios` falla por privilegios;
   - `::test_usuario_para_login_devuelve_solo_ese_email`: con usuarios de 2 tenants, `usuario_para_login('a@x.co')` devuelve 1 fila (`id`, `tenant_id`, `hash_clave`), `usuario_para_login('A@X.co')` devuelve la misma fila y un email inexistente devuelve 0;
   - `::test_email_se_guarda_en_minusculas`: con `app_mig` (no `app_rt`, que no tiene `INSERT` sobre `usuarios` y fallaría por privilegios sin probar nada), un `INSERT` con `email='A@X.co'` falla con sqlstate `23514` (violación de `CHECK`);
-  - `::test_usuario_para_login_es_security_definer_con_search_path`: en `pg_proc`, `prosecdef = true`, `proconfig` contiene `search_path=` y `has_function_privilege` da `app_rt` sí y `anon`/`authenticated` no. Para que no nazca verde por la razón equivocada, `supabase_simulado.sql` (002) suma `ALTER DEFAULT PRIVILEGES FOR ROLE app_mig IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, authenticated`, que es lo que hace Supabase real. Sin el `REVOKE` de la 0004, el test falla.
+  - `::test_fijar_idioma_no_cruza_tenants`: con `app.tenant_id` de B, `fijar_idioma(<id de A>, 'en')` modifica 0 filas y el `idioma` de A no cambia;
+  - `::test_funcion_es_security_definer_con_search_path[usuario_para_login|fijar_idioma]`: en `pg_proc`, `prosecdef = true`, `proconfig` contiene `search_path=` y `has_function_privilege` da `app_rt` sí y `anon`/`authenticated` no. Para que no nazca verde por la razón equivocada, `supabase_simulado.sql` (002) suma `ALTER DEFAULT PRIVILEGES FOR ROLE app_mig IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, authenticated`, que es lo que hace Supabase real. Sin el `REVOKE` de la 0004, el test falla.
 
 **Libro y lote** (`backend/tests/integration/test_costos_repo.py`)
 - `::test_gasto_busqueda_suma_lista_del_lote`: con filas `gratis` true y false en el lote, y filas de otro lote, `gasto_busqueda` da la Σ a valor de lista solo de su lote.
@@ -187,7 +188,10 @@ Costo por canal: email 0.05, whatsapp 0.30. Costo de evals: 1.00.
   - `::test_app_no_arranca_sin_session_secret` (también con uno de menos de 32 bytes);
   - `::test_docs_desactivadas`: `/docs`, `/redoc` y `/openapi.json` dan 404;
   - `::test_cors_solo_permite_web_origin`: un preflight desde `WEB_ORIGIN` recibe `Access-Control-Allow-Origin` con ese valor, y uno desde `https://otro.example` no recibe el header;
-  - `::test_clave_no_aparece_en_logs` (`caplog` durante un login fallido y uno exitoso).
+  - `::test_clave_no_aparece_en_logs` (`caplog` durante un login fallido y uno exitoso);
+  - `::test_sesion_devuelve_idioma[caso]`: con `usuarios.idioma='en'` y tenant `es`, devuelve `idioma_usuario='en'` e `idioma_tenant='es'`; con `usuarios.idioma` NULL, `idioma_usuario` es `null`;
+  - `::test_fijar_idioma_persiste`: `PATCH /usuarios/me {idioma: 'en'}` da 204, y el login siguiente devuelve `idioma_usuario='en'`;
+  - `::test_fijar_idioma_invalido_da_422[caso]`: `idioma` `'pt'` o `''`, y un body con `usuario_id` o `tenant_id` (`extra='forbid'`). El usuario sale del `sub` del token, nunca del body. El 401 sin token lo cubre `test_sin_token_da_401[ruta]`, que levanta la ruta nueva sola.
 - `test_api_busquedas.py`:
   - `::test_tenant_sale_del_token_no_del_body`: un body con `tenant_id` da 422 (`extra='forbid'`), y la búsqueda creada sin ese campo tiene el tenant del token;
   - `::test_tenant_b_no_ejecuta_busqueda_de_a`: B ejecuta el `id` de A y recibe 404, y la búsqueda de A no cambia;
@@ -195,6 +199,8 @@ Costo por canal: email 0.05, whatsapp 0.30. Costo de evals: 1.00.
   - `::test_ejecutar_con_costo_maximo_sobre_tope_da_409`: el borrador queda en `borrador` y no hay filas nuevas en `costos`;
   - `::test_validacion[caso]` → 422 con: `ciiu` que no tiene 4 dígitos, país fuera del enum, `tope_gasto_usd` ≤ 0 o > `TOPE_MAXIMO_USD`, `mensaje_base` > 1000 caracteres, más de 10 palabras clave o alguna de más de 40 caracteres, y `canal_preferido` deshabilitado en el registro;
   - `::test_tablero_devuelve_null_para_cpl_sin_divisor`;
+  - `::test_vista_previa_devuelve_motivos_como_codigo`: los motivos de fuente descartada y los errores de validación son códigos (`sin_mapeo_actividad`, nombre de la regla), nunca una frase;
+  - `::test_actividades_trae_ambos_nombres`: `GET /actividades` devuelve `codigo`, `nombre_es` y `nombre_en` (que puede ser `null`) de cada entrada de `config/actividades.yaml`;
   - `::test_tablero_atribucion_solo_de_fuentes_presentes[caso]`: siembra `lead_fuentes` directo con `app_mig` (no hace falta el adaptador de la 011) y compara `atribuciones` exacto y en orden, cada elemento `{fuente, texto, url}`:
     - `solo_osm` → solo `osm_overpass`, "© OpenStreetMap contributors", `https://www.openstreetmap.org/copyright`;
     - `osm_y_datos_gov` → `osm_overpass` y `datos_gov_co_rues`, "Datos: Confecámaras vía datos.gov.co (CC BY-SA 4.0)", `https://creativecommons.org/licenses/by-sa/4.0/`;
@@ -228,13 +234,28 @@ Costo por canal: email 0.05, whatsapp 0.30. Costo de evals: 1.00.
 
 Corre en el job de front de CI como parte de `npm test`, sin step aparte.
 
+**Idiomas del front** (`frontend/tests/arquitectura/i18n.test.ts`, con `// @vitest-environment node`, el mismo patrón que `limites.test.ts`):
+- `::es_y_en_tienen_las_mismas_claves`: las claves aplanadas (`a.b.c`) de `src/i18n/es.json` y `en.json` son el mismo conjunto, y ningún valor es `""`. El mensaje de falla lista las claves que faltan de cada lado. Un assert previo exige al menos las claves `motivos.sin_mapeo_actividad` y `acceso.ingresar`, para que dos archivos vacíos no pasen.
+- `::detecta_texto_literal_en_jsx`: el canario. En el mismo tmp que `limites.test.ts`, `src/busqueda/Literal.tsx` con `<p>Hola</p>` da al menos un error con `ruleId === 'i18next/no-literal-string'`, con la config real (`overrideConfigFile`).
+- `::detecta_texto_literal_en_atributo`: segundo canario, `<input placeholder="Buscar" />` da al menos un error de esa regla. `# [VALIDAR]` que `jsx-only` lo atrape; si no, se configura `jsx-attributes` hasta que el canario dé rojo con el texto y verde con `t(...)`.
+- `::permite_texto_traducido`: el control positivo. `src/busqueda/Traducido.tsx` con `<p>{t('acceso.ingresar')}</p>` da 0 errores de esa regla.
+- `frontend/src/i18n/elegirIdioma.test.ts::precedencia[caso]`, puro, sobre `elegirIdioma(languages, idiomaUsuario, idiomaTenant)`:
+  - `['es-CO']`, elección guardada `en`, tenant `es` → `en`. La elección gana sobre el navegador y el tenant: este caso fija el orden;
+  - `['es-CO']`, sin elección, tenant `en` → `es`. El navegador gana sobre el tenant;
+  - `['fr']`, sin elección, tenant `en` → `en`. Sin navegador útil, vale el tenant;
+  - `['fr']`, sin nada → `es`;
+  - `['pt-BR', 'en-US']`, sin nada → `en`: corta el código regional y toma el primero que está en `{es, en}`.
+- El repo real queda cubierto por `limites.test.ts::el_repo_no_tiene_violaciones`, que ya lintea `src/` con la config real: un literal en un componente lo pone en rojo.
+
 **Front** (Vitest + Testing Library, con la API mockeada)
 - `frontend/src/busqueda/NuevaBusqueda.test.tsx`:
   - `::muestra_conteo_y_motivo_por_fuente`;
   - `::aclara_que_el_conteo_es_antes_de_palabras_clave`;
   - `::buscar_deshabilitado_si_costo_maximo_supera_tope`: muestra el estimado y el máximo, y explica que se compara el máximo;
   - `::buscar_deshabilitado_si_ninguna_fuente_cubre`;
-  - `::cambiar_un_filtro_invalida_la_vista_previa`: Buscar queda deshabilitado hasta una nueva vista previa.
+  - `::cambiar_un_filtro_invalida_la_vista_previa`: Buscar queda deshabilitado hasta una nueva vista previa;
+  - `::cambia_idioma`: con `vi.spyOn(navigator, 'languages', 'get')` devolviendo `['es-CO']` (jsdom trae `['en-US']`) y la sesión con `idioma_usuario: null` e `idioma_tenant: 'es'`, arranca en es. Elegir English en el selector manda un solo `PATCH /usuarios/me` con body exacto `{idioma: 'en'}`, sin `usuario_id` ni `tenant_id`. El handler de MSW lo captura, y el test lo espera con `waitFor`. Además cambia las etiquetas al texto de `en.json`, el motivo `sin_mapeo_actividad` que vino como código, y el tope, que sale de `Intl.NumberFormat('en', {style: 'currency', currency: 'USD'})` (el test calcula lo esperado con `Intl`, no lo escribe a mano). La actividad muestra `nombre_en`, y la que tiene `nombre_en: null` muestra `nombre_es`. Al final, desmontar y `await i18n.changeLanguage('es')`: `i18next` es un singleton y sin eso seguiría en `en` por inercia, simulando una carga en frío. Después volver a montar la app con el mismo `sessionStorage` y el navegador todavía en `es-CO`: sigue en en. Eso prueba que la elección se guardó y que la app la lee al arrancar.
+  - `Login.test.tsx::selector_sin_sesion_no_guarda`: en `/login`, elegir English cambia las etiquetas y no dispara ningún `PATCH`.
 - `frontend/src/tablero/Tablero.test.tsx`:
   - `::cpl_null_se_muestra_sin_dato`: nunca `0` ni `∞`;
   - `::muestra_costo_lista_y_real`;
@@ -268,6 +289,7 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
 - Alta de usuarios por UI (va por script), roles y más de un usuario por tenant con permisos distintos.
 - Monedas que no sean USD.
 - Ejecución en background con polling (ver Decisiones técnicas).
+- **Idiomas:** traducir la API (devuelve códigos), traducir los docs y portugués.
 
 ## Decisiones técnicas
 
@@ -339,14 +361,15 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
 - `# ponytail:` solo mira el nombre. Si hace falta mirar la actividad o la web, se agrega cuando haya un caso real.
 
 **Auth:**
-- **`usuarios`** (`id`, `email` UNIQUE con `CHECK (email = lower(email))`, `hash_clave`, `tenant_id` FK, `creado_en`) tiene **RLS por `tenant_id`**, como toda tabla con datos de un tenant (constitución III).
+- **`usuarios`** (`id`, `email` UNIQUE con `CHECK (email = lower(email))`, `hash_clave`, `tenant_id` FK, `idioma` NULL con `CHECK IN ('es','en')`, `creado_en`) tiene **RLS por `tenant_id`**, como toda tabla con datos de un tenant (constitución III).
   - `app_rt` no tiene ningún privilegio sobre la tabla.
   - El login, que ocurre antes de conocer el tenant, entra por la función `usuario_para_login(email text)`:
     - `SECURITY DEFINER`, con dueño `app_mig`;
     - `SET search_path = public, pg_temp`;
-    - compara contra `lower(email)` y devuelve `id`, `tenant_id` y `hash_clave` de **ese** email y nada más (`crear_usuario.py` también guarda `lower()`);
+    - compara contra `lower(email)` y devuelve `id`, `tenant_id`, `hash_clave`, `usuarios.idioma` y `tenants.idioma` (por separado: el front necesita saber si hubo elección) de **ese** email y nada más (`crear_usuario.py` también guarda `lower()`, y acepta `--idioma es|en` opcional);
     - `REVOKE EXECUTE … FROM PUBLIC, anon, authenticated` (Postgres da `EXECUTE` a `PUBLIC` por defecto y Supabase a `anon`/`authenticated`; la 0004 trae su propio `DO` con el mismo guard de `pg_roles` del 002, para no fallar en vanilla; no toca la 0002, que ya está aplicada) y `GRANT EXECUTE` solo a `app_rt`.
   - Así un `SELECT` de `app_rt` no puede volcar los hashes de todos los tenants.
+  - La elección del selector entra por `fijar_idioma(p_usuario uuid, p_idioma text)`, con el mismo patrón (`SECURITY DEFINER`, `search_path`, `REVOKE`/`GRANT` solo a `app_rt`). Hace `UPDATE usuarios SET idioma = p_idioma WHERE id = p_usuario AND tenant_id = current_setting('app.tenant_id')::uuid`. El filtro por tenant va escrito porque el dueño `app_mig` no pasa por RLS. Así `app_rt` sigue sin ningún privilegio sobre la tabla. `PATCH /usuarios/me` la llama con el `sub` del token.
   - Se siembra con `app_mig` desde `backend/scripts/crear_usuario.py`, que lee la clave por `getpass` (nunca por argv, para que no quede en el historial).
 - **Clave:** `hashlib.scrypt` (n=2¹⁷, r=8, p=1, sal de 16 bytes, `maxmem=2²⁸`, porque con n=2¹⁷ el default de `maxmem` no alcanza) y `hmac.compare_digest`. El n es el mínimo de OWASP. Son ~128 MiB por login, y `security` lo confirma contra la memoria del servicio en Railway. Ante un email inexistente se calcula igual un scrypt de relleno, para no filtrar qué emails existen por timing.
 - **JWT:** HS256 con **PyJWT** (dependencia nueva), `algorithms=["HS256"]` explícito (rechaza `alg=none`) y `options={"require": ["exp", "sub", "tenant_id"]}`, porque PyJWT no exige `exp` si el token no lo trae. Razón: firmar y verificar a mano es justo donde se cuelan los bugs de verificación.
@@ -379,8 +402,9 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
 | `busquedas` | `+ costo_estimado_usd numeric`, `+ costo_maximo_usd numeric`, `+ ejecutada_en`, `CHECK` de `estado` |
 | `leads` | `+ fusionado_en uuid NULL REFERENCES leads(id)` |
 | `revision_dedup` | `+ motivo text NULL` |
-| `usuarios` | nueva, con RLS (arriba) |
-| `usuario_para_login(text)` | función `SECURITY DEFINER` (arriba) |
+| `usuarios` | nueva, con RLS e `idioma` (arriba) |
+| `usuario_para_login(text)` | función `SECURITY DEFINER` (arriba), devuelve también los dos idiomas |
+| `fijar_idioma(uuid, text)` | función `SECURITY DEFINER` (arriba) |
 | `costos` | índice `(tenant_id, lote_id)` |
 | `lead_fuentes` | índice `(busqueda_id, fuente)` |
 | vistas | las 9 de arriba, `security_invoker` |
@@ -422,15 +446,32 @@ Los `ALTER DEFAULT PRIVILEGES … ON TABLES` del 002 ya cubren las vistas nuevas
     |---|---|---|
     | `app` | `src/main.tsx`, `src/App.tsx` (`mode: 'file'`) | todas las features, `compartido`, `api` |
     | `api` | `src/api` | nada |
-    | `compartido` | `src/compartido` | `compartido`, `api` |
-    | `test` | `src/test` | `compartido`, `api` |
-    | `feature` | `src/*`, capturando el nombre | la misma feature, `compartido`, `api` |
+    | `i18n` | `src/i18n` | nada |
+    | `compartido` | `src/compartido` | `compartido`, `api`, `i18n` |
+    | `test` | `src/test` | `compartido`, `api`, `i18n` |
+    | `feature` | `src/*`, capturando el nombre | la misma feature, `compartido`, `api`, `i18n` |
 
-    Nadie importa `app`. Sin el tipo `app` primero, `src/App.tsx` caería en `feature` como una feature llamada `App.tsx`.
+    Nadie importa `app`. Sin el tipo `app` primero, `src/App.tsx` caería en `feature` como una feature llamada `App.tsx`. Lo mismo con `i18n`: sin su tipo, `src/i18n` sería una feature y toda feature que traduce violaría la regla. `app` también importa `i18n`.
   - corre con `eslint-import-resolver-typescript`, porque boundaries **ignora en silencio** los imports que no resuelve, y un `.tsx` sin resolver dejaría el canario verde por la razón equivocada. `import/no-unresolved` en `error` convierte ese silencio en error.
   - Si el 001 no dejó ESLint instalado, entran como devDependencies `eslint`, `typescript-eslint`, `eslint-plugin-boundaries`, `eslint-plugin-import` y el resolver.
   - La regla se sigue en el mismo sentido que el `layers` de import-linter en el back (002).
 - `vitest.config.ts` incluye `src/**` y `tests/**`, y excluye `e2e/`, para que Vitest no levante los specs de Playwright.
+
+**Idiomas** (es y en desde el primer componente):
+- **`react-i18next`** + `i18next` (dependencias nuevas). `src/i18n/index.ts` inicializa con `resources` de `src/i18n/es.json` y `en.json`, importados estáticamente: sin backend HTTP ni carga perezosa, son dos archivos chicos. `fallbackLng: 'es'`.
+- **Idioma de la UI:** el primero que exista de:
+  1. `usuarios.idioma`, la elección explícita (`idioma_usuario` del login);
+  2. `navigator.languages` cortado al código base (`en-US` → `en`), el primero que esté en `{es, en}`;
+  3. `tenants.idioma` (`idioma_tenant` del login);
+  4. `es`.
+
+  En la pantalla de login todavía no hay usuario ni tenant: valen 2 y 4. La elige `elegirIdioma(languages, idiomaUsuario, idiomaTenant)` en `src/i18n/elegirIdioma.ts`, pura.
+- **Selector** (`compartido/SelectorIdioma.tsx`, lo usan `acceso/` y el layout): llama a `i18n.changeLanguage` y, si hay sesión, a `PATCH /usuarios/me {idioma}`, y actualiza `idioma_usuario` en `sessionStorage`. En la pantalla de login solo cambia la pestaña: no hay usuario a quien guardárselo. `# ponytail:` si el `PATCH` falla, la UI queda en el idioma elegido y el próximo login vuelve al guardado; sin reintento ni aviso.
+- **La API devuelve códigos, no texto:** motivos (`sin_mapeo_actividad`), estados y errores de validación (el nombre de la regla, no `msg`). El front traduce con `t('motivos.' + codigo)`. Un código sin clave se ve como la clave cruda, nunca como un hueco: el test de paridad atrapa la falta en un idioma, y la falta en los dos se ve en pantalla.
+- **Fechas y montos:** `Intl.DateTimeFormat(i18n.language)` y `Intl.NumberFormat(i18n.language, {style: 'currency', currency: 'USD'})`, en una función de `compartido/formato.ts`. Sin librería de fechas.
+- **Catálogo de actividades:** es el `config/actividades.yaml` del 003, que ya mapea CIIU → OSM; no se crea otra tabla. Cada entrada suma `nombre_es` (CIIU Rev. 4 A.C., DANE; reemplaza a `descripcion`) y `nombre_en` (ISIC Rev. 4, ONU), que puede faltar. `GET /actividades` devuelve `codigo`, `nombre_es` y `nombre_en` (o `null`): es dato de catálogo, no texto de la API. El front muestra el del idioma activo y, si falta, cae a `nombre_es`.
+- **Literales en JSX:** `eslint-plugin-i18next` (devDependency nueva), regla `i18next/no-literal-string` en `error` con `mode: 'jsx-only'`, sobre `src/**/*.tsx` menos `*.test.tsx`. `jsx-only` deja pasar las rutas y las claves de objetos, que no son texto visible.
+- **El idioma del mensaje al lead no sale de acá:** lo fija `leads.idioma_contacto` por país (002) y lo usa el 007.
 
 **Variables de entorno nuevas:**
 - `SESSION_SECRET` y `WEB_ORIGIN` (api);
@@ -444,11 +485,12 @@ Los `ALTER DEFAULT PRIVILEGES … ON TABLES` del 002 ya cubren las vistas nuevas
 3. **`contar()`:** contrato rojo → Croma (con el test de una sola request) → Overpass.
 4. **Selección y post-filtro:** 4a tamaño como refinamiento; 4b palabras clave y exclusiones.
 5. **`VistaPrevia` + `EjecutarBusqueda` con tope** (unit). El **advisor revisa los tests de tope y de estimado.**
-6. **Auth:** `usuarios`, scrypt, JWT y `tenant_actual`. El **`security` revisa los tests de auth antes de aceptarlos.**
+6. **Auth:** `usuarios`, scrypt, JWT, `tenant_actual` y `PATCH /usuarios/me` con `fijar_idioma`. El **`security` revisa los tests de auth antes de aceptarlos.**
 7. **Endpoints + validación:** `test_api_busquedas.py`.
 8. **Front:**
    - Primero `limites.test.ts` en rojo: sin la config de boundaries, los tres negativos no dan error y `import_sin_resolver_es_error` tampoco. El control positivo y `el_repo_no_tiene_violaciones` nacerían verdes: se aceptan solo porque el canario crea los destinos y el escaneo exige los `results` conocidos (sin `App.tsx` todavía, el escaneo está en rojo). Después `eslint.config.js` → verde (≈ 25 min).
-   - Después login, formulario y tablero, con Vitest en rojo → verde, ya dentro de la estructura por feature.
+   - Después `i18n.test.ts` y `elegirIdioma.test.ts` en rojo: sin `es.json`/`en.json` falla la paridad, sin la regla `i18next/no-literal-string` fallan los canarios, y sin `elegirIdioma.ts` falla la precedencia. El control positivo nacería verde y se acepta solo porque el canario negativo está en rojo. Después `src/i18n/` y la regla → verde (≈ 20 min).
+   - Después login, formulario y tablero, con Vitest en rojo → verde, ya dentro de la estructura por feature y con todo texto visible en `es.json`/`en.json`.
 9. **E2E local** con el stub de fuentes en CI.
 10. **Cola de revisión** (back + pantalla). **Es lo primero que se recorta:** sin ella, la cola se sigue resolviendo por SQL como en el 003.
 11. **Una corrida real:** vista previa + Buscar contra Croma, avisada antes. Se anota el saldo antes y después para confirmar que fue 1 request y 1 crédito, si `total` viene en la respuesta real, y cuánto tarda la ejecución (el umbral de 30 s).

@@ -53,7 +53,8 @@ specs/001-walking-skeleton/
 .env.example                 # ya existe; se suman CORS_ORIGINS y E2E_BASE_URL
 backend/
 ├── pyproject.toml           # deps + [tool.importlinter]
-├── Dockerfile
+├── Dockerfile · .dockerignore   # multi-stage, ver research.md R-docker
+├── uv.lock                  # --frozen lo exige
 ├── alembic.ini
 ├── alembic/{env.py, versions/0001_inicial.py}   # env.py: URL desde os.environ, sin importar config
 ├── scripts/roles.sql        # app_mig + app_rt, idempotente, sin passwords; se pega en el SQL editor de Supabase
@@ -64,10 +65,11 @@ backend/
 ├── tests/arquitectura/{test_import_linter.py, test_migraciones.py, test_secrets.py, test_higiene.py}
 └── evals/run.py             # placeholder
 frontend/
-├── package.json · vite.config.ts · Dockerfile · Caddyfile
+├── package.json · vite.config.ts · Dockerfile · .dockerignore · Caddyfile
 ├── src/{main.tsx, App.tsx, App.test.tsx}
 └── e2e/health.spec.ts · playwright.config.ts
 .github/{workflows/ci.yml, workflows/e2e.yml, dependabot.yml}
+.github/scripts/check_imagen.sh   # job `imagenes`: sin node/npm/uv/pip, no root, tope de MB
 docs/{arquitectura-backend.md, arquitectura-frontend.md}
 ```
 
@@ -83,9 +85,19 @@ docs/{arquitectura-backend.md, arquitectura-frontend.md}
 4. **Rojo:** `test_health_consulta_db` (como `app_rt`: 200, `db == "ok"`) y `test_health_db_caida` (503). `/health` real → verde. `test_health_stub` se borra.
 5. **Rojo:** `App.test.tsx`, ok y error. Después `App.tsx` → verde.
 6. **Rojo:** `test_higiene` con un fixture de 101 líneas. Después → verde.
-7. `ci.yml` (jobs `back`, `front`, `seguridad`, `evals`, `migrar` solo en `main` con environment `produccion`) + `dependabot.yml` → push (con aviso previo) → CI verde.
+7. **Rojo:** `check_imagen.sh`, un caso por rama, verificando cada motivo en la salida (R-docker):
+   - `python:3.12-slim` → `pip` y `root`;
+   - `node:22-alpine` con `max_mb=250` → `node` y `npm`;
+   - slim con `max_mb=1` → tamaño.
+
+   Después, `ci.yml`:
+   - `back`, `front`, `seguridad` y `evals`;
+   - `imagenes`: construye las dos imágenes y les corre `check_imagen.sh`, con tope de 250 MB para `api` y 60 MB para `web` (R-docker);
+   - `migrar`: solo en `main`, con environment `produccion` y `needs` de `back`, `front`, `seguridad` e `imagenes`.
+
+   Más `dependabot.yml` (incluye `docker`) → push (con aviso previo) → CI verde.
 8. Railway: variables (`DATABASE_URL` del pooler en modo transacción solo en `api`; `VITE_API_URL` solo en `web`), dominios, `CORS_ORIGINS`, "Wait for CI". `MIGRATION_DATABASE_URL` (pooler en modo sesión) en el Environment `produccion`. **Rojo:** `e2e/health.spec.ts` contra la URL pública, vía `workflow_dispatch` → verde.
-9. Protección de `main` + required checks + README con badge + los dos docs de arquitectura.
+9. Protección de `main` + required checks (`back`, `front`, `seguridad`, `evals`, `imagenes`) + README con badge + los dos docs de arquitectura.
 
 ## Complexity Tracking
 

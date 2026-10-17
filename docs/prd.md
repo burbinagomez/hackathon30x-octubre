@@ -82,10 +82,10 @@ El reto **entrega el ICP**; no hay un cliente externo que "pida". En el evento, 
 
 ## 3. Arquitectura hexagonal: puertos, adaptadores y registro
 
-**Principio:** toda entrada y salida externa es un adaptador detrás de un puerto del dominio, y **se conecta o desconecta en `config/fuentes.yaml`**, nunca tocando dominio ni casos de uso. Cada adaptador declara `paises`, `filtros` que soporta y `trae` (qué campos devuelve); el orquestador elige los habilitados que cubren el ICP y, si ninguno cubre un país/criterio, lo reporta.
+**Principio:** toda entrada y salida externa es un adaptador detrás de un puerto del dominio, y **se conecta o desconecta en `backend/config/fuentes.yaml`**, nunca tocando dominio ni casos de uso. Cada adaptador declara `paises`, `filtros` que soporta y `trae` (qué campos devuelve); el orquestador elige los habilitados que cubren el ICP y, si ninguno cubre un país/criterio, lo reporta.
 
 ```
-PUERTOS (dominio)            ADAPTADORES (infraestructura) — config/fuentes.yaml
+PUERTOS (dominio)            ADAPTADORES (infraestructura) — backend/config/fuentes.yaml
 ─────────────────────────    ────────────────────────────────────────────────────────────────
 FuenteDescubrimiento   ◄──   croma_supersociedades_co  (CO · CIIU/dpto/ingresos → NIT, ciudad, dirección)   [ON]
                              croma_dian_trade_co       (CO · partida arancelaria → NIT, nombre)              [ON]
@@ -149,7 +149,7 @@ todo adaptador ─► RegistroCostos ─► costos ─► tablero (CPL, CPQL)
 - `CPQL(fuente, canal) = Σ costos (descubrimiento + contacto + llamada Dapta) / demos agendadas`
 - Tasas: respuesta, bloqueo, calificación, cobertura de teléfono, % contactable por política.
 
-Las tarifas viven en `config/tarifas.yaml` (versionado) para que el jurado vea los supuestos.
+Las tarifas viven en `backend/config/tarifas.yaml` (versionado) para que el jurado vea los supuestos.
 
 ---
 
@@ -222,7 +222,7 @@ Más: embudo por fuente, línea de tiempo de costos del evento, y la pantalla de
 ## 9. Orden de construcción (slices, TDD, un flujo completo primero)
 
 1. **Walking skeleton**: back `/health` y front en blanco en Railway, Postgres en Supabase, CI verde, secrets fuera, import-linter. *(sáb AM)*
-2. **Puertos + registro + primer adaptador:** puerto `FuenteDescubrimiento`, carga de `config/fuentes.yaml`, suite de contrato, adaptador `croma_supersociedades_co` → `leads` con ICP (CIIU/dpto) y `tipo_titular=juridica` → test rojo de dedup por NIT y test de contrato. *(sáb AM/PM)*
+2. **Puertos + registro + primer adaptador:** puerto `FuenteDescubrimiento`, carga de `backend/config/fuentes.yaml`, suite de contrato, adaptador `croma_supersociedades_co` → `leads` con ICP (CIIU/dpto) y `tipo_titular=juridica` → test rojo de dedup por NIT y test de contrato. *(sáb AM/PM)*
 3. **Segundo adaptador: `osm_overpass`** → normalización común + match difuso + dedup teléfono/dominio → los 4 niveles de dedup con tests; `croma_dian_trade_co` si sobra tiempo. *(sáb PM)*
 4. **Evals harness** (§6b): `backend/evals/dataset.json` con 20–40 pymes reales (origen + etiqueta encaja/no encaja), armado con las que encuentran 2 y 3 y con las 50 de ejemplo cuando lleguen; scorers de forma en Python; prompt de juez que puntúa encaje y calidad de mensaje (0–1); runner k=3 que devuelve el número agregado y la lista de casos fallidos; `baseline.json` guardado para comparar. Sin Braintrust ni Actions este fin de semana. *(sáb PM, ~2 h)*
 5. **Libro de costos** (`RegistroCostos` + Croma créditos + cómputo) + CPL por fuente en el tablero + **formulario "Nueva búsqueda" (puerta C) con vista previa de conteo y costo estimado**. *(sáb PM)* ← con esto ya hay demo mostrable

@@ -1,7 +1,7 @@
 # Research — 001 Walking skeleton
 
 ## R1. Dónde corren las migraciones
-- **Decision:** job `migrar` en GitHub Actions, solo en push a `main` y después de `back`, `front` y `seguridad`. Lo corre el GitHub Environment `produccion`, restringido a la rama `main`, con el secret `MIGRATION_DATABASE_URL`. Esa URL entra al **pooler de Supabase en modo sesión** (`aws-0-<region>.pooler.supabase.com:5432`) con el usuario `app_mig.<project-ref>` (NOSUPERUSER, dueño del schema `public`) y `?sslmode=require`. Railway tiene **"Wait for CI"** activado: despliega solo si CI pasó, migración incluida.
+- **Decision:** job `migrar` en GitHub Actions, solo en push a `main` y después de `back`, `front`, `seguridad` e `imagenes`. Lo corre el GitHub Environment `produccion`, restringido a la rama `main`, con el secret `MIGRATION_DATABASE_URL`. Esa URL entra al **pooler de Supabase en modo sesión** (`aws-0-<region>.pooler.supabase.com:5432`) con el usuario `app_mig.<project-ref>` (NOSUPERUSER, dueño del schema `public`) y `?sslmode=require`. Railway tiene **"Wait for CI"** activado: despliega solo si CI pasó, migración incluida.
 - **Por qué no la conexión directa:** `db.<ref>.supabase.co:5432` resuelve solo a IPv6 si no se paga el add-on IPv4, y los runners de GitHub Actions no tienen IPv6: la conexión falla con "Network is unreachable". El pooler en modo sesión es IPv4 en todos los planes y, a diferencia del modo transacción, soporta DDL, prepared statements y sesiones largas: sirve para Alembic. Fuentes: [Supabase — Connecting to Postgres](https://supabase.com/docs/guides/database/connecting-to-postgres), [discussion #20955](https://github.com/orgs/supabase/discussions/20955), [discussion #43111](https://github.com/orgs/supabase/discussions/43111).
 - **Rationale:** `MIGRATION_DATABASE_URL` nunca existe en el entorno de `api` ni de `web` (principio III). El orden queda garantizado: esquema antes que código. Con `app_mig` sin SUPERUSER, una credencial filtrada no puede saltarse RLS ni tocar otros roles.
 - **Consecuencia:** las migraciones corren antes que el código nuevo, así que deben ser compatibles hacia atrás (expand/contract). Queda escrito en `docs/arquitectura-backend.md`.
@@ -54,6 +54,50 @@
 - **Rationale:** la spec fija 2 servicios (`api`, `web`), y Caddy se configura con una línea.
 - **Alternatives:** FastAPI sirviendo el estático (acopla los deploys y deja un solo servicio); Railpack autodetectado (menos predecible en el primer build).
 
+## R-docker. Imágenes multi-stage en `api` y `web`
+- **`api`** (`backend/Dockerfile`):
+  - **Builder:** `python:3.12-slim`, con `uv` copiado desde `ghcr.io/astral-sh/uv:<tag fijo>`. Corre `uv sync --frozen --no-dev --no-install-project` con `UV_PYTHON_DOWNLOADS=never`, para que el `.venv` use el Python de la imagen, y `UV_LINK_MODE=copy`. `--frozen` exige `uv.lock` commiteado.
+  - **Final:** el mismo `python:3.12-slim`, con el mismo `WORKDIR /app`, para que las rutas absolutas del `.venv` sigan valiendo. Copia solo `.venv/` y `app/`, sin `uv` ni compiladores.
+  - **Sin pip:** la imagen oficial trae `pip` en `/usr/local`. El final corre `pip uninstall -y pip` antes de `USER`, que borra el paquete de `site-packages` además de los scripts; si borrara solo `/usr/local/bin/pip*`, `python -m pip` seguiría andando. En 3.12 la imagen no trae setuptools. El `ensurepip` que queda no le sirve a un usuario no root sobre `/usr/local`.
+  - **Versión de Python:** `uv python pin 3.12`, sin patch. Con `UV_PYTHON_DOWNLOADS=never`, un patch distinto al de la imagen hace fallar `uv sync`.
+  - **psycopg:** `psycopg[binary]`, que trae libpq en el wheel, así que no hace falta compilar.
+  - **Arranque:** usuario no root (`USER app`) y `CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}`. Va en forma shell porque la forma exec no expande `$PORT`. El `HEALTHCHECK` lee el mismo `${PORT:-8000}`.
+  - **Alembic no corre en el contenedor:** migra el job `migrar` de GitHub Actions (principio IV, R1).
+- **`web`** (`frontend/Dockerfile`, completa R5):
+  - **Etapas:** `node:22-alpine` hace el build. Un stage `caddy:2-alpine`, con el mismo tag fijo, saca la capability. El final es `alpine` con ese binario copiado, y sirve `dist/`.
+  - **Caddyfile:**
+    - opciones globales `{ admin off }`;
+    - sitio `:{$PORT:8080}`, con valor por defecto para `docker run` local y el HEALTHCHECK;
+    - `handle /health { respond 200 }`;
+    - `handle { root * /srv; try_files {path} /index.html; file_server }`.
+
+    Va con `handle` porque Caddy ordena `try_files` antes que `respond`: sueltos, `/health` se reescribiría a `/index.html`. Y sin `root` + `file_server`, Caddy contesta 200 vacío a todo, aunque `dist/` no exista.
+  - **Usuario:** no root, dueño de `/data` y `/config`, que Caddy necesita escribibles.
+  - **Capability:** el stage `caddy` corre `apk add libcap` → `setcap -r /usr/bin/caddy`, y el final copia solo el binario. El binario oficial trae `cap_net_bind_service=ep`, y si el runtime no la tiene en el bounding set, el kernel rechaza el exec de un usuario no root. Medido con `--cap-drop ALL`: sin `setcap -r` da `exec /usr/bin/caddy: operation not permitted`. Con el puerto > 1024 la capability no hace falta. `setcap -r` no la otorga, la saca. El job `imagenes` levanta `web` con `--cap-drop ALL` y espera `/health` en 200.
+  - **Tamaño (medido el 2026-10-17 con `check_imagen.sh`):** `caddy:2.11.7-alpine` sola pesa 62 MB. Hacer el `setcap` en el final reescribía el binario de 46 MB en otra capa, y la imagen quedaba en 111 MB. Con el binario copiado sobre `alpine:3.23.6` pesa 56 MB, dentro del tope de 60. El final define `XDG_CONFIG_HOME=/config`, `XDG_DATA_HOME=/data` y el `CMD` de la imagen oficial. El `HEALTHCHECK` usa el `wget` de busybox, sin curl.
+- **Ambos:**
+  - `.dockerignore`, que excluye `.env*`, `.venv`, `node_modules`, `dist`, `tests`, `__pycache__` y `.git`;
+  - tags de imagen base fijos (versión exacta; Dependabot `docker` los sube);
+  - `HEALTHCHECK` a `/health` sobre `${PORT}` con valor por defecto: en `api` con `python -c "urllib.request…"` (slim no trae curl) y en `web` con el `wget` de busybox.
+
+  Railway usa su propio healthcheck (`healthcheckPath`), así que el `HEALTHCHECK` de la imagen sirve en local y en CI.
+- **Check (job `imagenes` en CI):** `.github/scripts/check_imagen.sh <imagen> <max_mb>` falla si la imagen:
+  - tiene `node`, `npm`, `uv`, `pip` o `pip3` (`command -v` dentro de la imagen), o si `python -m pip --version` anda;
+  - tiene `Config.User` vacío, `root` o `0`;
+  - pesa más que `max_mb`: 250 MB para `api`, 60 MB para `web`.
+
+  El script reporta **cada** motivo por nombre, no solo el primero.
+
+  **Rojo**, con un caso por rama y verificando en la salida el motivo nombrado:
+  - `python:3.12-slim` pelada, `max_mb=250` → nombra `pip` y `root`;
+  - `node:22-alpine` con `max_mb=250` explícito → nombra `node` y `npm`, sin que el tamaño interfiera;
+  - `python:3.12-slim`, `max_mb=1` → nombra el tamaño.
+- **Orden en CI:** `migrar` tiene `imagenes` en sus `needs`, para que una imagen rota no deje el esquema migrado sin deploy (R1). `imagenes` es *required check* de `main` (principio V).
+- **Riesgo:** el límite de 60 MB de `web` está cerca del tamaño de `caddy:2-alpine`. Si no entra, se mide antes de subir el límite.
+- **Alternatives:**
+  - imagen de una etapa (deja uv, pip y la caché del build en runtime);
+  - distroless (sin shell, el check con `command -v` no corre y depurar en Railway se complica).
+
 ## R6. Postgres para tests
 - **Decision:** en CI, `services: postgres:16` + `roles.sql` + passwords de test. En local, un `docker run` documentado en el quickstart. `TEST_DATABASE_URL` (`app_rt`) y `TEST_MIGRATION_DATABASE_URL` (`app_mig`) son obligatorios: si faltan, los tests de integración **fallan**, no se saltan.
 - **Lo que vanilla no tiene:** roles `anon`/`authenticated` y pooler (el esquema `extensions` lo crea `roles.sql`, ver R3). Los roles los emula un script de CI en el slice 2, junto con la primera tabla. El pooler lo cubre `test_engine_desactiva_prepared_statements` (R10) y el E2E contra el deploy real.
@@ -86,3 +130,8 @@
 - **Decision:** el tenant se fija con `SET LOCAL app.tenant_id = …` (o `set_config(..., true)`) dentro de la transacción de la unidad de trabajo. Nunca `SET` de sesión.
 - **Rationale:** en modo transacción, la conexión física vuelve al pool de Supavisor al hacer commit y la usa otro cliente. Un `SET` de sesión dejaría el tenant de un request puesto para el siguiente. `SET LOCAL` muere con la transacción.
 - **Test:** entra en el slice 2 con la unidad de trabajo. Después del commit, `current_setting('app.tenant_id', true)` en la misma conexión vuelve vacío.
+
+## R12. Vite 6 y Vitest 4 en el front
+- **Decision:** `vite@6.4.3` y `vitest@4.1.11`, pin exacto, en lugar de los `vite@5.4.11` y `vitest@2.1.8` de T023. `@vitejs/plugin-react@4.3.4` se queda (acepta `vite ^6`). La config de vitest no cambió: `environment`, `setupFiles` y el `cleanup` explícito de `setupTests.ts` siguen igual.
+- **Rationale:** `npm audit --audit-level=high` del job `seguridad` falla con tinypool crítico (≤2.1.1, RCE por prototype pollution), presente en toda la línea vitest 2. `vitest@2.1.9` + `vite@5.4.21`, el fix que sugiere el audit, siguen con tinypool 1.1.1 y suben a 6 hallazgos. Medido el 2026-10-17: la combinación mínima en 0 es vitest 4.1.11 (≤4.1.10 es vulnerable) + vite 6.4.3 (≤6.4.2 es vulnerable). Sin `--omit` ni `overrides`.
+- **Test:** `npm audit --audit-level=high` da 0. La suite da 4/4 y vuelve a rojo contra el `App.tsx` sin estado de carga. La imagen web pesa 56 MB de 60.

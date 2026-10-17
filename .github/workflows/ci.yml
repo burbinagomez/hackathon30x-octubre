@@ -1,0 +1,131 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  back:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres-ci
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # Passwords de test, solo para este Postgres efímero (R6).
+      PGPASSWORD: postgres-ci
+      TEST_DATABASE_URL: postgresql+psycopg://app_rt:rt-ci@localhost:5432/postgres
+      TEST_MIGRATION_DATABASE_URL: postgresql+psycopg://app_mig:mig-ci@localhost:5432/postgres
+      TEST_ADMIN_DATABASE_URL: postgresql+psycopg://postgres:postgres-ci@localhost:5432/postgres
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: "0.12.1"
+      - name: roles.sql + passwords de test
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f scripts/roles.sql
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 \
+            -c "ALTER ROLE app_rt PASSWORD 'rt-ci'" -c "ALTER ROLE app_mig PASSWORD 'mig-ci'"
+      - run: uv sync --frozen
+      - run: uv run pytest -q
+      - run: uv run lint-imports
+      - name: alembic desde cero + check
+        env:
+          MIGRATION_DATABASE_URL: ${{ env.TEST_MIGRATION_DATABASE_URL }}
+        run: uv run alembic downgrade base && uv run alembic upgrade head && uv run alembic check
+
+  front:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  seguridad:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: "0.12.1"
+      - name: pip-audit
+        working-directory: backend
+        run: uv sync --frozen && uv run pip-audit --skip-editable
+      - name: npm audit
+        working-directory: frontend
+        run: npm audit --audit-level=high
+
+  evals:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: "0.12.1"
+      - run: uv run python -m evals.run
+
+  imagenes:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -t api backend
+      - run: docker build -t web frontend
+      - name: el check sigue detectando los tres motivos
+        run: .github/scripts/test_check_imagen.sh
+      - name: check_imagen (api 250 MB, web 60 MB)
+        run: |
+          rc=0
+          .github/scripts/check_imagen.sh api 250 || rc=1
+          .github/scripts/check_imagen.sh web 60 || rc=1
+          exit $rc
+      - name: web arranca sin capabilities (R-docker, setcap -r)
+        run: |
+          docker run -d --name web-sin-caps --cap-drop ALL -e PORT=8080 -p 8080:8080 web
+          for _ in $(seq 10); do curl -sf localhost:8080/health && exit 0; sleep 1; done
+          docker logs web-sin-caps
+          exit 1
+
+  migrar:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [back, front, seguridad, imagenes]
+    runs-on: ubuntu-24.04
+    environment: produccion
+    concurrency:
+      group: migrar
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: "0.12.1"
+      - run: uv sync --frozen --no-dev
+      - name: alembic upgrade head contra Supabase (pooler en modo sesión)
+        env:
+          MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+        run: uv run --no-dev alembic upgrade head

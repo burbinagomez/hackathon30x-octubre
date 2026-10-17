@@ -1,0 +1,40 @@
+[project]
+name = "dapta-leads-api"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "alembic>=1.20.0",
+    "fastapi>=0.143.3",
+    "psycopg[binary]>=3",
+    "pydantic-settings>=2.16.0",
+    "sqlalchemy>=2",
+    "uvicorn>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "import-linter>=2.15",
+    "pip-audit>=2.10.1",
+    "pytest>=9.1.1",
+]
+
+[tool.importlinter]
+root_package = "app"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Fuentes prohibidas"
+type = "forbidden"
+source_modules = ["app"]
+# import-linter 2.15 no acepta "linkedin*" (el wildcard reemplaza un módulo entero): nombres explícitos (R4).
+forbidden_modules = [
+    "googlemaps",
+    "linkedin", "linkedin_api", "linkedin_v2",
+    "instaloader",
+    "facebook", "facebook_business", "facebook_scraper",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
