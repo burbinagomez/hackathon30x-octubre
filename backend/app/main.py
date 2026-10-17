@@ -23,7 +23,9 @@ app = FastAPI(lifespan=lifespan)
 # CORS_ORIGINS no es secret: se lee acá, antes de verificar_entorno() en el lifespan.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o for o in os.environ.get("CORS_ORIGINS", "").split(",") if o],
+    allow_origins=[
+        o for o in (s.strip().rstrip("/") for s in os.environ.get("CORS_ORIGINS", "").split(",")) if o
+    ],
 )
 
 
