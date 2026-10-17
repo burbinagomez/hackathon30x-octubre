@@ -20,3 +20,8 @@ def test_cors_normaliza_espacios_y_barra_final(app_con_origenes, origen):
     # Sin `with`: no corre el lifespan, no hace falta DB. El header CORS sale igual (aunque /health dé 503).
     r = TestClient(app_con_origenes).get("/health", headers={"Origin": origen})
     assert r.headers.get("access-control-allow-origin") == origen
+
+
+def test_cors_no_autoriza_un_origen_fuera_de_la_lista(app_con_origenes):
+    r = TestClient(app_con_origenes).get("/health", headers={"Origin": "https://malo.example"})
+    assert "access-control-allow-origin" not in r.headers
