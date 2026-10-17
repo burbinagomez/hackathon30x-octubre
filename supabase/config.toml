@@ -1,0 +1,2 @@
+# Mínimo para `supabase link` y `supabase db push` en el job `migrar`. Sin stack local.
+project_id = "hackathon30x-octubre"

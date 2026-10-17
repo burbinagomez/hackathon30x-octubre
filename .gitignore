@@ -19,3 +19,7 @@ frontend/playwright-report/
 .vscode/
 # spec-kit / claude local
 .claude/settings.local.json
+
+# Supabase CLI
+supabase/.temp
+supabase/.branches
