@@ -141,14 +141,14 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
 
 | Tabla | Columnas | Restricciones |
 |---|---|---|
-| `tenants` | `id`, `nombre`, `idioma`, `creado_en` | Se siembra con el tenant del evento, por script. `idioma` NOT NULL DEFAULT `'es'`, CHECK `IN ('es','en')`: idioma de UI por defecto del tenant (lo usa el 005). |
+| `tenants` | `id`, `nombre`, `idioma`, `creado_en` | Se siembra con el tenant del evento desde `backend/scripts/sembrar_tenant.py`. `idioma` NOT NULL DEFAULT `'es'`, CHECK `IN ('es','en')`: idioma de UI por defecto del tenant (lo usa el 005). |
 | `busquedas` | `pais`, `criterios jsonb`, `estado`, `canal_preferido`, `tope_gasto_usd`, `mensaje_base` | — |
 | `leads` | `pais`, `id_fiscal`, `nombre`, `tipo_titular`, `ciudad`, `direccion`, `actividad_codigo`, `actividad_sistema`, `web`, `idioma_contacto` | `id_fiscal` nullable (por OSM). `tipo_titular` ∈ `juridica`/`natural`/`desconocido`, NOT NULL, default `desconocido`. UNIQUE `(tenant_id, pais, id_fiscal)`. `idioma_contacto` es `GENERATED ALWAYS AS (CASE pais WHEN 'CO' THEN 'es' WHEN 'MX' THEN 'es' WHEN 'PE' THEN 'es' WHEN 'BR' THEN 'pt' END) STORED`: el idioma del mensaje sale del país, nunca de la UI, y lo fija la base, no la app. `'pt'` es un dato, no una traducción: sin plantilla pt, el 007 lo marca `sin_plantilla_idioma`. Un país nuevo sin rama da `NULL`, que pasa a lo mismo. |
 | `lead_fuentes` | `lead_id`, `busqueda_id`, `fuente`, `encontrado_en`, `url_origen`, `licencia` | UNIQUE `(lead_id, fuente, busqueda_id)`. |
 | `cumplimiento` | `lead_id`, `fuente`, `licencia`, `url_origen`, `base_legal`, `as_of`, `opt_out_at`, `solicitudes jsonb` | `lead_id` UNIQUE. `base_legal` nullable hasta el 007 (la setea `AprobarMensaje`). |
 | `costos` | las columnas de `OperacionCosto` + `gratis` | `gratis bool NOT NULL`. |
 
-Todas menos `tenants` llevan `tenant_id` y RLS con `USING/WITH CHECK (tenant_id = current_setting('app.tenant_id')::uuid)`. `tenants` tiene RLS con `USING (id = current_setting('app.tenant_id')::uuid)`, solo `GRANT SELECT` a `app_rt`, y se siembra con `postgres`. La unidad de trabajo abre la transacción y hace `SET LOCAL app.tenant_id` (o `set_config(..., true)`) como primera sentencia. **Nunca `SET` de sesión:** `api` entra por el pooler de Supabase en modo transacción, y una conexión con el tenant de otro cliente puede llegar a la request siguiente.
+Todas menos `tenants` llevan `tenant_id` y RLS con `USING/WITH CHECK (tenant_id = current_setting('app.tenant_id')::uuid)`. `tenants` tiene RLS con `USING (id = current_setting('app.tenant_id')::uuid)`, solo `GRANT SELECT` a `app_rt`, y se siembra con `postgres`. La siembra la corre un humano desde local: `sembrar_tenant.py` pide la URL de `postgres` por `getpass`, nunca por argv, por `DATABASE_URL` ni por una variable en Railway (ahí `api` solo tiene `app_rt`). La unidad de trabajo abre la transacción y hace `SET LOCAL app.tenant_id` (o `set_config(..., true)`) como primera sentencia. **Nunca `SET` de sesión:** `api` entra por el pooler de Supabase en modo transacción, y una conexión con el tenant de otro cliente puede llegar a la request siguiente.
 
 **Roles de Supabase** (en la misma `0002`, al final):
 ```sql

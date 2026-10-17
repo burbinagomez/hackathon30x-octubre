@@ -194,7 +194,7 @@ Tests:
 - `backend/tests/arquitectura/test_contacto_no_aparece_en_logs.py::test_export_e_import_dapta_no_loguean_contacto`: exportar + importar (con un CSV que trae `telefono`) con `caplog` en `DEBUG` sobre todos los loggers: ni `+573001112233` ni la empresa aparecen.
 - La guarda de catálogo de la 003 sigue verde sin excepciones: `calificaciones` no guarda ningún dato de contacto.
 
-**Migración** (`backend/tests/integration/test_migraciones.py`)
+**Migración** (`backend/tests/arquitectura/test_migraciones.py`)
 - `::test_migracion_0008_sobre_0007_con_datos`: se aplica hasta la `0007`, se siembran contactos y respuestas → aplicar la `0008` no falla.
 - `::test_v_tablero_fuentes_conserva_columnas_previas_en_orden`: las columnas de la 005–007 siguen en el mismo orden; las nuevas, al final.
 
