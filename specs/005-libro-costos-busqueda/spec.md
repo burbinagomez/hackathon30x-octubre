@@ -144,6 +144,7 @@ Costo por canal: email 0.05, whatsapp 0.30. Costo de evals: 1.00.
 - `::test_contar_registra_costo_antes_de_devolver[…]`.
 - `::test_contar_devuelve_entero_no_negativo_o_none[…]`.
 - `::test_contar_rechaza_criterio_no_soportado[…]`: lanza `CriterioNoSoportado` y no hace ningún request.
+- `backend/tests/unit/descubrimiento/test_datos_gov_co.py::test_contar_segunda_llamada_sale_del_cache`: la 011 saca `contar` de su discriminador de caché (`tipo: filas|naturales`) y la 005 lo suma como `tipo: contar`. La segunda llamada a `contar` con los mismos criterios no hace request ni escribe costo.
 
 **Adaptadores**
 - `backend/tests/unit/descubrimiento/test_croma_supersociedades.py`:
@@ -169,7 +170,7 @@ Costo por canal: email 0.05, whatsapp 0.30. Costo de evals: 1.00.
   - `::test_fuente_no_disponible_da_conteo_null_y_sigue`: `FuenteNoDisponible` en OSM da `conteo=None`, `motivo='no_disponible'`, y cs igual devuelve su conteo;
   - `::test_limite_agotado_da_conteo_null`: `LimiteFuenteAgotado` da `motivo='limite_agotado'`;
   - `::test_costo_estimado_suma_lo_gastado_y_lo_que_falta`: lo gastado en la vista previa sale del libro falso, y lo que falta es 0 créditos de cs (la página 1 ya está en caché) más los segundos del `contar` de OSM × `computo_seg_usd`;
-  - `::test_costo_maximo_suma_costo_maximo_llamada_de_cada_fuente`: con cs + OSM seleccionadas, da lo gastado + 1 crédito × tarifa + 2 × 30 s × `computo_seg_usd`, y `dentro_del_tope` es false con un tope de un centavo menos;
+  - `::test_costo_maximo_suma_costo_maximo_llamada_de_cada_fuente`: con cs + OSM seleccionadas, da lo gastado + 1 crédito × tarifa + 2 × 30 s × `computo_seg_usd`, y `dentro_del_tope` es false con un tope de un centavo menos. Un segundo caso con cs + OSM + `datos_gov_co_rues` suma además 2 × 2 × 30 s × `computo_seg_usd`: si falta, el tope se calcula sin ese adaptador y nadie lo nota;
   - `::test_reporta_creditos_y_requests_restantes`: con 37 requests en 24 h y 1.212 créditos usados en el mes en el libro falso, devuelve `requests_restantes_24h = 63` y `creditos_restantes_mes = 288`.
 - `backend/tests/unit/descubrimiento/test_ejecutar_con_tope.py`:
   - `::test_no_ejecuta_si_costo_maximo_supera_tope`: lanza `TopeExcedido`, 0 requests, y la búsqueda sigue en `borrador`;
@@ -349,7 +350,8 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
 - Se mide a valor de lista (conservador: el tier gratis se acaba en medio de una búsqueda).
 - Antes de cada llamada a una fuente: `gasto_busqueda + costo_maximo_llamada ≤ tope`. `costo_maximo_llamada` lo declara cada adaptador en su `MetaFuente`:
   - **cs:** 1 crédito × tarifa, porque los intentos fallidos registran 0;
-  - **OSM:** 2 intentos × 30 s (el timeout del cliente, 003) × `computo_seg_usd`.
+  - **OSM:** 2 intentos × 30 s (el timeout del cliente, 003) × `computo_seg_usd`;
+  - **`datos_gov_co_rues`:** 2 requests × 2 intentos × 30 s × `computo_seg_usd` (la fórmula es de la 011: `specs/011-datos-gov-co/spec.md:230` en f8f9456).
 - `TOPE_MAXIMO_USD` (50) vive en `config/tarifas.yaml` en la sección `limites_app`.
 - La CLI del 002 sigue sin tope: es de operador, local.
 - `busquedas.estado` pasa a tener un `CHECK` ∈ `borrador`/`ejecutando`/`completada`/`tope_alcanzado`/`error`. La transición de `borrador` a `ejecutando` es un `UPDATE … WHERE estado='borrador'` que tiene que afectar 1 fila; si afecta 0, es 409. Eso cubre dos clics simultáneos.
