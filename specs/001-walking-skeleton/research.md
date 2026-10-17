@@ -13,7 +13,8 @@
      - `MIGRATION_DATABASE_URL` (ya no existe, pero el nombre sigue prohibido: defensa en profundidad);
      - un nombre con prefijo `SUPABASE_`;
      - un valor con prefijo `sb_publishable_`, `sb_secret_` o `sbp_` (access token del CLI, la credencial de `migrar`);
-     - un JWT (tres segmentos base64url) cuyo payload trae `role` en `{anon, service_role}`.
+     - un JWT (tres segmentos base64url) cuyo payload trae `role` en `{anon, service_role}`;
+     - un `DATABASE_URL` con usuario `postgres` o `postgres.<ref>`: la credencial de `migrar` puesta por error en `api`, que saltearía RLS. Solo mira `DATABASE_URL`, porque los tests de integración tienen su admin en `TEST_ADMIN_DATABASE_URL`.
      
      El mensaje nombra la variable y nunca el valor. `test_app_arranca_con_entorno_limpio` evita un guard que rechace todo. Si una key llega a `api`, el deploy falla al arrancar.
   2. `test_rol_runtime::test_rol_runtime_no_es_super_ni_bypassrls_ni_puede_crear`: conectado con `TEST_DATABASE_URL`, `rolsuper`, `rolbypassrls`, `rolcreaterole` y `rolcreatedb` de `current_user` deben ser false; ningún objeto de `pg_namespace` ni `pg_class` tiene dueño `app_rt`; `CREATE TABLE public.x()` debe dar permiso denegado, y `has_schema_privilege('app_rt','extensions','USAGE')` debe ser true (ver spec.md, `test_rol_runtime`). Cubre el hueco de que alguien ponga la URL del owner en `DATABASE_URL`.
@@ -117,8 +118,10 @@
 - **Límite conocido:** la reflexión con esquema `None` usa `pg_table_is_visible`, así que también ve `extensions`, que está en el `search_path`. Hoy no trae tablas; el slice 3 necesita `extensions` en el path para `gin_trgm_ops`, así que se deja así.
 - **En los tests (`test_migraciones.py`, T017):** cada test crea una base nueva (`DROP/CREATE DATABASE … WITH (FORCE)` + `roles.sql`), así que "desde vacío" es cierto.
   - `test_migrar_local_desde_vacio_dos_veces_sin_drift`: dos corridas en 0 y drift vacío.
-  - `test_migracion_aplicada_no_se_reaplica`: un `CREATE TABLE` sin `IF NOT EXISTS`; la segunda corrida da 0 solo si no lo reaplica.
-  - `test_migracion_rota_falla_claro_y_no_deja_nada`: `CREATE TABLE public.u; SELECT 1/0;` → exit ≠ 0, stderr nombra el archivo y `public.u` no existe.
+  - `test_aplica_solo_lo_que_falta_y_en_orden`: el caso de prod. `0001` (un `CREATE TABLE` sin `IF NOT EXISTS`) se aplica y se registra; se suma `0002` que altera esa tabla, y la segunda corrida da 0 solo si no reaplica `0001` y aplica `0002` después.
+  - `test_migracion_rota_falla_claro_y_no_deja_nada`: `CREATE TABLE public.u; SELECT 1/0;` → exit ≠ 0, stderr nombra el archivo, `public.u` no existe y no queda la fila `0001` (si quedara, la corrida siguiente saltearía el archivo roto).
+  - `test_version_repetida_falla_y_nombra_los_dos`: dos archivos con la misma versión fallan antes de aplicar nada; sin eso, el segundo se saltearía en silencio por estar la versión registrada.
+  - `test_nombre_invalido_falla`: prueba el patrón que vuelve seguro interpolar el nombre.
   - `test_drift_mira_solo_public_aunque_cambie_search_path`: con `ajeno.t` y `-c search_path=ajeno,public`, drift vacío; con `public.extra`, drift ≠ vacío.
 - **Sin downgrade:** las migraciones SQL solo van hacia adelante. Un error en prod se corrige con una migración nueva (expand/contract).
 - **Riesgo a verificar en la primera corrida de `migrar`:** que el CLI llega a la base desde el runner de GitHub (sin IPv6, la conexión directa `db.<ref>.supabase.co` falla; el CLI tiene que entrar por el pooler).

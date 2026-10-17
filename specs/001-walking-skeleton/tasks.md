@@ -46,7 +46,8 @@
     - `MIGRATION_DATABASE_URL`;
     - un nombre `SUPABASE_*`;
     - un valor que empieza con `sb_publishable_`, `sb_secret_` o `sbp_`;
-    - un JWT con `role` en `{anon, service_role}`.
+    - un JWT con `role` en `{anon, service_role}`;
+    - un `DATABASE_URL` con usuario `postgres` o `postgres.<ref>`.
 
     En cada caso, el nombre de la variable aparece en `str(exc)`, y el valor no aparece en `str(exc)`, `caplog.text` ni `capsys`.
   - `::test_jwt_malformado_no_filtra_el_valor`: con `FOO_TOKEN` la app arranca; con `SUPABASE_X` rechaza. En los dos, el valor no aparece.
@@ -78,8 +79,10 @@
   Si falta `TEST_DATABASE_URL`, falla; no se salta.
 - [X] T017 [P] 🤖 **Rojo:** `backend/tests/arquitectura/test_migraciones.py` (R-migraciones). Cada test arranca de una base nueva con `roles.sql`:
   - `::test_migrar_local_desde_vacio_dos_veces_sin_drift`: `scripts/migrar_local.sh` dos veces, las dos en 0, y `compare_metadata` contra `app/modelos.py` da vacío;
-  - `::test_migracion_aplicada_no_se_reaplica`: un `CREATE TABLE` sin `IF NOT EXISTS`; la segunda corrida da 0;
-  - `::test_migracion_rota_falla_claro_y_no_deja_nada`: exit ≠ 0, stderr nombra el archivo y la tabla del archivo roto no existe;
+  - `::test_aplica_solo_lo_que_falta_y_en_orden`: `0001` con un `CREATE TABLE` sin `IF NOT EXISTS` → la tabla existe y `0001` queda registrada; se suma `0002` que la altera → la segunda corrida da 0 y quedan `0001,0002`;
+  - `::test_migracion_rota_falla_claro_y_no_deja_nada`: exit ≠ 0, stderr nombra el archivo, la tabla del archivo roto no existe y no queda fila en `schema_migrations`;
+  - `::test_version_repetida_falla_y_nombra_los_dos`: `0001_a` y `0001_b` → exit ≠ 0 y stderr nombra los dos;
+  - `::test_nombre_invalido_falla`: un nombre fuera de `^[0-9]+_[a-z0-9_]+$` → exit ≠ 0;
   - `::test_drift_mira_solo_public_aunque_cambie_search_path`: con `ajeno.t` y `-c search_path=ajeno,public`, drift vacío; con una tabla extra en `public`, drift no vacío.
 - [X] T018 [P] 🤖 **Rojo:** `backend/tests/unit/test_db.py::test_engine_desactiva_prepared_statements`: el engine de `db.py` pasa `prepare_threshold=None`.
 - [X] T019 🤖 **Verde:**
