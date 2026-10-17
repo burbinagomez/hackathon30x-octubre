@@ -149,9 +149,30 @@ def _codeql_pinneado_por_sha():
     assert not sin_sha, f"github/codeql-action sin pinnear por SHA de commit: {sin_sha}"
 
 
+ACCIONES_CI = ("actions/checkout", "actions/setup-node", "actions/upload-artifact")
+
+
+def _ci_acciones_pinneadas():
+    # Sobre el texto: el `# vX.Y.Z` es un comentario y yaml lo descarta.
+    usos = re.findall(r"uses:\s*(\S+)(.*)", (WORKFLOWS / "ci.yml").read_text())
+    nuestros = [(u, resto) for u, resto in usos if u.split("@")[0] in ACCIONES_CI]
+    assert nuestros, f"ci.yml no usa {ACCIONES_CI}"
+    sin_sha = [u for u, resto in nuestros
+               if not (re.fullmatch(r"[^@]+@[0-9a-f]{40}", u) and re.fullmatch(r"\s*#\s*v\d+\.\d+\.\d+\s*", resto))]
+    assert not sin_sha, f"sin pinnear por SHA de commit con `# vX.Y.Z` al lado: {sin_sha}"
+
+
+def _ci_checkout_sin_credenciales():
+    checkouts = [s for s in _steps(_workflow("ci.yml")) if s.get("uses", "").startswith("actions/checkout@")]
+    assert checkouts, "ci.yml no usa actions/checkout"
+    # yaml lee `false` como bool: el string "false" no cuenta.
+    con = [s["uses"] for s in checkouts if (s.get("with") or {}).get("persist-credentials") is not False]
+    assert not con, f"{len(con)} checkout sin persist-credentials: false"
+
+
 # Lo que la spec promete del agente en CI: sin Bash, sin red y sin escritura.
-# Read no se restringe por ruta: el agente puede leer /proc/self/environ. Lo que garantiza el job es este corte,
-# que borra el reporte y falla si trae el secret, antes de que llegue al summary o al artifact.
+# Segunda capa contra la fuga del secret (la primera es el deny de /proc): este corte borra el reporte y
+# falla si trae el secret, antes de que llegue al summary o al artifact.
 CORTE = re.compile(r'grep -qF "\$ANTHROPIC_API_KEY" revision\.json && \{ rm -f revision\.\*;[^}]*exit 1; \}')
 # Read(//proc/**) es la primera capa: sin leer /proc/self/environ el agente no ve el secret. El grep es la segunda.
 PROHIBIDAS = {"Bash", "Edit", "Write", "WebFetch", "WebSearch", "Read(//proc/**)"}
@@ -177,6 +198,11 @@ def _problemas_revision(job: dict) -> list[str]:
         problemas.append(f"disallowed: --disallowedTools sin {sorted(PROHIBIDAS - prohibidas)}")
     if bypass:
         problemas.append(f"bypass: no puede saltear permisos: {bypass}")
+    # Flags verificados en `claude --help` de la versión pinneada.
+    if not re.search(r"--restricted(?![\w-])", runs):
+        problemas.append("restricted: falta --restricted (ignora settings del repo y confina las tools de archivo)")
+    if not re.search(r"--strict-mcp-config(?![\w-])", runs):
+        problemas.append("mcp: falta --strict-mcp-config (sin MCP fuera de --mcp-config)")
     if not re.search(r"@anthropic-ai/claude-code@\d+\.\d+\.\d+(?![\w.-])", runs):
         problemas.append("pin: la CLI de claude no está pinneada a versión exacta")
     if fuga := _fuga_del_secret(job.get("steps", [])):
@@ -202,14 +228,15 @@ def _fuga_del_secret(steps: list[dict]) -> str:
 def _job_revision(si="github.event_name == 'pull_request'", instalar="@anthropic-ai/claude-code@2.1.0",
                   permitidas="--allowedTools Read,Grep,Glob",
                   prohibidas='--disallowedTools "Bash,Edit,Write,WebFetch,WebSearch,Read(//proc/**)"',
-                  extra="", veredicto="| .github/scripts/veredicto_security.sh",
+                  extra="", modo="--restricted --strict-mcp-config",
+                  veredicto="| .github/scripts/veredicto_security.sh",
                   despues=None, artifact_primero=False) -> dict:
     despues = (CORTE_OK, RESUMEN) if despues is None else despues
     artifact = [{"uses": "actions/upload-artifact@v7", "if": "always()"}]
     return {"if": si, "steps": [
         {"run": f"npm install -g {instalar}"},
         *(artifact if artifact_primero else []),
-        {"run": "\n".join([f'claude -p "$PROMPT" {permitidas} {prohibidas} {extra} {veredicto}', *despues])},
+        {"run": "\n".join([f'claude -p "$PROMPT" {modo} {permitidas} {prohibidas} {extra} {veredicto}', *despues])},
         *([] if artifact_primero else artifact),
     ]}
 
@@ -230,6 +257,8 @@ CASOS_REVISION = {
     "disallowed-sin-proc": (_job_revision(prohibidas="--disallowedTools Bash,Edit,Write,WebFetch,WebSearch"),
                             ["disallowed"]),
     "bypass": (_job_revision(extra="--permission-mode bypassPermissions"), ["bypass"]),
+    "sin-restricted": (_job_revision(modo="--strict-mcp-config"), ["restricted"]),
+    "sin-strict-mcp": (_job_revision(modo="--restricted"), ["mcp"]),
     "cli-latest": (_job_revision(instalar="@anthropic-ai/claude-code@latest"), ["pin"]),
     "sin-corte": (_job_revision(despues=(RESUMEN,)), ["fuga"]),
     "corte-sin-exit": (_job_revision(despues=(CORTE_OK.replace(" exit 1;", ""), RESUMEN)), ["fuga"]),
@@ -260,6 +289,8 @@ def _revision_seguridad():
     pytest.param(_codeql_analiza, id="codeql-lenguajes"),
     pytest.param(_codeql_pinneado_por_sha, id="codeql-pinneado"),
     pytest.param(_revision_seguridad, id="revision-seguridad"),
+    pytest.param(_ci_acciones_pinneadas, id="ci-acciones-pinneadas"),
+    pytest.param(_ci_checkout_sin_credenciales, id="ci-checkout-sin-credenciales"),
 ])
 def test_constitucion_v_tiene_su_step(chequeo):
     chequeo()
