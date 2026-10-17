@@ -189,6 +189,7 @@ def _job_revision(si="github.event_name == 'pull_request'", instalar="@anthropic
 
 CASOS_REVISION = {
     "bueno": (_job_revision(), []),
+    "if-envuelto-ok": (_job_revision(si="${{ github.event_name == 'pull_request' }}"), []),
     "if-con-push": (_job_revision(si="github.event_name == 'push'"), ["if"]),
     "if-envuelto-con-and": (_job_revision(si="${{ github.event_name == 'pull_request' && true }}"), ["if"]),
     "sin-veredicto": (_job_revision(veredicto="> reporte.md"), ["veredicto"]),
