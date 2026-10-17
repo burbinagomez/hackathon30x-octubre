@@ -62,7 +62,7 @@ La spec tiene una sola historia (US1: una búsqueda por CLI deja leads deduplica
 ## Fase 3: US1, búsqueda por CLI con Supersociedades
 
 **Objetivo**: `uv run python -m app.cli buscar --tenant <id> --pais CO --ciiu 4711 --departamento 11` deja leads deduplicados, con costo y cumplimiento.
-**Prueba independiente**: los tests de esta fase, sin red; más una corrida real en T040.
+**Prueba independiente**: los tests de esta fase, sin red; más una corrida real en T042.
 
 ### Paso 5: adaptador Croma
 

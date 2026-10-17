@@ -217,7 +217,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUEN
 2. **Dominio + registro:** `EmpresaCruda`, `CriteriosICP`, `normalizar_nit`, los Protocols y `cargar_registro`. Los de `test_dominio.py` en rojo → verde. De los 4 de `test_registro.py`, el primero que se escribe es el del YAML real y **queda en rojo hasta T031**, cuando el catálogo registra `croma_supersociedades_co` (paso 5); los otros 3 pasan a verde en este paso.
 3. **Migración `0002` + `persistencia/`:**
    - `supabase_simulado.sql` en CI primero, para que los tests de privilegios nazcan en rojo;
-   - `test_unico_…`, `test_lead_persistido_conserva_tipo_titular`, `test_rls[…]` y los 3 de `test_privilegios_supabase.py` en rojo → verde;
+   - `test_unico_…`, `test_lead_persistido_conserva_tipo_titular`, `test_lead_nuevo_y_cumplimiento_en_una_transaccion`, `test_crear_busqueda_se_confirma_antes`, `test_rls[…]` y los 3 de `test_privilegios_supabase.py` en rojo → verde;
    - con la `0002` en el repo, `test_migrar_local_desde_vacio_dos_veces_sin_drift` queda en rojo por el `== "0001"`; se cambia el assert a las versiones de `supabase/migrations/*.sql` y vuelve a verde;
    - los 2 de `test_sembrar_tenant.py` en rojo → `sembrar_tenant.py` con upsert → verde;
    - el **advisor revisa los tests de RLS y de privilegios antes de aceptarlos**.
