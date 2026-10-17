@@ -18,7 +18,7 @@ cd ../frontend && npm ci && npm test
 
 ## Producción (una vez, a mano)
 En el dashboard de Supabase:
-1. **Settings → API → Exposed schemas**: sacar `public`.
+1. **Settings → Integrations → Data API**: sacar `public`.
 2. **Database → Extensions**: habilitar `pg_trgm` y `pgcrypto`.
 3. **SQL editor**: pegar `backend/scripts/roles.sql` y correrlo. Sin passwords.
 
