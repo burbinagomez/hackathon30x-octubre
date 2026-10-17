@@ -118,6 +118,7 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
 - `backend/tests/integration/test_leads_repo.py`:
   - `::test_unico_por_tenant_pais_id_fiscal`: un segundo INSERT con el mismo `(tenant_id, pais, id_fiscal)` viola la restricción.
   - `::test_unico_lead_fuente_busqueda`: un segundo INSERT en `lead_fuentes` con el mismo `(lead_id, fuente, busqueda_id)` viola la restricción, y `EjecutarBusqueda` lo resuelve con `ON CONFLICT DO NOTHING`.
+  - `::test_mismo_id_fiscal_en_otro_tenant_es_otro_lead`: el mismo `(pais, id_fiscal)` en otro tenant es otro lead; el dedup no cruza tenants.
   - `::test_lead_persistido_conserva_tipo_titular`: una `EmpresaCruda` de Supersociedades, guardada y releída, tiene `tipo_titular == 'juridica'`.
   - `::test_lead_nuevo_y_cumplimiento_en_una_transaccion`: si falla el INSERT del `cumplimiento`, no queda ninguna fila en `leads`.
   - `::test_crear_busqueda_se_confirma_antes`: la fila de `busquedas` es visible desde otra conexión antes de que se llame a ningún adaptador.
