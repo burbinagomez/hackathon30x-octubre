@@ -70,7 +70,7 @@
   - `ALTER DEFAULT PRIVILEGES FOR ROLE app_mig`: tablas (SELECT, INSERT, UPDATE, DELETE) y secuencias (USAGE, SELECT) para `app_rt`;
   - `CREATE SCHEMA IF NOT EXISTS extensions` + `GRANT USAGE … TO app_rt, app_mig`;
   - `search_path = public, extensions` en los dos roles.
-- [ ] T016 [P] 🤖 **Rojo:** `backend/tests/integration/test_rol_runtime.py::test_rol_runtime_no_es_super_ni_bypassrls_ni_puede_crear`. Como `app_rt`:
+- [X] T016 [P] 🤖 **Rojo:** `backend/tests/integration/test_rol_runtime.py::test_rol_runtime_no_es_super_ni_bypassrls_ni_puede_crear`. Como `app_rt`:
   - los 4 atributos (`rolsuper`, `rolbypassrls`, `rolcreaterole`, `rolcreatedb`) en false;
   - nada en `pg_namespace` ni en `pg_class` tiene dueño `app_rt`;
   - `CREATE TABLE` en `public` da permiso denegado;
