@@ -47,7 +47,7 @@ El esquema vive en `supabase/migrations/NNNN_nombre.sql`: SQL escrito a mano y r
 export TEST_DATABASE_URL=postgresql+psycopg://app_rt@localhost:5432/postgres
 export TEST_ADMIN_DATABASE_URL=postgresql+psycopg://postgres@localhost:5432/postgres
 cd backend && uv run pytest -q && uv run lint-imports
-cd frontend && npm test
+cd ../frontend && npm test
 ```
 Los tests de integración fallan, no se saltan, si falta alguna de las dos URLs. Más detalle en [`specs/001-walking-skeleton/quickstart.md`](specs/001-walking-skeleton/quickstart.md).
 
