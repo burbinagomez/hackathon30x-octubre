@@ -61,13 +61,13 @@ E2E_BASE_URL=http://localhost:4173 npx playwright test e2e/marca-responsive.spec
 Solo ese archivo: `health.spec.ts` contra `vite preview` falla porque no hay API detrás. Sin API, la página muestra "API: error · DB: error": coincide con `/^API:/` y para medir el layout alcanza. En `e2e.yml`, el archivo nuevo corre también contra Railway, junto a `health.spec.ts`.
 
 ## Criterios de aceptación
-- [ ] `frontend/src/tokens.css` existe, define en `:root` las seis variables y se importa en `main.tsx`.
-- [ ] `index.html` tiene el `<meta name="viewport">`, los `preconnect` a `fonts.googleapis.com` y `fonts.gstatic.com` y los `<link>` de Poppins y DM Sans con `display=swap`.
-- [ ] `vite.config.ts` tiene `test.css: { include: [/\?raw/] }`.
-- [ ] `marca-responsive.spec.ts` pasa en los tres viewports, con el canario; antes del cambio falló en los móviles.
-- [ ] `marca.test.ts` pasa; antes del cambio falló.
-- [ ] `npm test` sigue verde; `playwright.config.ts`, `health.spec.ts` y `package.json` sin cambios.
-- [ ] `docs/decisiones.md` tiene la fila de la regla responsive (2026-10-17).
+- [x] `frontend/src/tokens.css` existe, define en `:root` las seis variables y se importa en `main.tsx`.
+- [x] `index.html` tiene el `<meta name="viewport">`, los `preconnect` a `fonts.googleapis.com` y `fonts.gstatic.com` y los `<link>` de Poppins y DM Sans con `display=swap`.
+- [x] `vite.config.ts` tiene `test.css: { include: [/\?raw/] }`.
+- [x] `marca-responsive.spec.ts` pasa en los tres viewports, con el canario; antes del cambio falló en los móviles.
+- [x] `marca.test.ts` pasa; antes del cambio falló.
+- [x] `npm test` sigue verde; `playwright.config.ts`, `health.spec.ts` y `package.json` sin cambios.
+- [x] `docs/decisiones.md` tiene la fila de la regla responsive (2026-10-17).
 
 ## Fuera del alcance
 - Mecanismo de i18n (librería, archivos de mensajes, selector de idioma). Este slice no agrega texto; el mecanismo nace con el primer slice que lo necesite.
