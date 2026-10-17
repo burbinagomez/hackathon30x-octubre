@@ -9,6 +9,7 @@ docker run -d --name pg001 -e POSTGRES_HOST_AUTH_METHOD=trust -p 5432:5432 postg
 psql postgresql://postgres@localhost:5432/postgres -f backend/scripts/roles.sql
 export TEST_DATABASE_URL=postgresql+psycopg://app_rt@localhost:5432/postgres
 export TEST_MIGRATION_DATABASE_URL=postgresql+psycopg://app_mig@localhost:5432/postgres
+export TEST_ADMIN_DATABASE_URL=postgresql+psycopg://postgres@localhost:5432/postgres  # solo tests: crea el esquema `ajeno` de test_drift_mira_solo_public_aunque_cambie_search_path
 
 cd backend && uv sync && uv run pytest -q && uv run lint-imports
 cd ../frontend && npm ci && npm test
