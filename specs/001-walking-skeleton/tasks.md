@@ -148,6 +148,7 @@
 ### Pendientes para la 013 (advisor del PR #16, no se tocan acá)
 - [ ] `migrar_local.sh`: una migración con su propio `BEGIN`/`COMMIT` rompe el `-1`. El `COMMIT` interno confirma lo anterior y el registro queda afuera. Rechazarlo en el script o dejarlo escrito en la plantilla.
 - [ ] `migrar_local.sh`: aplica en silencio una pendiente con versión menor que la última registrada, y `db push` la rechaza sin `--include-all`. Local y CI dan verde, y `migrar` falla en `main`. Que el script falle igual.
+- [ ] Sentencias que no corren en transacción (`CREATE/DROP INDEX CONCURRENTLY`, `REINDEX … CONCURRENTLY`, `VACUUM`, `ALTER SYSTEM`, `CLUSTER`). `db push` confirma lo anterior y las corre sueltas, así que si algo falla después queda a medias y sin fila en el historial (`SIDE_EFFECTS.md` del CLI v2.119.0). Regla: cada una va en su propio archivo de migración y con `IF NOT EXISTS`. Además `migrar_local.sh` tiene que correr esos archivos sin `-1`, para que local y prod se comporten igual: hoy local falla y prod las aplica.
 
 ## Dependencias
 
