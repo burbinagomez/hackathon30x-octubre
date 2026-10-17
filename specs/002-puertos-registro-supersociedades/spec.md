@@ -114,6 +114,11 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
   - `::test_default_privileges_no_conceden_a_anon_ni_authenticated`: después de aplicar `supabase/migrations`, `postgres` crea una tabla **regular** `public.x` dentro de una transacción con rollback, y `anon`/`authenticated` no tienen ningún privilegio sobre ella. No una `TEMP TABLE`: esa va a `pg_temp` y no le aplican los defaults de `public`.
   - `::test_tenant_no_sobrevive_al_commit`: usa la unidad de trabajo real sobre el engine de `app_rt`, no un `SET LOCAL` escrito en el test. Dentro de la unidad de trabajo, `current_setting('app.tenant_id', true)` es el tenant; después del commit, en la misma conexión, es vacío o `NULL`. Prueba que el código usa `SET LOCAL` y no `SET` de sesión.
   - Que `app_rt` no tiene `BYPASSRLS` ya lo prueba `test_rol_runtime` del 001.
+- `backend/tests/arquitectura/test_migraciones.py::test_migrar_local_desde_vacio_dos_veces_sin_drift` (del 001): hoy afirma `_aplicadas(base_vacia) == "0001"`, así que la `0002` lo pone en rojo. Se cambia ese assert para comparar contra las versiones de `supabase/migrations/*.sql`, ordenadas y unidas por coma. Así ninguna migración siguiente lo vuelve a romper. Lo que prueba no cambia: desde vacío, dos corridas, sin drift y todas las migraciones registradas.
+  - La ruta sale del mismo default que `migrar_local.sh` (`BACKEND.parent / "supabase" / "migrations"`, sin pasar `MIGRACIONES`); la versión es lo que va antes del primer `_`, y el orden es de texto, como el `ORDER BY version` de `_aplicadas`.
+- `backend/tests/integration/test_sembrar_tenant.py`:
+  - `::test_sembrar_dos_veces_mismo_id_actualiza`: con `postgres`, la segunda siembra del mismo `id` cambia `nombre` e `idioma` (`'es'` → `'en'`) y no falla. Queda 1 fila con ese `id`, con el `nombre` y el `idioma` nuevos. El test llama a la función de siembra con una conexión, no al prompt de `getpass`.
+  - `::test_no_imprime_la_url_de_postgres`: `getpass` se reemplaza con monkeypatch por una URL con una password marcadora y host inalcanzable, y se corre el `main`. El exit code es distinto de 0 y la password no aparece ni en stdout ni en stderr (`capsys`).
 
 ## Fuera del alcance
 - **003:** OSM, normalización entre fuentes, dedup por dominio, teléfono o nombre difuso, y DIAN Trade.
@@ -148,7 +153,7 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
 | `cumplimiento` | `lead_id`, `fuente`, `licencia`, `url_origen`, `base_legal`, `as_of`, `opt_out_at`, `solicitudes jsonb` | `lead_id` UNIQUE. `base_legal` nullable hasta el 007 (la setea `AprobarMensaje`). |
 | `costos` | las columnas de `OperacionCosto` + `gratis` | `gratis bool NOT NULL`. |
 
-Todas menos `tenants` llevan `tenant_id` y RLS con `USING/WITH CHECK (tenant_id = current_setting('app.tenant_id')::uuid)`. `tenants` tiene RLS con `USING (id = current_setting('app.tenant_id')::uuid)`, solo `GRANT SELECT` a `app_rt`, y se siembra con `postgres`. La siembra la corre un humano desde local: `sembrar_tenant.py` pide la URL de `postgres` por `getpass`, nunca por argv, por `DATABASE_URL` ni por una variable en Railway (ahí `api` solo tiene `app_rt`). La unidad de trabajo abre la transacción y hace `SET LOCAL app.tenant_id` (o `set_config(..., true)`) como primera sentencia. **Nunca `SET` de sesión:** `api` entra por el pooler de Supabase en modo transacción, y una conexión con el tenant de otro cliente puede llegar a la request siguiente.
+Todas menos `tenants` llevan `tenant_id` y RLS con `USING/WITH CHECK (tenant_id = current_setting('app.tenant_id')::uuid)`. `tenants` tiene RLS con `USING (id = current_setting('app.tenant_id')::uuid)`, solo `GRANT SELECT` a `app_rt`, y se siembra con `postgres`. La siembra la corre un humano desde local: `sembrar_tenant.py` pide la URL de `postgres` por `getpass`, nunca por argv, por `DATABASE_URL` ni por una variable en Railway (ahí `api` solo tiene `app_rt`). Hace upsert por `id` (`INSERT … ON CONFLICT (id) DO UPDATE SET nombre = EXCLUDED.nombre, idioma = EXCLUDED.idioma`), con `--id` opcional: sin `--id` genera un uuid y lo imprime. Así se puede volver a correr sobre un tenant existente, y el 007 le suma `--firmante` y `--finalidad`. La unidad de trabajo abre la transacción y hace `SET LOCAL app.tenant_id` (o `set_config(..., true)`) como primera sentencia. **Nunca `SET` de sesión:** `api` entra por el pooler de Supabase en modo transacción, y una conexión con el tenant de otro cliente puede llegar a la request siguiente.
 
 **Roles de Supabase** (en la misma `0002`, al final):
 ```sql
@@ -186,6 +191,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUEN
 3. **Migración `0002` + `persistencia/`:**
    - `supabase_simulado.sql` en CI primero, para que los tests de privilegios nazcan en rojo;
    - `test_unico_…`, `test_lead_persistido_conserva_tipo_titular`, `test_rls[…]` y los 3 de `test_privilegios_supabase.py` en rojo → verde;
+   - con la `0002` en el repo, `test_migrar_local_desde_vacio_dos_veces_sin_drift` queda en rojo por el `== "0001"`; se cambia el assert a las versiones de `supabase/migrations/*.sql` y vuelve a verde;
+   - los 2 de `test_sembrar_tenant.py` en rojo → `sembrar_tenant.py` con upsert → verde;
    - el **advisor revisa los tests de RLS y de privilegios antes de aceptarlos**.
 4. **`postgres_costos`:** `test_todo_adaptador_de_registro_recibe_registro_costos` en rojo → verde.
 5. **Adaptador `croma_supersociedades_co`** con la fixture sintética:
