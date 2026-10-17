@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, make_url, text
 from sqlalchemy.exc import ProgrammingError
 
+from app import db
 from app.config import SecretProhibido
 from app.main import app
 
@@ -43,21 +44,31 @@ def test_rol_runtime_no_es_super_ni_bypassrls_ni_puede_crear(conn):
     assert conn.execute(text("SELECT has_schema_privilege(current_user, 'extensions', 'USAGE')")).scalar()
 
 
-@pytest.mark.parametrize("atributo", ["SUPERUSER", "BYPASSRLS"])
-def test_api_no_arranca_con_un_rol_que_saltea_rls(monkeypatch, atributo):
+@pytest.fixture(params=["SUPERUSER", "BYPASSRLS"])
+def url_peligrosa(request):
     # Sin "postgres" en el nombre: lo tiene que frenar la base, no el chequeo del string en config.py.
     admin = create_engine(_url("TEST_ADMIN_DATABASE_URL"), isolation_level="AUTOCOMMIT")
     with admin.connect() as c:
         c.execute(text("DROP ROLE IF EXISTS rt_peligroso"))
-        c.execute(text(f"CREATE ROLE rt_peligroso LOGIN {atributo} PASSWORD 'peligroso-test'"))
+        c.execute(text(f"CREATE ROLE rt_peligroso LOGIN {request.param} PASSWORD 'peligroso-test'"))
     url = make_url(_url("TEST_DATABASE_URL")).set(username="rt_peligroso", password="peligroso-test")
-    monkeypatch.setenv("DATABASE_URL", url.render_as_string(hide_password=False))
+    yield url.render_as_string(hide_password=False)
+    with admin.connect() as c:
+        c.execute(text("DROP ROLE rt_peligroso"))
+
+
+def test_api_no_arranca_con_un_rol_que_saltea_rls(monkeypatch, url_peligrosa):
+    monkeypatch.setenv("DATABASE_URL", url_peligrosa)
     monkeypatch.setenv("CORS_ORIGINS", "http://localhost:5173")
-    try:
-        with pytest.raises(SecretProhibido) as exc:
-            with TestClient(app):
-                pass
-        assert "DATABASE_URL" in str(exc.value)
-    finally:
-        with admin.connect() as c:
-            c.execute(text("DROP ROLE rt_peligroso"))
+    with pytest.raises(SecretProhibido) as exc:
+        with TestClient(app):
+            pass
+    assert "DATABASE_URL" in str(exc.value)
+
+
+def test_la_primera_conexion_real_chequea_el_rol_aunque_el_arranque_no_haya_podido(url_peligrosa):
+    # Base caída al arrancar = el engine existe pero nunca conectó; el chequeo tiene que correr igual al conectar.
+    engine = db.crear_engine(url_peligrosa)
+    for _ in range(2):  # y no se "gasta" al fallar: la segunda conexión también se frena
+        with pytest.raises(SecretProhibido):
+            engine.connect().close()

@@ -78,7 +78,7 @@
 
   Si falta `TEST_DATABASE_URL`, falla; no se salta.
 
-  Más `::test_api_no_arranca_con_un_rol_que_saltea_rls`: con un rol `SUPERUSER` o `BYPASSRLS` que no se llama `postgres`, la app no arranca y el error nombra `DATABASE_URL`. Lo cubre `db.verificar_rol()` en el lifespan, que le pregunta a la base `rolsuper OR rolbypassrls` de `current_user`: el chequeo del string en `config.py` es solo un barandal barato.
+  Más `::test_api_no_arranca_con_un_rol_que_saltea_rls`: con un rol `SUPERUSER` o `BYPASSRLS` que no se llama `postgres`, la app no arranca y el error nombra `DATABASE_URL`. Lo cubre un evento `first_connect` del engine (`db.crear_engine`), que le pregunta a la base `rolsuper OR rolbypassrls` de `current_user`; el lifespan fuerza esa primera conexión con `db.verificar_rol()`. Más `::test_la_primera_conexion_real_chequea_el_rol_aunque_el_arranque_no_haya_podido`: si la base estaba caída al arrancar, el chequeo corre en la primera conexión real y en cada reintento. El chequeo del string en `config.py` es solo un barandal barato.
 - [X] T017 [P] 🤖 **Rojo:** `backend/tests/arquitectura/test_migraciones.py` (R-migraciones). Cada test arranca de una base nueva con `roles.sql`:
   - `::test_migrar_local_desde_vacio_dos_veces_sin_drift`: `scripts/migrar_local.sh` dos veces, las dos en 0, `compare_metadata` contra `app/modelos.py` da vacío y queda registrada `0001`;
   - `::test_aplica_solo_lo_que_falta_y_en_orden`: `0001` con un `CREATE TABLE` sin `IF NOT EXISTS` → la tabla existe y `0001` queda registrada; se suma `0002` que la altera → la segunda corrida da 0 y quedan `0001,0002`;
