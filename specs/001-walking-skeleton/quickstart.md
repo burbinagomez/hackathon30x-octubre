@@ -8,8 +8,8 @@
 docker run -d --name pg001 -e POSTGRES_HOST_AUTH_METHOD=trust -p 5432:5432 postgres:16   # solo local: sin passwords
 psql postgresql://postgres@localhost:5432/postgres -f backend/scripts/roles.sql
 export TEST_DATABASE_URL=postgresql+psycopg://app_rt@localhost:5432/postgres
-export TEST_MIGRATION_DATABASE_URL=postgresql+psycopg://app_mig@localhost:5432/postgres
-export TEST_ADMIN_DATABASE_URL=postgresql+psycopg://postgres@localhost:5432/postgres  # solo tests: crea el esquema `ajeno` de test_drift_mira_solo_public_aunque_cambie_search_path
+export TEST_ADMIN_DATABASE_URL=postgresql+psycopg://postgres@localhost:5432/postgres  # solo tests: crea las bases vacías de test_migraciones
+backend/scripts/migrar_local.sh postgresql://postgres@localhost:5432/postgres   # supabase/migrations en orden, como en CI
 
 cd backend && uv sync && uv run pytest -q && uv run lint-imports
 cd ../frontend && npm ci && npm test
@@ -25,15 +25,13 @@ En el dashboard de Supabase:
 Passwords, desde `psql` (no quedan en ningún historial):
 ```bash
 psql "postgresql://postgres.<ref>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require"
-\password app_mig
 \password app_rt
-\dn+ public                          # dueño: app_mig
 ```
 Después hay que cargar:
-- `MIGRATION_DATABASE_URL` en el GitHub Environment `produccion`: `postgresql+psycopg://app_mig.<ref>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require` (modo sesión);
+- en el GitHub Environment `produccion`: secrets `SUPABASE_ACCESS_TOKEN` (Account → Access Tokens) y `SUPABASE_DB_PASSWORD` (la password de `postgres` del proyecto), variable `SUPABASE_PROJECT_REF`. Con eso el job `migrar` corre `supabase db push`;
 - `DATABASE_URL` en el servicio `api` de Railway: `postgresql+psycopg://app_rt.<ref>@aws-0-<region>.pooler.supabase.com:6543/postgres?sslmode=require` (modo transacción).
 
-La password que pusiste con `\password` va después del usuario (`usuario:password@`) **solo en el valor del secret**. No se escribe acá ni en ningún otro archivo.
+La password que pusiste con `\password app_rt` va después del usuario (`usuario:password@`) **solo en el valor de la variable de Railway**. No se escribe acá ni en ningún otro archivo.
 
 El host exacto del pooler sale de **Connect** en el dashboard.
 
@@ -45,7 +43,7 @@ gh workflow run e2e.yml -f base_url=https://web-production-ce4537.up.railway.app
 **Esperado:** la página muestra `API: ok · DB: ok`.
 
 ## Barandales
-- Setear `MIGRATION_DATABASE_URL` o cualquier key de Supabase en `api` hace que el deploy falle al arrancar.
+- Setear en `api` cualquier `SUPABASE_*`, `MIGRATION_DATABASE_URL`, una key de Supabase o un access token del CLI (`sbp_…`) hace que el deploy falle al arrancar.
 - `railway variables --service web` muestra solo `VITE_API_URL` (más las `RAILWAY_*` del sistema). Es manual: no hay token de Railway en CI.
 - `curl https://<ref>.supabase.co/rest/v1/` con la publishable key no lista nada de `public`.
 - `gh api repos/:owner/:repo/branches/main/protection` lista `back`, `front`, `seguridad`, `evals` e `imagenes` como required.

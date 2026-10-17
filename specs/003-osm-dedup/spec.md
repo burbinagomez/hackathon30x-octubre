@@ -284,7 +284,7 @@ Ninguno: este slice no usa IA. Las empresas de OSM + Supersociedades alimentan `
 - El dominio maneja el E.164 en claro; `repositorio_leads` cifra y hashea al escribir y descifra al leer.
 - Catálogo inicial: `leads.telefono_cifrado`, `leads.email_cifrado`. El 006 suma `nombre_contacto` y el 007 `respuesta_texto`.
 
-**Tablas** (migración `0003_osm_dedup`, a mano, con `GRANT` a `app_rt`):
+**Tablas** (migración `supabase/migrations/0003_osm_dedup.sql`, a mano, con `GRANT` a `app_rt`):
 
 | Tabla | Cambio |
 |---|---|

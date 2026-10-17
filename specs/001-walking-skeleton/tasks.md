@@ -22,7 +22,7 @@
 - [ ] T001 🧑B Verificar el proyecto Supabase del evento (ya existe). Anotar `project-ref` y región del pooler (no son secretos, pero no van al repo hasta el README de T033).
 - [ ] T002 🧑B Supabase → **Settings → API → Exposed schemas**: sacar `public`. **Database → Extensions**: habilitar `pg_trgm` y `pgcrypto` (quedan en `extensions`).
 - [ ] T003 🧑B Supabase: correr `\dn+ extensions` y `SELECT * FROM pg_default_acl` desde `psql` como `postgres` por el pooler en modo sesión. Pasarme **la salida** (no tiene secretos), que define si el `GRANT USAGE ON SCHEMA extensions` de `roles.sql` va a andar.
-- [X] T004 🤖 Esqueleto del back: `backend/pyproject.toml` (`uv python pin 3.12`, sin patch; FastAPI, SQLAlchemy 2, `psycopg[binary]` 3, Alembic, pydantic-settings, uvicorn; dev: pytest, httpx, import-linter, pip-audit) + `backend/uv.lock` commiteado y `backend/app/__init__.py`, `backend/app/modulos/__init__.py` vacíos.
+- [X] T004 🤖 Esqueleto del back: `backend/pyproject.toml` (`uv python pin 3.12`, sin patch; FastAPI, SQLAlchemy 2, `psycopg[binary]` 3, pydantic-settings, uvicorn; dev: pytest, httpx, import-linter, pip-audit, Alembic solo para el drift check) + `backend/uv.lock` commiteado y `backend/app/__init__.py`, `backend/app/modulos/__init__.py` vacíos.
 - [X] T005 🤖 **Rojo:** `backend/tests/unit/test_health_stub.py` (`GET /health` → 200). Verlo fallar por la ruta ausente, no por un import roto.
 - [X] T006 🤖 **Verde:** `backend/app/main.py` mínimo con `/health` stub. Después, `backend/Dockerfile` multi-stage y `backend/.dockerignore` (R-docker):
   - builder `python:3.12-slim` (tag fijo) + `uv` copiado de `ghcr.io/astral-sh/uv:<tag>`, con `uv sync --frozen --no-dev --no-install-project`;
@@ -45,7 +45,7 @@
   - `::test_app_no_arranca_con_secret_prohibido[…]`, un caso por parámetro:
     - `MIGRATION_DATABASE_URL`;
     - un nombre `SUPABASE_*`;
-    - un valor que empieza con `sb_publishable_` o `sb_secret_`;
+    - un valor que empieza con `sb_publishable_`, `sb_secret_` o `sbp_`;
     - un JWT con `role` en `{anon, service_role}`.
 
     En cada caso, el nombre de la variable aparece en `str(exc)`, y el valor no aparece en `str(exc)`, `caplog.text` ni `capsys`.
@@ -60,16 +60,15 @@
   - `handle { root * /srv; try_files {path} /index.html; file_server }`.
 - [X] T014 🤖 `.env.example`: sumar `CORS_ORIGINS=` y `E2E_BASE_URL=`, solo nombres.
 
-### Tarea 3: roles, Alembic, drift y engine
+### Tarea 3: roles, migraciones SQL, drift y engine
 - [X] T015 🤖 `backend/scripts/roles.sql`, idempotente y sin passwords (R3):
-  - `app_mig` y `app_rt` con `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB`, dentro de un `DO … IF NOT EXISTS`;
-  - `GRANT app_mig TO CURRENT_USER`;
-  - `ALTER SCHEMA public OWNER TO app_mig`;
+  - solo `app_rt`, con `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB`, dentro de un `DO … IF NOT EXISTS` (las migraciones corren como `postgres`: no hay rol de migraciones);
   - `REVOKE CREATE ON SCHEMA public FROM PUBLIC`;
   - `GRANT USAGE ON SCHEMA public TO app_rt`;
-  - `ALTER DEFAULT PRIVILEGES FOR ROLE app_mig`: tablas (SELECT, INSERT, UPDATE, DELETE) y secuencias (USAGE, SELECT) para `app_rt`;
-  - `CREATE SCHEMA IF NOT EXISTS extensions` + `GRANT USAGE … TO app_rt, app_mig`;
-  - `search_path = public, extensions` en los dos roles.
+  - `CREATE SCHEMA IF NOT EXISTS extensions` + `GRANT USAGE … TO app_rt`;
+  - `search_path = public, extensions` en `app_rt`.
+
+  Los `GRANT` de tablas a `app_rt` van dentro de cada migración.
 - [X] T016 [P] 🤖 **Rojo:** `backend/tests/integration/test_rol_runtime.py::test_rol_runtime_no_es_super_ni_bypassrls_ni_puede_crear`. Como `app_rt`:
   - los 4 atributos (`rolsuper`, `rolbypassrls`, `rolcreaterole`, `rolcreatedb`) en false;
   - nada en `pg_namespace` ni en `pg_class` tiene dueño `app_rt`;
@@ -77,21 +76,21 @@
   - `has_schema_privilege('app_rt','extensions','USAGE')` da true.
 
   Si falta `TEST_DATABASE_URL`, falla; no se salta.
-- [X] T017 [P] 🤖 **Rojo:** `backend/tests/arquitectura/test_migraciones.py`:
-  - `::test_upgrade_head_desde_vacio`: `downgrade base` → `upgrade head` como `app_mig` → la revisión actual es `head` y `alembic check` da 0. `MIGRATION_DATABASE_URL` va solo en el `env=` del subproceso.
-  - `::test_drift_mira_solo_public_aunque_cambie_search_path`: con `ajeno.t` creada y `PGOPTIONS="-c search_path=ajeno,public"`, `check` da 0 y `alembic_version` queda en `public`. Con una tabla extra en `public`, `check` da ≠ 0.
+- [X] T017 [P] 🤖 **Rojo:** `backend/tests/arquitectura/test_migraciones.py` (R-migraciones). Cada test arranca de una base nueva con `roles.sql`:
+  - `::test_migrar_local_desde_vacio_dos_veces_sin_drift`: `scripts/migrar_local.sh` dos veces, las dos en 0, y `compare_metadata` contra `app/modelos.py` da vacío;
+  - `::test_migracion_aplicada_no_se_reaplica`: un `CREATE TABLE` sin `IF NOT EXISTS`; la segunda corrida da 0;
+  - `::test_migracion_rota_falla_claro_y_no_deja_nada`: exit ≠ 0, stderr nombra el archivo y la tabla del archivo roto no existe;
+  - `::test_drift_mira_solo_public_aunque_cambie_search_path`: con `ajeno.t` y `-c search_path=ajeno,public`, drift vacío; con una tabla extra en `public`, drift no vacío.
 - [X] T018 [P] 🤖 **Rojo:** `backend/tests/unit/test_db.py::test_engine_desactiva_prepared_statements`: el engine de `db.py` pasa `prepare_threshold=None`.
 - [X] T019 🤖 **Verde:**
   - `backend/app/modelos.py` con `metadata = MetaData()`, sin importar `config`;
   - `backend/app/db.py` con `connect_args={"prepare_threshold": None}`;
-  - `backend/alembic.ini`;
-  - `backend/alembic/env.py`: URL desde `os.environ["MIGRATION_DATABASE_URL"]`, sin importar `app.config`, `SET search_path TO public, extensions` al conectar, `target_metadata = metadata`, sin `version_table_schema`;
-  - `backend/alembic/versions/0001_inicial.py` vacía.
+  - `backend/scripts/migrar_local.sh`: aplica `supabase/migrations/*.sql` en orden con `psql -1 -v ON_ERROR_STOP=1` como superusuario y registra cada uno en `supabase_migrations.schema_migrations`;
+  - `supabase/migrations/0001_inicial.sql` sin tablas y `supabase/config.toml` con solo `project_id`.
 - [ ] T020 🧑B Supabase (cuando T015 esté commiteado):
   - pegar `backend/scripts/roles.sql` en el **SQL editor** y correrlo;
-  - poner las passwords con `\password app_mig` y `\password app_rt` desde `psql` (nunca en el SQL editor);
-  - verificar con `\dn+ public` que el dueño es `app_mig`;
-  - verificar que el pooler acepta `app_rt.<ref>` (6543) y `app_mig.<ref>` (5432) con `sslmode=require`.
+  - poner la password con `\password app_rt` desde `psql` (nunca en el SQL editor);
+  - verificar que el pooler acepta `app_rt.<ref>` (6543) con `sslmode=require`.
 
   Pasarme solo las salidas, sin passwords. **Acá te aviso (0a/0b).**
 
@@ -122,14 +121,14 @@
 
   Después, contra las imágenes de T006 (250 MB) y T013 (60 MB) → verde.
 - [X] T029 🤖 `.github/workflows/ci.yml` con estos jobs (además, `imagenes`: build de las dos imágenes + `check_imagen.sh`):
-  - `back`: `postgres:16` + `roles.sql` + passwords de test, `uv sync`, `pytest`, `lint-imports`, alembic desde cero + `check`;
+  - `back`: `postgres:16` + `roles.sql` + password de test, `migrar_local.sh` desde vacío, `uv sync`, `pytest`, `lint-imports`;
   - `front`: `npm ci`, `vitest`, build;
   - `seguridad`: pip-audit, `npm audit --audit-level=high`, binario de gitleaks;
   - `evals`;
-  - `migrar`: solo en push a `main`, con `environment: produccion` y `needs` de `back`, `front`, `seguridad` e `imagenes`.
+  - `migrar`: solo en push a `main`, con `environment: produccion` y `needs` de `back`, `front`, `seguridad` e `imagenes`; `supabase/setup-cli` pineado → `supabase link` → `supabase db push`.
 
   Más `.github/workflows/e2e.yml` (`workflow_dispatch`, input `base_url` → `E2E_BASE_URL`) y `.github/dependabot.yml` (pip/uv, npm, github-actions y docker).
-- [ ] T030 🧑B GitHub: crear el Environment `produccion`, limitado a `main`, con el secret `MIGRATION_DATABASE_URL` (pooler en modo sesión, `app_mig.<ref>`). Activar CodeQL default setup.
+- [ ] T030 🧑B GitHub: crear el Environment `produccion`, limitado a `main`, con los secrets `SUPABASE_ACCESS_TOKEN` (access token de la cuenta, `sbp_…`) y `SUPABASE_DB_PASSWORD` (password de `postgres` del proyecto), y la variable `SUPABASE_PROJECT_REF`. Activar CodeQL default setup.
 - [ ] T031 🧑A Railway:
   - `api`: `DATABASE_URL` (pooler en modo transacción, `app_rt.<ref>`, 6543) y `CORS_ORIGINS` (dominio de `web`);
   - `web`: solo `VITE_API_URL`;

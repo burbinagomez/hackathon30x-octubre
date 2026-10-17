@@ -1,6 +1,6 @@
 # Constitución — Reto Dapta (30X Hackathon)
 
-> Ubicación: `.specify/memory/constitution.md` · **Versión 1.3.0** · Ratificada 2026-10-17 · 1.1.0: PASS^K en IX · 1.2.0: Postgres en Supabase (III, IV, V) · 1.3.0: límites del front por feature (I)
+> Ubicación: `.specify/memory/constitution.md` · **Versión 1.4.0** · Ratificada 2026-10-17 · 1.1.0: PASS^K en IX · 1.2.0: Postgres en Supabase (III, IV, V) · 1.3.0: límites del front por feature (I) · 1.4.0: migraciones SQL del Supabase CLI (III, IV, V)
 > Regla de oro: **una regla entra aquí solo si tiene un chequeo automático que la hace cumplir.** Sin chequeo, es un deseo.
 > Regla del proyecto: **nada se desarrolla sin spec, sin reglas, sin agentes y sin skills definidos.** Este archivo es las reglas; `docs/prd.md` es la spec de producto; `.claude/agents/` y `.claude/skills/` son los agentes y skills.
 
@@ -19,15 +19,15 @@ Todo cambio de comportamiento empieza con un test que falla. Back: `pytest`. Fro
 **Chequeo:** CI corre ambas suites en cada push/PR; PR que toca `src/` sin tocar `tests/` recibe marca para revisión. **Si falla:** sin merge.
 
 ### III. Aislamiento por tenant, probado
-Toda tabla con datos de un tenant lleva `tenant_id` y RLS activa. El rol de runtime **no** es dueño del esquema ni tiene `BYPASSRLS`; la URL de migraciones solo existe en el job de migraciones. El tenant se fija con `SET LOCAL` dentro de la transacción, nunca con `SET` de sesión (el pooler de Supabase en modo transacción reparte conexiones entre clientes). Los roles de Supabase `anon` y `authenticated` no tienen privilegios sobre tablas de `public`.
-**Chequeo:** por cada tabla con RLS, test que como tenant B intenta SELECT/UPDATE/DELETE/INSERT sobre datos de A y espera vacío/denegado, corriendo con rol sin `BYPASSRLS`. Test que falla si el entorno de runtime contiene la URL de migraciones. Test de `has_table_privilege` para `anon` y `authenticated`. **Si falla:** bloqueante absoluto.
+Toda tabla con datos de un tenant lleva `tenant_id` y RLS activa. El rol de runtime **no** es dueño del esquema ni tiene `BYPASSRLS`; las credenciales de migraciones solo existen en el job `migrar`. El tenant se fija con `SET LOCAL` dentro de la transacción, nunca con `SET` de sesión (el pooler de Supabase en modo transacción reparte conexiones entre clientes). Los roles de Supabase `anon` y `authenticated` no tienen privilegios sobre tablas de `public`.
+**Chequeo:** por cada tabla con RLS, test que como tenant B intenta SELECT/UPDATE/DELETE/INSERT sobre datos de A y espera vacío/denegado, corriendo con rol sin `BYPASSRLS`. Test que falla si el entorno de runtime contiene credenciales de migraciones. Test de `has_table_privilege` para `anon` y `authenticated`. **Si falla:** bloqueante absoluto.
 
 ### IV. El esquema lo gobiernan las migraciones
-Todo cambio de esquema es una migración Alembic revisada por un humano. `autogenerate` desactivado salvo con `include_object`. `alembic upgrade head` desde base vacía reproduce el esquema.
-**Chequeo:** CI levanta Postgres vacío → `upgrade head` → drift check contra modelos, acotado al esquema `public` (los de Supabase quedan fuera). **Si falla:** sin merge.
+Todo cambio de esquema es un `supabase/migrations/NNNN_nombre.sql` escrito a mano y revisado por un humano (nada de `supabase db diff` sin revisar); prod lo aplica `supabase db push` en el job `migrar` y aplicarlas en orden desde base vacía reproduce el esquema.
+**Chequeo:** CI levanta Postgres vacío → `scripts/migrar_local.sh` dos veces (la segunda no reaplica) → drift check contra modelos (`compare_metadata`), acotado al esquema `public` (los de Supabase quedan fuera). **Si falla:** sin merge.
 
 ### V. Seguridad en el pipeline
-Secrets en variables de entorno (Railway para `api`; GitHub Environment `produccion` para la URL de migraciones), nunca en el repo ni en el front; `.env*` ignorado. Ninguna key de Supabase (anon, service_role, publishable, secret) existe en el entorno de `api` ni de `web`: la app no arranca si la ve. Dependabot activo. `pip-audit` + `npm audit` (CVE alta/crítica bloquea). CodeQL. Secret scanning + step que falla si el diff introduce un secret. Revisión OWASP Top 10 por PR con el agente `security` (CRITICAL/HIGH bloquea). Toda entrada se valida en el back; texto externo que llegue a un LLM se trata como hostil (prompt injection).
+Secrets en variables de entorno (Railway para `api`; GitHub Environment `produccion` para las credenciales del Supabase CLI), nunca en el repo ni en el front; `.env*` ignorado. Ninguna key de Supabase (anon, service_role, publishable, secret) existe en el entorno de `api` ni de `web`: la app no arranca si la ve. Dependabot activo. `pip-audit` + `npm audit` (CVE alta/crítica bloquea). CodeQL. Secret scanning + step que falla si el diff introduce un secret. Revisión OWASP Top 10 por PR con el agente `security` (CRITICAL/HIGH bloquea). Toda entrada se valida en el back; texto externo que llegue a un LLM se trata como hostil (prompt injection).
 **Chequeo:** los steps son *required checks* de `main`; un test de configuración falla si falta alguno. **Si falla:** sin merge.
 
 ### VI. Datos de contacto tratados como sensibles

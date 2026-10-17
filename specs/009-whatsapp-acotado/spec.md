@@ -311,7 +311,7 @@ Tests:
 
 **Variables de entorno nuevas** (Railway, servicio `api`): `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_TENANT_ID`. La cuenta de Meta es nueva para el evento, o la existente solo con la validación escrita del dueño, registrada en `docs/decisiones.md` y referenciada en `validacion_dueno` (constitución, reglas del proyecto).
 
-**Migración `0009_whatsapp.py`** (a mano, revisada por un humano):
+**Migración `supabase/migrations/0009_whatsapp.sql`** (a mano, revisada por un humano):
 
 | Tabla / vista | Definición |
 |---|---|
@@ -329,7 +329,7 @@ Todas las vistas con `security_invoker = true`. No redondean.
 ## Plan de tareas (TDD, en orden)
 **Corte 1: gate, opt-in, envío, baja y freno (≈ 2 h 15)**
 1. Rojo: `test_config_whatsapp.py` → verde con la carga del adaptador y `ConfigInvalida`.
-2. Rojo: `test_migraciones.py` (0009) + `test_rls[opt_in_whatsapp]` + `test_privilegios_supabase` → verde con `0009_whatsapp.py`.
+2. Rojo: `test_migraciones.py` (0009) + `test_rls[opt_in_whatsapp]` + `test_privilegios_supabase` → verde con `supabase/migrations/0009_whatsapp.sql`.
 3. Rojo: `test_plantilla.py` (WhatsApp) + `test_freno.py` → verde con `config/plantillas/whatsapp_v1.txt`, `validar(canal=...)` y `frenado`.
 4. Rojo: `test_opt_in_whatsapp.py` → verde con `RegistrarOptIn` y el endpoint.
 5. Rojo: `test_elegibles_whatsapp.py` → verde con las vistas y `RedactarBorradoresWhatsapp`.

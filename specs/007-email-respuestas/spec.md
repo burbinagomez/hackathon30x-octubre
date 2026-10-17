@@ -231,7 +231,7 @@
 
 **Perfil del remitente:** `tenants` suma `firmante text NULL` y `finalidad text NULL`, con `CHECK (char_length(...) <= 120)`. Los setea el script de siembra de la 002 con `app_mig`, porque `app_rt` solo tiene `SELECT` sobre `tenants`. Sin perfil completo → `PerfilRemitenteIncompleto`.
 
-**Migración `0006_contacto_email.py`** (a mano, con `GRANT` a `app_rt`):
+**Migración `supabase/migrations/0006_contacto_email.sql`** (a mano, con `GRANT` a `app_rt`):
 
 | Tabla / vista | Definición |
 |---|---|
