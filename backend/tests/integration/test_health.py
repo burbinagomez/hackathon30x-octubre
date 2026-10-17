@@ -1,8 +1,12 @@
+import importlib
 import os
+from contextlib import contextmanager
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 
+import app.main as modulo_main
 from app.main import app
 
 
@@ -34,3 +38,18 @@ def test_health_db_caida(entorno):
         r = client.get("/health")
     assert r.status_code == 503
     assert r.json() == {"status": "error", "db": "error"}
+
+
+class _EngineFalso:
+    @contextmanager
+    def connect(self):
+        yield SimpleNamespace(execute=lambda *a, **k: None)
+
+
+def test_health_lee_el_engine_de_su_propia_app_tras_un_reload():
+    # test_cors recarga app.main: el `app` importado acá queda viejo y no es el global del módulo.
+    importlib.reload(modulo_main)
+    app.state.engine = _EngineFalso()
+    r = TestClient(app).get("/health")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok", "db": "ok"}
