@@ -83,8 +83,8 @@ jobs:
           ANTES: ${{ github.event.before }}
         run: |
           base_url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
-          curl -sSfLO "$base_url/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          curl -sSfLO "$base_url/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          curl --proto '=https' -sSfLO "$base_url/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl --proto '=https' -sSfLO "$base_url/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
           sha256sum --check --ignore-missing "gitleaks_${GITLEAKS_VERSION}_checksums.txt"
           tar -xzf "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" gitleaks
           if [ "$EVENTO" = pull_request ]; then
