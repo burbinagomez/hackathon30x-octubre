@@ -64,7 +64,7 @@ Solo ese archivo: `health.spec.ts` contra `vite preview` falla porque no hay API
 - [x] `frontend/src/tokens.css` existe, define en `:root` las seis variables y se importa en `main.tsx`.
 - [x] `index.html` tiene el `<meta name="viewport">`, los `preconnect` a `fonts.googleapis.com` y `fonts.gstatic.com` y los `<link>` de Poppins y DM Sans con `display=swap`.
 - [x] `vite.config.ts` tiene `test.css: { include: [/\?raw/] }`.
-- [x] `marca-responsive.spec.ts` pasa en los tres viewports, con el canario; antes del cambio falló en los móviles.
+- [ ] `marca-responsive.spec.ts` pasa en los tres viewports, con el canario, en `e2e.yml` contra Railway después del deploy: eso prueba lo que Railway sirve de verdad. Antes del cambio falló en los móviles.
 - [x] `marca.test.ts` pasa; antes del cambio falló.
 - [x] `npm test` sigue verde; `playwright.config.ts`, `health.spec.ts` y `package.json` sin cambios.
 - [x] `docs/decisiones.md` tiene la fila de la regla responsive (2026-10-17).
