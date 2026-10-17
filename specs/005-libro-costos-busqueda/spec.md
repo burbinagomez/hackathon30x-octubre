@@ -131,9 +131,9 @@ Costo por canal: email 0.05, whatsapp 0.30. Costo de evals: 1.00.
 - `test_privilegios_supabase.py::test_anon_y_authenticated_sin_privilegios`: la lista suma `pg_views WHERE schemaname='public'`, y el assert previo exige que esté `v_tablero_fuentes`. `usuarios` entra sola por `pg_tables`.
 - `backend/tests/integration/test_usuarios_repo.py`:
   - `::test_app_rt_no_lee_usuarios_directo`: un `SELECT`, INSERT, UPDATE o DELETE de `app_rt` sobre `usuarios` falla por privilegios;
-  - `::test_usuario_para_login_devuelve_solo_ese_email`: con usuarios de 2 tenants, `usuario_para_login('a@x.co')` devuelve 1 fila (`id`, `tenant_id`, `hash_clave`), `usuario_para_login('A@X.co')` devuelve la misma fila y un email inexistente devuelve 0;
-  - `::test_email_se_guarda_en_minusculas`: con `postgres` (no `app_rt`, que no tiene `INSERT` sobre `usuarios` y fallaría por privilegios sin probar nada), un `INSERT` con `email='A@X.co'` falla con sqlstate `23514` (violación de `CHECK`);
-  - `::test_fijar_idioma_no_cruza_tenants`: con `app.tenant_id` de B, `fijar_idioma(<id de A>, 'en')` modifica 0 filas y el `idioma` de A no cambia;
+  - `::test_usuario_para_login_devuelve_solo_ese_email`: con usuarios de 2 tenants, `usuario_para_login(hmac_email('a@x.co'))` devuelve 1 fila (`id`, `tenant_id`, `hash_clave`), y un HMAC inexistente devuelve 0;
+  - `backend/tests/unit/acceso/test_email_hmac.py::test_hmac_normaliza_y_depende_de_la_clave` reemplaza al test de minúsculas en la base: `hmac_email(" A@X.co ", k) == hmac_email("a@x.co", k)` (32 bytes, HMAC-SHA256) y es distinto con otra clave;
+  - `::test_fijar_idioma_no_cruza_tenants`: control positivo: con `app.tenant_id` de A, `fijar_idioma(<id de A>, 'en')` modifica 1 fila. Después, con `app.tenant_id` de B, `fijar_idioma(<id de A>, 'en')` modifica 0 filas y el `idioma` de A no cambia;
   - `::test_funcion_es_security_definer_con_search_path[usuario_para_login|fijar_idioma]`: en `pg_proc`, `prosecdef = true`, `proconfig` contiene `search_path=` y `has_function_privilege` da `app_rt` sí y `anon`/`authenticated` no. Para que no nazca verde por la razón equivocada, `supabase_simulado.sql` (002) suma `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, authenticated`, que es lo que hace Supabase real. Sin el `REVOKE` de la 0004, el test falla.
 
 **Libro y lote** (`backend/tests/integration/test_costos_repo.py`)
@@ -351,7 +351,7 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
 - Antes de cada llamada a una fuente: `gasto_busqueda + costo_maximo_llamada ≤ tope`. `costo_maximo_llamada` lo declara cada adaptador en su `MetaFuente`:
   - **cs:** 1 crédito × tarifa, porque los intentos fallidos registran 0;
   - **OSM:** 2 intentos × 30 s (el timeout del cliente, 003) × `computo_seg_usd`;
-  - **`datos_gov_co_rues`:** 2 requests × 2 intentos × 30 s × `computo_seg_usd` (la fórmula es de la 011: `specs/011-datos-gov-co/spec.md:230` en f8f9456).
+  - **`datos_gov_co_rues`:** 2 requests × 2 intentos × 30 s × `computo_seg_usd` (la fórmula es de la 011: `specs/011-datos-gov-co/spec.md:230` en c64c5f8).
 - `TOPE_MAXIMO_USD` (50) vive en `config/tarifas.yaml` en la sección `limites_app`.
 - La CLI del 002 sigue sin tope: es de operador, local.
 - `busquedas.estado` pasa a tener un `CHECK` ∈ `borrador`/`ejecutando`/`completada`/`tope_alcanzado`/`error`. La transición de `borrador` a `ejecutando` es un `UPDATE … WHERE estado='borrador'` que tiene que afectar 1 fila; si afecta 0, es 409. Eso cubre dos clics simultáneos.
@@ -363,12 +363,13 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
 - `# ponytail:` solo mira el nombre. Si hace falta mirar la actividad o la web, se agrega cuando haya un caso real.
 
 **Auth:**
-- **`usuarios`** (`id`, `email` UNIQUE con `CHECK (email = lower(email))`, `hash_clave`, `tenant_id` FK, `idioma` NULL con `CHECK IN ('es','en')`, `creado_en`) tiene **RLS por `tenant_id`**, como toda tabla con datos de un tenant (constitución III).
+- **`usuarios`** (`id`, `email_hmac bytea` UNIQUE, `hash_clave`, `tenant_id` FK, `idioma` NULL con `CHECK IN ('es','en')`, `creado_en`) tiene **RLS por `tenant_id`**, como toda tabla con datos de un tenant (constitución III).
+  - **El email no se guarda** (constitución VI, minimización): `email_hmac` = HMAC-SHA256 con `EMAIL_HMAC_CLAVE` (entorno, ≥ 32 bytes, por `Settings`) sobre `lower(strip(email))`. Lo calcula `acceso/dominio/email.py::hmac_email`, que comparten la API y `crear_usuario.py`. Ver plan P13.
   - `app_rt` no tiene ningún privilegio sobre la tabla.
-  - El login, que ocurre antes de conocer el tenant, entra por la función `usuario_para_login(email text)`:
+  - El login, que ocurre antes de conocer el tenant, entra por la función `usuario_para_login(p_email_hmac bytea)`:
     - `SECURITY DEFINER`, con dueño `postgres`;
     - `SET search_path = public, pg_temp`;
-    - compara contra `lower(email)` y devuelve `id`, `tenant_id`, `hash_clave`, `usuarios.idioma` y `tenants.idioma` (por separado: el front necesita saber si hubo elección) de **ese** email y nada más (`crear_usuario.py` también guarda `lower()`, y acepta `--idioma es|en` opcional);
+    - compara `email_hmac = p_email_hmac` y devuelve `id`, `tenant_id`, `hash_clave`, `usuarios.idioma` y `tenants.idioma` (por separado: el front necesita saber si hubo elección) de **ese** usuario y nada más (`crear_usuario.py` guarda el mismo HMAC, y acepta `--idioma es|en` opcional);
     - `REVOKE EXECUTE … FROM PUBLIC, anon, authenticated` (Postgres da `EXECUTE` a `PUBLIC` por defecto y Supabase a `anon`/`authenticated`; la 0004 trae su propio `DO` con el mismo guard de `pg_roles` del 002, para no fallar en vanilla; no toca la 0002, que ya está aplicada) y `GRANT EXECUTE` solo a `app_rt`.
   - Así un `SELECT` de `app_rt` no puede volcar los hashes de todos los tenants.
   - La elección del selector entra por `fijar_idioma(p_usuario uuid, p_idioma text)`, con el mismo patrón (`SECURITY DEFINER`, `search_path`, `REVOKE`/`GRANT` solo a `app_rt`). Hace `UPDATE usuarios SET idioma = p_idioma WHERE id = p_usuario AND tenant_id = current_setting('app.tenant_id')::uuid`. El filtro por tenant va escrito porque el dueño `postgres` no pasa por RLS. Así `app_rt` sigue sin ningún privilegio sobre la tabla. `PATCH /usuarios/me` la llama con el `sub` del token.
@@ -402,7 +403,7 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
 | Objeto | Cambio |
 |---|---|
 | `busquedas` | `+ costo_estimado_usd numeric`, `+ costo_maximo_usd numeric`, `+ ejecutada_en`, `CHECK` de `estado` |
-| `leads` | `+ fusionado_en uuid NULL REFERENCES leads(id)` |
+| `leads` | `+ fusionado_en uuid NULL`, `+ UNIQUE (tenant_id, id)`, `FOREIGN KEY (tenant_id, fusionado_en) REFERENCES leads (tenant_id, id)` (una FK simple no pasa por RLS: `test_rls.py::test_tenant_b_no_fusiona_con_lead_de_a`) |
 | `revision_dedup` | `+ motivo text NULL` |
 | `usuarios` | nueva, con RLS e `idioma` (arriba) |
 | `usuario_para_login(text)` | función `SECURITY DEFINER` (arriba), devuelve también los dos idiomas |

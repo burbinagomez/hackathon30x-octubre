@@ -11,11 +11,15 @@
 
 ## Fase 1: Puerta y setup
 
-- [ ] T001 [Paso 0] **Puerta.** `git fetch origin`. Confirmar que 002, 003, 011 y 004 están en `main`. Elegir el número de migración: el siguiente libre en `supabase/migrations/` (P5). Si las preguntas P1–P4 y P6 no tienen respuesta del dueño, frenar.
+- [ ] T001 [Paso 0] **Puerta.** `git fetch origin`. Confirmar que 002, 003, 011 y 004 están en `main`. Elegir el número de migración: el siguiente libre en `supabase/migrations/` (P5). Se frena en dos casos:
+  - P1 (estados, y qué deja la CLI) o P13 (email con HMAC, o enmienda de la constitución) no tienen respuesta del dueño;
+  - los defaults de P2 y P4 no están aprobados.
 - [ ] T002 [P] [Paso 0] `backend/pyproject.toml` suma `PyJWT`. `uv lock`.
 - [ ] T003 [P] [Paso 0] `frontend/package.json` suma `react-i18next` e `i18next` como dependencias, y `eslint`, `typescript-eslint`, `eslint-plugin-boundaries`, `eslint-plugin-import`, `eslint-import-resolver-typescript` y `eslint-plugin-i18next` como devDependencies.
-- [ ] T004 [Paso 0] **Esqueletos.** Las firmas del plan, que devuelven valores equivocados para que los rojos sean por aserción:
-  - `contar` → `-1`;
+- [ ] T004 [Paso 0] **Esqueletos de Python.** Las firmas del plan, que devuelven valores equivocados para que los rojos sean por aserción:
+  - `contar` → `-1` en Croma y OSM. **`datos_gov_co_rues` queda afuera:** la 011 ya implementa `contar` completo (011 tasks c64c5f8:163-173), y un stub rompería `test_contar_usa_count_con_el_mismo_where` de la 011;
+  - `FabricaFuentes` (Protocol en `descubrimiento/dominio/`);
+  - `hmac_email` → `b""`;
   - `gasto_busqueda` → `Decimal("-1")`;
   - `costo_maximo_llamada = Decimal("0")`;
   - `filtrar_por_palabras` → `[]`;
@@ -25,7 +29,9 @@
 ## Fase 2: Migración y vistas (Paso 1)
 
 - [ ] T005 [Paso 1] **Esqueleto de la migración** `supabase/migrations/NNNN_libro_costos_busqueda.sql`:
-  - columnas, `usuarios`, funciones e índices de plan §Migración;
+  - las columnas e índices de plan §Migración. `leads.fusionado_en` va con FK **simple** `REFERENCES leads(id)`; la compuesta entra en T011, después del rojo;
+  - `usuarios` con sus columnas (`email_hmac bytea UNIQUE`, sin email), **sin** `CHECK` y **sin** RLS;
+  - `usuario_para_login` y `fijar_idioma` como stubs `… WHERE false`, **sin** `SECURITY DEFINER` ni `REVOKE`;
   - las 9 vistas con sus columnas finales, `WHERE false` y **sin** `security_invoker`.
 
   `app/modelos.py` se actualiza a la par.
@@ -42,36 +48,59 @@
   - `::test_costo_por_canal`: email 0.05 y whatsapp 0.30. **Mutación:** sin `WHERE canal IS NOT NULL` → aparece una fila `None`.
   - `::test_fila_con_lote_y_lead_va_al_lead`: B = 0.25/0.15 y Σ parte (L1, cs) = 0.80/0.40. **Mutación:** el prorrateo filtra `lote_id IS NOT NULL` en lugar de `lead_id IS NULL` → Σ parte 0.85.
   - `::test_lead_fusionado_no_cuenta`: únicos 6, encontrados 7, prorrateo L2 `Decimal("0.20")`. **Mutación:** `v_leads_icp` sin `fusionado_en IS NULL` → 7 y 0.16.
-- [ ] T008 [Paso 1] **Verde:** las 9 vistas de spec:313-335, con `security_invoker = true` y `GRANT SELECT` a `app_rt`, y el `CHECK` de `estado` (P1).
+- [ ] T008 [Paso 1] **Verde:** los cuerpos de las 9 vistas de spec:313-335, el `GRANT SELECT` a `app_rt` y el `CHECK` de `estado` (P1). **Sin `security_invoker`:** esa opción entra solo en T011, para que T009 nazca rojo.
 - [ ] T009 [Paso 1] **Rojo (advisor, RLS):** `backend/tests/integration/test_rls.py`:
   - `::test_tenant_b_no_accede_a_datos_de_a[vista]`, sobre cada `v_*`: control positivo de A ≥ 1 fila, B ve 0 filas y 0 filas `TOTAL`. La siembra de A trae una `lead_fuentes` de `osm_overpass`. Rojo hoy: las vistas sin `security_invoker` corren como `postgres`. **Mutación tras el verde:** quitar `security_invoker` de una vista, o quitar `HAVING count(*) > 0` → B ve una fila `TOTAL`.
   - `::test_toda_vista_es_security_invoker`, desde `pg_class`. **Mutación:** una vista sin la opción.
   - `::test_usuarios_tiene_rls`. **Mutación:** sin `ENABLE ROW LEVEL SECURITY`, o sin la política.
+  - `::test_tenant_b_no_fusiona_con_lead_de_a`: como `app_rt` con el tenant B, un `UPDATE` de un lead de B con `fusionado_en` = id de un lead de A lanza `ForeignKeyViolation` (sqlstate `23503`). Rojo hoy, porque la FK simple de T005 no pasa por RLS y el `UPDATE` funciona. Control positivo: el mismo `UPDATE` hacia otro lead de B funciona. **Mutación:** FK simple.
 - [ ] T010 [P] [Paso 1] **Rojo (advisor):** `backend/tests/integration/test_privilegios_supabase.py::test_anon_y_authenticated_sin_privilegios` (de la 002) suma `pg_views`, con el assert previo de que esté `v_tablero_fuentes`. **Mutación:** sacar `pg_views` de la unión (falla el assert previo), o `GRANT SELECT ON v_tablero_fuentes TO anon`.
-- [ ] T011 [Paso 1] **Verde:** `security_invoker` en las 9 vistas y la RLS de `usuarios`.
+- [ ] T011 [Paso 1] **Verde:**
+  - `security_invoker = true` en las 9 vistas;
+  - la RLS de `usuarios`;
+  - `UNIQUE (tenant_id, id)` en `leads` y `FOREIGN KEY (tenant_id, fusionado_en) REFERENCES leads (tenant_id, id)`.
 - [ ] T012 [Paso 1] **Rojo (security, RLS):** `backend/tests/integration/test_usuarios_repo.py`:
-  - `::test_app_rt_no_lee_usuarios_directo`. **Mutación:** `GRANT SELECT ON usuarios TO app_rt`.
-  - `::test_usuario_para_login_devuelve_solo_ese_email`. **Mutación:** comparar `email = p_email` sin `lower()` → `A@X.co` devuelve 0 filas.
-  - `::test_email_se_guarda_en_minusculas`: sqlstate `23514`. **Mutación:** sin el `CHECK`.
-  - `::test_fijar_idioma_no_cruza_tenants`. **Mutación:** sin `AND tenant_id = current_setting(...)` → modifica 1 fila.
+  - `::test_app_rt_no_lee_usuarios_directo`. **Nace verde:** `app_rt` nunca tuvo `SELECT` sobre `usuarios`. Es una guarda. **Sabotaje:** `GRANT SELECT ON usuarios TO app_rt` → rojo, y se revierte.
+  - `::test_usuario_para_login_devuelve_solo_ese_email`. Con usuarios de 2 tenants, `usuario_para_login(hmac_email('a@x.co'))` devuelve 1 fila (la de A), y un HMAC inexistente devuelve 0. Rojo hoy: el stub `WHERE false` devuelve 0 filas. **Mutación:** sin el `WHERE email_hmac = p_email_hmac` → 2 filas.
+  - `::test_fijar_idioma_no_cruza_tenants`. Control positivo: con el tenant de A, `fijar_idioma` sobre el usuario de A modifica 1 fila. Rojo hoy: el stub modifica 0. Después, con el tenant de B sobre el usuario de A, modifica 0. **Mutación:** sin `AND tenant_id = current_setting(...)` → B modifica 1 fila.
   - `::test_funcion_es_security_definer_con_search_path[usuario_para_login|fijar_idioma]`, con el `ALTER DEFAULT PRIVILEGES` en `supabase_simulado.sql`. **Mutación:** sin el `REVOKE` → `anon` tiene `EXECUTE`.
-- [ ] T013 [Paso 1] **Verde:** las funciones, el `REVOKE`/`GRANT` y el `DO` con el guard de `pg_roles`. `backend/scripts/crear_usuario.py` con `getpass`.
+- [ ] T012b [P] [Paso 1] **Rojo (security):** `backend/tests/unit/acceso/test_email_hmac.py::test_hmac_normaliza_y_depende_de_la_clave`. Reemplaza a `test_email_se_guarda_en_minusculas` (P13). El test asierta cuatro cosas:
+  - `hmac_email(" A@X.co ", k)` es `bytes` de 32;
+  - es igual a `hmac_email("a@x.co", k)`;
+  - es distinto de `hmac_email("a@x.co", otra_k)`;
+  - es igual a `hmac.new(k, b"a@x.co", sha256).digest()`.
+
+  Rojo hoy: el esqueleto devuelve `b""` y el largo 32 falla. **Mutaciones:**
+  - sin `lower()`/`strip()` → falla la igualdad;
+  - `sha256(email)` sin clave → falla la desigualdad entre claves.
+- [ ] T013 [Paso 1] **Verde:**
+  - las funciones reales, `SECURITY DEFINER` con `search_path`;
+  - el `REVOKE`/`GRANT` y el `DO` con el guard de `pg_roles`;
+  - `acceso/dominio/email.py::hmac_email`;
+  - `EMAIL_HMAC_CLAVE` en `Settings`;
+  - `backend/scripts/crear_usuario.py` con `getpass`, que guarda solo el HMAC.
 
 **Checkpoint**: vistas, RLS, privilegios y usuarios verdes.
 
 ## Fase 3: `gasto_busqueda` y lote (Paso 2)
 
 - [ ] T014 [Paso 2] **Rojo (advisor, costos):** `backend/tests/integration/test_costos_repo.py::test_gasto_busqueda_suma_lista_del_lote`, con montos no enteros (`0.40` gratis y `0.07`) y filas de otro lote; espera `Decimal("0.47")`. **Mutación:** sumar `monto_real` → 0.07, o sin el filtro de `lote_id` → incluye el otro lote.
+  - `::test_gasto_busqueda_sin_filas_es_cero`: un lote sin filas da `Decimal("0")`, con `type is Decimal`. Rojo hoy: el esqueleto devuelve `Decimal("-1")`. **Mutación:** sin `COALESCE` → `None`, y el tope revienta con `None + Decimal`.
 - [ ] T015 [Paso 2] **Verde:** `postgres_costos.gasto_busqueda` y el método en el Protocol (P3), más el registro falso compartido de `tests/`.
 
 ## Fase 4: `contar()` y `costo_maximo_llamada` (Paso 3)
 
-- [ ] T016 [Paso 3] **Rojo (advisor, costos):** `backend/tests/contratos/test_fuente_descubrimiento.py`, parametrizado sobre el catálogo (`croma_supersociedades_co`, `osm_overpass`, `datos_gov_co_rues`). Los tres tests:
+- [ ] T016 [Paso 3] **Rojo (advisor, costos):** `backend/tests/contratos/test_fuente_descubrimiento.py`, parametrizado sobre el catálogo (`croma_supersociedades_co`, `osm_overpass`, `datos_gov_co_rues`). Los cuatro tests:
   - `::test_contar_registra_costo_antes_de_devolver[…]`. Un caso con éxito y otro con transporte que siempre falla (sale `FuenteNoDisponible`): en los dos hay ≥ 1 fila en el registro falso. **Mutación:** `registrar` solo en el camino feliz.
   - `::test_contar_devuelve_entero_no_negativo_o_none[…]`: `type(r) is int and r >= 0` o `r is None`. **Mutación:** devolver el `total` crudo del JSON (`"2015"`, un str) → rojo por el tipo.
   - `::test_contar_rechaza_criterio_no_soportado[…]`: `CriterioNoSoportado` y 0 requests en el transporte. **Mutación:** validar después del request → 1 request.
 
-  **viene de 011 (D7):** las tres parametrizaciones `[datos_gov_co_rues]` (T035 de la 011).
+  - `::test_costo_maximo_llamada_positivo[…]`: `type(meta.costo_maximo_llamada) is Decimal and > 0`. Sin esta guarda, un adaptador nuevo (por ejemplo `croma_dian_trade_co`, spec:27) entraría al tope como gratis por el default `Decimal("0")`. Rojo hoy en los tres: el esqueleto deja `0`, y la 011 no lo fija. **Mutación:** una fábrica sin `dataclasses.replace`.
+
+  **viene de 011 (D7):** las tres parametrizaciones `[datos_gov_co_rues]` de los tests de `contar` (T035 de la 011). **Nacen verdes,** porque la 011 ya implementa `contar` completo. Cada una se acepta por un sabotaje en `datos_gov_co_rues.py`, que se aplica, se ve rojo y se revierte:
+  - `registrar_costo_antes_de_devolver`: `registrar` solo en el camino feliz;
+  - `entero_no_negativo_o_none`: devolver `"2015"` como str;
+  - `rechaza_criterio_no_soportado`: validar después del request.
 - [ ] T017 [P] [Paso 3] **Rojo:** `backend/tests/unit/descubrimiento/test_croma_supersociedades.py`:
   - `::test_contar_lee_total_de_la_pagina_1`, con la fixture sintética con `total=2015` y 100 ítems. **Mutación:** `len(empresas)` → 100.
   - `::test_contar_y_buscar_hacen_una_sola_request`: 1 request y 1 fila. **Mutación:** `contar` con `per_page=1` → otra clave de caché → 2 requests.
@@ -82,11 +111,11 @@
   - `::test_contar_registra_segundos`, con reloj falso y una espera de `Retry-After` de por medio: unidades = segundos del request. **Mutación:** medir desde antes de la espera → incluye los segundos de `sleep`.
   - `::test_costo_maximo_llamada`: `== Decimal("0.00042")` (2 × 30 × 0.0000070). No está en la spec; lo suma el plan. **Mutación:** 1 intento → 0.00021.
 - [ ] T019 [P] [Paso 3] **Rojo (advisor, costos):** `backend/tests/unit/descubrimiento/test_datos_gov_co.py`:
-  - `::test_costo_maximo_llamada`: `meta.costo_maximo_llamada == Decimal("0.00084")`, que es 2 requests × 2 intentos × 30 s × `computo_seg_usd`, con `type is Decimal`. La fórmula está en la 011 spec (f8f9456):230. **viene de 011 (D7)** (T035 de la 011). **Mutación:** 2 × 30 (sin las 2 requests) → 0.00042; o calcular con `float` → `0.0008399999…`, rojo por valor y por tipo.
+  - `::test_costo_maximo_llamada`: `meta.costo_maximo_llamada == Decimal("0.00084")`, que es 2 requests × 2 intentos × 30 s × `computo_seg_usd`, con `type is Decimal`. La fórmula está en la 011 spec (c64c5f8):230. **viene de 011 (D7)** (T035 de la 011). **Mutación:** 2 × 30 (sin las 2 requests) → 0.00042; o calcular con `float` → `0.0008399999…`, rojo por valor y por tipo.
   - `::test_contar_segunda_llamada_sale_del_cache`: dos `contar` con los mismos criterios dan 1 request y 1 fila de costo. Es nuevo en la 005 por el advisor de la 011: la 011 deja el discriminador en `tipo: filas|naturales`. **Rojo natural:** sin `tipo: contar`, `contar` no cachea → 2 requests. **Mutación tras el verde:** `contar` con el discriminador `filas` → choca con la clave de filas, y el test agrega un `buscar` previo con los mismos criterios para que la mutación dé rojo.
   - Los tests que quedan en la 011 (`test_contar_usa_count_con_el_mismo_where` y `test_contar_registra_socrata_descarga`) **no se duplican**.
 - [ ] T020 [Paso 3] **Verde:**
-  - `contar` en el Protocol y en los tres adaptadores;
+  - `contar` en el Protocol y en Croma y OSM. En `datos_gov_co_rues` ya está, por la 011;
   - `costo_maximo_llamada` calculado en cada fábrica (P4);
   - `tipo: contar` en el discriminador de caché de `datos_gov_co_rues`;
   - `CROMA_BASE_URL` en `Settings`.
@@ -105,9 +134,9 @@
 
 ## Fase 6: `VistaPrevia` y `EjecutarBusqueda` con tope (Paso 5) — advisor
 
-- [ ] T024 [Paso 5] **Rojo (advisor, costos):** `backend/tests/unit/descubrimiento/test_vista_previa.py`, con fuentes, repo y libro falsos:
+- [ ] T024 [Paso 5] **Rojo (advisor, costos):** `backend/tests/unit/descubrimiento/test_vista_previa.py`, con una `FabricaFuentes` falsa (que devuelve fuentes falsas y registra el `lote_id` con el que se la llamó), un repo falso y un libro falso:
   - `::test_conteo_por_fuente_y_motivo_de_las_descartadas` (`pais=PE`). **Mutación:** no copiar `ignoradas` a la respuesta.
-  - `::test_crea_busqueda_en_borrador_con_criterios`. **Mutación:** usar `crear_busqueda` del 002 → estado `creada`.
+  - `::test_crea_busqueda_en_borrador_con_criterios`: queda en estado `borrador`, y la fábrica se llamó una vez con `lote_id == borrador.id`. **Mutación:** usar `crear_busqueda` del 002 → estado `creada`; o pedir las fuentes antes de crear el borrador → `lote_id=None`.
   - `::test_fuente_no_disponible_da_conteo_null_y_sigue`. **Mutación:** dejar que la excepción se propague → cs no tiene conteo.
   - `::test_limite_agotado_da_conteo_null`. **Mutación:** mapear todo error a `no_disponible`.
   - `::test_costo_estimado_suma_lo_gastado_y_lo_que_falta`: el gastado sale del libro falso (`Decimal("0.00113")`) + 0 de cs + segundos de OSM × 0.0000070. **Mutación:** sumar 1 crédito de cs aunque haya caché.
@@ -118,8 +147,13 @@
 
     **Mutación:** iterar sobre un subconjunto fijo de claves (sin `datos_gov_co_rues`) → falla el segundo caso; o `<` en lugar de `≤` → falla el borde.
   - `::test_reporta_creditos_y_requests_restantes`: 63 y 288. **Mutación:** devolver lo usado en lugar de lo restante.
-- [ ] T025 [Paso 5] **Verde:** `descubrimiento/aplicacion/vista_previa.py` y los métodos de borrador de `RepositorioLeads` (P2), con `ignorados` derivado (P7).
-- [ ] T026 [Paso 5] **Rojo (advisor, costos y cumplimiento):** `backend/tests/unit/descubrimiento/test_ejecutar_con_tope.py`:
+- [ ] T025 [Paso 5] **Verde:**
+  - `descubrimiento/aplicacion/vista_previa.py`, que recibe `FabricaFuentes`;
+  - los métodos de borrador de `RepositorioLeads` (P2);
+  - `ignorados` derivado (P7).
+
+  La implementación real de `FabricaFuentes` va en `app/api` (raíz de composición). `aplicacion/` no importa el catálogo concreto, y lo vigila import-linter.
+- [ ] T026 [Paso 5] **Rojo (advisor, costos y cumplimiento):** `backend/tests/unit/descubrimiento/test_ejecutar_con_tope.py`, con la misma `FabricaFuentes` falsa de T024:
   - `::test_no_ejecuta_si_costo_maximo_supera_tope`: `TopeExcedido`, 0 requests, estado `borrador`. **Mutación:** chequear el tope después de `pasar_a_ejecutando`.
   - `::test_corta_antes_de_la_llamada_que_pasaria_el_tope`. **Mutación:** chequear después de llamar → OSM se llama.
   - `::test_solo_ejecuta_borrador`: `BusquedaYaEjecutada`. **Mutación:** ignorar el `bool` de `pasar_a_ejecutando`.
@@ -131,11 +165,11 @@
 ## Fase 7: Auth (Paso 6) — security
 
 - [ ] T029 [Paso 6] **Rojo (security):** `backend/tests/integration/test_auth.py`:
-  - `::test_sesion_con_clave_correcta_devuelve_token`. **Mutación:** `exp` de 8 min.
+  - `::test_sesion_con_clave_correcta_devuelve_token`: el login con `" A@X.co "` encuentra al usuario, porque la API llama a `usuario_para_login(hmac_email(...))`. **Mutación:** `exp` de 8 min; o pasar el email crudo sin `hmac_email` → 401.
   - `::test_clave_incorrecta_y_email_inexistente_dan_el_mismo_401`, con un spy sobre `hashlib.scrypt` llamado en los dos casos. **Mutación:** `return 401` sin el scrypt de relleno.
   - `::test_sin_token_da_401[ruta]`, sobre `app.routes`. **Mutación:** una ruta sin la dependencia `tenant_actual`.
   - `::test_token_invalido_da_401[caso]`: vencido, otra clave, `alg=none`, sin `exp`, sin `tenant_id`. **Mutación:** sacar `require` → los casos sin `exp` y sin `tenant_id` pasan.
-  - `::test_app_no_arranca_sin_session_secret`. **Mutación:** sin el validador de largo mínimo.
+  - `::test_app_no_arranca_sin_secreto[session_secret|email_hmac_clave]`. **Mutación:** sin el validador de largo mínimo en cualquiera de los dos.
   - `::test_docs_desactivadas`. **Mutación:** `docs_url` por defecto.
   - `::test_cors_solo_permite_web_origin`. **Mutación:** `allow_origins=["*"]`.
   - `::test_clave_no_aparece_en_logs`. **Mutación:** `logger.info(body)`.
@@ -162,19 +196,27 @@
   - `::test_vista_previa_devuelve_motivos_como_codigo`. **Mutación:** devolver `msg` de pydantic.
   - `::test_actividades_trae_ambos_nombres`. **Mutación:** omitir la clave `nombre_en` cuando es `null`.
   - `::test_tablero_atribucion_solo_de_fuentes_presentes[caso]` (advisor, cumplimiento). **Mutación:** sin el `EXISTS` → `solo_croma` trae dos.
-  - `::test_tablero_trae_naturales_por_fuente`. **viene de 011 (D7)** (T047 de la 011). Definición en la 011 spec (f8f9456):135. **Mutación:** `COALESCE(naturales, 0)` → OSM trae `0` en lugar de `null`; o `ORDER BY … ASC` → toma el conteo viejo.
+  - `::test_tablero_trae_naturales_por_fuente`. **viene de 011 (D7)** (T047 de la 011). Definición en la 011 spec (c64c5f8):135. Las dos búsquedas se siembran con `creado_en` **explícito y distinto**. Con `DEFAULT now()`, dentro de una misma transacción empatan: `DISTINCT ON` elegiría al azar, y la mutación ASC no daría rojo. **Mutación:** `COALESCE(naturales, 0)` → OSM trae `0` en lugar de `null`; o `ORDER BY fuente, creado_en ASC` → toma el conteo viejo.
 - [ ] T032 [Paso 7] **Verde:**
   - routers `busquedas`, `tablero`, `actividades`;
   - `repositorio_tablero.py`;
   - `limites_app` en `tarifas.yaml` (P11);
   - `nombre_es`/`nombre_en` en `actividades.yaml`;
-  - la columna de orden del tablero (P6);
-  - el verde del tablero de naturales, `DISTINCT ON (fuente)` sobre las búsquedas `completada`. **viene de 011 (D7)** (T049 de la 011).
+  - el verde del tablero de naturales: `DISTINCT ON (fuente) … ORDER BY fuente, creado_en DESC` (la columna ya existe en la 002) sobre las búsquedas `completada`, o `IN ('completada','terminada')` según lo que decida el dueño en P1; **viene de 011 (D7)** (T049 de la 011).
 - [ ] T033 [Paso 7] `EXCLUIDOS` de los tests de arquitectura de la 002 suma `repositorio_tablero.py` y `repositorio_usuarios.py` (P10). `uv run lint-imports` verde.
 
 ## Fase 9: Front (Paso 8)
 
 - [ ] T034 [Paso 8] Mover `src/setupTests.ts` a `src/test/setup.ts` y sumar `src/test/servidor.ts` (MSW sin handlers). `vitest.config.ts` incluye `src/**` y `tests/**` y excluye `e2e/`.
+
+  **Esqueletos del front,** para que los rojos de T035–T041 y T047 fallen por aserción y no por "module not found" ni ENOENT:
+  - `Login`, `NuevaBusqueda`, `Tablero` y `ColaRevision` devuelven `null`;
+  - `api/cliente.ts` exporta sus funciones sin tocar el token;
+  - `elegirIdioma` devuelve `'xx'`;
+  - `src/i18n/es.json` y `en.json` son `{}`;
+  - `frontend/eslint.config.js` es `export default []`, para que `overrideConfigFile` de `limites.test.ts` encuentre el archivo.
+
+  Un test que nazca verde contra estos esqueletos (por ejemplo, un positivo de `limites.test.ts` con la config vacía) se acepta solo si su mutación lo pone en rojo.
 - [ ] T035 [Paso 8] **Rojo:** `frontend/tests/arquitectura/limites.test.ts`, los 6 tests de spec:221-235. **Mutación:** cada negativo, con su dirección en `allow`; para `import_sin_resolver_es_error`, `import/no-unresolved` en `off`.
 - [ ] T036 [Paso 8] **Verde:** `frontend/eslint.config.js` (boundaries, en el orden de tipos de spec:445-452, más el resolver de TS).
 - [ ] T037 [Paso 8] **Rojo:**
@@ -234,14 +276,15 @@
 - Fase 2 → Fase 3 → Fase 4. La Fase 5 puede correr en paralelo con la Fase 4.
 - Las Fases 4 y 5 → Fase 6 → T028.
 - La Fase 7 solo necesita la Fase 2. Las Fases 6 y 7 → Fase 8 → Fase 9 → Fase 10.
-- La Fase 11 solo necesita la Fase 8.
+- T045–T046 necesitan la Fase 8. T047 necesita además T034 (esqueletos del front) y T042 (cliente y router).
+- T034 va antes de cualquier rojo del front.
 - Se pueden correr en paralelo T017, T018 y T019; T022 con la Fase 4; T039, T040 y T041.
 
 ## Orden de corte (spec:499-506)
 
 1. Fase 11 (cola de revisión).
 2. Fase 10 (E2E).
-3. T022–T023 (4b, palabras clave): pasan a la 010.
+3. T022–T023 (4b, palabras clave): pasan a la 010, junto con `test_filtradas_por_palabras_no_generan_lead_ni_cumplimiento` de T026.
 4. `v_costo_por_canal` y `test_costo_por_canal`: pasan a la 007.
 5. Cobertura por país y revisiones pendientes en el tablero.
 

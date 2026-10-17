@@ -5,8 +5,9 @@
 > Este plan no rediseña lo que fijan la 002, la 003 y la 011: lo cita por línea. Las referencias son a los planes en sus ramas, todavía no en `main`:
 > - **002 plan** = `git show 89d3e59:specs/002-puertos-registro-supersociedades/plan.md`;
 > - **003 plan** = `git show f393852:specs/003-osm-dedup/plan.md`;
-> - **011 plan** = `git show 6c4bd7d:specs/011-datos-gov-co/plan.md`;
-> - **011 spec** = `git show f8f9456:specs/011-datos-gov-co/spec.md`, que es la versión con la D7 aplicada.
+> - **011 plan** = `git show c64c5f8:specs/011-datos-gov-co/plan.md`;
+> - **011 spec** = `git show c64c5f8:specs/011-datos-gov-co/spec.md`. c64c5f8 es el commit de la 011 que aprobó el advisor, con la D7 aplicada. Las líneas citadas son las mismas que en 6c4bd7d y f8f9456.
+> - **002 migración** = `git show b651aac:supabase/migrations/0002_descubrimiento.sql`.
 >
 > Lo que la 005 necesita y ninguna de esas fija va a **Preguntas abiertas**, con la sección exacta y un default propuesto, que no se aplica hasta que lo apruebe el dueño.
 >
@@ -51,8 +52,8 @@ Además absorbe de la 011, por la D7, seis tests y el verde del tablero de natur
 | II Test primero | Cada test tiene una mutación que lo pone en rojo por aserción (ver `tasks.md`). Los esqueletos van antes del rojo, para que no haya `ImportError` ni `AttributeError`. El advisor y security revisan antes de aceptar. | ✅ |
 | III Tenant/RLS | Vistas `security_invoker` con `test_rls[vista]` y control positivo. `usuarios` con RLS y sin privilegios para `app_rt`. Las funciones `SECURITY DEFINER` llevan `search_path` y `REVOKE` a `PUBLIC`/`anon`/`authenticated`. `pg_views` entra en `test_privilegios_supabase`. | ✅ |
 | IV Migraciones | Una migración a mano. `app/modelos.py` suma columnas y `usuarios`, y el drift sigue vacío (las vistas no las compara `compare_metadata`; T006 lo confirma). | ✅ |
-| V Seguridad | `SESSION_SECRET` (≥ 32 bytes), `WEB_ORIGIN` y `CROMA_BASE_URL` por `Settings`. Docs desactivadas, CORS cerrado, clave fuera de logs y `extra='forbid'`. | ✅ |
-| VI Contacto | El formulario no pide contacto y la cola no lo expone (`test_cola_no_expone_contacto`). El email del usuario es dato de login, no de lead (ver P13). | ⚠️ |
+| V Seguridad | `SESSION_SECRET` y `EMAIL_HMAC_CLAVE` (≥ 32 bytes cada una), `WEB_ORIGIN` y `CROMA_BASE_URL` por `Settings`. Docs desactivadas, CORS cerrado, clave fuera de logs y `extra='forbid'`. | ✅ |
+| VI Contacto | El formulario no pide contacto y la cola no lo expone (`test_cola_no_expone_contacto`). El email del usuario no se guarda: solo `email_hmac` (HMAC-SHA256 con clave de entorno sobre el email normalizado), por minimización. Enmendar la constitución es decisión del dueño (P13). | ⚠️ P13 |
 | VII Cumplimiento | Una empresa filtrada por palabra clave no genera lead ni `cumplimiento`. Fusionar no toca `cumplimiento`. `v_atribuciones` sale de `lead_fuentes`. | ✅ |
 | VIII Costos | `contar` registra antes de devolver o de lanzar, igual que `buscar`. Todo descubrimiento lleva `lote_id = busqueda.id`. El CPL sale solo de vistas sobre `costos`. | ✅ |
 | IX Evals | N/A (sin IA). `fuente='evals'` aparte, en `v_costo_evals`. | — |
@@ -64,7 +65,7 @@ Además absorbe de la 011, por la D7, seis tests y el verde del tablero de natur
 |---|---|
 | `CriteriosICP.filtros` | 002 plan:58 |
 | `PaginaEmpresas.total` ("lo usa la vista previa del 005") | 002 plan:77; `truncado` y `descartados_sin_nombre` en 003 plan:62 |
-| `MetaFuente`, armada desde el YAML | 002 plan:80-89; `cuenta_naturales` con default `False` en 011 plan D2 (6c4bd7d:74) |
+| `MetaFuente`, armada desde el YAML | 002 plan:80-89; `cuenta_naturales` con default `False` en 011 plan D2 (c64c5f8:74) |
 | `FuenteDescubrimiento` con `meta` como atributo + `buscar` | 002 plan:91-93; D1 de la 011 |
 | `CriterioNoSoportado`, `LimiteFuenteAgotado`, `FuenteNoDisponible` | 002 plan:97-99 |
 | `RepositorioLeads` | 002 plan:108-115; métodos de dedup en 003 plan:64 |
@@ -76,9 +77,9 @@ Además absorbe de la 011, por la D7, seis tests y el verde del tablero de natur
 | `seleccionar_fuentes` → `(seleccionadas, ignoradas)` | 003 plan:65; motivos en 003 spec:41-45 |
 | `EjecutarBusqueda` captura errores por fuente | 002 plan:295, 003 plan:55 |
 | Costo por intento de `overpass_query`, espera no cobrada, timeout de cliente de 30 s | 003 plan:40, 003 spec:211 y :299 |
-| Fórmula de `costo_maximo_llamada` de datos.gov.co | 011 spec (f8f9456):230 |
+| Fórmula de `costo_maximo_llamada` de datos.gov.co | 011 spec (c64c5f8):230 |
 | Discriminador de caché de datos.gov.co (`tipo: filas\|naturales`, sin `contar`) | 011 (advisor de la 011); la 005 suma `contar` |
-| `busquedas.naturales_por_fuente` | 011 spec (f8f9456):37 y :203 |
+| `busquedas.naturales_por_fuente` | 011 spec (c64c5f8):37 y :203 |
 
 ## Cambios de puerto (son enmienda: la spec 005 es la spec que pide 002 plan:103)
 
@@ -92,7 +93,10 @@ class FuenteDescubrimiento(Protocol):
 @dataclass(frozen=True)
 class MetaFuente:                     # 002 plan:80, + un campo con default
     ...
-    costo_maximo_llamada: Decimal = Decimal("0")   # origen: ver P4
+    costo_maximo_llamada: Decimal = Decimal("0")   # origen: ver P4; el contrato exige > 0
+
+class FabricaFuentes(Protocol):       # nuevo; implementación en app/api (raíz de composición)
+    def __call__(self, lote_id: UUID) -> Mapping[str, FuenteDescubrimiento]: ...
 
 # costos/dominio
 class RegistroCostos(Protocol):
@@ -107,6 +111,10 @@ class RegistroCostos(Protocol):
 
 `None` significa que la fuente no da conteo, con `motivo='sin_conteo'`.
 
+El default `Decimal("0")` de `costo_maximo_llamada` no puede dejar entrar gratis al tope a un adaptador nuevo, como `croma_dian_trade_co` (spec:27). Para eso la suite de contrato suma `test_costo_maximo_llamada_positivo[…]`, que exige `type is Decimal and > 0`.
+
+`gasto_busqueda` de un lote sin filas devuelve `Decimal("0")`, nunca `None` (`COALESCE`): `None + Decimal` rompe el tope.
+
 ## Diseño por área (resumen de la spec, con lo que agrega el plan)
 
 **Vistas** (spec:313-335):
@@ -118,20 +126,20 @@ class RegistroCostos(Protocol):
 **`costo_maximo_llamada` por adaptador** (spec:350-353):
 - **cs:** 1 crédito × `usd_por_credito`;
 - **OSM:** 2 × 30 s × `computo_seg_usd`;
-- **`datos_gov_co_rues`:** 2 requests × 2 intentos × 30 s × `computo_seg_usd`, según la 011 spec (f8f9456):230.
+- **`datos_gov_co_rues`:** 2 requests × 2 intentos × 30 s × `computo_seg_usd`, según la 011 spec (c64c5f8):230.
 
 Cada uno tiene su test en el archivo del adaptador, y `test_costo_maximo_suma_costo_maximo_llamada_de_cada_fuente` lleva un caso con las tres fuentes.
 
 **Caché de `contar` en datos.gov.co:** la 011 deja su discriminador en `tipo: filas|naturales`, y la 005 suma `tipo: contar`. La segunda llamada con los mismos criterios no hace request ni escribe costo (`test_contar_segunda_llamada_sale_del_cache`). En cs no hace falta un discriminador: `contar` y `buscar(1)` comparten clave a propósito (P12).
 
-**Lote = búsqueda:** `VistaPrevia` crea el borrador **antes** de construir los adaptadores y los arma con `lote_id = borrador.id` (002 plan:286). `EjecutarBusqueda` los vuelve a armar con el mismo id.
+**Lote = búsqueda:** `VistaPrevia` crea el borrador **antes** de construir los adaptadores, y los pide con `fabrica_fuentes(borrador.id)` (002 plan:286). `EjecutarBusqueda` los vuelve a pedir con el mismo id. La 002 entrega instancias ya armadas desde la raíz de composición (002 plan:150), pero acá el `lote_id` nace dentro del caso de uso. Sin el puerto `FabricaFuentes`, `aplicacion/` tendría que importar el catálogo concreto. El Protocol vive en `descubrimiento/dominio/`, la implementación en `app/api` (cierra sobre catálogo, tarifas, transportes y `RegistroCostos`) y los tests de caso de uso usan una falsa.
 
 **Tope:** el chequeo es `gasto_busqueda(id) + meta.costo_maximo_llamada ≤ tope` antes de cada `buscar`. Lo hace el caso de uso, no el adaptador: el adaptador no conoce el tope.
 
-**Auth:** spec:363-380, sin cambios. `tenant_actual` abre la unidad de trabajo de la 002 con `set_config('app.tenant_id', …, true)`.
+**Auth:** spec:363-380, con un cambio por el principio VI (P13). `usuarios` no guarda el email: guarda `email_hmac bytea UNIQUE`, que es HMAC-SHA256 con `EMAIL_HMAC_CLAVE` (entorno, ≥ 32 bytes, por `Settings`) sobre `lower(strip(email))`. El normalizador y el HMAC son una función pura en `acceso/dominio/`. `usuario_para_login(p_email_hmac bytea)` recibe el HMAC, y `crear_usuario.py` lo calcula igual. `tenant_actual` abre la unidad de trabajo de la 002 con `set_config('app.tenant_id', …, true)`.
 
 **Tablero:**
-- `repositorio_tablero.py` solo lee vistas. Suma la columna de naturales de la 011 desde `busquedas.naturales_por_fuente` (P6), y la combina en la API con `meta.cuenta_naturales` del registro.
+- `repositorio_tablero.py` solo lee vistas. Suma la columna de naturales de la 011 desde `busquedas.naturales_por_fuente`, con `DISTINCT ON (fuente) … ORDER BY fuente, creado_en DESC`. `busquedas.creado_en` ya existe (002 migración:19); la 011 spec:203 lo escribe `creada_en`, pero es la misma columna. También la combina en la API con `meta.cuenta_naturales` del registro.
 - La cobertura por país sale del registro, no de la base.
 
 **Front:** spec:414-474, sin cambios. Hoy el repo tiene `src/setupTests.ts`; la spec pide `src/test/setup.ts` y `servidor.ts`, así que T034 lo mueve.
@@ -139,11 +147,11 @@ Cada uno tiene su test en el archivo del adaptador, y `test_costo_maximo_suma_co
 ## Migración
 
 Va un único archivo, `supabase/migrations/NNNN_libro_costos_busqueda.sql` (el número sale de P5), con la tabla de spec:398-410:
-- en `busquedas`: `+ costo_estimado_usd`, `+ costo_maximo_usd`, `+ ejecutada_en` y el `CHECK` nuevo de `estado` (P1); también la columna de orden del tablero (P6);
-- en `leads`: `+ fusionado_en`;
+- en `busquedas`: `+ costo_estimado_usd`, `+ costo_maximo_usd`, `+ ejecutada_en` y el `CHECK` nuevo de `estado` (P1);
+- en `leads`: `+ fusionado_en uuid NULL` con `FOREIGN KEY (tenant_id, fusionado_en) REFERENCES leads (tenant_id, id)`, más el `UNIQUE (tenant_id, id)` que esa FK necesita. Una FK simple no pasa por RLS: el tenant B podría apuntar a un lead de A (`test_tenant_b_no_fusiona_con_lead_de_a`). La 002 no tiene FKs compuestas (0002_descubrimiento.sql usa `REFERENCES leads(id)`), así que la 005 inaugura el patrón;
 - en `revision_dedup`: `+ motivo`;
-- la tabla `usuarios` con RLS;
-- las funciones `usuario_para_login` y `fijar_idioma`;
+- la tabla `usuarios` (`email_hmac bytea UNIQUE`, sin email) con RLS;
+- las funciones `usuario_para_login(p_email_hmac bytea)` y `fijar_idioma`;
 - los índices `(tenant_id, lote_id)` y `(busqueda_id, fuente)`;
 - las 9 vistas;
 - un `DO` con el guard de `pg_roles` para los `REVOKE EXECUTE`.
@@ -202,22 +210,25 @@ docs/{arquitectura-backend.md, arquitectura-frontend.md, prd.md (§4)}
 ## Preguntas abiertas
 
 Ninguna se resuelve en este plan. Cada fila dice qué tareas bloquea.
+- **Bloquean la puerta T001: P1 y P13.** Las decide el dueño.
+- **P2 y P4** tienen default, pero falta que el dueño lo apruebe.
+- P3, P5, P7–P12 y P14 no bloquean.
+- P6 se borró: `busquedas.creado_en` ya existe (002 migración:19).
 
 | # | Pregunta (sección exacta) | Bloquea | Default propuesto |
 |---|---|---|---|
-| P1 | **Estados de `busquedas`.** La 002 fija `CHECK IN ('creada','terminada','con_errores')` (002 plan:208, OQ11 :295). La 005 pide `borrador`/`ejecutando`/`completada`/`tope_alcanzado`/`error` (spec:355). La 011 deja "completada" a la 005 (011 plan D6, 6c4bd7d:78). Falta definir qué estado deja la CLI y qué es `error` frente a `con_errores` cuando falla una sola fuente. | T008, T024–T027, T032 | El `CHECK` nuevo es la unión de los 8 valores. La CLI sigue igual. En la API, una fuente caída con otra que respondió deja `completada` con el error por fuente en la respuesta, y `error` queda solo para cuando todas fallan. |
-| P2 | **`RepositorioLeads` no crea borradores.** `crear_busqueda(criterios)` (002 plan:109) no recibe canal, tope, mensaje ni costos estimados, y no hay transición `borrador → ejecutando`. | T024–T027 | Se agregan `crear_borrador(criterios, canal, tope, mensaje) -> UUID`, `fijar_estimados(id, estimado, maximo)`, `obtener_borrador(id)` y `pasar_a_ejecutando(id) -> bool` (`UPDATE … WHERE estado='borrador'`). Los métodos del 002 no cambian. |
+| P1 | **Estados de `busquedas`.** La 002 fija `CHECK IN ('creada','terminada','con_errores')` (002 plan:208, OQ11 :295). La 005 pide `borrador`/`ejecutando`/`completada`/`tope_alcanzado`/`error` (spec:355). La 011 deja "completada" a la 005 (011 plan D6, c64c5f8:78). Falta definir qué estado deja la CLI y qué es `error` frente a `con_errores` cuando falla una sola fuente. | **Puerta T001.** T008, T024–T027, T032 | El `CHECK` nuevo es la unión de los 8 valores. La CLI sigue igual. En la API, una fuente caída con otra que respondió deja `completada` con el error por fuente en la respuesta, y `error` queda solo para cuando todas fallan. **Efecto a decidir:** si la CLI sigue dejando `terminada`, el tablero de naturales, que toma búsquedas `completada` (011 spec c64c5f8:203), nunca muestra lo que corre la CLI. Eso incluye la demo de conectar y desconectar de la 011. Hay dos salidas: filtrar `estado IN ('completada','terminada')`, o que la CLI deje `completada`. El dueño elige, y queda explícito en T032. |
+| P2 | **`RepositorioLeads` no crea borradores.** `crear_busqueda(criterios)` (002 plan:109) no recibe canal, tope, mensaje ni costos estimados, y no hay transición `borrador → ejecutando`. | T024–T027 (falta aprobar el default) | Se agregan `crear_borrador(criterios, canal, tope, mensaje) -> UUID`, `fijar_estimados(id, estimado, maximo)`, `obtener_borrador(id)` y `pasar_a_ejecutando(id) -> bool` (`UPDATE … WHERE estado='borrador'`). Los métodos del 002 no cambian. |
 | P3 | **`gasto_busqueda` en el Protocol `RegistroCostos`** (002 plan:135-138). Si entra al Protocol, los registros falsos de la 002 y la 003 tienen que implementarlo. | T014–T015, T024 | Entra al Protocol, y el registro falso compartido suma el método en el mismo commit. |
-| P4 | **De dónde sale `costo_maximo_llamada`.** `MetaFuente` "se arma desde la entrada de fuentes.yaml, no desde la clase" (002 plan:80), pero el valor depende de la tarifa (`computo_seg_usd`, `usd_por_credito`) y de constantes del adaptador (timeout, intentos). La 011 lo deja a la 005 (011 plan D2, 6c4bd7d:74), y la fórmula de datos.gov.co está en la 011 spec (f8f9456):230. | T016–T020 | La fábrica de cada adaptador, en `adaptadores/__init__.py`, lo calcula con la tarifa ya resuelta y hace `dataclasses.replace(meta, costo_maximo_llamada=…)`. El YAML no lo declara. |
-| P5 | **Número de migración.** La spec dice `0004` (spec:398), y la 011 dice "el siguiente libre… previsiblemente `0004`" (011 plan D8, 6c4bd7d:80). Con el orden 002 → 003 → 011 → 004 → 005, la 011 toma el `0004` antes. | T001, T005 | El siguiente libre en `main` al pasar la puerta T001 (previsiblemente `0005`). Se corrige `spec.md`. |
-| P6 | **Orden del tablero de naturales.** La 011 usa `ORDER BY creada_en DESC` (011 spec f8f9456:203), pero `busquedas` no tiene `creada_en` (002 spec:150). | T031–T032 | La migración de la 005 suma `creada_en timestamptz NOT NULL DEFAULT now()`. Alternativa: ordenar por `ejecutada_en`, que la 005 ya agrega. |
+| P4 | **De dónde sale `costo_maximo_llamada`.** `MetaFuente` "se arma desde la entrada de fuentes.yaml, no desde la clase" (002 plan:80), pero el valor depende de la tarifa (`computo_seg_usd`, `usd_por_credito`) y de constantes del adaptador (timeout, intentos). La 011 lo deja a la 005 (011 plan D2, c64c5f8:74), y la fórmula de datos.gov.co está en la 011 spec (c64c5f8):230. | T016–T020 (falta aprobar el default) | La fábrica de cada adaptador, en `adaptadores/__init__.py`, lo calcula con la tarifa ya resuelta y hace `dataclasses.replace(meta, costo_maximo_llamada=…)`. El YAML no lo declara. |
+| P5 | **Número de migración.** La spec dice `0004` (spec:398), y la 011 dice "el siguiente libre… previsiblemente `0004`" (011 plan D8, c64c5f8:80). Con el orden 002 → 003 → 011 → 004 → 005, la 011 toma el `0004` antes. | T001, T005 | El siguiente libre en `main` al pasar la puerta T001 (previsiblemente `0005`). Se corrige `spec.md`. |
 | P7 | **`ignorados` por fuente.** `seleccionar_fuentes` devuelve `(seleccionadas: dict[clave, CriteriosICP], ignoradas: dict[clave, motivo])` (003 plan:65), y la vista previa necesita también los criterios ignorados de cada fuente seleccionada (spec:55). | T021, T025 | Se derivan en `VistaPrevia` como `set(criterios.filtros) - set(seleccionadas[k].filtros)`, sin tocar la firma de la 003. |
 | P8 | **Nombre del archivo de selección.** La spec dice `test_seleccion.py` (spec:158) y la 003 crea `test_seleccion_fuentes.py` (003 plan:132). | T021 | Va en `test_seleccion_fuentes.py`, y se corrige `spec.md`. |
 | P9 | **`test_tamano_es_refinamiento_no_requisito` puede nacer verde.** La 003 ya manda a `ignorados` los criterios que la fuente no declara (003 spec:45). | T021 | Se acepta como test de caracterización solo si la mutación (tratar `ingresos_min` como requisito) lo pone en rojo, y el advisor lo confirma. |
 | P10 | **`EXCLUIDOS`** (002 spec:66, enmendado en 002 plan:297). La 005 suma `repositorio_tablero.py` y `repositorio_usuarios.py` (spec:305). | T033 | Se enmienda en el mismo commit que los crea. |
 | P11 | **`limites_app` en `tarifas.yaml`.** Hoy no existe. ¿Lo lee el cargador de tarifas de la 002 o uno aparte? | T032 | Lo lee el mismo cargador, como `Decimal(str(v))`, y llega a la API por `Settings` en la raíz de composición. |
 | P12 | **Costo de `contar` de Croma.** Si la página 1 queda en caché, `buscar` no vuelve a cobrar. ¿La fila `croma_consulta` de `contar` es la misma que la de `buscar` (1 crédito en total)? | T017 | Sí: `contar` hace la request y escribe la fila, y `buscar(1)` es cache hit y no escribe nada. Es lo que prueba `test_contar_y_buscar_hacen_una_sola_request`. |
-| P13 | **Email de `usuarios` sin cifrar.** El principio VI cubre "correos". El email del usuario tiene que poder buscarse con `lower(email)` para el login. | T012–T013 | Se guarda en claro, como dato de cuenta del operador y no de lead, y se suma a la lista cerrada de `test_ninguna_columna_de_contacto_fuera_del_catalogo` (003) con esa razón. Lo revisa security. |
+| P13 | **Email de `usuarios`.** El principio VI dice "correos… se cifran en reposo" (constitution.md:34), sin distinguir entre lead y operador. Guardarlo en claro y meterlo en la lista cerrada de `test_ninguna_columna_de_contacto_fuera_del_catalogo` sería saltarse la regla. | **Puerta T001.** T005, T012–T013, T029–T030 | **Se aplica HMAC:** `email_hmac bytea UNIQUE`, que es HMAC-SHA256(`EMAIL_HMAC_CLAVE`, `lower(strip(email))`), sin email en claro. Es minimización: el login solo necesita igualdad, y `usuario_para_login` recibe el HMAC. La alternativa es enmendar la constitución, y eso lo decide el dueño. Si el test de catálogo de la 003 matchea columnas por nombre (`email*`), `email_hmac` entra con la razón "HMAC no reversible, no es contacto". Lo revisa security. |
 | P14 | **Costo de `contar` de OSM en la vista previa de un ICP de BR o PE** (estimado de OSM como cota baja, spec:341). Sin pregunta de diseño, pero se registra para la Fase 12. | — | Se mide en la corrida real. |
 
 ## Complexity Tracking
