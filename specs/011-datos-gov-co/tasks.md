@@ -31,7 +31,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`.
   - Las respuestas a D1–D11 quedan anotadas en `plan.md`.
   - Ninguna tarea marcada [002] o [003] arranca sin esto.
 - [ ] T002 [MIN] Se confirma que `pyyaml` y `httpx` ya están en `[project].dependencies` (`pyyaml` lo agrega la 002). **No se toca `pyproject.toml`.** `uv run lint-imports` en verde.
-- [ ] T003 [MIN] [P] Fixtures sintéticas en `backend/tests/fixtures/datos_gov_co/`. Las tres usan el esquema real de `c82u-588k`, NITs ficticios con el formato `9\d{8}` y ninguna razón social real.
+- [X] T003 [MIN] [P] Fixtures sintéticas en `backend/tests/fixtures/datos_gov_co/`. Las tres usan el esquema real de `c82u-588k`, NITs ficticios con el formato `9\d{8}` y ninguna razón social real.
   - `filas.json`: empresas válidas con las 7 columnas del `$select`.
   - `filas_descartables.json`: las válidas más un caso de cada tipo, de (a) a (d), más (a'), una natural escrita `"Persona Natural "` (mayúsculas mezcladas y un espacio al final).
   - `conteo_naturales.json`, con `[{"count": "26304"}]`. Lo usa recién la Fase Pulido, pero se escribe junto con las otras dos.
@@ -40,7 +40,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`.
 
 ### Fase 2: Skills (Paso 1), sin bloqueo
 
-- [ ] T004 [MIN] [P] [Paso 1] Cambios en `.claude/skills/fuentes-publicas/SKILL.md`. *[MIN dudosa: es doc, pero la línea 56 hoy le dice a cualquier lead que saque `tipo_titular` de `clase_identificacion`, y eso deja pasar naturales.]*
+- [X] T004 [MIN] [P] [Paso 1] Cambios en `.claude/skills/fuentes-publicas/SKILL.md`. *[MIN dudosa: es doc, pero la línea 56 hoy le dice a cualquier lead que saque `tipo_titular` de `clase_identificacion`, y eso deja pasar naturales.]*
   - Línea 39, la fila de `datos_gov_co_rues`:
     - `c82u-588k`;
     - `filtros: [ciiu, departamento]`;
@@ -48,7 +48,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`.
     - `trae: [nit, nombre, ciiu, ciudad_camara]`;
     - "conectado".
   - Línea 56: `tipo_titular` de datos.gov.co sale de `organizacion_juridica` y **no** de `clase_identificacion`, porque la clase NIT incluye naturales.
-- [ ] T005 [MIN] [P] [Paso 1] Cambios en `.claude/skills/cumplimiento-datos/SKILL.md`. *[MIN dudosa, por la misma razón que T004: regla 1.]*
+- [X] T005 [MIN] [P] [Paso 1] Cambios en `.claude/skills/cumplimiento-datos/SKILL.md`. *[MIN dudosa, por la misma razón que T004: regla 1.]*
   - Regla 1: la misma corrección que en T004.
   - Regla 4: una nota de que una fuente que permite filtrar en el servidor cuenta las naturales en lugar de guardarlas.
 
@@ -56,13 +56,13 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`.
 
 *[MIN dudosa: sin cámaras no hay filtro por departamento, y la selección de fuentes de la 003 da `sin_geografia`. Las 58 completas pasan a Pulido (T054), que es el corte 4 de la spec.]*
 
-- [ ] T006 [MIN] [Paso 2] Stub `backend/app/modulos/descubrimiento/aplicacion/camaras.py`, con `Camara(codigo, nombre, municipio_sede, departamentos)` y dos funciones:
+- [X] T006 [MIN] [Paso 2] Stub `backend/app/modulos/descubrimiento/aplicacion/camaras.py`, con `Camara(codigo, nombre, municipio_sede, departamentos)` y dos funciones:
   - `cargar_camaras(ruta) -> {}`;
   - `camaras_de(camaras, departamento) -> set()`.
 
   Y `backend/config/camaras_co.yaml` vacío (`{}`).
-- [ ] T007 [MIN] [Paso 2] **Rojo:** `backend/tests/unit/descubrimiento/test_camaras_co.py::test_bogota_y_cundinamarca`. Falla por aserción: `set() != {"04"}`.
-- [ ] T008 [MIN] [Paso 2] **Verde:** `camaras_co.yaml` con las cámaras 04, 14, 47 y 58, y su cargador.
+- [X] T007 [MIN] [Paso 2] **Rojo:** `backend/tests/unit/descubrimiento/test_camaras_co.py::test_bogota_y_cundinamarca`. Falla por aserción: `set() != {"04"}`.
+- [X] T008 [MIN] [Paso 2] **Verde:** `camaras_co.yaml` con las cámaras 04, 14, 47 y 58, y su cargador.
 
 ### Fase 4: Filtro jurídico (Paso 4) [002], bloqueada por D1, D9 y (advisor)
 
@@ -253,7 +253,7 @@ T049, el verde del tablero (`GET /tablero/fuentes`, la columna y las claves de i
 
 ## Dependencias
 
-- **Ya, sin la 002 ni la 003:** T003, T004, T005 y T006–T008, en paralelo entre sí (archivos distintos). T006 crea `descubrimiento/aplicacion/camaras.py`: si la 002 crea los `__init__.py` del paquete con otro contenido, el merge de T001 lo resuelve.
+- **Ya, sin la 002 ni la 003:** T003, T004, T005 y T006–T008, en paralelo entre sí (archivos distintos). T006 crea `descubrimiento/aplicacion/camaras.py` (el paquete ya vino vacío de la 002).
 - **Puerta.** T001 bloquea toda tarea marcada [002] o [003], y todo lo que viene después de la Fase 3.
 - **Adaptador.** La Fase 4 necesita la Fase 3, porque el adaptador usa cámaras. La Fase 5 sigue a la 4. Las dos tocan el mismo archivo de adaptador y el mismo `test_datos_gov_co.py`: van en serie, con un solo dueño.
 - **En paralelo dentro del mínimo, sin pisarse:** T036 (`test_costos_repo.py`) con T038 (`test_registro.py`, `test_seleccion_fuentes.py`) y T039 (`fabricas.py`), una vez que T030 está en verde. T051 con T050.
