@@ -115,7 +115,7 @@
 
 - [X] T026 🤖 **Rojo:** `backend/tests/arquitectura/test_higiene.py`. Con un fixture de 101 líneas falla; el `CLAUDE.md` real (< 100 líneas) pasa. **Verde** después.
 - [X] T027 🤖 `backend/evals/run.py`, un placeholder que sale con 0.
-- [ ] T028 🤖 **Rojo:** `.github/scripts/check_imagen.sh <imagen> <max_mb>`. Reporta cada motivo por nombre, y `pip` se busca también con `python -m pip --version`. Tiene que fallar, con el motivo en la salida, en tres casos:
+- [X] T028 🤖 **Rojo:** `.github/scripts/check_imagen.sh <imagen> <max_mb>`. Reporta cada motivo por nombre, y `pip` se busca también con `python -m pip --version`. Tiene que fallar, con el motivo en la salida, en tres casos:
   - `python:3.12-slim` pelada → `pip` y `root`;
   - `node:22-alpine` con `max_mb=250` → `node` y `npm`;
   - slim con `max_mb=1` → el tamaño.
