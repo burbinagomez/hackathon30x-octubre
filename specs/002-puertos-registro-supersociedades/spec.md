@@ -94,7 +94,7 @@ Los contadores son del puerto: `RegistroCostos.requests_24h(proveedor)` y `Regis
 - `::test_502_con_99_previas_no_reintenta`: con 99 requests previas, un 502 da 1 request, 1 fila escrita y `LimiteFuenteAgotado`.
 - `::test_429_lanza_limite_sin_reintento`: 1 request, 1 fila con `unidades=0` y `LimiteFuenteAgotado`.
 - `::test_error_no_se_cachea`: tras un 4xx o un 5xx agotado el caché sigue vacío y la siguiente búsqueda sí hace request.
-- `::test_respuesta_200_que_no_parsea_no_se_cachea`: un 200 con el cuerpo truncado, o sin `data` ni `total`, hace fallar al adaptador y deja `fuente_cache` vacío. La fila de `costos` se escribe igual, porque el intento HTTP se envió. Sabotaje que lo pone en rojo: mover el upsert del caché antes del parseo.
+- `::test_respuesta_200_que_no_parsea_no_se_cachea`: un 200 con el cuerpo truncado, o sin `data` ni `total`, cumple `pytest.raises(FuenteNoDisponible)`, la misma excepción de un 4xx. El mensaje del error no incluye el cuerpo de la respuesta ni la API key. `fuente_cache` queda vacío. La fila de `costos` se escribe igual, porque Croma cobró el 200: 1 fila con `unidades=1` y `costo_unitario == tarifas.croma.usd_por_credito`. Sabotajes que lo ponen en rojo: mover el upsert del caché antes del parseo, o registrar el fallo de parseo como intento fallido (`unidades=0`).
 
 **Caso de uso** (`backend/tests/unit/descubrimiento/test_ejecutar_busqueda.py`, con repositorio falso)
 - `::test_mismo_nit_de_dos_fuentes_queda_en_un_lead`: dos `EmpresaCruda` `(CO, 900123456)` de **fuentes distintas** dan 1 lead con 2 `lead_fuentes`.
