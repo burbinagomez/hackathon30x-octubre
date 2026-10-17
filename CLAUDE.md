@@ -16,6 +16,7 @@ Lee antes de tocar nada, en este orden:
 - **Nada de otros proyectos del equipo**: ni cuentas, ni código, ni credenciales. Todo servicio se crea nuevo para el evento.
 - **Secrets en entorno.** Nunca en el repo ni en el front.
 - **Contacto cifrado, nunca en logs.**
+- **Idiomas es/en.** La UI existe en es y en desde el primer componente; la API devuelve códigos, no texto; el idioma del mensaje al lead lo decide el país del lead, no la UI.
 - No hagas `git push` sin avisar antes exactamente qué archivos y qué commit, y esperar el OK.
 
 ## Stack
