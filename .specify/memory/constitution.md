@@ -1,6 +1,6 @@
 # Constitución — Reto Dapta (30X Hackathon)
 
-> Ubicación: `.specify/memory/constitution.md` · **Versión 1.0.0** · Ratificada 2026-10-17
+> Ubicación: `.specify/memory/constitution.md` · **Versión 1.3.0** · Ratificada 2026-10-17 · 1.1.0: PASS^K en IX · 1.2.0: Postgres en Supabase (III, IV, V) · 1.3.0: límites del front por feature (I)
 > Regla de oro: **una regla entra aquí solo si tiene un chequeo automático que la hace cumplir.** Sin chequeo, es un deseo.
 > Regla del proyecto: **nada se desarrolla sin spec, sin reglas, sin agentes y sin skills definidos.** Este archivo es las reglas; `docs/prd.md` es la spec de producto; `.claude/agents/` y `.claude/skills/` son los agentes y skills.
 
@@ -11,6 +11,7 @@
 ### I. Hexagonal con barandal — fuentes y salidas conectables
 Módulos en `backend/app/modulos/<nombre>/{dominio,aplicacion,infraestructura}`. La dependencia apunta hacia adentro: `dominio/` no importa framework, DB ni clientes externos; `aplicacion/` depende de puertos (Protocols) definidos en `dominio/`; adaptadores viven en `infraestructura/` en archivos separados de sus puertos. Entidades de dominio ≠ modelos de persistencia.
 **Toda entrada y salida externa es un adaptador detrás de un puerto**: `FuenteDescubrimiento`, `Enriquecedor`, `CanalContacto`, `Calificador`, `Clasificador`, `RegistroCostos`. Los adaptadores se **registran en `config/fuentes.yaml`** con `habilitado`, `paises`, `filtros` y `trae`; el orquestador carga solo los habilitados que cubren el ICP. Cambiar de fuente (Croma ↔ datos.gov.co, email ↔ WhatsApp, Dapta API ↔ CSV) es un flag, nunca un cambio en dominio ni en casos de uso.
+**Front por feature:** `frontend/src/<feature>/`. Una feature importa solo de `compartido/` y `api/`, nunca de otra feature. Lo verifica `eslint-plugin-boundaries` en CI, con canario (`frontend/tests/arquitectura/limites.test.ts`), igual que `import-linter` en el back.
 **Chequeo:** `import-linter` con contratos de capas por módulo, en CI. **Suite de contrato por puerto** (`tests/contratos/`), parametrizada sobre todos los adaptadores registrados: cada uno pasa los mismos tests con proveedor falso. Test que falla si un adaptador no está en el registro o si el dominio referencia un adaptador concreto. **Si falla:** sin merge.
 
 ### II. El test va primero y en rojo — back y front
@@ -18,15 +19,15 @@ Todo cambio de comportamiento empieza con un test que falla. Back: `pytest`. Fro
 **Chequeo:** CI corre ambas suites en cada push/PR; PR que toca `src/` sin tocar `tests/` recibe marca para revisión. **Si falla:** sin merge.
 
 ### III. Aislamiento por tenant, probado
-Toda tabla con datos de un tenant lleva `tenant_id` y RLS activa. El rol de runtime **no** es dueño del esquema ni tiene `BYPASSRLS`; la URL de migraciones solo existe en el job de migraciones.
-**Chequeo:** por cada tabla con RLS, test que como tenant B intenta SELECT/UPDATE/DELETE/INSERT sobre datos de A y espera vacío/denegado, corriendo con rol sin `BYPASSRLS`. Test que falla si el entorno de runtime contiene la URL de migraciones. **Si falla:** bloqueante absoluto.
+Toda tabla con datos de un tenant lleva `tenant_id` y RLS activa. El rol de runtime **no** es dueño del esquema ni tiene `BYPASSRLS`; la URL de migraciones solo existe en el job de migraciones. El tenant se fija con `SET LOCAL` dentro de la transacción, nunca con `SET` de sesión (el pooler de Supabase en modo transacción reparte conexiones entre clientes). Los roles de Supabase `anon` y `authenticated` no tienen privilegios sobre tablas de `public`.
+**Chequeo:** por cada tabla con RLS, test que como tenant B intenta SELECT/UPDATE/DELETE/INSERT sobre datos de A y espera vacío/denegado, corriendo con rol sin `BYPASSRLS`. Test que falla si el entorno de runtime contiene la URL de migraciones. Test de `has_table_privilege` para `anon` y `authenticated`. **Si falla:** bloqueante absoluto.
 
 ### IV. El esquema lo gobiernan las migraciones
 Todo cambio de esquema es una migración Alembic revisada por un humano. `autogenerate` desactivado salvo con `include_object`. `alembic upgrade head` desde base vacía reproduce el esquema.
-**Chequeo:** CI levanta Postgres vacío → `upgrade head` → drift check contra modelos. **Si falla:** sin merge.
+**Chequeo:** CI levanta Postgres vacío → `upgrade head` → drift check contra modelos, acotado al esquema `public` (los de Supabase quedan fuera). **Si falla:** sin merge.
 
 ### V. Seguridad en el pipeline
-Secrets en variables de entorno (Railway), nunca en el repo ni en el front; `.env*` ignorado. Dependabot activo. `pip-audit` + `npm audit` (CVE alta/crítica bloquea). CodeQL. Secret scanning + step que falla si el diff introduce un secret. Revisión OWASP Top 10 por PR con el agente `security` (CRITICAL/HIGH bloquea). Toda entrada se valida en el back; texto externo que llegue a un LLM se trata como hostil (prompt injection).
+Secrets en variables de entorno (Railway para `api`; GitHub Environment `produccion` para la URL de migraciones), nunca en el repo ni en el front; `.env*` ignorado. Ninguna key de Supabase (anon, service_role, publishable, secret) existe en el entorno de `api` ni de `web`: la app no arranca si la ve. Dependabot activo. `pip-audit` + `npm audit` (CVE alta/crítica bloquea). CodeQL. Secret scanning + step que falla si el diff introduce un secret. Revisión OWASP Top 10 por PR con el agente `security` (CRITICAL/HIGH bloquea). Toda entrada se valida en el back; texto externo que llegue a un LLM se trata como hostil (prompt injection).
 **Chequeo:** los steps son *required checks* de `main`; un test de configuración falla si falta alguno. **Si falla:** sin merge.
 
 ### VI. Datos de contacto tratados como sensibles
@@ -42,8 +43,8 @@ Cada consulta a fuente, fetch web, llamada a LLM/Jev, crédito de Croma, mensaje
 **Chequeo:** test de integración que ejecuta cada tipo de operación con proveedor falso y verifica la fila en `costos`; test que falla si un adaptador de salida no pasa por el puerto `RegistroCostos`. **Si falla:** sin merge.
 
 ### IX. Lo que no se mide no se declara funcionando
-Clasificación de respuestas y encaje ICP tienen set etiquetado versionado en `evals/` y corren en CI (`jev_check`/`jev_classify`, versión pineada `jev-1.13.0`). Umbral mínimo por eval; un cambio que baje la métrica respecto a `main` no mergea sin justificación. Email y teléfono se **verifican antes de enviar**; se reporta tasa usable, no tasa de match.
-**Chequeo:** job de evals en CI publica métricas y compara con `main`. **Si falla:** sin merge.
+Clasificación de respuestas, encaje ICP y redacción del mensaje tienen set etiquetado versionado en `evals/` (`jev_check`/`jev_classify`, versión pineada `jev-1.13.0`; método en `docs/prd.md` §6b). Umbral mínimo por eval; un cambio que baje la métrica respecto al baseline no mergea sin justificación. **PASS^K con k=3** para LLM-as-judge y para la redacción del mensaje: el caso pasa solo si pasa las 3 corridas. Jev corre con k=1 solo después de demostrar determinación con k=3 sobre el set. Email y teléfono se **verifican antes de enviar**; se reporta tasa usable, no tasa de match.
+**Chequeo:** el runner corre local con un comando (`uv run python -m evals.run`), compara con `evals/baseline.json` y sale ≠ 0 si baja; CI invoca ese mismo comando. **Si falla:** sin merge.
 
 ### X. Documentación viva y pocas reglas
 `README.md` (qué resuelve, cómo correr, variables, tests, atribuciones ODbL/CC BY-SA, badge CI), `docs/arquitectura-backend.md`, `docs/arquitectura-frontend.md`, actualizados en el mismo PR. Comentarios explican el *por qué*. Este archivo no crece por acumulación: una regla nueva trae su chequeo o no entra. Un solo `CLAUDE.md` raíz (<100 líneas) + opcionales en `backend/` y `frontend/`.
@@ -56,7 +57,7 @@ Clasificación de respuestas y encaje ICP tienen set etiquetado versionado en `e
 - **Nada de otros proyectos.** Cuentas, proveedores, código o credenciales de otros proyectos del equipo no se reutilizan. Todo servicio se crea nuevo para el evento. Única excepción: un proveedor de WhatsApp Business API ya existente, **solo si el dueño lo valida por escrito**; mientras tanto, el canal no está disponible.
 - **Repo público y open source** desde el primer commit (regla del 30X). Base derivada de OSM/RUES bajo ODbL / CC BY-SA, con atribución.
 - **El proyecto empezó tras el kickoff** (16-oct). Nada anterior.
-- **Un flujo completo el domingo vale más que cinco a medias.** Si el domingo 3pm el slice 7 (WhatsApp) no está, se corta.
+- **Un flujo completo el domingo vale más que cinco a medias.** Si el domingo 3pm el slice 9 (WhatsApp) no está, se corta.
 
 ## Flujo de trabajo
 

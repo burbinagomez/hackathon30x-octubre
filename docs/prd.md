@@ -163,7 +163,7 @@ Las tarifas viven en `config/tarifas.yaml` (versionado) para que el jurado vea l
 
 **Licencias:** atribución a OpenStreetMap y a Confecámaras/datos.gov.co en README y en el tablero; la base derivada publicada bajo ODbL / CC BY-SA (compatible con el repo open source del evento).
 
-**Datos sensibles:** teléfonos, correos y textos de respuesta cifrados en reposo; nunca en logs. RLS por tenant con test que intenta romper el aislamiento. Secrets en variables de Railway.
+**Datos sensibles:** teléfonos, correos y textos de respuesta cifrados en reposo; nunca en logs. RLS por tenant con test que intenta romper el aislamiento. Secrets en variables de Railway (`api`) y en el GitHub Environment `produccion` (migraciones); ninguna key de Supabase en el runtime.
 
 ---
 
@@ -171,11 +171,36 @@ Las tarifas viven en `config/tarifas.yaml` (versionado) para que el jurado vea l
 
 | Uso | Cómo | Eval |
 |---|---|---|
-| Encaje con ICP (señales difusas: "¿este negocio es del rubro X?") | `jev_classify` con preguntas estrechas + opción "ninguna"; lo determinista (CIIU, estado) va por reglas | Set etiquetado con las 50 empresas **[MENTORES]**; matriz de confusión en CI |
-| Clasificación de respuestas | `jev_check` en tiempo real: ¿interesado? ¿rechazo? ¿automática? ¿rebote? ¿pide no contacto? | 20–30 respuestas sintéticas + las reales del evento; umbral ≥90% en CI |
-| Redacción/personalización del primer mensaje | LLM (Sonnet vía harness) con plantilla fija + 1 dato del lead; salida validada (longitud, opt-out presente, sin datos inventados) | `jev_check` sobre cada mensaje: ¿tiene opt-out? ¿menciona la fuente? ¿inventa algo? |
+| Encaje con ICP (señales difusas: "¿este negocio es del rubro X?") | `jev_classify` con preguntas estrechas + opción "ninguna"; lo determinista (CIIU, estado) va por reglas | Eval `encaje_icp` del harness (§6b), dataset de pymes reales + las 50 empresas **[MENTORES]** |
+| Clasificación de respuestas | `jev_check` en tiempo real: ¿interesado? ¿rechazo? ¿automática? ¿rebote? ¿pide no contacto? | Eval `clasificacion_respuestas` (§6b): 20–30 respuestas sintéticas + las reales del evento; umbral ≥90% |
+| Redacción/personalización del primer mensaje | LLM (Sonnet vía harness) con plantilla fija + 1 dato del lead; salida validada (longitud, opt-out presente, sin datos inventados) | Eval `pertinencia_mensaje` (§6b): scorers de forma + juez 0–1, PASS^3 |
 
 Versión de Jev pineada (`TYPESAFE_DEFAULT_MODEL=jev-1.13.0`). Todo entra a `costos`.
+
+---
+
+## 6b. Evals — lo que no se mide no se declara funcionando
+
+**Ciclo:** casos → agente → scorers → baseline → PR verde/rojo.
+1. **Casos** (`backend/evals/dataset.json`): pymes reales, cada una con su origen (fuente + `as_of`) y una etiqueta humana (`encaja` / `no_encaja`; y, cuando exista, el resultado de Dapta).
+2. **Agente:** el componente bajo prueba corre sobre cada caso (clasificador de encaje, redactor del mensaje, clasificador de respuestas).
+3. **Scorers**, de dos tipos:
+   - **Forma** — código determinista en Python, pasa o no pasa: ¿salida con el esquema esperado?, ¿etiqueta dentro del enum?, ¿<100 palabras?, ¿opt-out?, ¿origen del dato?, ¿una sola pregunta?
+   - **Significado** — un juez que devuelve una probabilidad 0–1: Jev (`jev_check` / `jev_classify`) o LLM-as-judge con un prompt versionado en `backend/evals/jueces/`. ¿Encaja con el ICP? ¿El mensaje es pertinente para *este* lead? ¿Inventa datos?
+4. **Baseline** (`backend/evals/baseline.json`, versionado): el número agregado por eval de la última versión aceptada.
+5. **PR verde/rojo:** si un agregado baja respecto al baseline o queda bajo su umbral, el runner sale ≠ 0 y el PR queda rojo. Si mejora, el baseline se actualiza en el mismo PR.
+
+**PASS^K con k=3:** todo componente no determinista (LLM-as-judge, redacción del mensaje) corre 3 veces por caso, y el caso pasa solo si pasa las 3. Jev baja a k=1 solo después de demostrar con k=3, sobre el set, que siempre da la misma respuesta.
+
+**Runner:** `cd backend && uv run python -m evals.run` corre local con un comando y devuelve el número agregado por eval y la lista de casos fallidos. CI invoca el mismo comando. Este fin de semana no se usan Braintrust ni Actions: el chequeo es el comando local más el baseline commiteado.
+
+**Los 3 puntos de decisión que se evalúan:**
+
+| Decisión | Componente | Forma | Significado | Ground truth |
+|---|---|---|---|---|
+| **Encaje con ICP** (eval `encaje_icp`) | `jev_classify` (slice 6) | etiqueta ∈ {encaja, no_encaja, ninguna} | probabilidad de encaje vs etiqueta humana | etiqueta en `dataset.json` |
+| **Pertinencia del mensaje** (eval `pertinencia_mensaje`) | redactor Sonnet (slice 7) | <100 palabras, opt-out, origen, 1 pregunta, sin adjuntos | juez 0–1: pertinente para este lead, sin datos inventados | muestra revisada por un humano |
+| **Match con Dapta** (eval `match_dapta`) | encaje predicho vs calificación (slice 8) | resultado de Dapta ∈ enum | — | **la calificación de Dapta**: ¿los que marcamos `encaja` son los que Dapta califica? |
 
 ---
 
@@ -196,24 +221,35 @@ Más: embudo por fuente, línea de tiempo de costos del evento, y la pantalla de
 
 ## 9. Orden de construcción (slices, TDD, un flujo completo primero)
 
-1. **Walking skeleton** en Railway: back `/health`, front en blanco, Postgres, CI verde, secrets fuera, import-linter. *(sáb AM)*
+1. **Walking skeleton**: back `/health` y front en blanco en Railway, Postgres en Supabase, CI verde, secrets fuera, import-linter. *(sáb AM)*
 2. **Puertos + registro + primer adaptador:** puerto `FuenteDescubrimiento`, carga de `config/fuentes.yaml`, suite de contrato, adaptador `croma_supersociedades_co` → `leads` con ICP (CIIU/dpto) y `tipo_titular=juridica` → test rojo de dedup por NIT y test de contrato. *(sáb AM/PM)*
 3. **Segundo adaptador: `osm_overpass`** → normalización común + match difuso + dedup teléfono/dominio → los 4 niveles de dedup con tests; `croma_dian_trade_co` si sobra tiempo. *(sáb PM)*
-4. **Libro de costos** (`RegistroCostos` + Croma créditos + cómputo) + CPL por fuente en el tablero + **formulario "Nueva búsqueda" (puerta C) con vista previa de conteo y costo estimado**. *(sáb PM)* ← con esto ya hay demo mostrable
-5. **Enriquecedor:** `sitio_web` (contacto publicado) + `croma_rues_co` (verificación, tipo_titular) → `contactable`. *(sáb noche)*
-6. **Email** vía `CanalContacto` + adaptador SMTP (proveedor gratuito nuevo; nada de otros proyectos) + respuestas por IMAP/webhook + `jev_check` en tiempo real + tasa de respuesta. *(dom AM)*
-7. **Dapta** (`dapta_csv` primero; `dapta_api` si llega la doc) + CPQL. *(dom AM)*
-8. **WhatsApp** (`whatsapp_meta`, acotado, tasa de bloqueo) — **[VALIDAR]**; si no se valida, el MVP es solo email. *(dom, si hay tiempo)*
-9. **Puertas A y B de intake:** lookalike desde las 50 empresas de ejemplo (resolver por nombre en RUES → ICP prellenado) y "una frase → ICP" (una llamada LLM con salida estructurada, validada por `jev_check`). *(dom, si hay tiempo; es el remate del pitch para la audiencia de Dapta)*
-9b. **`datos_gov_co_rues`** como adaptador desconectado con su test de contrato pasando — demuestra en vivo el "se conecta y desconecta". *(dom, si hay tiempo; 1 h)*
-10. **Seguridad**: RLS probado, cifrado de contacto, libro de cumplimiento, `/security-review`. *(transversal desde el slice 2, cierre dom PM)*
-11. README + arquitectura + video de respaldo (Cap) + pitch. *(dom PM)*
+4. **Evals harness** (§6b): `backend/evals/dataset.json` con 20–40 pymes reales (origen + etiqueta encaja/no encaja), armado con las que encuentran 2 y 3 y con las 50 de ejemplo cuando lleguen; scorers de forma en Python; prompt de juez que puntúa encaje y calidad de mensaje (0–1); runner k=3 que devuelve el número agregado y la lista de casos fallidos; `baseline.json` guardado para comparar. Sin Braintrust ni Actions este fin de semana. *(sáb PM, ~2 h)*
+5. **Libro de costos** (`RegistroCostos` + Croma créditos + cómputo) + CPL por fuente en el tablero + **formulario "Nueva búsqueda" (puerta C) con vista previa de conteo y costo estimado**. *(sáb PM)* ← con esto ya hay demo mostrable
+6. **Enriquecedor:** `sitio_web` (contacto publicado) + `croma_rues_co` (verificación, tipo_titular) → `contactable`. *(sáb noche)*
+7. **Email** vía `CanalContacto` + adaptador SMTP (proveedor gratuito nuevo; nada de otros proyectos) + respuestas por IMAP/webhook + `jev_check` en tiempo real + tasa de respuesta. *(dom AM)*
+8. **Dapta** (`dapta_csv` primero; `dapta_api` si llega la doc) + CPQL. *(dom AM)*
+9. **WhatsApp** (`whatsapp_meta`, acotado, tasa de bloqueo) — **[VALIDAR]**; si no se valida, el MVP es solo email. *(dom, si hay tiempo)*
+10. **Puertas A y B de intake:** lookalike desde las 50 empresas de ejemplo (resolver por nombre en RUES → ICP prellenado) y "una frase → ICP" (una llamada LLM con salida estructurada, validada por `jev_check`). *(dom, si hay tiempo; es el remate del pitch para la audiencia de Dapta)*
+11. **`datos_gov_co_rues`** como adaptador desconectado con su test de contrato pasando — demuestra en vivo el "se conecta y desconecta". *(dom, si hay tiempo; 1 h)*
+12. **Seguridad**: RLS probado, cifrado de contacto, libro de cumplimiento, `/security-review`. *(transversal desde el slice 2, cierre dom PM)*
+13. README + arquitectura + video de respaldo (Cap) + pitch. *(dom PM)*
 
-Si el domingo a las 3pm no está el 8, se corta: email solo. Un flujo completo vale más que dos a medias.
+El número del slice es el de su spec (`specs/0NN-…`). Si el domingo a las 3pm no está el 9, se corta: email solo. Un flujo completo vale más que dos a medias.
 
 ---
 
 ## 10. Pitch (etapa 05, para quien decide en Dapta)
+
+**Rúbrica del 30X** (con esto se juzga, y con esto se ordena el pitch):
+
+| Criterio | Peso | Evidencia nuestra |
+|---|---|---|
+| Impacto | 30% | CPL y CPQL reales por fuente y canal, contra $80–500 por lead en pauta |
+| Innovación | 20% | fuentes públicas gratuitas, costo estimado antes de buscar, CPQL cerrado con el calificador de Dapta |
+| Viabilidad técnica | 20% | evals con baseline y PASS^3 (§6b), hexagonal con suite de contrato, CI |
+| Viabilidad de implementación | 20% | adaptadores por flag, RLS, cifrado, libro de cumplimiento, costo mensual estimado |
+| Presentación | 10% | demo en vivo del tablero + video de respaldo |
 
 1. **Problema:** sus pymes pagan $80–500 por lead en pauta y no saben qué canal les sirve; 3 de 5 le piden leads.
 2. **Solución en acción:** demo del tablero con leads reales del fin de semana, CPL y CPQL por fuente y canal, y el libro de costos abierto.

@@ -19,7 +19,7 @@ Lee antes de tocar nada, en este orden:
 - No hagas `git push` sin avisar antes exactamente qué archivos y qué commit, y esperar el OK.
 
 ## Stack
-Back: Python 3.12 + FastAPI + Postgres (RLS) + Alembic. Front: React + TypeScript + Vite. Deploy: Railway (3 servicios: api, web, postgres). CI: GitHub Actions. IA: Claude vía harness; Jev (`jev-code`) para clasificar/verificar, versión `jev-1.13.0`.
+Back: Python 3.12 + FastAPI + Postgres (RLS) + Alembic. Front: React + TypeScript + Vite. Deploy: Railway (2 servicios: api, web) + Postgres en Supabase (solo Postgres: sin Auth, Storage, Edge Functions ni Data API sobre `public`; `api` entra por el pooler en modo transacción, las migraciones por el modo sesión). CI: GitHub Actions. IA: Claude vía harness; Jev (`jev-code`) para clasificar/verificar, versión `jev-1.13.0`.
 
 ## Comandos
 ```bash
