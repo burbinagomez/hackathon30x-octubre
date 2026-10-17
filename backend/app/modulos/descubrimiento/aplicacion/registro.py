@@ -47,3 +47,8 @@ def cargar_registro(ruta_yaml: Path, catalogo: dict[str, type]) -> Registro:
             raise RegistroInvalido(f"{clave}: falta {falta}") from None
         fuentes[clave] = (catalogo[clave], meta)
     return Registro(fuentes, frozenset(sin_implementacion))
+
+
+def cargar_actividades(ruta_yaml: Path) -> dict[str, tuple[str, ...]]:
+    """CIIU -> etiquetas OSM, desde config/actividades.yaml."""
+    return {}
