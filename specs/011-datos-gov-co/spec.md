@@ -1,7 +1,7 @@
 # Spec 011 — datos.gov.co (`c82u-588k`), segunda fuente de descubrimiento, con contrato
 
 **Slice:** 011 · **Rama:** `feature/011-datos-gov-co` · **Tiempo:** sábado PM, justo después de la 003 (≤ 1,5 h con los cortes de "Cuándo cortar"; completo, ~2 h)
-**Depende de:** 002 (puerto, registro, contrato, caché), 003 (normalización, dedup, selección de fuentes), 005 (`costo_maximo_llamada`, la suite de contrato de `contar` y el tablero, con sus tests movidos a specs/005 por D7). **Desbloquea:** el descubrimiento en CO sin depender del tier de Croma, la demo en vivo de que una fuente se conecta y se desconecta (PRD §9) y la atribución del README en la 013.
+**Depende de:** 002 (puerto, registro, contrato, caché), 003 (normalización, dedup, selección de fuentes). **Desbloquea:** la 005 (`costo_maximo_llamada`, la suite de contrato de `contar` y el tablero, con los tests movidos a specs/005 por D7), el descubrimiento en CO sin depender del tier de Croma, la demo en vivo de que una fuente se conecta y se desconecta (PRD §9) y la atribución del README en la 013.
 
 > **Orden 002 → 003 → 011.** **D7, resuelta por el dueño:** los 6 tests que dependen de la 005 se movieron a specs/005. Son `test_costo_maximo_llamada`, los tres de `contar` de la suite de contrato de la 005, `test_tablero_trae_naturales_por_fuente` y `muestra_naturales_encontradas_no_contactables`. En la 011 quedan solo `test_contar_usa_count_con_el_mismo_where` y `test_contar_registra_socrata_descarga`, que son rojo real por aserción: `contar` es un método del adaptador y no necesita nada de la 005. El PR de la 011 no lleva `xfail`.
 
@@ -102,8 +102,8 @@ Ninguno: este slice no usa IA.
 - `::test_as_of_sale_del_header`: `X-SODA2-Truth-Last-Modified: Fri, 02 Oct 2026 21:39:26 GMT` → `as_of == datetime(2026, 10, 2, 21, 39, 26, tzinfo=UTC)`. Sin el header, `as_of` es la hora de la consulta según el reloj inyectable.
 - `::test_cinco_mil_filas_marca_truncado`: `truncado` se mide sobre las filas **crudas** que llegaron, antes del filtro del cliente. Con 5.000 filas, 3 de ellas descartables, `truncado is True`; con 4.999, `False`. En los dos casos, `total is None`: el total exacto lo da `contar`.
 - `::test_pagina_2_vacia_sin_request`: `buscar(criterios, pagina=2)` devuelve 0 empresas y `truncado is False`, con 0 requests y 0 filas de costo.
-- `::test_contar_usa_count_con_el_mismo_where`: `$select=count(*)` y el mismo `$where` de la request de filas. La respuesta `[{"count": "2015"}]` devuelve `2015`.
-- `::test_contar_registra_socrata_descarga`: `contar` deja 1 fila `socrata_descarga` con los segundos medidos y el `lote_id` de la vista previa.
+- `::test_contar_usa_count_con_el_mismo_where`: `$select=count(*)` y el mismo `$where` de la request de filas, comparado contra el literal de `test_query_filtra_juridicas_en_servidor` y no contra el builder de filas. La respuesta `[{"count": "2015"}]` devuelve `2015`.
+- `::test_contar_registra_socrata_descarga`: con un reloj falso que avanza 2 s, `contar` deja 1 fila `socrata_descarga` con `unidades == Decimal("2")`, `unidades * costo_unitario == 2 * computo_seg_usd` (`OperacionCosto` no tiene campo `monto`) y el `lote_id` que llega por el constructor.
 - `::test_registra_segundos_de_cada_intento`: en las filas, un 503 seguido de un 200, con el transporte falso avanzando el reloj 2 s y 3 s; después el conteo, que tarda 1 s. Resultado: 3 filas `tipo="socrata_descarga"` con `unidades` 2, 3 y 1, `costo_unitario == tarifas.computo_seg_usd` (un `Decimal`), `proveedor="datos.gov.co"`, `fuente="datos_gov_co_rues"`, `lead_id=None`, `gratis=False` y el `lote_id` de la corrida.
 - `::test_segundo_fallo_lanza_fuente_no_disponible`: dos 503 (o dos timeouts) en las filas → `FuenteNoDisponible`, 2 filas de costo, ninguna request de conteo y un mensaje que no incluye el cuerpo de la respuesta.
 - `::test_cache_hit_no_hace_request`: un segundo `buscar` con los mismos criterios da 0 requests y 0 filas nuevas de costo, con el mismo resultado, `naturales_no_descargadas` incluido.
@@ -229,7 +229,7 @@ GET https://www.datos.gov.co/resource/c82u-588k.json
 - **Hay una fila por intento, fallidos incluidos.** Es una diferencia deliberada con Croma, que en la 002 registra `unidades=0` en un intento fallido: Croma cobra créditos solo por respuesta exitosa, mientras que acá lo que se cobra es nuestro cómputo, y ese se gasta igual cuando la request falla.
 - `costo_maximo_llamada = 2 requests × 2 intentos × 30 s × computo_seg_usd`.
 
-**Caché:** `fuente_cache` con `proveedor='datos.gov.co'`, `endpoint='c82u-588k'`, `hash_params` de los parámetros SoQL ordenados y `as_of` del header. Las filas, el conteo de naturales y `contar` usan claves distintas.
+**Caché:** `fuente_cache` con `proveedor='datos.gov.co'`, `endpoint='c82u-588k'`, `hash_params` de los parámetros SoQL ordenados y `as_of` del header. Las filas y el conteo de naturales usan claves distintas. `contar` no se cachea en la 011: la 005 suma su clave junto con su test de hit de caché (YAGNI).
 - Se guardan **las filas ya filtradas por el cliente**, no la respuesta cruda. Así, aunque el servidor dejara pasar algo, el caché no lo guarda (`test_cache_no_guarda_lo_descartado`).
 - A diferencia de Overpass (003), esta respuesta se puede cachear: no trae teléfono, correo, dirección ni personas naturales.
 

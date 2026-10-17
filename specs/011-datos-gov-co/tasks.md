@@ -15,7 +15,7 @@
 - **(advisor)**: el advisor revisa el test antes de pasar al Verde.
 - **Bloqueada por Dn**: no se empieza hasta que la pregunta n de `plan.md` esté resuelta.
 
-Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Para el front: `cd frontend && npm test`.
+Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`.
 
 ---
 
@@ -155,7 +155,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Pa
   - `::test_cache_hit_no_hace_request`
   - `::test_conteo_fallido_no_se_cachea`: hace 1 request en el segundo `buscar`.
   - `::test_cache_no_guarda_lo_descartado`: lee la columna de D5.
-- [ ] T032 [Paso 6] **Verde:** las tres claves (`filas`, `naturales` y `contar`) con el discriminador dentro del hash. Se guardan las filas ya filtradas, y un `None` no se cachea.
+- [ ] T032 [Paso 6] **Verde:** las dos claves (`filas` y `naturales`) con el discriminador dentro del hash. `contar` no se cachea en la 011: la 005 suma su clave junto con su test de hit de caché (YAGNI). Se guardan las filas ya filtradas, y un `None` no se cachea.
 - [ ] T033 [Paso 6] **Rojo (D9):**
   - `::test_app_token_va_en_header_y_nunca_en_logs`. La parte del header es rojo real. Las de "nunca en logs" y "`tok-falso-123` no aparece en ningún `empresa.url_origen`" son guardas: la mutación `logger.debug(headers)`, o meter el token en la query de `url_origen`, las pone en rojo y se revierte.
   - `::test_url_se_puede_sobrescribir`.
@@ -163,11 +163,13 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Pa
 - [ ] T035 [Paso 6] **Rojo y verde de `contar` (D7):** son dos tests en `test_datos_gov_co.py`, y los dos tienen que fallar por aserción. Ni `xfail`, ni `ImportError`, ni `AttributeError`.
   - **Antes del rojo**, se agrega el stub `DatosGovCoRues.contar(criterios) -> int`, que devuelve `0` sin hacer request ni registrar costo. Así el test encuentra el método y falla en el `assert`. El método es del adaptador, y el puerto no tiene que declararlo todavía.
   - `::test_contar_usa_count_con_el_mismo_where`.
+    - El `$where` capturado se compara contra el literal de la spec (`test_query_filtra_juridicas_en_servidor`, spec.md:81): `organizacion_juridica != 'PERSONA NATURAL'`, `organizacion_juridica IS NOT NULL`, `estado_matricula = 'ACTIVA'`, `cod_ciiu_act_econ_pri = '4711'`, `codigo_camara in('04')` y `nit IS NOT NULL`. **No** se compara contra el builder de filas: si se comparara, quitar `nit IS NOT NULL` cambiaría los dos lados y el test quedaría verde.
     - **Rojo:** con el stub, falla `len(capturadas) == 1`, porque no hubo request, y falla `== 2015`.
-    - **Mutación que lo pone en rojo:** quitar `nit IS NOT NULL` del `$where` de `contar`, de modo que difiera del de la request de filas, o devolver un valor fijo en lugar del `count`.
+    - **Mutación que lo pone en rojo:** quitar `nit IS NOT NULL` del `$where` de `contar` (falla contra el literal), o devolver un valor fijo en lugar del `count`.
   - `::test_contar_registra_socrata_descarga`.
+    - Con un reloj falso que avanza 2 s, afirma 1 fila `socrata_descarga` con `unidades == Decimal("2")`, `unidades * costo_unitario == 2 * computo_seg_usd` (`OperacionCosto` no tiene campo `monto`) y el `lote_id` que llega por el constructor.
     - **Rojo:** con el stub, hay 0 filas `socrata_descarga` en el `RegistroCostos` falso, y el assert de 1 fila falla.
-    - **Mutación que lo pone en rojo:** no registrar la fila, o registrarla con `unidades=0`, que hace fallar el assert de los segundos medidos.
+    - **Mutación que lo pone en rojo:** no registrar la fila, o registrarla con `unidades=0`, que hace fallar `unidades == Decimal("2")` y el producto con `costo_unitario`.
   - **Verde:** `contar` hace `$select=count(*)` con el mismo `$where` de jurídicas y registra una fila `socrata_descarga` antes de devolver.
 - [ ] T036 [Paso 6] **Guarda (advisor):** `backend/tests/integration/test_costos_repo.py::test_socrata_descarga_escribe_fila_en_costos`, con `postgres_costos` real, rol `app_rt` y `SET LOCAL` del tenant.
   - Valida `unidades == Decimal(2)`, el `costo_unitario` como `numeric`, `gratis=false` y el `tenant_id`.
@@ -188,7 +190,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`. Pa
 - [ ] T040 [Paso 7] **Verde, en UN commit:**
   - `fuentes.yaml` con `habilitado: true`, `dataset: c82u-588k`, `filtros: [ciiu, departamento]`, `trae: [nit, nombre, ciiu, ciudad_camara]` y `cuenta_naturales: true`;
   - el alta en el catálogo;
-  - los tests de la 003 y la 005 que leen el YAML real, actualizados según D10.
+  - los tests de la 003 que leen el YAML real, actualizados según D10.
 
   La suite de contrato pasa con `[datos_gov_co_rues]` sin que se toquen sus tests. `test_todo_adaptador_de_registro_esta_declarado` y `test_todo_adaptador_de_registro_recibe_registro_costos` siguen en verde.
 
@@ -244,7 +246,7 @@ T049, el verde del tablero (`GET /tablero/fuentes`, la columna y las claves de i
 - [ ] T051 [Paso 11] `docs/arquitectura-backend.md`: cómo conectar o desconectar una fuente, con este adaptador como ejemplo, y por qué la natural se filtra en el servidor y se cuenta. El mínimo si se corta son 5 líneas.
 - [ ] T052 [P] [Paso 11] Se revisa que `spec.md` siga alineada con el plan. D1 (`meta`), D5 (`respuesta`) y D7 (tests movidos a la 005) ya se corrigieron en los commits de docs.
 - [ ] T053 [Paso 11] Cierre:
-  - la suite completa, `lint-imports` y `npm test` en verde;
+  - la suite completa y `lint-imports` en verde;
   - el agente `security` sobre el diff (OWASP y principios V a VII), donde CRITICAL o HIGH bloquean;
   - commits convencionales, `feat(011): …`.
 

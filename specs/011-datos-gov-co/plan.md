@@ -135,7 +135,7 @@ docs/arquitectura-backend.md
 - **`FuenteNoDisponible(f"datos.gov.co {status}")`.** Lleva solo el código de estado, sin `response.text`.
 - **Orden dentro de `buscar(p=1)`.** Primero valida y traduce, sin I/O. Después vienen las filas (desde el caché o la red), el conteo (desde el caché o la red, y si falla da `None`, que no se cachea), el mapeo y el armado de `PaginaEmpresas`.
 - **Filtro del cliente.** Una función pura `_es_juridica_valida(fila) -> bool` evalúa los casos (a) a (d). (a) compara `organizacion_juridica.strip().upper() == "PERSONA NATURAL"`, para que no se escape una variante de mayúsculas o espacios (caso a'). Solo cuenta lo descartado y nunca lo pasa a `logger`.
-- **Hash del caché.** `sha256` del JSON de los parámetros SoQL ordenados (`sort_keys=True`). Lleva un discriminador `tipo: filas|naturales|contar` dentro de los parámetros, para que las tres claves sean distintas aunque el `$where` coincida.
+- **Hash del caché.** `sha256` del JSON de los parámetros SoQL ordenados (`sort_keys=True`). Lleva un discriminador `tipo: filas|naturales` dentro de los parámetros, para que las dos claves sean distintas aunque el `$where` coincida. `contar` no se cachea en la 011: la 005 suma su clave junto con su test de hit de caché (YAGNI).
 - **`as_of`.** `email.utils.parsedate_to_datetime(header)`, de la stdlib. Sin header, `reloj()`.
 - **`ciudad`.** `camaras[codigo_camara].municipio_sede`. Si la cámara de la fila no está en el YAML, `ciudad = None`. No se descarta, porque es jurídica válida.
 - **`naturales_por_fuente`.** `EjecutarBusqueda` arma `{clave: pagina.naturales_no_descargadas}` solo para las fuentes con `meta.cuenta_naturales`, y lo escribe con el `UPDATE` de cierre de la búsqueda.
