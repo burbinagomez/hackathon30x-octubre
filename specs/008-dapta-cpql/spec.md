@@ -308,3 +308,6 @@ Todas las vistas con `security_invoker = true`. No redondean.
 - **El CSV exportado vive en la máquina del operador** con teléfonos en claro. Fuera de nuestro control: la página de Calificación dice "borralo después de subirlo a Dapta".
 - **Baja posterior al export:** Dapta ya tiene el número. Mitigación: `dapta pendientes` y sacarlo a mano de la campaña.
 - **Cuándo cortar:** ver el orden de corte. Lo que nunca se corta es el corte 1.
+
+## Pendiente al implementar
+- **"Se aplica hasta la `0007`"** (test de migración): el test copia `0001`–`0007` a `tmp_path` y migra con `_migrar(url, migraciones)` de `tests/arquitectura/test_migraciones.py`, que pasa `MIGRACIONES`. Después suma la `0008`.
