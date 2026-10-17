@@ -30,7 +30,7 @@
   - `por_id_fiscal(pais, id_fiscal) -> Lead | None` (el `UNIQUE (tenant_id, pais, id_fiscal)` del 002 garantiza uno);
   - `por_dominio`, `por_telefono` y `candidatos_por_nombre` (los tres devuelven `list[Lead]`; `candidatos_por_nombre` con su similitud);
   - `registrar_revision`;
-  - `aplicar_fusion(lead_id, cambios: CambiosLead) -> None`: `CambiosLead` lo calcula la función pura `fusionar(lead, empresa)` del dominio y trae solo lo que cambia. El `UPDATE` escribe los campos simples con `coalesce(columna, :valor)` (nunca pisa un no nulo), cada par (dato cifrado + `telefono_hmac` + canal) junto o nada, y `tipo_titular` solo si sube. `lead_fuentes` se suma con `agregar_lead_fuente` del 002; `cumplimiento` no se toca.
+  - `aplicar_fusion(lead_id, cambios: CambiosLead) -> None`: `CambiosLead` lo calcula la función pura `fusionar(lead, empresa)` del dominio y trae solo lo que cambia. El `UPDATE` escribe los campos simples con `coalesce(columna, :valor)` (nunca pisa un no nulo). Los pares (dato cifrado + `telefono_hmac` + canal) no van con `coalesce`: si `CambiosLead` trae un par es porque `fusionar` decidió que completa un nulo o sube de confianza, y entonces se **reemplaza** completo (dato, hmac y canal juntos, nunca uno solo). `tipo_titular` solo si sube. `lead_fuentes` se suma con `agregar_lead_fuente` del 002; `cumplimiento` no se toca.
 - **Archivo nuevo `config/actividades.yaml`**: tabla de equivalencias CIIU → etiquetas OSM. No es un registro de adaptadores; es dato de dominio que vive en config para cambiarlo sin tocar código.
 - **Archivo nuevo `config/dedup.yaml`**: `hosts_compartidos`, los hosts que no identifican a una empresa y quedan fuera de la regla 2. Mismo criterio que `actividades.yaml`: se agrega un host sin tocar código.
 
@@ -45,7 +45,7 @@ Ninguno: este slice no usa IA. Las empresas de OSM + Supersociedades alimentan `
 
 ## Flujo principal
 1. `uv run python -m app.cli buscar --tenant <id> --pais CO --ciiu 4711 --departamento 11 --ciudad "Bogotá"` crea la `busqueda`.
-2. `seleccionar_fuentes(registro, criterios, actividades) -> tuple[dict[str, CriteriosICP], dict[str, str]]` (dominio, puro) devuelve `(seleccionadas, ignoradas)`: por clave, los criterios ya filtrados para esa fuente, o el motivo por el que se ignoró. `sin_fuente_para` del 002 es "`seleccionadas` vacío" y lo deriva `EjecutarBusqueda`, así que `test_sin_fuente_para_el_pais_se_reporta` sigue en verde. Decide, por cada fuente habilitada e implementada:
+2. `seleccionar_fuentes(metas: Iterable[MetaFuente], criterios, actividades) -> tuple[dict[str, CriteriosICP], dict[str, str]]` (dominio, puro; `Registro` es de `aplicacion` y el contrato `layers` del 002 no deja que el dominio lo vea, así que `EjecutarBusqueda` le pasa `[m for _, m in registro.fuentes]`) devuelve `(seleccionadas, ignoradas)`: por clave, los criterios ya filtrados para esa fuente, o el motivo por el que se ignoró. `sin_fuente_para` del 002 es "`seleccionadas` vacío" y lo deriva `EjecutarBusqueda`, así que `test_sin_fuente_para_el_pais_se_reporta` sigue en verde. Decide, por cada fuente habilitada e implementada:
    - **País:** está en `paises` o `paises` incluye `"*"`.
    - **Actividad:** si la fuente filtra por `ciiu`, va directo. Si filtra por `tipo_negocio`, se traduce con `config/actividades.yaml`; sin mapeo, la fuente se ignora con motivo `sin_mapeo_actividad`.
    - **Geografía:** al menos una de las del ICP (`departamento`, `ciudad`) está en `filtros`; si no, se ignora con motivo `sin_geografia`.
@@ -81,7 +81,7 @@ Ninguno: este slice no usa IA. Las empresas de OSM + Supersociedades alimentan `
   - `::test_icp_colombia_completo_usa_las_dos_fuentes`: el ICP del flujo da Supersociedades con `{ciiu, departamento}` y OSM con `{ciudad, tipo_negocio}`; `departamento` queda en `ignorados` de OSM y `ciudad` en los de Supersociedades.
   - `::test_icp_sin_ciudad_ignora_osm_por_geografia`: con solo `departamento`, OSM queda ignorada con `sin_geografia` y Supersociedades corre.
   - `::test_ciiu_sin_mapeo_ignora_osm`: un CIIU que no está en `actividades.yaml` deja OSM ignorada con `sin_mapeo_actividad`.
-  - `::test_icp_brasil_solo_usa_osm`: `pais=BR` + ciudad + CIIU mapeado → solo OSM; Supersociedades ignorada por país.
+  - `::test_icp_fuera_de_colombia_solo_usa_osm[BR|PE]`: parametrizado sobre `["BR", "PE"]`, con las `MetaFuente` del `fuentes.yaml` real; `pais` + ciudad + CIIU mapeado → `seleccionadas.keys() == {"osm_overpass"}` e `ignoradas == {"croma_supersociedades_co": "pais"}`. Las fuentes deshabilitadas o sin implementación no llegan a `seleccionar_fuentes` (`Registro.fuentes` solo trae las habilitadas e implementadas, 002 plan:144-146), así que no aparecen en `ignoradas`.
   - `::test_criterio_no_declarado_no_llega_al_adaptador`: `ingresos_min` en el ICP llega a Supersociedades y no a OSM. El adaptador falso de OSM lanza `CriterioNoSoportado` si lo recibe, así que el test falla si el filtro no ocurre.
 
 **Contrato del puerto** (`backend/tests/contratos/test_fuente_descubrimiento.py`)
@@ -132,14 +132,14 @@ Ninguno: este slice no usa IA. Las empresas de OSM + Supersociedades alimentan `
 - `::test_id_fiscal_distinto_nunca_fusiona`: mismo dominio y mismo teléfono, pero NIT distinto en los dos → `nuevo`, sin fila en revisión.
 - `::test_veto_excluye_candidato_y_sigue_con_la_regla_siguiente`: el dominio coincide con A (NIT distinto) y el teléfono con B (sin NIT) → `fusionar(B, regla=3)`.
 - `::test_veto_sigue_con_el_siguiente_candidato_de_la_misma_regla`: `por_dominio` devuelve [A (NIT distinto), C (sin NIT)] → `fusionar(C, regla=2)`.
-- `::test_desempate_por_creado_en`: `por_telefono` devuelve dos leads sin NIT → se fusiona con el de `creado_en` menor, sin importar el orden en que el repo falso los devuelva.
+- `::test_desempate_por_creado_en`: `por_telefono` devuelve dos leads sin NIT → se fusiona con el de `creado_en` menor. Parametrizado con los dos órdenes en que el repo falso los devuelve (`[viejo, nuevo]` y `[nuevo, viejo]`), para que "toma el primero" falle en uno de los dos.
 - `::test_homonimo_cercano_fusiona`: lead de Supersociedades (con NIT y geo) + OSM homónimo (sin NIT) a 120 m, similitud 1.0 → `fusionar(lead, regla=4)`.
 - `::test_homonimo_lejano_va_a_revision`: el mismo par a 3 km → `revisar`, aunque la similitud sea 1.0.
 - `::test_homonimo_sin_geo_va_a_revision`: el mismo par con `geo` nulo en cualquiera de los dos → `revisar`.
 - `::test_borde_de_distancia`: 250 m → `fusionar`; 251 m → `revisar`.
 - `::test_homonimos_osm_lejanos_van_a_revision`: dos leads OSM sin NIT, similitud 1.0, a 3 km → `revisar`; el mismo par a 100 m → `fusionar(lead, regla=4)`.
 - `::test_regla_4_prefiere_candidato_fusionable_sobre_revision`: A (similitud 1.0, con NIT, a 3 km) y B (0.93, sin NIT, a 80 m) → `fusionar(B, regla=4)`.
-- `::test_regla_4_ordena_por_similitud_y_despues_creado_en`: dos candidatos fusionables con la misma similitud → gana el de `creado_en` menor; con similitudes 0.95 y 0.97 → gana el de 0.97, sin importar el orden en que los devuelva el repo falso. Si ninguno es fusionable (0.97 y 0.90, los dos a 3 km, devueltos al revés), la revisión apunta al de 0.97.
+- `::test_regla_4_ordena_por_similitud_y_despues_creado_en`: dos candidatos fusionables con la misma similitud → gana el de `creado_en` menor; con similitudes 0.95 y 0.97 → gana el de 0.97. Los dos casos van parametrizados con los dos órdenes en que los devuelve el repo falso, para que "toma el primero" falle en uno de los dos. Si ninguno es fusionable (0.97 y 0.90, los dos a 3 km, devueltos al revés), la revisión apunta al de 0.97.
 - `::test_sin_ciudad_salta_regla_4`: empresa sin ciudad y nombre idéntico a un lead → `nuevo`, y el repo falso no recibió `candidatos_por_nombre`.
 - `::test_misma_ciudad_es_requisito_de_regla_4`: el repo falso recibe la ciudad normalizada; el filtro real se prueba en integración.
 - `::test_bordes_de_similitud`: `clasificar_similitud(0.92) == CANDIDATO_FUSION` (candidato: la regla 4 todavía exige geo y ≤ 250 m), `(0.9199) == REVISION`, `(0.85) == REVISION`, `(0.8499) == NUEVO`.
@@ -174,9 +174,10 @@ Ninguno: este slice no usa IA. Las empresas de OSM + Supersociedades alimentan `
   - `::test_por_telefono_encuentra_por_hmac`: el lead guardado con `+573001234567` se encuentra por ese número y no por `+573001234568`.
   - `::test_por_dominio_devuelve_todos_los_que_coinciden`: dos leads con el mismo dominio → los dos, para que el dominio aplique veto y desempate.
   - `::test_par_de_revision_no_se_duplica_invertido`: registrar `(A, B)` y después `(B, A)` deja una sola fila.
+  - `::test_aplicar_fusion_simple_no_pisa_y_par_que_sube_reemplaza`: dos casos contra Postgres. (a) Campo simple: lead con `dominio` lleno + `CambiosLead` con otro `dominio` → el `dominio` original queda. (b) Par que sube: lead con teléfono `whatsapp_osm` + `CambiosLead` con otro teléfono `osm_contacto` → `telefono_cifrado` descifra al nuevo, `telefono_hmac` es el del nuevo y `telefono_canal == "osm_contacto"`. Con `coalesce` sobre el par, (b) falla.
   - Los valores de los pares salen de una emulación de `pg_trgm`; el test fija la **banda**, no el número exacto. Si Postgres real los ubica distinto, se cambia el par, no el umbral.
 - `backend/tests/integration/test_busqueda_dos_fuentes.py`:
-  - `::test_supersociedades_y_osm_dan_un_lead`: `"SUPERMERCADO LA ECONOMÍA S.A.S."` en `"BOGOTÁ D.C."` (Supersociedades, NIT 900123456, geo de la fixture) + `"Supermercado La Economía"` en Bogotá a 120 m (OSM, con teléfono) → 1 lead con 2 `lead_fuentes`, `tipo_titular='juridica'`, `id_fiscal='900123456'`, `telefono_cifrado` no nulo y 1 `cumplimiento`.
+  - `::test_supersociedades_y_osm_dan_un_lead`: `"SUPERMERCADO LA ECONOMÍA S.A.S."` en `"BOGOTÁ D.C."` (Supersociedades, NIT 900123456, geo de la fixture) + `"Supermercado La Economía"` en Bogotá a 120 m (OSM, con teléfono) → 1 lead con 2 `lead_fuentes`, `tipo_titular='juridica'`, `id_fiscal='900123456'`, `telefono_cifrado` no nulo y 1 `cumplimiento`, y esa única fila sigue con `fuente='croma_supersociedades_co'` y la licencia original: prueba contra Postgres que el `UPDATE` de `aplicar_fusion` no toca `cumplimiento` (el repo falso de `test_fusion_no_toca_cumplimiento` no tiene esa tabla).
   - `::test_orden_de_fuentes_no_cambia_el_resultado`: OSM primero y Supersociedades después da el mismo lead (fusión por regla 4, NIT completado, `tipo_titular` sube a `juridica`).
   - `::test_homonimo_lejano_no_hereda_el_telefono`: el mismo par con el nodo OSM a 3 km → 2 leads y 1 `revision_dedup` pendiente; el lead `juridica` queda con `telefono_cifrado` nulo.
   - `::test_osm_caido_no_pierde_supersociedades`: el transporte OSM devuelve 504 dos veces → los leads de Supersociedades se persisten y el resumen marca `osm_overpass` como caída.
@@ -235,7 +236,7 @@ Ninguno: este slice no usa IA. Las empresas de OSM + Supersociedades alimentan `
 
 **Sin caché para Overpass:** la respuesta cruda trae teléfonos y correos, y `fuente_cache` los dejaría en claro (principio VI). Overpass es gratis y la regla de 1 req/s la cumple el limitador. `# ponytail:` si Overpass nos limita en la demo, caché con `respuesta_cifrada`.
 
-**Selección de fuentes:** función pura que lee `paises`/`filtros` de la `MetaFuente` de cada entrada de `Registro.fuentes` (002), no un método nuevo en cada adaptador. Reemplaza el `cubre()` estricto del 002 en el orquestador (el plan 002 deja la traducción de criterios a la 003); `cubre()` sigue en el dominio. El adaptador sigue lanzando `CriterioNoSoportado` (contrato del 002) como red de seguridad. El cargador de `config/actividades.yaml` vive en `aplicacion/registro.py`, junto a `cargar_registro` (como en el 002); el dominio recibe solo el `dict`.
+**Selección de fuentes:** función pura que recibe `Iterable[MetaFuente]` y lee `paises`/`filtros`, no un método nuevo en cada adaptador. No recibe `Registro`: es un tipo de `aplicacion` y el dominio no lo importa (contrato `layers`, 002 plan:31); `EjecutarBusqueda` le pasa `[m for _, m in registro.fuentes]`. Reemplaza el `cubre()` estricto del 002 en el orquestador (el plan 002 deja la traducción de criterios a la 003). `cubre()` sigue en el dominio pero pierde la parte de filtros: queda solo el país (`pais ∈ paises` o `"*" ∈ paises`), y `seleccionar_fuentes` lo usa para el primer paso. El caso "falso con un filtro fuera de `meta.filtros`" de `test_dominio.py::test_cubre` (002) se reemplaza por "verdadero con un filtro fuera de `meta.filtros`": ese filtro ahora lo descarta la selección. El adaptador sigue lanzando `CriterioNoSoportado` (contrato del 002) como red de seguridad. El cargador de `config/actividades.yaml` vive en `aplicacion/registro.py`, junto a `cargar_registro` (como en el 002); el dominio recibe solo el `dict`.
 
 **`config/actividades.yaml`:**
 ```yaml
