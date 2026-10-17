@@ -1,7 +1,7 @@
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -30,9 +30,9 @@ app.add_middleware(
 
 
 @app.get("/health")
-def health():
+def health(request: Request):
     try:
-        with app.state.engine.connect() as conexion:
+        with request.app.state.engine.connect() as conexion:
             conexion.execute(text("SELECT 1"))
     except Exception:
         return JSONResponse(status_code=503, content={"status": "error", "db": "error"})
