@@ -298,7 +298,7 @@ Ninguno: este slice no usa IA. Las empresas de OSM + Supersociedades alimentan `
 
 **Costos:** `overpass_query` con `unidades` = segundos **del request** (desde antes del `POST` hasta tener la respuesta), medidos con el reloj inyectable. La espera del limitador y la de `Retry-After` **no** se cuentan: es tiempo sin cómputo, y contarla haría el costo dependiente de la carga del servidor público. `costo_unitario = tarifas.computo_seg_usd`, `gratis=false` (el cómputo es nuestro aunque Overpass no cobre). Los intentos fallidos también registran sus segundos. El cargador de `tarifas.yaml` convierte con `Decimal(str(valor))`, para que el test compare `Decimal` con `Decimal` y no un float.
 
-**Cumplimiento de un lead OSM:** `fuente='osm_overpass'`, `licencia='ODbL'`, `url_origen` del elemento, `as_of` de la base OSM, `base_legal` nula hasta el 007. La atribución "© OpenStreetMap contributors, ODbL" se muestra en el tablero (005) y en el README (013).
+**Cumplimiento de un lead OSM:** `fuente='osm_overpass'`, `licencia='ODbL'`, `url_origen` del elemento, `as_of` de la base OSM, `base_legal` nula hasta el 007. La atribución "© OpenStreetMap contributors", con enlace a `/copyright`, se muestra en el tablero (005, en cuanto OSM aporta un lead) y en el README (013).
 
 ## Plan de tareas (TDD, en orden)
 1. **Normalización, geo y `config/dedup.yaml`:** `test_normalizacion.py` en rojo → verde. El primero, `test_normaliza_nombre`.

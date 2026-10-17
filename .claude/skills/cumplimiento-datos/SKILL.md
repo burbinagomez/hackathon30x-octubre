@@ -29,7 +29,7 @@ description: Reglas de cumplimiento para encontrar, guardar y contactar leads ba
 8. **Volumen:** email ≤ N/día por dominio remitente (config); WhatsApp por API (`whatsapp_meta`) solo con validación escrita del dueño (constitución, reglas del proyecto); el asistido (`whatsapp_asistido`, envío humano desde el teléfono de la pyme, sin API) no la necesita. Los dos: opt-in previo, ≤ M/día y tasa de bloqueo vigilada (<1%).
 9. **Cifrado:** `email`, `telefono`, `nombre_contacto`, `respuesta_texto` pasan por `Cifrador` (AES-GCM, clave en entorno) antes de persistir. Nunca en logs, trazas ni mensajes de error. Catálogo de columnas sensibles en `backend/app/seguridad/catalogo_sensibles.py`; test que falla si una columna del catálogo no está cifrada.
 10. **Retención:** leads sin respuesta se purgan a los 90 días (documentado; job si hay tiempo). Respuestas: 180 días.
-11. **Atribución visible:** README y pie del tablero: "Datos de OpenStreetMap (ODbL) y Confecámaras/datos.gov.co (CC BY-SA 4.0)".
+11. **Atribución visible:** el README nombra las dos fuentes. El pie del tablero muestra solo las que aportaron leads (`v_atribuciones`, 005): "© OpenStreetMap contributors", con enlace a openstreetmap.org/copyright, y "Datos: Confecámaras vía datos.gov.co (CC BY-SA 4.0)".
 
 ## Fuentes
 Permitidas (según `config/fuentes.yaml`): Croma (registros de gobierno multi-país), OpenStreetMap/Overpass, sitio web del lead (robots.txt, sin IPs privadas, límite de tamaño/redirecciones), datos.gov.co (adaptador desconectado por defecto).

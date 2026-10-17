@@ -32,7 +32,7 @@
 ## Skills que aplican
 - `libro-costos`: tipos `croma_consulta` y `overpass_query`, `gratis`, atribución, prorrateo, desperdicio, fórmulas, "sin dato" y fixture de 10 leads.
 - `fuentes-publicas`:
-  - atribución ODbL en el pie del tablero;
+  - atribución en el pie del tablero, solo de las fuentes que aportaron leads: "© OpenStreetMap contributors" (OSM, ODbL) y "Datos: Confecámaras vía datos.gov.co (CC BY-SA 4.0)" (011);
   - Croma no se redistribuye: la API no expone `fuente_cache` ni respuestas crudas, solo conteos, costos y los leads del propio tenant.
 - `cumplimiento-datos`:
   - el formulario no pide ni muestra contacto;
@@ -65,7 +65,7 @@ Ninguno: este slice no usa IA. La medición es el test de fórmulas, con número
      - las empresas pasan por el post-filtro de palabras clave y exclusiones **antes** de persistir: una empresa filtrada no genera lead ni `cumplimiento`, pero lo que costó traerla queda en el lote;
      - estado final: `completada` | `tope_alcanzado` | `error`.
    - Responde encontrados · únicos · nuevos · en revisión · gasto lista y real.
-5. **Tablero:** `GET /tablero/fuentes` devuelve las filas de `v_tablero_fuentes`, la fila TOTAL, el costo de evals, la cobertura por país (sale del registro: qué fuentes cubren cada país), las revisiones pendientes y la atribución. El front solo formatea.
+5. **Tablero:** `GET /tablero/fuentes` devuelve las filas de `v_tablero_fuentes`, la fila TOTAL, el costo de evals, la cobertura por país (sale del registro: qué fuentes cubren cada país), las revisiones pendientes y `atribuciones` (las filas de `v_atribuciones`: una por fuente que aportó leads, con texto y enlace). El front solo formatea.
 6. **Cola de revisión:** `GET /dedup/revision` lista los pares pendientes (nombre, ciudad, fuentes, similitud). `POST /dedup/revision/{id} {accion: fusionar|separar}` los resuelve.
 
 ## Terminado cuando (tests que hoy fallan)
@@ -124,7 +124,7 @@ Costo por canal: email 0.05, whatsapp 0.30. Costo de evals: 1.00.
 - `::test_lead_fusionado_no_cuenta`: si se marca `H.fusionado_en = G` y se mueven sus `lead_fuentes`, osm queda con únicos = 6 y encontrados = 7, y el prorrateo de L2 pasa a 0.20 por lead (4 leads). El CPL de osm no se asierta exacto, porque 1.40/6 es periódico. Es el comportamiento buscado: el CPL se recalcula con los leads reales.
 
 **Aislamiento y privilegios de las vistas**
-- `backend/tests/integration/test_rls.py::test_tenant_b_no_accede_a_datos_de_a[vista]`, sobre cada `v_*`: con datos solo de A, el tenant B ve 0 filas. Esto exige `security_invoker`: una vista común corre con los permisos de su dueño, `app_mig`, que es dueño de las tablas, así que la RLS no le aplica.
+- `backend/tests/integration/test_rls.py::test_tenant_b_no_accede_a_datos_de_a[vista]`, sobre cada `v_*`: con datos solo de A, el tenant B ve 0 filas. Control positivo en el mismo test: como A, cada vista devuelve ≥ 1 fila. Si no, el 0 de B no prueba nada. Por eso la siembra de A trae `costos`, leads y una `lead_fuentes` de `osm_overpass`; sin ella, `v_atribuciones` da 0 filas a cualquiera. Esto exige `security_invoker`: una vista común corre con los permisos de su dueño, `app_mig`, que es dueño de las tablas, así que la RLS no le aplica.
 - `::test_toda_vista_es_security_invoker`: toda vista de `pg_class` en `public` tiene `security_invoker=true` en `reloptions`. Sale del catálogo, así que una vista nueva entra sola.
 - `test_rls.py::test_usuarios_tiene_rls`: en `pg_class`, `usuarios` tiene `relrowsecurity = true` y una política por `tenant_id` en `pg_policies`. `usuarios` **no** entra a la lista fija de `test_tenant_b_no_accede_a_datos_de_a[tabla]` del 002: `app_rt` no tiene privilegios sobre ella, así que el test daría `permission denied` y no probaría RLS. El aislamiento por rol lo cubre `test_app_rt_no_lee_usuarios_directo`, y el de RLS, este test.
 - `test_rls.py::test_tenant_b_no_accede_a_datos_de_a[vista]`: B también ve 0 filas en la fila `TOTAL`, que solo existe si hay datos (`HAVING count(*) > 0`).
@@ -194,7 +194,12 @@ Costo por canal: email 0.05, whatsapp 0.30. Costo de evals: 1.00.
   - `::test_ejecutar_dos_veces_da_409`;
   - `::test_ejecutar_con_costo_maximo_sobre_tope_da_409`: el borrador queda en `borrador` y no hay filas nuevas en `costos`;
   - `::test_validacion[caso]` → 422 con: `ciiu` que no tiene 4 dígitos, país fuera del enum, `tope_gasto_usd` ≤ 0 o > `TOPE_MAXIMO_USD`, `mensaje_base` > 1000 caracteres, más de 10 palabras clave o alguna de más de 40 caracteres, y `canal_preferido` deshabilitado en el registro;
-  - `::test_tablero_devuelve_null_para_cpl_sin_divisor`.
+  - `::test_tablero_devuelve_null_para_cpl_sin_divisor`;
+  - `::test_tablero_atribucion_solo_de_fuentes_presentes[caso]`: siembra `lead_fuentes` directo con `app_mig` (no hace falta el adaptador de la 011) y compara `atribuciones` exacto y en orden, cada elemento `{fuente, texto, url}`:
+    - `solo_osm` → solo `osm_overpass`, "© OpenStreetMap contributors", `https://www.openstreetmap.org/copyright`;
+    - `osm_y_datos_gov` → `osm_overpass` y `datos_gov_co_rues`, "Datos: Confecámaras vía datos.gov.co (CC BY-SA 4.0)", `https://creativecommons.org/licenses/by-sa/4.0/`;
+    - `solo_croma` → `[]`;
+    - `sin_leads` → `[]`.
 
 **Cola de revisión** (`backend/tests/integration/test_revision_dedup.py`)
 - `::test_fusionar_mueve_lead_fuentes_y_marca_absorbido`: el absorbido queda con `fusionado_en` = superviviente y sin `lead_fuentes`.
@@ -234,7 +239,10 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
   - `::cpl_null_se_muestra_sin_dato`: nunca `0` ni `∞`;
   - `::muestra_costo_lista_y_real`;
   - `::costo_de_evals_va_aparte`;
-  - `::muestra_atribucion_odbl`;
+  - `::muestra_atribucion_de_las_fuentes_presentes[caso]`: el pie pinta un enlace por elemento de `atribuciones`, con el `texto` y el `href` de la API:
+    - `ambas` → se ven "© OpenStreetMap contributors" (enlace a `/copyright`) y "Datos: Confecámaras vía datos.gov.co (CC BY-SA 4.0)";
+    - `solo_osm` → se ve la de OSM y no la de datos.gov.co;
+    - `ninguna` → no hay atribución. Con este caso y el anterior, un texto hardcodeado en el front falla;
   - `::muestra_cobertura_por_pais`;
   - `::muestra_revisiones_pendientes`.
 - `frontend/src/api/cliente.test.ts::un_401_lleva_al_login_y_borra_el_token`.
@@ -295,6 +303,12 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
   - costos lista y real;
   - desperdicio lista y real;
   - `cpl_lista` = costo_lista / NULLIF(icp, 0), e igual `cpl_real`.
+- `v_atribuciones(fuente, texto, url, orden)`: un `VALUES` con las fuentes cuya licencia pide atribución, filtrado por `EXISTS` de al menos una fila en `lead_fuentes` del tenant con esa `fuente`:
+  - `osm_overpass` → "© OpenStreetMap contributors" y `https://www.openstreetmap.org/copyright`, que es lo que pide la OSMF: el aviso más el enlace a `/copyright`;
+  - `datos_gov_co_rues` → "Datos: Confecámaras vía datos.gov.co (CC BY-SA 4.0)" y el enlace a la licencia;
+  - Croma no lleva fila: no tiene licencia abierta que pida atribución, y no se redistribuye.
+  - Sale de `lead_fuentes` y no de `cumplimiento`, porque un lead fusionado tiene una sola fila de cumplimiento (la de su origen) y las `lead_fuentes` de todas sus fuentes. Tampoco mira `habilitado`: una fuente desconectada que ya aportó leads sigue en la base y sigue debiendo atribución.
+  - `# ponytail:` el mapa vive en la vista. Si se suma una tercera fuente con atribución, se mueve a una columna `atribucion` en `config/fuentes.yaml`.
 - **El CPL incluye el desperdicio en el numerador:** el costo de adquirir leads incluye las búsquedas que no rindieron (fórmula de la skill: Σ costos(fuente)). Por eso el CPL no es el promedio de `v_costo_por_lead`, y el test de conservación cierra la cuenta.
 - La API serializa `numeric` como string decimal y `NULL` como `null`. El front formatea; no calcula.
 
@@ -369,7 +383,7 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
 | `usuario_para_login(text)` | función `SECURITY DEFINER` (arriba) |
 | `costos` | índice `(tenant_id, lote_id)` |
 | `lead_fuentes` | índice `(busqueda_id, fuente)` |
-| vistas | las 8 de arriba, `security_invoker` |
+| vistas | las 9 de arriba, `security_invoker` |
 
 Los `ALTER DEFAULT PRIVILEGES … ON TABLES` del 002 ya cubren las vistas nuevas para `anon`/`authenticated`, y el test de privilegios lo confirma.
 
@@ -444,7 +458,7 @@ Los `ALTER DEFAULT PRIVILEGES … ON TABLES` del 002 ya cubren las vistas nuevas
 1. **10, la cola de revisión:** pasa al primer hueco libre del domingo (ya no al de la 011, que se construye el sábado antes de esta spec). Mientras tanto se resuelve por SQL, como en el 003.
 2. **9, el E2E:** pasa a la 012.
 3. **4b, palabras clave y exclusiones:** pasa a la 010. El formulario no muestra esos campos.
-4. **`v_costo_por_canal`:** pasa a la 007. La 0004 queda con 7 vistas y `test_costo_por_canal` se va con ella.
+4. **`v_costo_por_canal`:** pasa a la 007. La 0004 queda con 8 vistas y `test_costo_por_canal` se va con ella.
 5. **Cobertura por país y revisiones pendientes en el tablero:** pasan a la 012.
 
 **Mínimo para la demo:** 1, 2, 3, 4a, 5, 6, 7 y 8, con el tablero mostrando solo encontrados, únicos, ICP, costo lista y real, desperdicio, CPL, costo de evals y atribución. PRD §9 pone 003, 004 y 005 juntos el sábado a la tarde. Si la 003 o la 004 se pasan, la 005 arranca con el mínimo y el resto entra por el orden de corte.

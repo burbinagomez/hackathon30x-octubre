@@ -3,7 +3,7 @@
 **Slice:** 011 · **Rama:** `feature/011-datos-gov-co` · **Tiempo:** sábado PM, justo después de la 003 (≤ 1,5 h con los cortes de "Cuándo cortar"; completo, ~2 h)
 **Depende de:** 002 (puerto, registro, contrato, caché), 003 (normalización, dedup, selección de fuentes), 005 (`contar`, `costo_maximo_llamada`, tablero). **Desbloquea:** el descubrimiento en CO sin depender del tier de Croma, la demo en vivo de que una fuente se conecta y se desconecta (PRD §9) y la atribución del README en la 013.
 
-> **Orden 002 → 003 → 011.** Si la 005 no está en main cuando se implemente, los tests de `contar` (los tres de la suite de contrato de la 005, `test_contar_usa_count_con_el_mismo_where` y `test_contar_registra_socrata_descarga`), los del tablero (`test_tablero_trae_naturales_por_fuente`, `muestra_naturales_encontradas_no_contactables`) y los de atribución (`test_tablero_trae_atribucion_completa`, `muestra_atribucion_odbl_y_cc_by_sa`) quedan en rojo hasta que entre la 005. La spec no se parte: el PR de la 011 lo declara y esos tests se ponen en verde en el de la 005 o en uno posterior.
+> **Orden 002 → 003 → 011.** Si la 005 no está en main cuando se implemente, los tests de `contar` (los tres de la suite de contrato de la 005, `test_contar_usa_count_con_el_mismo_where` y `test_contar_registra_socrata_descarga`), los del tablero (`test_tablero_trae_naturales_por_fuente`, `muestra_naturales_encontradas_no_contactables`) quedan en rojo hasta que entre la 005. La spec no se parte: el PR de la 011 lo declara y esos tests se ponen en verde en el de la 005 o en uno posterior.
 
 > **Cambio de dataset.** El PRD §2 nombraba `nb3d-v3n7`. Al consultar la API real (2026-10-17) resultó ser "Establecimientos - Agencias - Sucursales": la identificación es la del **propietario** y **no distingue personas naturales**. En la verificación, 37 personas naturales tenían NIT de 9 dígitos con prefijo 8/9, y 24 de ellas tenían DV consistente, así que ninguna heurística sobre el NIT sirve. Esta spec usa **`c82u-588k`** ("Personas Naturales, Personas Jurídicas y ESAL", Confecámaras, CC BY-SA 4.0): es el registro mercantil, con una fila por matrícula y la naturaleza jurídica declarada en `organizacion_juridica`. Se mantiene el id de fuente `datos_gov_co_rues`. La nota quedó en el PRD §2.
 >
@@ -19,7 +19,7 @@
 - Lo declara en `config/fuentes.yaml` con **`habilitado: true`** desde que se implementa: entra a toda búsqueda CO junto a OSM y Croma. Con un YAML que lo pone en `false`, no se carga y no hace ni una request.
 - Registra el costo `socrata_descarga` por intento. Cada lead nuevo lleva su fila en `cumplimiento` con `CC-BY-SA-4.0`.
 - Tests sin red: una fixture bloquea toda conexión saliente que no sea a loopback.
-- Muestra la atribución completa de la regla 11 de `cumplimiento-datos` en el tablero.
+- Aparece en la atribución del tablero ("Datos: Confecámaras vía datos.gov.co (CC BY-SA 4.0)") en cuanto aporta un lead. La arma la 005 (`v_atribuciones`) por fuente presente, y esta spec no suma tests de atribución.
 
 ## Puertos y adaptadores que toca (`config/fuentes.yaml`)
 - **`fuentes_descubrimiento.datos_gov_co_rues`** (`habilitado: true`, `paises: [CO]`, `licencia: CC-BY-SA-4.0`): implementa `FuenteDescubrimiento` (`buscar`, `contar`, `meta`) y entra al catálogo. Este slice le cambia cuatro cosas en el YAML:
@@ -130,11 +130,9 @@ Ninguno: este slice no usa IA.
 - `backend/tests/integration/test_costos_repo.py::test_socrata_descarga_escribe_fila_en_costos`: el adaptador, con transporte y reloj falsos y `postgres_costos` real, deja 1 fila `socrata_descarga` por request, con `unidades == Decimal(2)`, `costo_unitario` igual a `computo_seg_usd` leído como `numeric`, `gratis=false` y el `tenant_id` del contexto.
 - `backend/tests/integration/test_rls.py`: **se actualiza**. `naturales_por_fuente` de otro tenant no se ve, ya cubierto por la política de `busquedas`; el test solo suma la columna al assert.
 
-**Tablero y atribución**
+**Tablero**
 - `backend/tests/integration/test_api_busquedas.py::test_tablero_trae_naturales_por_fuente`: con dos búsquedas completadas del tenant, la más reciente con `{"datos_gov_co_rues": 26304}`, la fila `datos_gov_co_rues` de `GET /tablero/fuentes` trae `cuenta_naturales == true` y `naturales_no_descargadas == 26304`. Si el último conteo fue `null`, trae `null`. Una fuente con `cuenta_naturales=False` (OSM) trae `cuenta_naturales == false` y `naturales_no_descargadas == null`, **nunca `0`**.
-- `backend/tests/integration/test_api_busquedas.py::test_tablero_trae_atribucion_completa`: `GET /tablero/fuentes` devuelve `atribucion == "Datos de OpenStreetMap (ODbL) y Confecámaras/datos.gov.co (CC BY-SA 4.0)"`, el texto de la regla 11 de `cumplimiento-datos`.
 - `frontend/src/tablero/Tablero.test.tsx`:
-  - `::muestra_atribucion_odbl` **se actualiza** a `muestra_atribucion_odbl_y_cc_by_sa`. El pie muestra el texto que manda la API, sin hardcodearlo en el front.
   - `::muestra_naturales_encontradas_no_contactables`: en la columna "Naturales (no contactables)":
     - con `cuenta_naturales: true` y `26304`, muestra "26.304";
     - con `cuenta_naturales: true` y `null`, muestra "—" (falló);
@@ -241,8 +239,7 @@ GET https://www.datos.gov.co/resource/c82u-588k.json
 
 **Selección de registro:** la CLI lee `FUENTES_YAML` del entorno (por defecto `config/fuentes.yaml`) y se lo pasa a `cargar_registro`. La API no la lee: en Railway siempre corre el YAML del repo.
 
-**Atribución:** el texto de la regla 11 de `cumplimiento-datos` es una constante del backend que `GET /tablero/fuentes` devuelve en `atribucion`, y el front solo la pinta. Va completo aunque la fuente esté desconectada: nombrar una fuente que hoy no aporta filas no viola nada, y omitirla cuando sí aporta violaría el CC BY-SA. Así se resuelve lo que la 005 dejó sin definir.
-- `# ponytail:` texto fijo. Si se suman más licencias, se arma desde las `licencia` distintas de `lead_fuentes` del tenant.
+**Atribución:** la define la 005 en `v_atribuciones`, por fuente presente en `lead_fuentes` del tenant, también si la fuente hoy está desconectada (sus filas siguen en la base). El `VALUES` de esa vista ya trae `datos_gov_co_rues`, y lo cubre `test_tablero_atribucion_solo_de_fuentes_presentes[osm_y_datos_gov]` de la 005, que siembra `lead_fuentes` sin depender de este adaptador.
 
 ## Plan de tareas (TDD, en orden)
 1. **Corregir las skills.** Va primero porque el `lead` las carga antes de escribir el adaptador.
@@ -257,7 +254,7 @@ GET https://www.datos.gov.co/resource/c82u-588k.json
 6. **Resto del adaptador:** cámaras, mapeo, `as_of`, truncado, página 2, `contar`, costos, fallo, caché (con `test_conteo_fallido_no_se_cachea`), token y URL en rojo → verde. Después `test_socrata_descarga_escribe_fila_en_costos`. El **advisor revisa los tests de costos**.
 7. **Registro y contrato:** cambio de `dataset`/`filtros`/`trae` y `habilitado: false → true` en `fuentes.yaml`, en el mismo commit, alta en el catálogo, `test_registro.py` y `test_seleccion_fuentes.py` actualizados, suite de contrato con `[datos_gov_co_rues]`: rojo → verde. Todo test de la 003 o la 005 que arme el registro desde el YAML del repo (por ejemplo, si `test_icp_colombia_completo_usa_las_dos_fuentes` lo hace) pasa a esperar también `datos_gov_co_rues` en este paso; los que usan un registro en memoria no cambian.
 8. **Migración `busquedas.naturales_por_fuente`**, CLI con `FUENTES_YAML` e integración `test_conectar_desconectar.py` (con `test_naturales_se_guardan_como_conteo`) y `test_rls.py`: rojo → verde.
-9. **Tablero:** `test_tablero_trae_naturales_por_fuente`, `test_tablero_trae_atribucion_completa` y `Tablero.test.tsx` en rojo → verde.
+9. **Tablero:** `test_tablero_trae_naturales_por_fuente` y `Tablero.test.tsx` en rojo → verde.
 10. **Una corrida real**, avisada antes, con el YAML del repo (CO/4711/11), sin token y contra Postgres de desarrollo. Se anotan los segundos de cada request, las filas, los descartados, las naturales y el `as_of`. Si la forma difiere de la fixture, se corrige la fixture y se vuelve al paso 6. La respuesta real **no se commitea** (trae NITs reales), y solo se anotan conteos.
 11. **`docs/arquitectura-backend.md`:** cómo conectar o desconectar una fuente, con este adaptador como ejemplo, y por qué la persona natural se filtra en el servidor y se cuenta. Es lo primero que se recorta.
 
@@ -271,7 +268,7 @@ GET https://www.datos.gov.co/resource/c82u-588k.json
 | 4 | Las 58 cámaras | `test_yaml_real_cubre_58_camaras_y_33_departamentos` | Solo las cámaras de 11 y 25 (04, 14, 47, 58), más `test_bogota_y_cundinamarca`. Un departamento sin cámara lanza `CriterioNoSoportado`, el lado seguro. |
 | 5 | Caché | `test_cache_hit_no_hace_request`, `test_cache_no_guarda_lo_descartado`, `test_conteo_fallido_no_se_cachea` | Una request por búsqueda. La API es gratis, y el costo de cómputo queda en `costos` igual. Sin caché no hay nada guardado que filtrar. |
 
-**No se cortan:** el filtro jurídico en el servidor y su defensa en el cliente, la lista blanca del `$select`, sus tests y el de logs (principio VII); el conteo de naturales en `busquedas`; la suite de contrato; `habilitado: true` en el repo y su par deshabilitado por YAML temporal; la fixture sin red; el costo por intento (principio VIII); el token fuera de los logs; la fila de `cumplimiento` con CC BY-SA, y la atribución de la regla 11 (`test_tablero_trae_atribucion_completa` y `muestra_atribucion_odbl_y_cc_by_sa`).
+**No se cortan:** el filtro jurídico en el servidor y su defensa en el cliente, la lista blanca del `$select`, sus tests y el de logs (principio VII); el conteo de naturales en `busquedas`; la suite de contrato; `habilitado: true` en el repo y su par deshabilitado por YAML temporal; la fixture sin red; el costo por intento (principio VIII); el token fuera de los logs; y la fila de `cumplimiento` con CC BY-SA. La atribución vive en la 005, dentro de su mínimo para la demo.
 
 ## Riesgos
 - **Calidad de `organizacion_juridica`:** lo declara cada cámara. Si una matriculara a una persona natural con otra organización jurídica, entraría. No es una heurística nuestra: es el dato oficial de la naturaleza de la matrícula, el mismo que decide si la persona está bajo la Ley 1581. La corrida del paso 10 revisa a mano 20 razones sociales al azar, contando cuántas parecen un nombre propio sin forma societaria (sin `S.A.S.`, `LTDA`, `S.A.` ni similares), y anota solo ese conteo. Si aparece alguna, se para y se revisa.
