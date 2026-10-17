@@ -109,6 +109,13 @@ def test_tenant_b_no_accede_a_datos_de_a(rt, datos, tabla):
     _rechazado(rt, datos, INSERT_CON_TENANT_DE_A[tabla], PRIVILEGIO_INSUFICIENTE)
 
 
+def test_tenant_b_no_muda_una_fila_propia_a_a(rt, datos):
+    # WITH CHECK: B no puede dejar su búsqueda con el tenant_id de A. Sin WHERE a propósito: si el UPDATE
+    # lee columnas, Postgres también aplica el USING a la fila nueva y el test no probaría el WITH CHECK.
+    # RLS lo acota a las filas de B, y B tiene una sola búsqueda.
+    _rechazado(rt, datos, "UPDATE busquedas SET tenant_id = :a", PRIVILEGIO_INSUFICIENTE)
+
+
 # Con su propio tenant_id y un id de A (lead o búsqueda): la política lo deja pasar y una FK simple no pasa por RLS.
 COLGAR_DE_LEAD_DE_A = {
     "lead_fuentes": "INSERT INTO lead_fuentes (tenant_id, lead_id, busqueda_id, fuente, url_origen, licencia) "
