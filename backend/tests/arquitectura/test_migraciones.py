@@ -60,12 +60,27 @@ def test_migrar_local_desde_vacio_dos_veces_sin_drift(base_vacia):
     assert _drift(base_vacia) == []
 
 
-def test_migracion_aplicada_no_se_reaplica(base_vacia, tmp_path):
-    # Sin IF NOT EXISTS: si el script la reaplicara, la segunda corrida fallaría.
+def _consultar(url, sql):
+    with create_engine(url.replace("postgresql://", "postgresql+psycopg://", 1)).connect() as c:
+        return c.execute(text(sql)).scalar()
+
+
+def _aplicadas(url):
+    return _consultar(url, "SELECT string_agg(version, ',' ORDER BY version) "
+                           "FROM supabase_migrations.schema_migrations")
+
+
+def test_aplica_solo_lo_que_falta_y_en_orden(base_vacia, tmp_path):
+    # Sin IF NOT EXISTS: si el script reaplicara 0001, la segunda corrida fallaría.
     (tmp_path / "0001_t.sql").write_text("CREATE TABLE public.t (id int);")
     assert _migrar(base_vacia, tmp_path).returncode == 0
+    assert _consultar(base_vacia, "SELECT to_regclass('public.t') IS NOT NULL")
+    assert _aplicadas(base_vacia) == "0001"
+
+    (tmp_path / "0002_y.sql").write_text("ALTER TABLE public.t ADD COLUMN y int;")
     segunda = _migrar(base_vacia, tmp_path)
     assert segunda.returncode == 0, segunda.stderr
+    assert _aplicadas(base_vacia) == "0001,0002"
 
 
 def test_migracion_rota_falla_claro_y_no_deja_nada(base_vacia, tmp_path, admin):
@@ -73,8 +88,25 @@ def test_migracion_rota_falla_claro_y_no_deja_nada(base_vacia, tmp_path, admin):
     r = _migrar(base_vacia, tmp_path)
     assert r.returncode != 0
     assert "0001_rota.sql" in r.stderr
-    with create_engine(base_vacia.replace("postgresql://", "postgresql+psycopg://", 1)).connect() as c:
-        assert c.execute(text("SELECT to_regclass('public.u') IS NULL")).scalar()
+    assert _consultar(base_vacia, "SELECT to_regclass('public.u') IS NULL")
+    # Si quedara la fila, la corrida siguiente saltearía el archivo roto y daría verde.
+    assert _aplicadas(base_vacia) is None
+
+
+def test_version_repetida_falla_y_nombra_los_dos(base_vacia, tmp_path):
+    (tmp_path / "0001_a.sql").write_text("SELECT 1;")
+    (tmp_path / "0001_b.sql").write_text("SELECT 1;")
+    r = _migrar(base_vacia, tmp_path)
+    assert r.returncode != 0
+    assert "0001_a.sql" in r.stderr and "0001_b.sql" in r.stderr
+
+
+def test_nombre_invalido_falla(base_vacia, tmp_path):
+    # El patrón es lo que vuelve seguro interpolar version y name en el INSERT.
+    (tmp_path / "0001_Mal'.sql").write_text("SELECT 1;")
+    r = _migrar(base_vacia, tmp_path)
+    assert r.returncode != 0
+    assert "nombre inválido" in r.stderr
 
 
 def test_drift_mira_solo_public_aunque_cambie_search_path(base_vacia):
