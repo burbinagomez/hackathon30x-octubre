@@ -51,6 +51,24 @@
   nombre_es: "Alojamiento en hoteles"
   nombre_en: "Short term accommodation activities"
   osm: ["tourism=hotel"]
+"8610":
+  nombre_es: "Actividades de hospitales y clínicas, con internación"
+  nombre_en: "Hospital activities"
+  osm: ["amenity=hospital"]
+"8621":
+  nombre_es: "Actividades de la práctica médica, sin internación"
+  nombre_en: "Medical and dental practice activities"
+  osm: ["amenity=clinic", "amenity=doctors"]
+"8691":
+  nombre_es: "Actividades de apoyo diagnóstico"
+  nombre_en: "Other human health activities"
+  osm: ["healthcare=laboratory"]
+"8692":
+  nombre_es: "Actividades de apoyo terapéutico"
+  nombre_en: "Other human health activities"
+"8699":
+  nombre_es: "Otras actividades de atención de la salud humana"
+  nombre_en: "Other human health activities"
 "8622":
   nombre_es: "Actividades de la práctica odontológica"
   nombre_en: "Medical and dental practice activities"
