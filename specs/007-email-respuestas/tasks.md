@@ -24,12 +24,12 @@
 
 ## Fase 3: Adaptador `smtp_email` (Paso 2) — security
 
-- [ ] T020 [Paso 2] `tests/contratos/test_smtp_email.py` contra el SMTP falso: `::test_headers_list_unsubscribe_y_message_id` (mailto + https a `API_BASE_URL`, `List-Unsubscribe-Post: List-Unsubscribe=One-Click`, `text/plain`, sin adjuntos), `::test_autentica_con_usuario_y_clave`, `::test_error_de_transporte_es_canal_no_disponible_sin_direccion`.
-- [ ] T021 [Paso 2] `::test_costo_se_registra_aunque_smtp_falle`: RCPT 550 → 1 fila `email_envio`, `unidades=1`, `canal='email'`, `lead_id`, `lote_id`, `gratis=true`, `costo_unitario` `type(v) is Decimal`. Mutación `sabotaje_costo_despues_del_smtp`: registrar después de `send_message`.
-- [ ] T022 [Paso 2] `::test_contacto_no_aparece_en_logs`: con `caplog` en DEBUG y `SMTPRecipientsRefused`, ni la dirección ni `smtp_clave` aparecen en logs, en `str(excepcion)` ni en `repr(LeadContactable)`. Mutación `sabotaje_log_con_destinatario`. (security)
-- [ ] T023 [Paso 2] `::test_ninguna_solo_con_localhost`: `smtp_seguridad='ninguna'` con otro host → error de config. Mutación `sabotaje_sin_tls_remoto`. (security)
-- [ ] T024 [Paso 2] `test_costos_por_adaptador.py` suma los `CanalContacto` (`RegistroCostos` en el `__init__`).
-- [ ] T025 [Paso 2] Implementar `smtp_email.py` hasta verde.
+- [x] T020 [Paso 2] `tests/contratos/test_smtp_email.py` contra el SMTP falso: `::test_headers_list_unsubscribe_y_message_id` (mailto + https a `API_BASE_URL`, `List-Unsubscribe-Post: List-Unsubscribe=One-Click`, `text/plain`, sin adjuntos), `::test_autentica_con_usuario_y_clave`, `::test_error_de_transporte_es_canal_no_disponible_sin_direccion`.
+- [x] T021 [Paso 2] `::test_costo_se_registra_aunque_smtp_falle`: RCPT 550 → 1 fila `email_envio`, `unidades=1`, `canal='email'`, `lead_id`, `lote_id`, `gratis=true`, `costo_unitario` `type(v) is Decimal`. Mutación `sabotaje_costo_despues_del_smtp`: registrar después de `send_message`.
+- [x] T022 [Paso 2] `::test_contacto_no_aparece_en_logs`: con `caplog` en DEBUG y `SMTPRecipientsRefused`, ni la dirección ni `smtp_clave` aparecen en logs, en `str(excepcion)` ni en `repr(LeadContactable)`. Mutación `sabotaje_log_con_destinatario`. (security)
+- [x] T023 [Paso 2] `::test_ninguna_solo_con_localhost`: `smtp_seguridad='ninguna'` con otro host → error de config. Mutación `sabotaje_sin_tls_remoto`. (security)
+- [x] T024 [Paso 2] `test_costos_por_adaptador.py` suma los `CanalContacto` (`RegistroCostos` en el `__init__`).
+- [x] T025 [Paso 2] Implementar `smtp_email.py` hasta verde.
 
 ## Fase 4: Migración (Paso 3) — después de T001
 

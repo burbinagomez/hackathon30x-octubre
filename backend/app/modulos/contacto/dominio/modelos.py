@@ -16,7 +16,8 @@ class MensajeSaliente:
     busqueda_id: UUID
     asunto: str
     cuerpo: str
-    url_baja: str
+    token_baja: str  # URL de baja y List-Unsubscribe
+    token_msgid: str  # Message-ID: la respuesta se asocia por In-Reply-To
     direccion: str = field(repr=False)
 
 
