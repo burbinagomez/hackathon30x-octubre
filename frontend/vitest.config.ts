@@ -5,6 +5,11 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: "jsdom",
+    // Valores de prueba: supabase.ts exige una key publishable al cargar.
+    env: {
+      VITE_SUPABASE_URL: "http://supabase.test",
+      VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_prueba",
+    },
     setupFiles: "./src/test/setup.ts",
     include: ["src/**/*.test.{ts,tsx}", "tests/**/*.test.{ts,tsx}"],
     // e2e/ es de Playwright.

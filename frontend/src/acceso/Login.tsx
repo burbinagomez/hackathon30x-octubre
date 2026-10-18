@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { pedir } from "../api/cliente";
-import { guardarIdiomas, type RespuestaUsuario } from "../api/sesion";
+import { cerrarSesion, guardarIdiomas, type RespuestaUsuario } from "../api/sesion";
 import { supabase } from "../api/supabase";
 import { aplicarIdioma } from "../compartido/idioma";
 import { navegar } from "../compartido/navegar";
@@ -24,6 +24,8 @@ export default function Login() {
       if (!data.session) throw new Error("sin sesión");
       guardarIdiomas(await pedir<RespuestaUsuario>("/usuarios/me"));
     } catch {
+      // Autenticado en Supabase sin acceso a la API (403): no dejar una sesión a medias.
+      await cerrarSesion();
       setFallo("error_generico");
       return;
     }
