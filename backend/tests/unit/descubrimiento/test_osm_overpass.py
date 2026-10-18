@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from urllib.parse import parse_qs
@@ -92,6 +93,42 @@ def test_envia_user_agent_identificable(adaptador, enviados):
     agente = enviados[0].headers["User-Agent"]
     assert agente.startswith("dapta-reto-30x/")
     assert REPO_URL in agente
+
+
+def test_mapea_elemento_a_empresa_cruda(adaptador):
+    pagina = adaptador.buscar(ICP_BOGOTA, 1)
+
+    por_url = {e.url_origen: e for e in pagina.empresas}
+    assert set(por_url) == {
+        "https://www.openstreetmap.org/node/123",
+        "https://www.openstreetmap.org/way/456",
+    }
+    nodo = por_url["https://www.openstreetmap.org/node/123"]
+    assert nodo.nombre == "Supermercado Ficticio La Prueba"
+    assert nodo.pais == "CO"
+    assert nodo.fuente == "osm_overpass"
+    assert nodo.ciudad == "Bogotá D.C."  # addr:city
+    assert nodo.direccion == "Calle Inventada 12-34"
+    assert nodo.as_of == datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
+    assert nodo.actividad == ("shop=supermarket", "OSM")
+    assert nodo.tipo_titular == "desconocido"
+    assert nodo.id_fiscal is None
+    assert nodo.web is None
+    assert adaptador.meta.licencia == "ODbL"
+
+    way = por_url["https://www.openstreetmap.org/way/456"]
+    assert way.ciudad == "Bogotá"  # sin addr:city, la ciudad buscada
+    assert way.direccion is None
+    assert way.actividad == ("shop=convenience", "OSM")
+    assert pagina.total is None
+
+
+def test_elemento_sin_nombre_se_descarta(adaptador):
+    pagina = adaptador.buscar(ICP_BOGOTA, 1)
+
+    assert len(pagina.empresas) == 2
+    assert all(e.nombre for e in pagina.empresas)
+    assert "https://www.openstreetmap.org/node/789" not in {e.url_origen for e in pagina.empresas}
 
 
 def test_rechaza_criterio_no_soportado_sin_request(adaptador, enviados):
