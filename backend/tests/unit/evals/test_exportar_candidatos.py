@@ -54,6 +54,10 @@ OSM_DESCONOCIDO = _lead(tipo_titular="desconocido", nombre="Tienda Don Sintetico
 REPO = RepoLeadsFalso([CROMA_LEAD, OSM_JURIDICA, OSM_DESCONOCIDO])
 BUSQUEDA = uuid4()
 ORIGENES = {BUSQUEDA: [
+    # Fuente fuera de esquema.FUENTES, antes de la OSM del mismo lead: sin el filtro, ganaría ella.
+    Origen(OSM_JURIDICA.id, "datos_gov_co_rues", AS_OF, "CC-BY-SA-4.0"),
+    # El lead de Croma también vino de OSM, y primero: Croma tiene que ganar igual (sin nombre).
+    Origen(CROMA_LEAD.id, esquema.OSM, AS_OF, "ODbL-1.0"),
     Origen(CROMA_LEAD.id, CROMA, AS_OF, "terminos-croma", actividad="4752", ingresos_cop=INGRESOS),
     Origen(OSM_JURIDICA.id, esquema.OSM, AS_OF, "ODbL-1.0", actividad="4752"),
     Origen(OSM_DESCONOCIDO.id, esquema.OSM, AS_OF, "ODbL-1.0"),
@@ -79,7 +83,10 @@ def test_aplica_whitelist(tmp_path):
     casos = json.loads(texto)["casos"]
     croma, osm = _por_fuente(casos)
 
-    assert codigo == 0 and len(casos) == 3
+    assert codigo == 0 and len(casos) == 3  # un caso por lead, aunque tenga varias fuentes
+    assert {c["origen"]["fuente"] for c in casos} <= esquema.FUENTES
+    # CROMA_LEAD sale como Croma y sin nombre, aunque su origen OSM llegó primero.
+    assert len(croma) == 1 and all(c.get("nombre") != CROMA_LEAD.nombre for c in casos)
     for prohibido in (NIT, WEB, EMAIL, TELEFONO, str(INGRESOS), CROMA_LEAD.nombre, CROMA_LEAD.direccion):
         assert prohibido not in texto
     assert esquema.problemas_contacto("dataset.json", json.loads(texto)) == []
