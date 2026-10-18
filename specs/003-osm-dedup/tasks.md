@@ -95,6 +95,7 @@ Nota de proceso: T049 nació verde porque T016b se hizo antes (el orden de esta 
 
 - [x] T052 [MIN] [Paso 10] **Rojo + Verde:** `backend/tests/unit/test_cli.py::test_ciudad_llega_a_los_criterios`. Con `catalogo={"osm_overpass": FuenteFalsa}`, `--ciudad Bogotá` llega en `criterios.filtros["ciudad"]`. El rojo es por mutación: primero `--ciudad` entra en `argparse` sin pasar a los criterios, y falla el assert. Después, el verde en `app/cli.py`. El resumen detallado va a `T052p`. — 002: T040, T041 (en `main`, T041 ya lee `tarifas.yaml` con `Decimal(str(v))`)
 - [ ] T053 [MIN] [Paso 10] **Una** corrida real contra Overpass (Bogotá, 4711), **avisada antes**. Se anotan los segundos, los elementos y el `name` real de la relación de Bogotá, sin copiar ningún dato de contacto. Si difiere de la fixture, se corrige la fixture y se vuelve a la Fase 3. Dudosa: es [MIN] porque la fixture es sintética, y sin una corrida real no está probado que OSM devuelva leads. — 002: T041 (vía T052)
+  **Decisión del dueño (2026-10-18): T053 se difiere al primer deploy en Railway.** Se valida desde la pantalla "Nueva búsqueda" de la 005 (Bogotá, CIIU 4711), anotando los segundos de la fila `overpass_query`, los elementos devueltos y si el `name` de Bogotá coincide con la fixture. Queda como deuda explícita, no bloquea el PR del [MIN].
 
 ---
 
@@ -121,7 +122,7 @@ Decisión del dueño: `tipo_titular != 'juridica'` guarda `nombre` y `direccion`
 
 ## Fase 7: Cierre del mínimo
 
-- [ ] T055 [MIN] Cierre (incluye la Fase 6b): `uv run pytest -q`, `uv run lint-imports`, `scripts/migrar_local.sh` dos veces desde vacío. PR del [MIN], con la lista de Pulido como deuda. Se repite al cerrar Pulido. — ya
+- [ ] T055 [MIN] Cierre **sin T053** (diferido por decisión del dueño, 2026-10-18; se deja como deuda explícita en el PR) (incluye la Fase 6b): `uv run pytest -q`, `uv run lint-imports`, `scripts/migrar_local.sh` dos veces desde vacío. PR del [MIN], con la lista de Pulido como deuda. Se repite al cerrar Pulido. — ya
 
 ---
 
