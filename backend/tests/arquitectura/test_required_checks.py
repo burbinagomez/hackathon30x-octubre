@@ -283,7 +283,7 @@ touch "$LLAMADAS/claude"
 [ -n "$CLAUDE_FALLA" ] && exit 1
 printf '{"result": "%s", "total_cost_usd": 0.01}' "$RESPUESTA"
 """
-KEY_FALSA = "clave-de-prueba-012"
+KEY_FALSA = "key-falsa-de-test"
 OMITIDA = "falta el secret ANTHROPIC_API_KEY, revisión omitida"
 CASOS_STEP_REVISION = {
     # Pendiente humano (spec 012, Fuera del alcance): con el secret cargado, sin key vuelve a fallar.
