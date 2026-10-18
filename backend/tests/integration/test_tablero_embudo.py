@@ -4,6 +4,8 @@ from uuid import uuid4
 
 from sqlalchemy import text
 
+from app.db import unidad_de_trabajo
+from app.modulos.tablero.infraestructura.persistencia.embudo_sql import SQL_EMBUDO_FUENTES, SQL_EMBUDO_TOTAL
 from app.modulos.tablero.infraestructura.persistencia.repositorio_tablero import leer_tablero
 from tests.integration.test_tablero_repo import _costo
 from tests.integration.test_vistas_costos import CS, OSM, INSERT_LEAD_FUENTE, fixture10  # noqa: F401  (fixture)
@@ -34,6 +36,8 @@ def sembrar_embudo(admin, f):
     _enriquecer(admin, f, "F", contactable=True, telefono=True, calificado=False)
     # Natural con teléfono cifrado: no cuenta como "con teléfono" (solo jurídicas).
     _enriquecer(admin, f, "G", contactable=False, razon="persona_natural", telefono=True, natural=True)
+    # Natural marcada contactable (dato roto): por cumplimiento nunca se contacta ni entra al embudo.
+    _enriquecer(admin, f, "H", contactable=True, natural=True)
 
 
 def _filas(datos):
@@ -50,7 +54,7 @@ def test_embudo_por_fuente_con_datos_sembrados(rt, admin, fixture10):
     filas = _filas(leer_tablero(rt, fixture10["tenant"]))
 
     assert _embudo(filas[CS]) == (4, 4, 3, 2, 2, 2)
-    assert _embudo(filas[OSM]) == (8, 7, 4, 3, 2, 1)
+    assert _embudo(filas[OSM]) == (8, 7, 3, 3, 2, 1)
 
 
 def test_lead_de_dos_fuentes_cuenta_en_las_dos_y_una_vez_en_el_total(rt, admin, fixture10):
@@ -59,7 +63,7 @@ def test_lead_de_dos_fuentes_cuenta_en_las_dos_y_una_vez_en_el_total(rt, admin, 
     filas = _filas(leer_tablero(rt, fixture10["tenant"]))
 
     # C (enriquecido, contactable, con teléfono, calificado) suma en CS y en OSM; el total lo cuenta una vez.
-    assert _embudo(filas["TOTAL"]) == (12, 10, 6, 4, 3, 2)
+    assert _embudo(filas["TOTAL"]) == (12, 10, 5, 4, 3, 2)
     assert filas[CS].calificados + filas[OSM].calificados == 3 != filas["TOTAL"].calificados
 
 
@@ -96,5 +100,17 @@ def test_el_embudo_de_otro_tenant_no_se_ve(rt, admin, fixture10, tenants):
     como_b = _filas(leer_tablero(rt, b))
 
     assert _embudo(como_a[CS]) == (4, 4, 3, 2, 2, 2)  # nada de B
+    assert _embudo(como_a["TOTAL"]) == (12, 10, 5, 4, 3, 2)
     assert _embudo(como_b[CS]) == (1, 1, 1, 1, 0, 1)
+    assert _embudo(como_b["TOTAL"]) == (1, 1, 1, 1, 0, 1)
     assert set(como_b) == {CS, "TOTAL"}
+
+
+def test_las_consultas_del_embudo_devuelven_solo_conteos(rt, admin, fixture10):
+    """El permiso sobre `leads` se acota a las columnas devueltas: nada de contacto, ni siquiera por accidente."""
+    sembrar_embudo(admin, fixture10)
+    with unidad_de_trabajo(rt, fixture10["tenant"]) as c:
+        por_fuente, total = c.execute(SQL_EMBUDO_FUENTES), c.execute(SQL_EMBUDO_TOTAL)
+        assert set(por_fuente.keys()) == {"fuente", "enriquecidos", "contactables", "con_telefono", "calificados"}
+        assert set(total.keys()) == {"enriquecidos", "contactables", "con_telefono", "calificados"}
+        assert len(por_fuente.all()) == 2 and len(total.all()) == 1
