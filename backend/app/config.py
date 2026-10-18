@@ -4,7 +4,7 @@ import json
 import os
 from urllib.parse import urlsplit
 
-from pydantic import SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # sbp_: access token del CLI. `migrar` ya no lo usa (usa SUPABASE_DB_URL), pero en la api sigue prohibido.
@@ -43,9 +43,9 @@ class Settings(BaseSettings):
     datos_gov_co_app_token: SecretStr | None = None
     repo_url: str = "https://github.com/burbinagomez/hackathon30x-octubre"
     # Supabase Auth: URLs públicas (JWKS del proyecto y emisor del token). Ningún secreto de firma en la api.
-    # None hasta T029, que las vuelve obligatorias al montar la dependencia de auth en la API.
-    auth_jwks_url: str | None = None
-    auth_issuer: str | None = None
+    # Obligatorias y no vacías: sin ellas la API no arranca (fallaría abierta o cerrada sin avisar).
+    auth_jwks_url: str = Field(min_length=1)
+    auth_issuer: str = Field(min_length=1)
 
     @field_validator("cifrado_key")
     @classmethod

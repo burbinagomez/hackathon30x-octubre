@@ -356,7 +356,7 @@ $$;
 
 **Riesgo aceptado.** El rate limit y el bloqueo por intentos del login pasan a ser los de Supabase Auth, no los de la api (la 012 ya no los construye).
 
-**Variables.** api: `AUTH_JWKS_URL`, `AUTH_ISSUER`, `WEB_ORIGIN`. web: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (clave pública por diseño; choca con constitución:30, abajo).
+**Variables.** api: `AUTH_JWKS_URL`, `AUTH_ISSUER`, `CORS_ORIGINS` (**divergencia con T030, decisión de coordinación 2026-10-18:** se mantiene `CORS_ORIGINS`, que ya existe en `.env.example` y tiene tests; `WEB_ORIGIN` no se crea. Orígenes permitidos, métodos GET/POST, headers `Authorization` y `Content-Type`, sin `allow_credentials`). web: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (clave pública por diseño; choca con constitución:30, abajo).
 
 ### Conflictos con la constitución y CLAUDE.md (enmienda que decide el dueño; no se editan acá)
 
