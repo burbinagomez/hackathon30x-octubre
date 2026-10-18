@@ -36,7 +36,7 @@ Cada llamada recibe `RegistroCostos` y escribe su fila **antes de devolver** (sk
 | `croma_dian_trade_co` `POST /co/dian-trade/directory-search/v1` | CO | `tariff_code` (4/6/10), `flow`, `year`, `query`; paginado ≤100 | NIT, nombre, `natural_person`, USD, kg, partidas | dataset · 1 crédito | Descubrimiento de importadores/exportadores. Sin ciudad ni contacto. |
 | `croma_siem_mx` `POST /mx/siem/establishments/v1` + `/establishment/v1` | MX | `name` **(obligatorio, substring)**, `state_code` INEGI, `activity_code` SCIAN; 10/página | búsqueda: nombre, estado, cámara. **Detalle: RFC, dirección, teléfono, email, web, empleados, status** | live · 10 créditos · async (`callback_url`) | Descubrimiento MX **parcial** (hay que iterar nombres). Directorio autodeclarado. |
 | `osm_overpass` | cualquiera | ciudad/área, tipo (`shop`/`amenity`/`office`/`craft`) | nombre, `phone`, `website`, `email`, `addr:*`, geo | live · cómputo | **Segunda fuente de descubrimiento (gratuita de verdad)** + contactabilidad. Cubre micro-pymes y países sin registro en Croma. |
-| `datos_gov_co_rues` SODA `nb3d-v3n7` | CO | CIIU, cámara (proxy ciudad), estado, `tipo_propietario` | NIT, nombre, CIIU, estado, tipo_titular | dataset · cómputo | **Desconectado esta vez.** Respaldo si Croma se objeta o se agota. |
+| `datos_gov_co_rues` SODA `c82u-588k` | CO | `filtros: [ciiu, departamento]` (el adaptador traduce departamento → cámara con `config/camaras_co.yaml`). La condición de jurídica (`organizacion_juridica != 'PERSONA NATURAL'`) y `estado_matricula = 'ACTIVA'` se aplican en el servidor | `trae: [nit, nombre, ciiu, ciudad_camara]` | dataset · cómputo | **Conectado** (spec 011). Descubrimiento CO de jurídicas activas; las naturales se cuentan, no se descargan. |
 | `croma_rues_co` `POST /co/rues/entity-by-nit/v1` (y `entities-by-name`) | CO | NIT o nombre | matrícula, estado, CIIU, representantes, financieros, renovaciones, vinculados | live · 10 créditos | **Enriquecimiento/verificación**, no descubrimiento. Puede dar 502: reintentar con backoff. |
 | `croma_supersociedades_detalle_co` | CO | NIT | accionistas, `officers[]` (representante legal), email de notificación judicial | live | Enriquecimiento. |
 | `croma_sunat_pe` | PE | RUC/documento/nombre | contribuyente, estado | live | Verificación PE. |
@@ -53,7 +53,7 @@ Cada llamada recibe `RegistroCostos` y escribe su fila **antes de devolver** (sk
 - `id_fiscal`: NIT (CO, sin DV; validar DV aparte), RFC (MX), RUC (PE), CNPJ (BR). Guardar `sistema_id`.
 - `actividad`: código + `sistema` (`CIIU` CO/PE, `SCIAN` MX, `CNAE` BR). Tabla de equivalencias en `config/actividades.yaml` para el ICP multi-país.
 - `telefono` → E.164 con `phonenumbers` y región del país.
-- `tipo_titular`: `juridica` si viene de Supersociedades; de `natural_person` en DIAN Trade; de `legal_name` vs `person_name` en SIEM; de RUES/datos.gov.co por `clase_identificacion`. Si no se sabe → `desconocido` (= natural para cumplimiento).
+- `tipo_titular`: `juridica` si viene de Supersociedades; de `natural_person` en DIAN Trade; de `legal_name` vs `person_name` en SIEM; de datos.gov.co (`c82u-588k`) por `organizacion_juridica` (`PERSONA NATURAL` = natural), **nunca** por `clase_identificacion`: la clase NIT incluye personas naturales. Si no se sabe → `desconocido` (= natural para cumplimiento).
 
 ## Dedup entre fuentes (en este orden; cada regla con test)
 1. `id_fiscal` + `pais`.
