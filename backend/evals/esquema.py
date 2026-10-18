@@ -12,4 +12,5 @@ def problemas_dataset(datos) -> list[str]:
 
 
 def rango_ingresos(cop: int) -> str:
+    """Bucket de ingresos anuales en pesos COP (no miles), los que reporta Supersociedades."""
     return "no_implementado"
