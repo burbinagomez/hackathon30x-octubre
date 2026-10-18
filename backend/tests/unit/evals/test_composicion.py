@@ -83,6 +83,19 @@ def test_falla_del_juez_sale_2_sin_key_ni_costos(tmp_path, capsys, http):
     assert costos.filas == [] and len(capturados) == 1  # corta en la primera falla: no sigue gastando
 
 
+@pytest.mark.parametrize("http", [None, httpx.ConnectTimeout("timeout")], ids=["ok", "falla_del_juez"])
+def test_cierra_el_cliente_http_al_terminar(tmp_path, capsys, http):
+    # httpx.Client.close() cierra su transporte: el transporte falso anota el cierre.
+    cerrados = []
+    t = transporte([], http=http)
+    t.close = lambda: cerrados.append(True)
+    run.main(["--config", str(config(tmp_path)), "--tenant", str(uuid4())], entorno=ENTORNO,
+             registro_costos=RegistroCostosFalso(), transporte=t)
+    capsys.readouterr()
+
+    assert cerrados == [True]
+
+
 @pytest.mark.parametrize("ruta, esperado", [
     (None, 0),  # el evals.yaml versionado: lo que corre el job `evals` del CI
     (("claude-sin-tarifa", "claude"), 2),

@@ -192,10 +192,10 @@ def _componibles(evals) -> dict[str, dict[str, Decimal]]:
     return tarifas
 
 
-def componer(entorno, transporte=None, *, tenant, evals, carpeta, registro_costos=None):
+def componer(entorno, http: httpx.Client, *, tenant, evals, carpeta, registro_costos=None):
     """Rama por defecto: JuezClaude del CATALOGO + PostgresCostos del 002 (o el registro inyectado).
 
-    `transporte` es la costura de los tests (httpx.MockTransport); en producción, None = red real.
+    `http` lo abre y lo cierra main(); su transporte es la costura de los tests (httpx.MockTransport).
     La key sale del mapeo `entorno`, nunca del entorno del proceso. Lanza ConfigInvalida antes de cualquier request.
     """
     from evals.jueces.claude import JuezClaude
@@ -209,8 +209,6 @@ def componer(entorno, transporte=None, *, tenant, evals, carpeta, registro_costo
         from app.db import crear_engine
         from app.modulos.costos.infraestructura.postgres_costos import PostgresCostos
         registro_costos = PostgresCostos(crear_engine(entorno["DATABASE_URL"]), tenant_id)
-    # ponytail: un cliente por corrida que no se cierra; vive lo que vive el proceso del CLI.
-    http = httpx.Client(base_url=API_ANTHROPIC, transport=transporte, timeout=60)
 
     def fabrica(nombre, lote_id):
         ev = evals[nombre]
@@ -221,6 +219,12 @@ def componer(entorno, transporte=None, *, tenant, evals, carpeta, registro_costo
 
 
 def main(argv, entorno=os.environ, fabrica_juez=None, registro_costos=None, transporte=None) -> int:
+    """`transporte` es la costura de los tests; en producción, None = red real. Un cliente por corrida, cerrado."""
+    with httpx.Client(base_url=API_ANTHROPIC, transport=transporte, timeout=60) as http:
+        return _main(argv, entorno, fabrica_juez, registro_costos, http)
+
+
+def _main(argv, entorno, fabrica_juez, registro_costos, http) -> int:
     try:
         args = _args(argv)
     except SystemExit:
@@ -235,7 +239,7 @@ def main(argv, entorno=os.environ, fabrica_juez=None, registro_costos=None, tran
         return _error(f"config_invalida: {e}")
     if fabrica_juez is None:
         try:
-            fabrica_juez = componer(entorno, transporte, tenant=args.tenant, evals=evals, carpeta=args.config.parent,
+            fabrica_juez = componer(entorno, http, tenant=args.tenant, evals=evals, carpeta=args.config.parent,
                                     registro_costos=registro_costos)
         except ConfigInvalida as e:
             return _error(f"config_invalida: {e}")

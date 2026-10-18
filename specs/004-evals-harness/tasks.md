@@ -96,7 +96,7 @@
   - la rama por defecto usa el `registro_costos` inyectado en `main()` cuando viene (no crea otro);
   - la tarifa del yaml entra como `Decimal(str(v))`: `in_usd_por_M: 0.10` → `costo_unitario == Decimal("0.0000001")` exacto (con `Decimal(0.10)` da `0.1000000000000000055…/1e6` y falla).
 
-  Hecho: `componer(entorno, transporte, *, tenant, evals, carpeta, registro_costos)` en `run.py` y `main(..., transporte=None)`; tests en `tests/unit/evals/test_composicion.py` y `tests/integration/test_costos_repo.py::test_evals_run_compuesto_escribe_en_costos`. `__main__` → `SystemExit(main(argv))`; el job `evals` corre `--validar`.
+  Hecho: `componer(entorno, http, *, tenant, evals, carpeta, registro_costos)` en `run.py` y `main(..., transporte=None)`, que abre un `httpx.Client` por corrida con ese transporte y lo cierra al salir; tests en `tests/unit/evals/test_composicion.py` y `tests/integration/test_costos_repo.py::test_evals_run_compuesto_escribe_en_costos`. `__main__` → `SystemExit(main(argv))`; el job `evals` corre `--validar`.
 
 ### Exportación de candidatos
 - [x] T020 [P] [US1] 🤖 **Rojo:** `backend/tests/unit/evals/test_exportar_candidatos.py` con un repositorio falso que sigue la forma de `RepositorioLeads` del 002 (D4):
