@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from jwt.exceptions import PyJWKClientConnectionError, PyJWKClientError
 
 from app.modulos.acceso.dominio.errores import JwksInaccesible, TokenInvalido
-from app.modulos.acceso.infraestructura.verificador_jwks import VerificadorJwks
+from app.modulos.acceso.infraestructura.verificador_jwks import VerificadorJwks, cliente_jwks
 
 ISSUER = "https://proyecto.example/auth/v1"
 KID = "clave-1"
@@ -135,3 +135,11 @@ def test_jwks_inaccesible_no_es_token_invalido():
 
     assert _resultado(verificador, _emitir(_claims())) == "JwksInaccesible"
     assert not issubclass(JwksInaccesible, TokenInvalido)
+
+
+def test_el_cliente_de_produccion_no_espera_mas_de_5_segundos_al_jwks():
+    # Un JWKS colgado no puede dejar colgada la API.
+    cliente = cliente_jwks("https://proyecto.example/auth/v1/.well-known/jwks.json")
+
+    assert isinstance(cliente, jwt.PyJWKClient)
+    assert cliente.timeout == 5

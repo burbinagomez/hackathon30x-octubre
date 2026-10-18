@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     datos_gov_co_url: str | None = None
     datos_gov_co_app_token: SecretStr | None = None
     repo_url: str = "https://github.com/burbinagomez/hackathon30x-octubre"
+    # Supabase Auth: URLs públicas (JWKS del proyecto y emisor del token). Ningún secreto de firma en la api.
+    # None hasta T029, que las vuelve obligatorias al montar la dependencia de auth en la API.
+    auth_jwks_url: str | None = None
+    auth_issuer: str | None = None
 
     @field_validator("cifrado_key")
     @classmethod
