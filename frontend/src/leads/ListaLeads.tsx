@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ErrorApi } from "../api/cliente";
 import Enlace from "../compartido/Enlace";
+import Esqueleto from "../compartido/Esqueleto";
 import { RUTA_BUSQUEDAS } from "../compartido/rutas";
 import Atribuciones from "../compartido/Atribuciones";
 import { entero } from "../compartido/formato";
@@ -35,7 +36,7 @@ export default function ListaLeads({ clave, titulo, cargar }: {
       {fallo && <p role="alert" className="error">{t(`leads.${fallo}`)}</p>}
     </>
   );
-  if (!datos) return <main className="pantalla pantalla-ancha">{cabecera}</main>;
+  if (!datos) return <main className="pantalla pantalla-ancha">{cabecera}{!fallo && <Esqueleto filas={6} />}</main>;
 
   const paginas = Math.max(1, Math.ceil(datos.total / datos.tamano));
   const sino = (v: boolean | null) => (v === null ? "" : v ? t("leads.si") : t("leads.no"));

@@ -61,6 +61,14 @@
       "revisar": "Prellenamos los filtros con tu frase. Revisalos y ajustalos antes de la vista previa.",
       "error_no_disponible": "La sugerencia con IA no está disponible ahora. Usá los filtros directamente.",
       "error_interpretacion": "No pudimos interpretar la frase. Probá con otra redacción o usá los filtros."
+    },
+    "trabajando": {
+      "buscando": "Buscando empresas en las fuentes",
+      "buscando_boton": "Buscando…",
+      "consultando": "Consultando {{fuente}}",
+      "vista_previa": "Calculando conteo y costo",
+      "frase": "La IA está leyendo tu frase",
+      "lookalike": "Buscando tus clientes en el RUES"
     }
   },
   "fuentes": {
@@ -199,5 +207,8 @@
     },
     "ninguna_respondio": "Ninguna fuente respondió. Probá de nuevo más tarde.",
     "ver_tablero": "Ver el tablero"
+  },
+  "comun": {
+    "cargando": "Cargando…"
   }
 }
