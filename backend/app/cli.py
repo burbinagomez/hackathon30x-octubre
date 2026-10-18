@@ -4,7 +4,7 @@ import sys
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import cache
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import httpx
 import yaml
@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from app.composicion import CONFIG, armador_de_fuente, cargar_tarifas
 from app.config import Settings, SettingsEmail
 from app.modulos.contacto.dominio.errores import MensajeCambio, SinVistaPrevia
+from app.modulos.contacto.dominio.tokens import firmar
 from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.costos.dominio.puertos import RegistroCostos
 from app.modulos.descubrimiento.aplicacion.ejecutar_busqueda import EjecutarBusqueda
@@ -119,10 +120,14 @@ def _invalida(error: ValidationError) -> int:
     return 2
 
 
-def _hay_ruta_de_baja() -> bool:
-    from app.main import app
-    # app.routes no lista los routers incluidos (FastAPI 0.143); el esquema sí, aunque openapi_url sea None.
-    return "/baja/{token}" in app.openapi()["paths"]
+def _hay_ruta_de_baja(ajustes: SettingsEmail, tenant: UUID, transporte: httpx.BaseTransport | None = None) -> bool:
+    """La API desplegada en API_BASE_URL acepta un token firmado con esta BAJA_SECRET: los enlaces que mandamos andan."""
+    token = firmar(ajustes.baja_secret.get_secret_value().encode(), "baja", tenant, uuid4())
+    try:
+        with httpx.Client(transport=transporte, timeout=5) as cliente:
+            return cliente.get(f"{ajustes.api_base_url.rstrip('/')}/baja/{token}").status_code == 200
+    except httpx.HTTPError:
+        return False
 
 
 def _armar_envio_postgres(ajustes: SettingsEmail, tenant: UUID):
@@ -135,8 +140,8 @@ def _enviar(args, armar_envio) -> int:
         ajustes = SettingsEmail()
     except ValidationError as error:
         return _invalida(error)
-    if ajustes.email_modo == "real" and not _hay_ruta_de_baja():
-        print("EMAIL_MODO=real sin /baja/{token} en la api: no se manda a direcciones reales", file=sys.stderr)
+    if ajustes.email_modo == "real" and not _hay_ruta_de_baja(ajustes, args.tenant):
+        print("EMAIL_MODO=real y /baja/{token} no responde en API_BASE_URL con esta BAJA_SECRET: no se manda", file=sys.stderr)
         return 2
     try:
         caso = (armar_envio or _armar_envio_postgres)(ajustes, args.tenant)
