@@ -48,14 +48,18 @@ def test_encontrados_y_unicos_por_fuente(rt, fixture10):
 
 
 def test_lead_de_dos_fuentes_cuenta_una_vez_en_total(rt, admin, fixture10):
-    # A pasa a estar también en osm: ya no es solo de cs. Una vista de valores fijos no puede acertar los dos escenarios.
+    # A pasa a estar también en osm y K es un lead nuevo: una vista de valores fijos no acierta ningún escenario.
+    k = uuid4()
     with admin.begin() as c:
-        c.execute(INSERT_LEAD_FUENTE, {"t": fixture10["tenant"], "l": fixture10["leads"]["A"],
-                                       "b": fixture10["busquedas"]["L2"], "f": OSM})
+        c.execute(text("INSERT INTO leads (id, tenant_id, pais, nombre, tipo_titular) "
+                       "VALUES (:id, :t, 'CO', 'K', 'juridica')"), {"id": k, "t": fixture10["tenant"]})
+        for lead in (fixture10["leads"]["A"], k):
+            c.execute(INSERT_LEAD_FUENTE, {"t": fixture10["tenant"], "l": lead,
+                                           "b": fixture10["busquedas"]["L2"], "f": OSM})
 
     tablero = _tablero(rt, fixture10["tenant"])
 
     unicos = {f: tablero.get(f, (None, None))[1] for f in (CS, OSM, "TOTAL")}
-    assert unicos == {CS: 4, OSM: 8, "TOTAL": 10}
-    assert tablero.get(OSM) == (9, 8) and tablero.get("TOTAL") == (13, 10)
-    assert unicos[CS] + unicos[OSM] == 12  # A y C cuentan en las dos fuentes y una sola vez en el total
+    assert unicos == {CS: 4, OSM: 9, "TOTAL": 11}
+    assert tablero.get(OSM) == (10, 9) and tablero.get("TOTAL") == (14, 11)
+    assert unicos[CS] + unicos[OSM] == 13  # A y C cuentan en las dos fuentes y una sola vez en el total
