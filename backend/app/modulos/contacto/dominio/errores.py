@@ -8,3 +8,7 @@ class CanalNoDisponible(Exception):
 
 class SinVistaPrevia(Exception):
     """`enviar` sin un `--dry-run` previo de esa búsqueda (P1)."""
+
+
+class MensajeCambio(Exception):
+    """El `mensaje_base` de la búsqueda cambió desde el `--dry-run`: hace falta otro."""

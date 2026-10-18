@@ -79,6 +79,8 @@ class LeadContactable:
 - **Aprobación humana** (P1, condiciones de Daniel):
   - `enviar --dry-run --busqueda <id>` compone los mensajes, imprime asunto, cuerpo y cantidad (sin direcciones) y deja cada `contacto` en `aprobado` con ese asunto y cuerpo. Es la constancia de la vista previa; no manda nada.
   - `enviar --busqueda <id>` solo manda `contactos` que ya existen: nunca crea uno. Sin `--dry-run` previo no hay filas y falla con `SinVistaPrevia`. Un lead que aparece después del `--dry-run` no sale hasta otro `--dry-run`.
+  - Si `busquedas.mensaje_base` cambió desde el `--dry-run`, `enviar` frena con `MensajeCambio` y pide otro: recompone con el texto vigente y compara contra `contactos.cuerpo`.
+  - La salida del `--dry-run`: cuántos se enviarían, el modo y un ejemplo del mensaje con el enlace de baja, sin ninguna dirección.
   - Tope de **20 envíos por corrida** (`TOPE_POR_CORRIDA`); el resto queda `aprobado` para la próxima.
   - Elegible: jurídica, canal publicado, fila en `cumplimiento`, mensaje con enlace de baja, sin opt-out.
   - `EMAIL_MODO` (`prueba` por defecto | `real`). En `prueba` solo se manda a direcciones de `EMAIL_PRUEBA_DESTINOS`; las demás quedan `aprobado`, sin SMTP ni costo. `real` lo cambia solo Daniel en Railway.
