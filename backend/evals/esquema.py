@@ -53,7 +53,7 @@ WHITELIST: dict[str, dict[tuple[str, ...], set[str]]] = {
 
 EMAIL = re.compile(r"[^@\s]+@[^@\s.]+(?:\.[^@\s.]+)+")  # sin `.` en las etiquetas: sin backtracking (Sonar)
 # 7+ dígitos con separadores opcionales; la coma no separa ("4711, 4719" es una lista de CIIU).
-TELEFONO = re.compile(r"\d(?:[ .\-()]*\d){6,}")
+TELEFONO = re.compile(r"\d(?:[ .\-()]{0,3}\d){6,}")  # separadores acotados: lineal (Sonar)
 FECHA_EN_TEXTO = re.compile(r"\d{4}-\d{2}-\d{2}")
 ID_ALEATORIO = re.compile(r"[co]-[0-9a-f]{12}")  # c- Croma, o- OSM: secrets.token_hex(6) al exportar
 ID_CROMA = re.compile(r"c-[0-9a-f]{12}")
