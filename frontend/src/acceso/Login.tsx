@@ -16,6 +16,7 @@ export default function Login() {
   async function ingresar(e: FormEvent) {
     e.preventDefault();
     try {
+      if (!supabase) throw new Error("sin configuración");
       const { data, error } = await supabase.auth.signInWithPassword({ email, password: clave });
       if (error) {
         setFallo(error.code === "invalid_credentials" ? "error_credenciales" : "error_generico");

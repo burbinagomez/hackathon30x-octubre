@@ -12,6 +12,9 @@
     "pais": "The source does not cover this country",
     "sin_geografia": "The source needs a state or city"
   },
+  "config": {
+    "incompleta": "Incomplete configuration"
+  },
   "salud": {
     "estado": "API: {{api}} · DB: {{db}}"
   },
