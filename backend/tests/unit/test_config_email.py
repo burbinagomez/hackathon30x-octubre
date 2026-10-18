@@ -90,3 +90,20 @@ def test_baja_secret_corta_no_arranca(entorno):
 
     with pytest.raises(ValidationError):
         SettingsEmail(_env_file=None)
+
+
+@pytest.mark.parametrize("url", ["http://api.ejemplo.test", "ftp://api.ejemplo.test", "api.ejemplo.test",
+                                 "http://localhost.atacante.test", "https://"])
+def test_api_base_url_exige_https(entorno, url):
+    # El enlace de baja va en cada mail: en claro se puede leer o reescribir en el camino.
+    entorno.setenv("API_BASE_URL", url)
+
+    with pytest.raises(ValidationError, match="API_BASE_URL"):
+        SettingsEmail(_env_file=None)
+
+
+@pytest.mark.parametrize("url", ["http://localhost:8000", "http://127.0.0.1:8000"])
+def test_api_base_url_http_solo_en_localhost(entorno, url):
+    entorno.setenv("API_BASE_URL", url)
+
+    assert SettingsEmail(_env_file=None).api_base_url == url

@@ -16,3 +16,7 @@ class MensajeCambio(Exception):
 
 class PlantillaInvalida(Exception):
     """El mensaje no cumple la regla 7. `args[0]` es el nombre de la regla."""
+
+
+class DestinatarioInvalido(Exception):
+    """La dirección no es una sola casilla o un encabezado trae CR/LF. Nunca se reintenta ni se cobra."""

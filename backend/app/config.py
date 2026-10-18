@@ -93,6 +93,11 @@ class SettingsEmail(Settings):
     def _sin_tls_solo_local(self) -> "SettingsEmail":
         if self.smtp_seguridad == "ninguna" and self.smtp_host not in ("localhost", "127.0.0.1"):
             raise ValueError("SMTP_SEGURIDAD=ninguna solo con SMTP_HOST local")
+        # El enlace de baja va en cada mail: http solo contra la api local de los tests.
+        url = urlsplit(self.api_base_url)
+        local = url.scheme == "http" and url.hostname in ("localhost", "127.0.0.1")
+        if not url.hostname or not (url.scheme == "https" or local):
+            raise ValueError("API_BASE_URL tiene que ser https")
         return self
 
 class SecretProhibido(RuntimeError):

@@ -19,6 +19,7 @@ class Recibido:
 class SmtpFalso:
     rechazar: frozenset[str] = frozenset()
     cortar_en_data: bool = False
+    fallar_en_quit: bool = False
     mensajes: list[Recibido] = field(default_factory=list)
     credenciales: list[tuple[str, str]] = field(default_factory=list)
 
@@ -75,7 +76,7 @@ class SmtpFalso:
                 self.mensajes.append(Recibido(remitente, destinos, b"".join(filas)))
                 decir("250 ok")
             elif verbo == "QUIT":
-                decir("221 chau")
+                decir("421 cerrando" if self.fallar_en_quit else "221 chau")
                 return
             else:
                 decir("250 ok")

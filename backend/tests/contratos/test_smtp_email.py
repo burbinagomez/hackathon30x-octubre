@@ -9,7 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.config import SettingsEmail
-from app.modulos.contacto.dominio.errores import CanalNoDisponible
+from app.modulos.contacto.dominio.errores import CanalNoDisponible, DestinatarioInvalido
 from app.modulos.contacto.dominio.modelos import LeadContactable, MensajeSaliente
 from app.modulos.contacto.infraestructura.smtp_email import SmtpEmail
 from tests.falsos import RegistroCostosFalso
@@ -36,10 +36,10 @@ def _ajustes(falso: SmtpFalso | None = None, **extra) -> SettingsEmail:
     return SettingsEmail(**(base | extra))
 
 
-def _mensaje() -> MensajeSaliente:
+def _mensaje(direccion: str = DESTINO, asunto: str = "Consulta de Ana Pérez") -> MensajeSaliente:
     return MensajeSaliente(contacto_id=uuid4(), lead_id=uuid4(), busqueda_id=uuid4(),
-                           asunto="Consulta de Ana Pérez", cuerpo="Hola.\nResponda BAJA para no recibir más.\n",
-                           token_baja="TOKBAJA", token_msgid="TOKMSG", direccion=DESTINO)
+                           asunto=asunto, cuerpo="Hola.\nResponda BAJA para no recibir más.\n",
+                           token_baja="TOKBAJA", token_msgid="TOKMSG", direccion=direccion)
 
 
 def _enviar(falso: SmtpFalso | None, m: MensajeSaliente | None = None):
@@ -118,3 +118,50 @@ def test_ninguna_solo_con_localhost():
     with pytest.raises(ValidationError, match="ninguna"):
         _ajustes(smtp_host="smtp.resend.com")
     assert _ajustes(smtp_host="localhost").smtp_seguridad == "ninguna"
+
+
+@pytest.mark.parametrize("direccion", [
+    f"{DESTINO}, otro@atacante.test",
+    f"{DESTINO}; otro@atacante.test",
+    f"{DESTINO},",
+    f"Compras <{DESTINO}>",
+    f"<{DESTINO}>",
+    f"{DESTINO}\r\nBcc: otro@atacante.test",
+    "compras @ferreteria-sintetica.test",
+    "compras",
+    "compras@",
+    "@ferreteria-sintetica.test",
+    "compras@@ferreteria-sintetica.test",
+    "",
+])
+def test_direccion_que_no_es_una_sola_casilla_no_se_envia_ni_cobra(direccion):
+    """La dirección viene raspada de un tercero: una coma no puede sumar un destinatario sin base legal."""
+    costos = RegistroCostosFalso()
+    with SmtpFalso() as falso, pytest.raises(DestinatarioInvalido) as e:
+        SmtpEmail(_ajustes(falso), costos, Decimal("0.0")).enviar(_mensaje(direccion))
+    assert falso.mensajes == [] and costos.filas == []
+    assert "atacante" not in str(e.value) + repr(e.value)
+    assert e.value.__cause__ is None and (e.value.__context__ is None or e.value.__suppress_context__)
+
+
+def test_crlf_en_asunto_es_destinatario_invalido_sin_costo():
+    costos = RegistroCostosFalso()
+    with SmtpFalso() as falso, pytest.raises(DestinatarioInvalido) as e:
+        SmtpEmail(_ajustes(falso), costos, Decimal("0.0")).enviar(_mensaje(asunto="Hola\r\nBcc: otro@atacante.test"))
+    assert falso.mensajes == [] and costos.filas == []
+    assert "atacante" not in str(e.value) + repr(e.value)
+    assert e.value.__cause__ is None and (e.value.__context__ is None or e.value.__suppress_context__)
+
+
+def test_destinatario_invalido_no_es_canal_no_disponible():
+    # Uno se reintenta y el otro nunca: no pueden confundirse en un except.
+    assert not issubclass(DestinatarioInvalido, CanalNoDisponible)
+    assert not issubclass(CanalNoDisponible, DestinatarioInvalido)
+
+
+def test_falla_en_quit_despues_de_aceptado_cuenta_como_enviado():
+    """El servidor ya aceptó el DATA: un reintento duplicaría el mail."""
+    with SmtpFalso(fallar_en_quit=True) as falso:
+        _, costos, resultado = _enviar(falso)
+    assert resultado.enviado is True
+    assert len(falso.mensajes) == 1 and len(costos.filas) == 1
