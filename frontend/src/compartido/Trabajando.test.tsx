@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import Trabajando from "./Trabajando";
 
@@ -27,4 +27,22 @@ test("el_anillo_es_decorativo_para_el_lector_de_pantalla", () => {
 test("muestra_el_detalle_por_paso_si_lo_hay", () => {
   render(<Trabajando texto="Buscando" pasos={["OpenStreetMap", "RUES"]} />);
   expect(screen.getAllByRole("listitem").map((li) => li.textContent)).toEqual(["OpenStreetMap", "RUES"]);
+});
+
+test("se_despliega_para_ver_el_detalle_de_lo_que_hace", () => {
+  render(<Trabajando texto="Buscando" detalle={<p>Tope de gasto: 5</p>} />);
+  const alternar = screen.getByRole("button", { name: "Buscando" });
+
+  expect(alternar).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByText("Tope de gasto: 5")).not.toBeInTheDocument();
+  fireEvent.click(alternar);
+  expect(alternar).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByText("Tope de gasto: 5")).toBeInTheDocument();
+  fireEvent.click(alternar);
+  expect(screen.queryByText("Tope de gasto: 5")).not.toBeInTheDocument();
+});
+
+test("sin_detalle_no_hay_boton_para_desplegar", () => {
+  render(<Trabajando texto="Buscando" />);
+  expect(screen.queryByRole("button")).not.toBeInTheDocument();
 });

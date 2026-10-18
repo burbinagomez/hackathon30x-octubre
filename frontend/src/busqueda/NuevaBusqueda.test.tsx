@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import type { ComponentType } from "react";
 import { afterEach, expect, test, vi } from "vitest";
@@ -446,4 +446,17 @@ test("mientras_busca_muestra_que_trabaja_fuente_por_fuente_y_despues_el_resultad
   responder(HttpResponse.json({ estado: "completada", por_fuente: { osm_overpass: { estado: "con_resultados", encontrados: 7 } } }));
   await waitFor(() => expect(fila("OpenStreetMap: 7 empresas")).toBeDefined());
   expect(screen.queryByRole("status", { name: es.busqueda.trabajando.buscando })).not.toBeInTheDocument();
+});
+
+test("la_pildora_de_busqueda_se_despliega_con_lo_que_consulta_y_el_costo", async () => {
+  server.use(http.post("*/busquedas/:id/ejecutar", () => new Promise<Response>(() => undefined)));
+  await previsualizar();
+  await waitFor(() => expect(boton("Buscar")).toBeEnabled());
+  fireEvent.click(boton("Buscar"));
+
+  fireEvent.click(await screen.findByRole("button", { name: es.busqueda.trabajando.buscando }));
+
+  const pildora = screen.getByRole("status", { name: es.busqueda.trabajando.buscando });
+  expect(within(pildora).getByText(/OpenStreetMap: 7 previstas/)).toHaveTextContent("no filtra por: ingresos_min");
+  expect(within(pildora).getByText(/Costo máximo/)).toHaveTextContent("tope");
 });

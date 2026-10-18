@@ -68,7 +68,11 @@
       "consultando": "Consultando {{fuente}}",
       "vista_previa": "Calculando conteo y costo",
       "frase": "La IA está leyendo tu frase",
-      "lookalike": "Buscando tus clientes en el RUES"
+      "lookalike": "Buscando tus clientes en el RUES",
+      "detalle_fuente": "{{fuente}}: {{conteo}} previstas",
+      "detalle_fuente_sin_conteo": "{{fuente}}: sin conteo previo",
+      "detalle_ignora": "no filtra por: {{campos}}",
+      "detalle_costo": "Costo máximo {{maximo}} · tope {{tope}}"
     }
   },
   "fuentes": {
