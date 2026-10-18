@@ -41,3 +41,6 @@ class PostgresCostos:
                      "AND ts >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'"),
                 {"p": proveedor},
             ).scalar_one()
+
+    def gasto_busqueda(self, busqueda_id: UUID) -> Decimal:
+        return Decimal("-1")  # esqueleto T004

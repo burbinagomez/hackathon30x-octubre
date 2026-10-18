@@ -153,3 +153,29 @@ def test_socrata_descarga_escribe_fila_en_costos(rt, admin, tenant):
     assert filas == [(tenant, "socrata_descarga", Decimal(2), Decimal("0.0000070"), "USD", "datos.gov.co",
                       "datos_gov_co_rues", None, lote, False)]
     assert tipo_costo == "numeric"
+
+
+def _fila_de_lote(admin, tenant, lote, unidades, costo_unitario, gratis):
+    with admin.begin() as c:
+        c.execute(text("INSERT INTO costos (tenant_id, tipo, unidades, costo_unitario, moneda, proveedor, gratis, lote_id) "
+                       "VALUES (:t, 'croma_consulta', :u, :cu, 'USD', 'croma', :g, :l)"),
+                  {"t": tenant, "u": Decimal(unidades), "cu": Decimal(costo_unitario), "g": gratis, "l": lote})
+
+
+def test_gasto_busqueda_suma_lista_del_lote(rt, admin, tenant):
+    lote, otro = uuid4(), uuid4()
+    _fila_de_lote(admin, tenant, lote, "1", "0.40", True)  # gratis: el tope cuenta el valor de lista
+    _fila_de_lote(admin, tenant, lote, "1", "0.07", False)
+    _fila_de_lote(admin, tenant, otro, "1", "9.99", False)  # otro lote: no entra
+
+    gasto = PostgresCostos(rt, tenant).gasto_busqueda(lote)
+
+    assert type(gasto) is Decimal
+    assert gasto == Decimal("0.47")
+
+
+def test_gasto_busqueda_sin_filas_es_cero(rt, tenant):
+    gasto = PostgresCostos(rt, tenant).gasto_busqueda(uuid4())
+
+    assert type(gasto) is Decimal
+    assert gasto == Decimal("0")
