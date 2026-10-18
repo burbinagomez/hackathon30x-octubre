@@ -18,26 +18,26 @@
 
 ## Fase 2: E1 — CSP y cabeceras en `frontend/vercel.json`
 
-- [ ] T010 [P] [Paso 1] [MIN] `lead` **Rojo**: `frontend/tests/arquitectura/cabeceras.test.ts`: parsea `frontend/vercel.json` y para `source: "/(.*)"` exige la CSP **exacta** (directiva por directiva), HSTS, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy` y COOP; `connect-src` exactamente `'self' https://ouhetsbchchwsyqxwhxb.supabase.co https://api.profitdata.tech`; y que el rewrite a `/index.html` siga. Hoy falla en el assert porque `vercel.json` no tiene `headers`. Pegar el output.
+- [X] T010 [P] [Paso 1] [MIN] `lead` **Rojo**: `frontend/tests/arquitectura/cabeceras.test.ts`: parsea `frontend/vercel.json` y para `source: "/(.*)"` exige la CSP **exacta** (directiva por directiva), HSTS, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy` y COOP; `connect-src` exactamente `'self' https://ouhetsbchchwsyqxwhxb.supabase.co https://api.profitdata.tech`; y que el rewrite a `/index.html` siga. Hoy falla en el assert porque `vercel.json` no tiene `headers`. Pegar el output.
 - [ ] T011 (advisor) Revisa T010: que la CSP se compare exacta (no `contains`), que el test lea el `vercel.json` real y no una copia, y que falle por el motivo correcto.
 - [x] T012 [Paso 1] [MIN] **Daniel**: dictó los dos orígenes públicos de `connect-src`: `https://ouhetsbchchwsyqxwhxb.supabase.co` (`VITE_SUPABASE_URL`) y `https://api.profitdata.tech` (`VITE_API_URL`). Son públicos; ningún secreto va a `vercel.json`.
-- [ ] T013 [Paso 1] [MIN] `lead` **Verde**: bloque `headers` en `frontend/vercel.json` (plan §E1), con los dos orígenes literales de T012 y sin tocar el rewrite. T010 en verde.
+- [X] T013 [Paso 1] [MIN] `lead` **Verde**: bloque `headers` en `frontend/vercel.json` (plan §E1), con los dos orígenes literales de T012 y sin tocar el rewrite. T010 en verde.
 - [ ] T014 [Paso 1] [MIN] **Mutación** `lead`: sacar `frame-ancestors 'none'` → T010 rojo. Sacar el origen de Supabase de `connect-src` → rojo. Restaurar.
 - [ ] T016 [Paso 1] [MIN] **Daniel**: deploy en Vercel y `curl -sI https://www.profitdata.tech/` con la CSP en la respuesta. Frontera humana.
 - [ ] T017 [Paso 1] (security) Revisa la CSP final: sin `'unsafe-inline'`, sin `'unsafe-eval'`, sin comodines, `connect-src` solo con `'self'` y los dos orígenes.
 
 ## Fase 3: E2 — Google Fonts fuera de `index.html`
 
-- [ ] T020 [P] [Paso 2] [MIN] `lead` **Rojo**: `frontend/src/test/index_html.test.ts::no_carga_recursos_de_terceros`: lee `frontend/index.html` y falla si hay un `href` o `src` con `https://` (P1 = self-host). Hoy falla en el assert por `fonts.googleapis.com`.
-- [ ] T021 [Paso 2] [MIN] `lead` **Verde** (P1, self-host): DM Sans 400/500/700 y Poppins 500/600/700 en `frontend/public/fuentes/*.woff2`, `@font-face` en `frontend/src/estilos/fuentes.css`, y fuera los tres `<link>` de Google de `index.html`. T020 en verde.
+- [X] T020 [P] [Paso 2] [MIN] `lead` **Rojo**: `frontend/src/test/index_html.test.ts::no_carga_recursos_de_terceros`: lee `frontend/index.html` y falla si hay un `href` o `src` con `https://` (P1 = self-host). Hoy falla en el assert por `fonts.googleapis.com`.
+- [X] T021 [Paso 2] [MIN] `lead` **Verde** (P1, self-host): DM Sans 400/500/700 y Poppins 500/600/700 en `frontend/public/fuentes/*.woff2`, `@font-face` en `frontend/src/estilos/fuentes.css`, y fuera los tres `<link>` de Google de `index.html`. T020 en verde. *Auditoría 2026-10-18: el `@font-face` está en `frontend/src/fuentes.css`, no en `src/estilos/fuentes.css`*
 - [ ] T022 [Paso 2] [MIN] **Mutación** `lead`: volver a pegar el `<link>` de Google en `index.html` → T020 rojo. Restaurar.
 - [ ] T023 [Paso 2] `swarm`: confirmar la licencia OFL de las dos familias y anotarla en el PR.
 
 ## Fase 4: E3 — Sesión de supabase-js
 
-- [ ] T030 [P] [Paso 3] [MIN] `lead` **Rojo**: `frontend/src/api/supabase.test.ts::la_sesion_va_a_sessionStorage`: `vi.mock("@supabase/supabase-js")` con un `createClient` espía (sobre `moduloFalso` de `frontend/src/test/supabaseFalso.ts`), importar `supabase.ts` y asertar que el tercer argumento trae `auth.storage === window.sessionStorage`. Hoy falla porque el argumento es `undefined`.
+- [X] T030 [P] [Paso 3] [MIN] `lead` **Rojo**: `frontend/src/api/supabase.test.ts::la_sesion_va_a_sessionStorage`: `vi.mock("@supabase/supabase-js")` con un `createClient` espía (sobre `moduloFalso` de `frontend/src/test/supabaseFalso.ts`), importar `supabase.ts` y asertar que el tercer argumento trae `auth.storage === window.sessionStorage`. Hoy falla porque el argumento es `undefined`.
 - [ ] T031 (advisor) Revisa T030: que el assert sea sobre el argumento que recibe `createClient`, no sobre un mock que se devuelve a sí mismo.
-- [ ] T032 [Paso 3] [MIN] `lead` **Verde**: `createClient(url, key, { auth: { storage: window.sessionStorage } })` en `frontend/src/api/supabase.ts`. T030 en verde.
+- [X] T032 [Paso 3] [MIN] `lead` **Verde**: `createClient(url, key, { auth: { storage: window.sessionStorage } })` en `frontend/src/api/supabase.ts`. T030 en verde.
 - [ ] T033 [Paso 3] [MIN] **Mutación** `lead`: sacar `storage` → T030 rojo. Restaurar.
 - [ ] T034 [Paso 3] (security) Revisa E3 junto con la CSP: deja escrito en el PR que `sessionStorage` achica la ventana, no el vector XSS, y que la mitigación es T013.
 

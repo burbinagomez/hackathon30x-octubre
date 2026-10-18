@@ -30,7 +30,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`.
   - `git fetch && git merge origin/main` en `feature/011-datos-gov-co`. Si hay conflictos, se para y se avisa.
   - Las respuestas a D1–D11 quedan anotadas en `plan.md`.
   - Ninguna tarea marcada [002] o [003] arranca sin esto.
-- [ ] T002 [MIN] Se confirma que `pyyaml` y `httpx` ya están en `[project].dependencies` (`pyyaml` lo agrega la 002). **No se toca `pyproject.toml`.** `uv run lint-imports` en verde.
+- [X] T002 [MIN] Se confirma que `pyyaml` y `httpx` ya están en `[project].dependencies` (`pyyaml` lo agrega la 002). **No se toca `pyproject.toml`.** `uv run lint-imports` en verde.
 - [X] T003 [MIN] [P] Fixtures sintéticas en `backend/tests/fixtures/datos_gov_co/`. Las tres usan el esquema real de `c82u-588k`, NITs ficticios con el formato `9\d{8}` y ninguna razón social real.
   - `filas.json`: empresas válidas con las 7 columnas del `$select`.
   - `filas_descartables.json`: las válidas más un caso de cada tipo, de (a) a (d), más (a'), una natural escrita `"Persona Natural "` (mayúsculas mezcladas y un espacio al final).
@@ -66,22 +66,22 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`.
 
 ### Fase 4: Filtro jurídico (Paso 4) [002], bloqueada por D1, D9 y (advisor)
 
-- [ ] T012 [MIN] [002] [Paso 4] Stub del adaptador en `infraestructura/adaptadores/datos_gov_co_rues.py`.
+- [X] T012 [MIN] [002] [Paso 4] Stub del adaptador en `infraestructura/adaptadores/datos_gov_co_rues.py`.
   - Clase `DatosGovCoRues` con el constructor del plan: transporte, reloj, dormir, `RegistroCostos`, caché, cámaras, tarifas, `lote_id`, meta, `url` y `app_token`. En el mínimo, el caché y el token pueden llegar en `None`, y la `url` es la constante pública del dataset.
   - `buscar` devuelve `PaginaEmpresas` vacía y no hace requests.
   - **Todavía no** entra al catálogo: eso es T040.
-- [ ] T013 [MIN] [Paso 4] **Rojo (advisor):** `backend/tests/unit/descubrimiento/test_datos_gov_co.py::test_query_filtra_juridicas_en_servidor`.
+- [X] T013 [MIN] [Paso 4] **Rojo (advisor):** `backend/tests/unit/descubrimiento/test_datos_gov_co.py::test_query_filtra_juridicas_en_servidor`.
   - Arranca con `assert len(capturadas) == 1`, antes de indexar, para que el rojo sea una aserción y no un `IndexError`.
   - Después toma la request de filas y afirma cada cláusula del `$where` de la spec, `$limit=5000` y que no haya `$order`, `$offset` ni `$group`.
   - Falla por aserción en el `len`: hay 0 requests capturadas.
-- [ ] T014 [MIN] [Paso 4] **Rojo (advisor):** `::test_select_no_pide_columnas_de_personas`.
+- [X] T014 [MIN] [Paso 4] **Rojo (advisor):** `::test_select_no_pide_columnas_de_personas`.
   - `$select` igual a la lista exacta de 7 columnas.
   - Un `for` sobre las 8 columnas prohibidas, enumeradas en el test, que afirma que ninguna está.
-- [ ] T015 [MIN] [Paso 4] **Rojo (advisor):** `::test_cliente_descarta_lo_que_no_debio_llegar`, con `filas_descartables.json`.
+- [X] T015 [MIN] [Paso 4] **Rojo (advisor):** `::test_cliente_descarta_lo_que_no_debio_llegar`, con `filas_descartables.json`.
   - Ningún `id_fiscal` ni `nombre` de los casos (a), (a'), (b), (c) ni (d) aparece en `empresas`.
   - La cantidad de empresas es igual a la cantidad de válidas.
   - El assert de `descartados_no_juridica == 5` se suma en T021 (Pulido), cuando el campo exista.
-- [ ] T016 [MIN] [Paso 4] **Guarda (advisor):** `::test_descartados_no_se_loguean`.
+- [X] T016 [MIN] [Paso 4] **Guarda (advisor):** `::test_descartados_no_se_loguean`.
   - `caplog.set_level(DEBUG)` sobre el root, que incluye `httpx`. Ningún `record.getMessage()` ni `record.args` contiene el `nit` ni la `razon_social` de (a), (a') a (d).
   - **Mutación:** un `logger.debug(fila)` en el descarte → rojo. Se revierte.
 - [X] T017 [MIN] [Paso 4] **Advisor:** revisa T013–T016 antes del verde. Sus hallazgos se aplican y se vuelve a pedir revisión hasta APRUEBA.
@@ -118,7 +118,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`.
   - Valida `unidades == Decimal(2)`, el `costo_unitario` como `numeric`, `gratis=false` y el `tenant_id`.
   - **Nace verde**, porque el CHECK de `costos.tipo` de la 002 ya incluye `socrata_descarga` (plan 002, línea 210) y el adaptador ya registra desde T030.
   - **Mutación:** registrar `unidades=0` (falla `== Decimal(2)`) o un `tipo` fuera del CHECK (falla la constraint) tiene que ponerlo en rojo. Se revierte.
-- [ ] T037 [MIN] [Paso 6] El advisor revisa la guarda T036 y su mutación, hasta APRUEBA. No hay código nuevo.
+- [ ] T037 [MIN] [Paso 6] El advisor revisa la guarda T036 y su mutación, hasta APRUEBA. No hay código nuevo. *Auditoría 2026-10-18: sin evidencia en el repo de la revisión del advisor*
 
 **Checkpoint**: `test_datos_gov_co.py` y `test_costos_repo.py` en verde, sin `xfail`.
 
@@ -144,11 +144,11 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`.
 
 ### Fase 7: Corrida real y cierre (Pasos 10 y 11)
 
-- [ ] T050 [MIN] [Paso 10] **Una corrida real, avisada antes:** `uv run python -m app.cli buscar --tenant <id> --pais CO --ciiu 4711 --departamento 11`, contra Postgres de desarrollo y sin token. *[MIN dudosa: las fixtures son sintéticas, y es la única prueba de que la API real devuelve leads.]*
+- [ ] T050 [MIN] [Paso 10] **Una corrida real, avisada antes:** `uv run python -m app.cli buscar --tenant <id> --pais CO --ciiu 4711 --departamento 11`, contra Postgres de desarrollo y sin token. *[MIN dudosa: las fixtures son sintéticas, y es la única prueba de que la API real devuelve leads.]* *Auditoría 2026-10-18: sin evidencia en el repo de la corrida real*
   - Se anotan solo conteos en el PR: los segundos por request, las filas, los descartados y el `as_of`. Además, de 20 razones sociales al azar, cuántas parecen un nombre propio sin forma societaria. Si aparece alguna, se para.
   - **La respuesta no se commitea.**
   - Si la forma difiere de la fixture, se corrige la fixture y se vuelve a la Fase 5.
-- [ ] T051 [MIN] [P] [Paso 11] `docs/arquitectura-backend.md`: 5 líneas, cómo conectar o desconectar una fuente, con este adaptador como ejemplo, y por qué la natural se filtra en el servidor. *[MIN: el doc va en el mismo cambio. La versión completa es T056.]*
+- [ ] T051 [MIN] [P] [Paso 11] `docs/arquitectura-backend.md`: 5 líneas, cómo conectar o desconectar una fuente, con este adaptador como ejemplo, y por qué la natural se filtra en el servidor. *[MIN: el doc va en el mismo cambio. La versión completa es T056.]* *Auditoría 2026-10-18: falta: `docs/arquitectura-backend.md` no existe en main*
 - [ ] T053 [MIN] [Paso 11] Cierre:
   - la suite completa y `lint-imports` en verde;
   - el agente `security` sobre el diff (OWASP y principios V a VII), donde CRITICAL o HIGH bloquean;
@@ -176,7 +176,7 @@ Va después del mínimo, en este orden. Cada Rojo sigue siendo rojo real.
 
 ### Cámaras completas (Paso 2)
 
-- [ ] T054 [Paso 2] **Rojo:** `test_camaras_co.py::test_yaml_real_cubre_58_camaras_y_33_departamentos`. Falla por aserción: hay 4 cámaras. **Verde:** las 58. Las `[VALIDAR]` se confirman con **una** consulta `$select=codigo_camara,camara_comercio&$group=codigo_camara,camara_comercio`, avisada antes y sin token, y con el sitio de Confecámaras. Solo se anotan los códigos en el YAML.
+- [ ] T054 [Paso 2] **Rojo:** `test_camaras_co.py::test_yaml_real_cubre_58_camaras_y_33_departamentos`. Falla por aserción: hay 4 cámaras. **Verde:** las 58. Las `[VALIDAR]` se confirman con **una** consulta `$select=codigo_camara,camara_comercio&$group=codigo_camara,camara_comercio`, avisada antes y sin token, y con el sitio de Confecámaras. Solo se anotan los códigos en el YAML. *Auditoría 2026-10-18: `camaras_co.yaml` sigue con 4 cámaras*
 
 ### Conteo de naturales (Paso 5), bloqueada por D2 y D3
 
@@ -202,10 +202,10 @@ Va después del mínimo, en este orden. Cada Rojo sigue siendo rojo real.
   - `::test_conteo_fallido_no_se_cachea`: hace 1 request en el segundo `buscar`.
   - `::test_cache_no_guarda_lo_descartado`: lee la columna de D5.
 - [ ] T032 [Paso 6] **Verde:** las dos claves (`filas` y `naturales`) con el discriminador dentro del hash. `contar` no se cachea en la 011: la 005 suma su clave junto con su test de hit de caché (YAGNI). Se guardan las filas ya filtradas, y un `None` no se cachea.
-- [ ] T033 [Paso 6] **Rojo (D9):**
+- [ ] T033 [Paso 6] **Rojo (D9):** *Auditoría 2026-10-18: falta: no existen `test_app_token_va_en_header_y_nunca_en_logs` ni `test_url_se_puede_sobrescribir` (el adaptador sí manda `X-App-Token`)*
   - `::test_app_token_va_en_header_y_nunca_en_logs`. La parte del header es rojo real. Las de "nunca en logs" y "`tok-falso-123` no aparece en ningún `empresa.url_origen`" son guardas: la mutación `logger.debug(headers)`, o meter el token en la query de `url_origen`, las pone en rojo y se revierte.
   - `::test_url_se_puede_sobrescribir`.
-- [ ] T034 [Paso 6] **Verde:** campos `datos_gov_co_url` y `datos_gov_co_app_token` en `settings` (sin literales: el default de la URL es la constante pública del dataset). La fábrica se los pasa al adaptador. *(En el mínimo no hay token, así que no hay secreto que manejar.)*
+- [X] T034 [Paso 6] **Verde:** campos `datos_gov_co_url` y `datos_gov_co_app_token` en `settings` (sin literales: el default de la URL es la constante pública del dataset). La fábrica se los pasa al adaptador. *(En el mínimo no hay token, así que no hay secreto que manejar.)*
 - [ ] T035 [Paso 6] **Rojo y verde de `contar` (D7):** son dos tests en `test_datos_gov_co.py`, y los dos tienen que fallar por aserción. Ni `xfail`, ni `ImportError`, ni `AttributeError`. *(Pulido: `contar` lo usa la vista previa de la 005, que no está en el mínimo.)*
   - **Antes del rojo**, se agrega el stub `DatosGovCoRues.contar(criterios) -> int`, que devuelve `0` sin hacer request ni registrar costo. Así el test encuentra el método y falla en el `assert`. El método es del adaptador, y el puerto no tiene que declararlo todavía.
   - `::test_contar_usa_count_con_el_mismo_where`.

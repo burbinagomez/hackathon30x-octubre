@@ -18,7 +18,7 @@
 
   El default de P4 frena solo la Fase 4, que es Pulido: el [MIN] arranca sin él.
 - [x] T002 [MIN] [P] [Paso 0] `backend/pyproject.toml` suma `PyJWT`. `uv lock`. *(Con Supabase Auth pasa a `pyjwt[crypto]`; el cambio entra en T013.)*
-- [x] T003 [MIN] [P] [Paso 0] `frontend/package.json` suma `react-i18next` e `i18next` como dependencias, y `eslint`, `typescript-eslint`, `eslint-plugin-boundaries`, `eslint-plugin-import`, `eslint-import-resolver-typescript` y `eslint-plugin-i18next` como devDependencies.
+- [ ] T003 [MIN] [P] [Paso 0] `frontend/package.json` suma `react-i18next` e `i18next` como dependencias, y `eslint`, `typescript-eslint`, `eslint-plugin-boundaries`, `eslint-plugin-import`, `eslint-import-resolver-typescript` y `eslint-plugin-i18next` como devDependencies. *Auditoría 2026-10-18: falta `eslint-plugin-boundaries` en devDependencies (se sacó por CVE, PR #37); lo demás está*
 - [ ] T004 [MIN] [Paso 0] **Esqueletos de Python.** Las firmas del plan, que devuelven valores equivocados para que los rojos sean por aserción:
   - `contar` → `-1` en Croma y OSM. **`datos_gov_co_rues` queda afuera:** la 011 ya implementa `contar` completo (011 tasks c64c5f8:163-173), y un stub rompería `test_contar_usa_count_con_el_mismo_where` de la 011;
   - `FabricaFuentes` (Protocol en `descubrimiento/dominio/`);
@@ -33,7 +33,7 @@
 
 ## Fase 2: Migración y vistas (Paso 1)
 
-- [x] T005 [MIN] [Paso 1] **Esqueleto de la migración** `supabase/migrations/NNNN_libro_costos_busqueda.sql`:
+- [ ] T005 [MIN] [Paso 1] **Esqueleto de la migración** `supabase/migrations/NNNN_libro_costos_busqueda.sql`: *Auditoría 2026-10-18: falta `leads.fusionado_en` y las 7 vistas de costo (solo existen `v_tablero_fuentes` reducida y `v_atribuciones`); lo de [MIN] está hecho*
   - las columnas e índices de plan §Migración. `leads.fusionado_en` va con FK **simple** `REFERENCES leads(id)`; la compuesta entra en T011, después del rojo;
   - `usuarios` con sus columnas (`auth_user_id uuid PRIMARY KEY`, `tenant_id`, `idioma`, `creado_en`; sin email), **sin** `CHECK` y **sin** RLS;
   - `tenant_de_usuario` (y `fijar_idioma`, Pulido) como stubs `… WHERE false`, **sin** `SECURITY DEFINER` ni `REVOKE`;
@@ -43,7 +43,7 @@
   *Verificado 2026-10-18 (parte [MIN]): el esqueleto lo reemplazó la 0006 final (T013); `usuarios`, `tenant_de_usuario` y las dos vistas están, `modelos.py` a la par. `fusionado_en` y las 7 vistas de costo son Pulido.*
 - [x] T006 [MIN] [Paso 1] `backend/tests/arquitectura/test_migraciones.py::test_migrar_local_desde_vacio_dos_veces_sin_drift` (de la 002) sigue verde con la migración nueva. Se confirma que `compare_metadata` no reporta las vistas. **Mutación:** borrar `fusionado_en` de `modelos.py` → drift.
   *Verificado: verde en la suite; sabotaje `usuarios.auth_user_id` fuera de `modelos.py` -> rojo en `test_migrar_local_desde_vacio_dos_veces_sin_drift` y `test_drift_mira_solo_public...`.*
-- [x] T007 [MIN] [Paso 1] **Rojo (advisor):** `backend/tests/integration/test_vistas_costos.py`, con el fixture de spec:77-112, sembrado con `postgres` y leído como `app_rt`. Cada test, con su mutación: *(parte [MIN] hecha)*
+- [ ] T007 [MIN] [Paso 1] **Rojo (advisor):** `backend/tests/integration/test_vistas_costos.py`, con el fixture de spec:77-112, sembrado con `postgres` y leído como `app_rt`. Cada test, con su mutación: *(parte [MIN] hecha)* *Auditoría 2026-10-18: de los 11 tests solo existen `test_encontrados_y_unicos_por_fuente` y `test_lead_de_dos_fuentes_cuenta_una_vez_en_total`; faltan los de costo, prorrateo, desperdicio, canal y fusionado (el costo por fuente se calcula en `repositorio_tablero.py`, no en vistas)*
   - `::test_cpl_por_fuente_fixture_10_leads`: la tabla exacta, con `type is Decimal`. **Mutación:** `unicos = count(*)` en lugar de `count(DISTINCT lead_id)` → osm 8 ≠ 7. **Segunda mutación:** `::float8` en `cpl_lista` → rojo por el tipo.
   - `::test_costo_por_lead_conserva_el_total`. **Mutación:** `v_costo_por_lead` sin el costo directo (`lead_id IS NOT NULL`) → Σ cs se queda corto por 0.05.
   - `::test_lote_sin_leads_es_desperdicio`. **Mutación:** `v_prorrateo` agrupa por `fuente_ef` sin `lote_id` → la fila 5 se reparte entre los leads de L1.
@@ -56,8 +56,8 @@
   - `::test_fila_con_lote_y_lead_va_al_lead`: B = 0.25/0.15 y Σ parte (L1, cs) = 0.80/0.40. **Mutación:** el prorrateo filtra `lote_id IS NOT NULL` en lugar de `lead_id IS NULL` → Σ parte 0.85.
   - `::test_lead_fusionado_no_cuenta`: únicos 6, encontrados 7, prorrateo L2 `Decimal("0.20")`. **Mutación:** `v_leads_icp` sin `fusionado_en IS NULL` → 7 y 0.16.
   *Verificado 2026-10-18 (parte [MIN]): `test_vistas_costos.py:46` (`test_encontrados_y_unicos_por_fuente`) y `:50` (`test_lead_de_dos_fuentes_cuenta_una_vez_en_total`) verdes. Sabotaje `unicos = count(*)` en `v_tablero_fuentes` -> rojo en los dos (`AssertionError` sobre la tabla por fuente y sobre el TOTAL); revertido (base reconstruida, 2 passed).*
-- [x] T008 [MIN] [Paso 1] **Verde:** los cuerpos de las 9 vistas de spec:313-335, el `GRANT SELECT` a `app_rt` y el `CHECK` de `estado` (P1). **Sin `security_invoker`:** esa opción entra solo en T011, para que T009 nazca rojo.
-- [x] T009 [MIN] [Paso 1] **Rojo (advisor, RLS):** `backend/tests/integration/test_rls.py`:
+- [ ] T008 [MIN] [Paso 1] **Verde:** los cuerpos de las 9 vistas de spec:313-335, el `GRANT SELECT` a `app_rt` y el `CHECK` de `estado` (P1). **Sin `security_invoker`:** esa opción entra solo en T011, para que T009 nazca rojo. *Auditoría 2026-10-18: solo 2 de las 9 vistas existen; faltan las 7 de costo*
+- [ ] T009 [MIN] [Paso 1] **Rojo (advisor, RLS):** `backend/tests/integration/test_rls.py`: *Auditoría 2026-10-18: falta `test_tenant_b_no_fusiona_con_lead_de_a` y el `[vista]` de las vistas de costo; la parte [MIN] está hecha*
   - `::test_tenant_b_no_accede_a_datos_de_a[vista]`, sobre cada `v_*`: control positivo de A ≥ 1 fila, B ve 0 filas y 0 filas `TOTAL`. La siembra de A trae una `lead_fuentes` de `osm_overpass`. Rojo hoy: las vistas sin `security_invoker` corren como `postgres`. **Mutación tras el verde:** quitar `security_invoker` de una vista, o quitar `HAVING count(*) > 0` → B ve una fila `TOTAL`.
   - `::test_toda_vista_es_security_invoker`, desde `pg_class`. **Mutación:** una vista sin la opción.
   - `::test_usuarios_tiene_rls`. **Mutación:** sin `ENABLE ROW LEVEL SECURITY`, o sin la política.
@@ -65,12 +65,12 @@
   *Verificado (parte [MIN]): `test_usuarios_tiene_rls` existe; sabotaje `DISABLE ROW LEVEL SECURITY` -> rojo; sabotaje `security_invoker=false` en `v_atribuciones` -> rojo en `[v_atribuciones]` y en `test_toda_vista_es_security_invoker`.*
 - [x] T010 [MIN] [P] [Paso 1] **Rojo (advisor):** `backend/tests/integration/test_privilegios_supabase.py::test_anon_y_authenticated_sin_privilegios` (de la 002) suma `pg_views`, con el assert previo de que esté `v_tablero_fuentes`. **Mutación:** sacar `pg_views` de la unión (falla el assert previo), o `GRANT SELECT ON v_tablero_fuentes TO anon`.
   - **LOW (security):** `::test_anon_y_authenticated_sin_execute_en_funciones_de_public`: recorre `pg_proc` de `public` y falla si `anon` o `authenticated` pueden ejecutar **cualquier** función (hoy `tenant_de_usuario` y las que vengan). **Mutación:** sacar el `REVOKE` de una función.
-- [x] T011 [MIN] [Paso 1] **Verde:**
+- [ ] T011 [MIN] [Paso 1] **Verde:** *Auditoría 2026-10-18: falta la FK compuesta de `fusionado_en`; `security_invoker` y RLS de `usuarios` están hechos*
   - `security_invoker = true` en las 9 vistas;
   - la RLS de `usuarios`;
   - `FOREIGN KEY (tenant_id, fusionado_en) REFERENCES leads (tenant_id, id)`, que se apoya en `leads_tenant_id_id_key` (002 migración:41).
   *Verificado (parte [MIN]): `security_invoker` en las vistas [MIN] y RLS de `usuarios` en la 0006. La FK compuesta de `fusionado_en` es Pulido.*
-- [x] T012 [MIN] [Paso 1] **Rojo (security, RLS):** `backend/tests/integration/test_usuarios_repo.py`:
+- [ ] T012 [MIN] [Paso 1] **Rojo (security, RLS):** `backend/tests/integration/test_usuarios_repo.py`: *Auditoría 2026-10-18: falta `fijar_idioma` y su test (`test_fijar_idioma_no_cruza_tenants`); el resto está hecho*
   - `::test_app_rt_no_lee_usuarios_directo`. **Nace verde:** `app_rt` nunca tuvo `SELECT` sobre `usuarios`. Es una guarda. **Sabotaje:** `GRANT SELECT ON usuarios TO app_rt` → rojo, y se revierte. **LOW (security):** el test fija `app.tenant_id` del tenant dueño de la fila y exige sqlstate `42501` (privilegio insuficiente), para que no pase por un error de `current_setting`.
   - `::test_tenant_de_usuario_devuelve_solo_ese_usuario`. Con usuarios de 2 tenants, `tenant_de_usuario(<auth_user_id de A>)` devuelve 1 fila (tenant de A, `idioma_usuario`, `idioma_tenant`) y un uuid inexistente devuelve 0. Rojo hoy: el stub `WHERE false` devuelve 0 filas. **Mutación:** sin el `WHERE u.auth_user_id = p_auth_user_id` → 2 filas.
   - `::test_fijar_idioma_no_cruza_tenants` **(Pulido)**. Control positivo con el tenant de A: `fijar_idioma(<uid de A>, 'en')` modifica 1 fila. Rojo hoy: el stub modifica 0. Después, con el tenant de B sobre el usuario de A, modifica 0. **Mutación:** sin `AND tenant_id = current_setting(...)` → B modifica 1 fila.
@@ -81,7 +81,7 @@
   - `::test_token_invalido_lanza[caso]` → `TokenInvalido`: vencido, sin `exp`, sin `sub`, `aud` distinto, `iss` distinto, firmado con otra clave, `alg=none`, HS256 firmado con la clave pública como secreto (confusión de algoritmo) y `kid` ausente del JWKS y `alg=RS256` con el `kid` de la clave EC. Rojo hoy: el esqueleto no lanza (falla el `pytest.raises`). **Mutaciones:** sin `audience`; sin `issuer`; sin `require`; `clave.key` en vez del `PyJWK` entero (muere `alg_rs256_con_kid_ec`); sin el `except` de `PyJWKClientConnectionError` (muere `test_jwks_inaccesible_no_es_token_invalido`); `timeout` distinto de 5. `algorithms` con `HS256`, `algorithms` tomado del header o sin `algorithms` (las mata `::test_clave_simetrica_en_el_jwks_no_valida_tokens_hs256`: JWKS envenenado con una clave `oct`/HS256 y un token HS256 firmado con ella; con el `PyJWK` entero el `alg` del token coincide con el de la clave, así que solo la lista `algorithms` lo rechaza). Caso `nbf_futuro` (muere sin `verify_nbf`).
   - **LOW (security):** `::test_sub_que_no_es_uuid_lanza[caso]` (`sub` ausente de forma de uuid, vacío, numérico): `TokenInvalido`, nunca un `ValueError` sin capturar. **Mutación:** `UUID(sub)` fuera del `try`.
   *Verificado: `test_verificar_token.py` verde con los casos de la tarea (incluye JWKS inaccesible, timeout 5 s y clave simétrica).*
-- [x] T013 [MIN] [Paso 1] **Verde:**
+- [ ] T013 [MIN] [Paso 1] **Verde:** *Auditoría 2026-10-18: falta `fijar_idioma` y el procedimiento de baja en `docs/arquitectura-backend.md` (no existe en main)*
   - `tenant_de_usuario` real (`SECURITY DEFINER` con `search_path`), el `REVOKE`/`GRANT` y el `DO` con el guard de `pg_roles`;
   - `acceso/infraestructura/verificador_jwks.py` (`PyJWKClient`, el `PyJWK` entero a `jwt.decode`, `algorithms=["ES256","RS256"]`, `audience`, `issuer`, `require`; `PyJWKClientConnectionError` → `JwksInaccesible`); `pyjwt[crypto]` en `pyproject.toml`; **LOW:** `PyJWKClient(..., timeout=5)` (~5 s): un JWKS colgado no deja colgada la API.
   - `AUTH_JWKS_URL` y `AUTH_ISSUER` en `Settings`, `.env.example` y `docs/referencia-configuracion.md` si existe;
@@ -94,9 +94,9 @@
   *Verificado (parte [MIN]): `tenant_de_usuario`, verificador JWKS, `AUTH_*` en `SettingsApi` y `.env.example`, `crear_usuario.py` con `getpass` y procedimiento de baja en el docstring, `hmac_email` borrado (guarda `test_sin_login_propio.py`), `test_migracion_0006.py`. La baja en `docs/arquitectura-backend.md` queda en T049.*
 ## Fase 3: `gasto_busqueda` y lote (Paso 2)
 
-- [ ] T014 [Pulido] [Paso 2] **Rojo (advisor, costos):** `backend/tests/integration/test_costos_repo.py::test_gasto_busqueda_suma_lista_del_lote`, con montos no enteros (`0.40` gratis y `0.07`) y filas de otro lote; espera `Decimal("0.47")`. **Mutación:** sumar `monto_real` → 0.07, o sin el filtro de `lote_id` → incluye el otro lote.
+- [X] T014 [Pulido] [Paso 2] **Rojo (advisor, costos):** `backend/tests/integration/test_costos_repo.py::test_gasto_busqueda_suma_lista_del_lote`, con montos no enteros (`0.40` gratis y `0.07`) y filas de otro lote; espera `Decimal("0.47")`. **Mutación:** sumar `monto_real` → 0.07, o sin el filtro de `lote_id` → incluye el otro lote.
   - `::test_gasto_busqueda_sin_filas_es_cero`: un lote sin filas da `Decimal("0")`, con `type is Decimal`. Rojo hoy: el esqueleto devuelve `Decimal("-1")`. **Mutación:** sin `COALESCE` → `None`, y el tope revienta con `None + Decimal`.
-- [ ] T015 [Pulido] [Paso 2] **Verde:** `postgres_costos.gasto_busqueda` y el método en el Protocol (P3), más el registro falso compartido de `tests/`.
+- [X] T015 [Pulido] [Paso 2] **Verde:** `postgres_costos.gasto_busqueda` y el método en el Protocol (P3), más el registro falso compartido de `tests/`.
 
 ## Fase 4: `contar()` y `costo_maximo_llamada` (Paso 3)
 
@@ -144,7 +144,7 @@
 
 ## Fase 6: `VistaPrevia` y `EjecutarBusqueda` con tope (Paso 5) — advisor
 
-- [ ] T024 [MIN] [Paso 5] **Rojo (advisor, costos):** `backend/tests/unit/descubrimiento/test_vista_previa.py`, con una `FabricaFuentes` falsa (que devuelve fuentes falsas y registra el `lote_id` con el que se la llamó), un repo falso y un libro falso:
+- [ ] T024 [MIN] [Paso 5] **Rojo (advisor, costos):** `backend/tests/unit/descubrimiento/test_vista_previa.py`, con una `FabricaFuentes` falsa (que devuelve fuentes falsas y registra el `lote_id` con el que se la llamó), un repo falso y un libro falso: *Auditoría 2026-10-18: faltan los tests de costo estimado, costo máximo, tope y créditos restantes (`contar`/`costo_maximo_llamada` no existen)*
   - `::test_conteo_por_fuente_y_motivo_de_las_descartadas` (`pais=PE`). **Mutación:** no copiar `ignoradas` a la respuesta.
   - `::test_crea_busqueda_en_borrador_con_criterios`: queda en estado `borrador`, y la fábrica se llamó una vez con `lote_id == borrador.id`. **Mutación:** usar `crear_busqueda` del 002 → estado `creada`; o pedir las fuentes antes de crear el borrador → `lote_id=None`.
   - `::test_ignorados_son_los_criterios_que_la_fuente_no_aplica_y_el_ciiu_traducido_no_cuenta` **(P7, advisor T024)**: `ignorados` por fuente, ordenado; el `ciiu` que se aplica traducido a `tipo_negocio` no es ignorado. **Mutación:** derivar `set(criterios.filtros) - set(sel[k].filtros)` sin sacar el `ciiu` → OSM trae `ciiu`; o sin `sorted`.
@@ -166,7 +166,7 @@
   La implementación real de `FabricaFuentes` va en `app/api` (raíz de composición). `aplicacion/` no importa el catálogo concreto, y lo vigila import-linter.
   *Hecho 2026-10-18 (parte [MIN]): `crear_borrador`, `obtener_borrador` y `pasar_a_ejecutando` en el Protocol y en `RepositorioLeadsPostgres` (4 tests en `test_leads_repo.py`), `Borrador` en el dominio, `VistaPrevia` con `ignorados` ordenado (P7 corregido). Sabotajes vistos en rojo: copiar `ignoradas`, `crear_busqueda` del 002, fuentes antes del borrador, ciiu traducido como ignorado, `ignorados` sin ordenar, `obtener_borrador` sin filtro de estado, `pasar_a_ejecutando` sin `AND estado='borrador'`.*
 
-- [ ] T026 [MIN] [Paso 5] **Rojo (advisor, costos y cumplimiento):** `backend/tests/unit/descubrimiento/test_ejecutar_con_tope.py`, con la misma `FabricaFuentes` falsa de T024:
+- [ ] T026 [MIN] [Paso 5] **Rojo (advisor, costos y cumplimiento):** `backend/tests/unit/descubrimiento/test_ejecutar_con_tope.py`, con la misma `FabricaFuentes` falsa de T024: *Auditoría 2026-10-18: faltan los tests de tope (`test_no_ejecuta_si_costo_maximo_supera_tope`, `test_corta_antes…`) y de palabras clave*
   - `::test_no_ejecuta_si_costo_maximo_supera_tope`: `TopeExcedido`, 0 requests, estado `borrador`. **Mutación:** chequear el tope después de `pasar_a_ejecutando`.
   - `::test_corta_antes_de_la_llamada_que_pasaria_el_tope`. **Mutación:** chequear después de llamar → OSM se llama.
   - `::test_solo_ejecuta_borrador`: `BusquedaYaEjecutada`. **Mutación:** ignorar el `bool` de `pasar_a_ejecutando`.
@@ -175,14 +175,14 @@
   *Rojo escrito 2026-10-18, pendiente de advisor (parte [MIN]): `test_ejecutar_con_tope.py` con `test_usa_los_criterios_guardados`, `test_solo_ejecuta_borrador`, más tres que el [MIN] necesita y la tabla no listaba: `test_lote_es_la_busqueda_y_cada_llamada_deja_su_costo_y_cada_lead_su_cumplimiento`, `test_pierde_la_carrera_por_el_borrador_no_llama_a_ninguna_fuente` (mata "ignorar el bool de `pasar_a_ejecutando`", que el secuencial no distingue) y `test_estado_final_completada_si_una_fuente_respondio_y_error_si_fallaron_todas` (P1). Los de tope y palabras clave siguen en Pulido. Esqueleto: clase `EjecutarBorrador` (decisión abierta con el advisor: clase aparte para no romper la CLI y los tests de la 003).*
   *Decisiones del advisor (APROBADO CON CAMBIOS, 2026-10-18):* `EjecutarBorrador` aceptado (nombre y clase aparte), pero el bucle de fuentes, `normalizar_nit`, el dedup, `agregar_lead_fuente` y el armado de errores viven en **una** función privada compartida con `EjecutarBusqueda`, sin copiarlos. `RepositorioLeads.estado(busqueda_id) -> str | None` por RLS (otro tenant -> `None`); el caso de uso levanta `BusquedaNoEncontrada` (404) o `BusquedaYaEjecutada` (409) y el router solo traduce. Sin fuente que cubra el ICP: `completada` con `sin_fuente_para`, sin llamar a ninguna. Tope de gasto: Pulido (ver "Qué se deja afuera"). Rojos endurecidos: `criterios_por_fuente` (dict por clave), cumplimiento exacto por lead, mismo NIT en dos fuentes, estado de la búsqueda tras la carrera y tras el 409, búsqueda inexistente o ajena, sin fuente que cubra.*
 
-- [x] T027 [MIN] [Paso 5] **Verde:** `EjecutarBusqueda` con tope, `lote_id = busqueda.id`, estado final (P1) y `naturales_por_fuente` (011).
+- [ ] T027 [MIN] [Paso 5] **Verde:** `EjecutarBusqueda` con tope, `lote_id = busqueda.id`, estado final (P1) y `naturales_por_fuente` (011). *Auditoría 2026-10-18: falta el tope de gasto y `naturales_por_fuente`; `EjecutarBorrador` con lote y estado final está hecho*
   *Hecho 2026-10-18 (parte [MIN]): `_correr_fuentes` compartida por `EjecutarBusqueda` (CLI, sin cambios de comportamiento) y `EjecutarBorrador` (API); `RepositorioLeads.estado`; `BusquedaNoEncontrada`/`BusquedaYaEjecutada`; cierre en `error` ante una excepción inesperada. Sabotajes vistos en rojo y revertidos: ignorar el bool de `pasar_a_ejecutando`, sin `BusquedaNoEncontrada`, sin cierre en `error`, cualquier fuente caída es `error`, fuentes intercambiadas, sin fuente deja `terminada`, sin `normalizar_nit`, licencia de otra fuente en `lead_fuentes`.*
 
 - [ ] T028 [Pulido] [Paso 5] **Rojo (advisor, costos):** `backend/tests/integration/test_costos_repo.py::test_costos_de_descubrimiento_llevan_lote_de_la_busqueda` (spec:141), con transportes falsos y `postgres_costos` real. **Mutación:** construir los adaptadores de la vista previa con `lote_id=None`. Va acá y no en la Fase 3 porque necesita los dos casos de uso.
 
 ## Fase 7: Auth (Paso 6) — security
 
-- [x] T029 [MIN] [Paso 6] **Rojo (security):** `backend/tests/integration/test_auth.py`:
+- [ ] T029 [MIN] [Paso 6] **Rojo (security):** `backend/tests/integration/test_auth.py`: *Auditoría 2026-10-18: faltan `test_fijar_idioma_persiste` y `test_fijar_idioma_invalido_da_422` (no existe `PATCH /usuarios/me`)*
   - `::test_token_valido_resuelve_el_tenant_desde_usuarios`: un token con `tenant_id` (o `user_metadata.tenant_id`) de B y el `sub` de un usuario de A actúa como A. **Mutación:** leer el tenant del claim.
   - `::test_token_valido_sin_fila_en_usuarios_da_403`: cuerpo `sin_acceso`; y borrar la fila corta el acceso con el mismo token. **Mutación:** `tenant_actual` cae a un tenant por defecto.
   - `::test_sin_token_da_401[ruta]`, sobre `app.routes` menos `/health`. **Mutación:** una ruta sin la dependencia `tenant_actual`.
@@ -194,7 +194,7 @@
   - `::test_usuarios_me_devuelve_idioma[caso]`. **Mutación:** `COALESCE(usuarios.idioma, tenants.idioma)` → `idioma_usuario` nunca es `null`.
   - `::test_fijar_idioma_persiste` **(Pulido)**. **Mutación:** devolver 204 sin llamar a `fijar_idioma`.
   - `::test_fijar_idioma_invalido_da_422[caso]` **(Pulido)**. **Mutación:** modelo sin `extra='forbid'`.
-- [x] T030 [MIN] [Paso 6] **Verde:**
+- [ ] T030 [MIN] [Paso 6] **Verde:** *Auditoría 2026-10-18: falta `PATCH /usuarios/me`*
   - `repositorio_usuarios.py` (llama a `tenant_de_usuario`);
   - `app/api/sesion.py` (Bearer → `VerificadorToken` → `tenant_de_usuario(sub)` → `tenant_actual`);
   - `GET /usuarios/me` y `PATCH /usuarios/me` → Pulido;
@@ -203,7 +203,7 @@
 
 ## Fase 8: Endpoints (Paso 7)
 
-- [x] T031 [MIN] [Paso 7] **Rojo:** `backend/tests/integration/test_api_busquedas.py`:
+- [ ] T031 [MIN] [Paso 7] **Rojo:** `backend/tests/integration/test_api_busquedas.py`: *Auditoría 2026-10-18: falta `test_ejecutar_con_costo_maximo_sobre_tope_da_409` y `test_tablero_trae_naturales_por_fuente`*
   - `::test_tenant_sale_del_token_no_del_body` (advisor, RLS). **Mutación:** modelo sin `extra='forbid'` → 201 en lugar de 422.
   - `::test_tenant_b_no_ejecuta_busqueda_de_a` (advisor, RLS). **Mutación:** abrir la unidad de trabajo con el tenant de la búsqueda en lugar del del token.
   - `::test_ejecutar_dos_veces_da_409`. **Mutación:** mapear `BusquedaYaEjecutada` a 500.
@@ -217,7 +217,7 @@
   *Van a Pulido (el [MIN] no los pide): `::test_ejecutar_con_costo_maximo_sobre_tope_da_409`, `::test_tablero_devuelve_null_para_cpl_sin_divisor` y `::test_tablero_trae_naturales_por_fuente` (D7). El [MIN] sí fija que el tablero completa con `null` lo que no calcula (`test_tablero_completa_con_null_lo_que_el_minimo_no_calcula`).*
   *Rojo escrito 2026-10-18, pendiente de advisor (RLS y cumplimiento) (parte [MIN]): `test_api_busquedas.py`, 21 casos en rojo por assert (`501 == 201/200/422`; `['4711', '5611', '4752'] == []` para el YAML de actividades). Más lo que el [MIN] necesita y la tabla no listaba: 404 frente a 409 entre tenants (ajena indistinguible de inexistente, sin requests ni costos), `test_validacion_ciiu_devuelve_el_nombre_de_la_regla`, `test_actividades_yaml_real_tiene_nombre_es_en_todas_las_entradas`, y `test_flujo_completo_deja_leads_costos_y_cumplimiento_del_tenant` (vista previa -> ejecutar -> tablero con fuentes reales y transporte falso: costos con `lote_id` = búsqueda y `lead_id` null, un `cumplimiento` por lead, nada en B). Contrato del verde: `app.state.transporte_http` y `app.state.actividades_yaml`; vista previa 201, ejecutar 200; errores 422 como `{errores: [{campo, codigo}]}`.*
   *Verde 2026-10-18 con T032 (parte [MIN]); 27 casos en `test_api_busquedas.py` + `tests/unit/api/`. Ajuste a lo pedido: `base_legal` NO se exige no nula en `cumplimiento` (la setea AprobarMensaje en el 007: 0002 migración:68, 003 spec:344); el test exige que sea NULL en todos, para que nadie la rellene con `persona_juridica_canal_publicado` a un lead de OSM (`desconocido` = natural).*
-- [x] T032 [MIN] [Paso 7] **Verde:**
+- [ ] T032 [MIN] [Paso 7] **Verde:** *Auditoría 2026-10-18: faltan `limites_app` en `tarifas.yaml` y el tablero de naturales (`tablero.py` devuelve `cuenta_naturales: False` y `null`)*
   - routers `busquedas`, `tablero`, `actividades`;
   - `repositorio_tablero.py`;
   - `limites_app` en `tarifas.yaml` (P11);
@@ -239,8 +239,8 @@
   - `frontend/eslint.config.js` es `export default []`, para que `overrideConfigFile` de `limites.test.ts` encuentre el archivo.
 
   Un test que nazca verde contra estos esqueletos (por ejemplo, un positivo de `limites.test.ts` con la config vacía) se acepta solo si su mutación lo pone en rojo.
-- [ ] T035 [MIN] [Paso 8] **Rojo:** `frontend/tests/arquitectura/limites.test.ts`, los 6 tests de spec:221-235. **Mutación:** cada negativo, con su dirección en `allow`; para `import_sin_resolver_es_error`, `import/no-unresolved` en `off`.
-- [ ] T036 [Pulido] [Paso 8] **Verde:** `frontend/eslint.config.js` (boundaries, en el orden de tipos de spec:445-452, más el resolver de TS).
+- [ ] T035 [MIN] [Paso 8] **Rojo:** `frontend/tests/arquitectura/limites.test.ts`, los 6 tests de spec:221-235. **Mutación:** cada negativo, con su dirección en `allow`; para `import_sin_resolver_es_error`, `import/no-unresolved` en `off`. *Auditoría 2026-10-18: existe `el_repo_no_tiene_violaciones` pero no los 6 tests de límites ni `boundaries` (T036 sigue sin hacerse)*
+- [ ] T036 [Pulido] [Paso 8] **Verde:** `frontend/eslint.config.js` (boundaries, en el orden de tipos de spec:445-452, más el resolver de TS). *Auditoría 2026-10-18: `eslint.config.js` solo tiene la regla i18next; no hay reglas de límites*
   - Nota: `eslint-plugin-boundaries` se sacó de devDependencies (PR #37) porque arrastra handlebars 4.7.9 (3 CVE críticos) y braces 3.0.3 (CVE alto, sin versión arreglada) y rompía `npm audit`. Al retomar la T036, elegí un plugin sin braces vulnerable: `eslint-plugin-import`, ya instalado, trae `import/no-restricted-paths`.
 - [x] T037 [MIN] [Paso 8] **Rojo:**
   - `frontend/tests/arquitectura/i18n.test.ts`, los 4 tests. **Mutación:** borrar una clave de `en.json`; `mode` que no atrapa atributos.
