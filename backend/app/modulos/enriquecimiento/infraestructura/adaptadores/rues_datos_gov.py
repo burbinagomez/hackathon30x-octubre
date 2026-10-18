@@ -24,16 +24,20 @@ def _desconocido(motivo: str, candidatos: int | None = None) -> VerificacionTitu
 
 
 class RuesDatosGov:
-    def __init__(self, buscador: BuscadorRazonSocialRues, municipio_de_camara: Mapping[str, str]) -> None:
-        """`municipio_de_camara`: codigo_camara -> municipio sede (el dataset no trae municipio, ver camaras_co.yaml)."""
+    def __init__(self, buscador: BuscadorRazonSocialRues, municipio_de_camara: Mapping[str, str],
+                 alias_ciudad: Mapping[str, str] | None = None) -> None:
+        """`municipio_de_camara`: codigo_camara -> municipio sede (el dataset no trae municipio, ver camaras_co.yaml).
+        `alias_ciudad`: nombre corto normalizado -> sede normalizada ("CALI" -> "SANTIAGO DE CALI")."""
         self._buscador = buscador
         self._municipios = municipio_de_camara
+        self._alias = alias_ciudad or {}
 
     def verificar(self, lead_id: UUID, nombre_normalizado: str, ciudad: str | None, pais: str) -> VerificacionTitular:
         if pais != "CO":  # el RUES es colombiano: una ciudad que coincida en otro país no prueba nada
             return _desconocido("pais_no_soportado")
         nombre = normalizar_nombre(nombre_normalizado)
         ciudad_lead = normalizar_ciudad(ciudad or "")
+        ciudad_lead = self._alias.get(ciudad_lead, ciudad_lead)
         if not ciudad_lead:  # sin ciudad no hay segundo dato que desambigüe: ni se consulta
             return _desconocido("sin_ciudad")
         if not nombre:

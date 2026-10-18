@@ -1,9 +1,64 @@
-# Cámaras de comercio (codigo_camara de c82u-588k) → departamentos DIVIPOLA que cubren.
+# Cámaras de comercio (codigo_camara de c82u-588k) → municipio sede y departamentos DIVIPOLA que cubren.
 # Una cámara no es un departamento: la 04 (Bogotá) también cubre municipios
 # de Cundinamarca. Filtrar por departamento sobreincluye; no subincluye.
-# Nombres verificados contra la API ($group=codigo_camara,camara_comercio) el 2026-10-17.
-# ponytail: solo las cámaras de 11 y 25 (corte 4 de la spec); las 58 son T054.
+# Los 58 códigos y nombres salen de la API ($group=codigo_camara,camara_comercio), consultada el 2026-10-18.
+# municipio_sede: el nombre exacto de geografia/co.yaml (DIVIPOLA). alias: como lo escribe OSM cuando difiere.
+# Departamentos: el de la sede; las cámaras que cubren municipios de otro departamento sobreincluyen igual que la 04.
+"01": {nombre: "Armenia", municipio_sede: "Armenia", departamentos: ["63"]}
+"02": {nombre: "Barrancabermeja", municipio_sede: "Barrancabermeja", departamentos: ["68"]}
+"03": {nombre: "Barranquilla", municipio_sede: "Barranquilla", departamentos: ["08"]}
 "04": {nombre: "Bogotá", municipio_sede: "Bogotá", departamentos: ["11", "25"]}
+"05": {nombre: "Bucaramanga", municipio_sede: "Bucaramanga", departamentos: ["68"]}
+"06": {nombre: "Buenaventura", municipio_sede: "Buenaventura", departamentos: ["76"]}
+"07": {nombre: "Buga", municipio_sede: "Guadalajara de Buga", departamentos: ["76"], alias: ["Buga"]}
+"08": {nombre: "Cali", municipio_sede: "Santiago de Cali", departamentos: ["76"], alias: ["Cali"]}
+"09": {nombre: "Cartagena", municipio_sede: "Cartagena de Indias", departamentos: ["13"], alias: ["Cartagena"]}
+"10": {nombre: "Cartago", municipio_sede: "Cartago", departamentos: ["76"]}
+"11": {nombre: "Cúcuta", municipio_sede: "San José de Cúcuta", departamentos: ["54"], alias: ["Cúcuta"]}
+"12": {nombre: "Chinchiná", municipio_sede: "Chinchiná", departamentos: ["17"]}
+"13": {nombre: "Duitama", municipio_sede: "Duitama", departamentos: ["15"]}
 "14": {nombre: "Girardot", municipio_sede: "Girardot", departamentos: ["25"]}   # [VALIDAR] si también cubre 73
+"15": {nombre: "Honda", municipio_sede: "Honda", departamentos: ["73"]}
+"16": {nombre: "Ibagué", municipio_sede: "Ibagué", departamentos: ["73"]}
+"17": {nombre: "Ipiales", municipio_sede: "Ipiales", departamentos: ["52"]}
+"18": {nombre: "La Dorada", municipio_sede: "La Dorada", departamentos: ["17"]}
+"19": {nombre: "Magangué", municipio_sede: "Magangué", departamentos: ["13"]}
+"20": {nombre: "Manizales", municipio_sede: "Manizales", departamentos: ["17"]}
+"21": {nombre: "Medellín para Antioquia", municipio_sede: "Medellín", departamentos: ["05"]}
+"22": {nombre: "Montería", municipio_sede: "Montería", departamentos: ["23"]}
+"23": {nombre: "Huila", municipio_sede: "Neiva", departamentos: ["41"]}
+"24": {nombre: "Palmira", municipio_sede: "Palmira", departamentos: ["76"]}
+"25": {nombre: "Pamplona", municipio_sede: "Pamplona", departamentos: ["54"]}
+"26": {nombre: "Pasto", municipio_sede: "Pasto", departamentos: ["52"]}
+"27": {nombre: "Pereira", municipio_sede: "Pereira", departamentos: ["66"]}
+"28": {nombre: "Cauca", municipio_sede: "Popayán", departamentos: ["19"]}
+"29": {nombre: "Chocó", municipio_sede: "Quibdó", departamentos: ["27"]}
+"30": {nombre: "La Guajira", municipio_sede: "Riohacha", departamentos: ["44"]}
+"31": {nombre: "San Andrés", municipio_sede: "San Andrés", departamentos: ["88"]}
+"32": {nombre: "Santa Marta para el Magdalena", municipio_sede: "Santa Marta", departamentos: ["47"]}
+"33": {nombre: "Santa Rosa de Cabal", municipio_sede: "Santa Rosa de Cabal", departamentos: ["66"]}
+"34": {nombre: "Sincelejo", municipio_sede: "Sincelejo", departamentos: ["70"]}
+"35": {nombre: "Sogamoso", municipio_sede: "Sogamoso", departamentos: ["15"]}
+"36": {nombre: "Tuluá", municipio_sede: "Tuluá", departamentos: ["76"]}
+"37": {nombre: "Tumaco", municipio_sede: "San Andrés de Tumaco", departamentos: ["52"], alias: ["Tumaco"]}
+"38": {nombre: "Tunja", municipio_sede: "Tunja", departamentos: ["15"]}
+"39": {nombre: "Valledupar", municipio_sede: "Valledupar", departamentos: ["20"]}
+"40": {nombre: "Villavicencio", municipio_sede: "Villavicencio", departamentos: ["50"]}
+"41": {nombre: "Florencia para el Caquetá", municipio_sede: "Florencia", departamentos: ["18"]}
+"42": {nombre: "Amazonas", municipio_sede: "Leticia", departamentos: ["91"]}
+"43": {nombre: "Sevilla", municipio_sede: "Sevilla", departamentos: ["76"]}
+"44": {nombre: "Urabá", municipio_sede: "Apartadó", departamentos: ["05"]}
+"45": {nombre: "Sur y Oriente del Tolima", municipio_sede: "Espinal", departamentos: ["73"]}   # [VALIDAR] sede verificada de memoria
+"46": {nombre: "Putumayo", municipio_sede: "Mocoa", departamentos: ["86"]}
 "47": {nombre: "Facatativá", municipio_sede: "Facatativá", departamentos: ["25"]}
+"48": {nombre: "Arauca", municipio_sede: "Arauca", departamentos: ["81"]}
+"49": {nombre: "Ocaña", municipio_sede: "Ocaña", departamentos: ["54"]}
+"50": {nombre: "Casanare", municipio_sede: "Yopal", departamentos: ["85"]}
+"51": {nombre: "Oriente Antioqueño", municipio_sede: "Rionegro", departamentos: ["05"]}
+"52": {nombre: "Magdalena Medio", municipio_sede: "Puerto Berrío", departamentos: ["05"]}   # [VALIDAR] sede verificada de memoria
+"53": {nombre: "Aguachica", municipio_sede: "Aguachica", departamentos: ["20"]}
+"54": {nombre: "Dosquebradas", municipio_sede: "Dosquebradas", departamentos: ["66"]}
+"55": {nombre: "Aburrá Sur", municipio_sede: "Itagüí", departamentos: ["05"]}
+"56": {nombre: "Piedemonte Araucano", municipio_sede: "Saravena", departamentos: ["81"]}   # [VALIDAR] sede verificada de memoria
+"57": {nombre: "San José", municipio_sede: "San José del Guaviare", departamentos: ["95"]}
 "58": {nombre: "Soacha", municipio_sede: "Soacha", departamentos: ["25"]}

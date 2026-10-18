@@ -2,19 +2,27 @@
 Reusa el cliente de la 011 (`DatosGovCoRues`) con transporte falso: sin red. Datos sintéticos."""
 import logging
 from datetime import UTC, datetime
-from types import SimpleNamespace
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 
 import httpx
 import pytest
 
-from app.modulos.descubrimiento.aplicacion.camaras import cargar_camaras
+from app.modulos.descubrimiento.aplicacion.camaras import (
+    alias_de_ciudad,
+    cargar_camaras,
+)
 from app.modulos.descubrimiento.dominio.modelos import MetaFuente
 from app.modulos.descubrimiento.infraestructura.adaptadores.datos_gov_co_rues import (
-    LIMITE_COINCIDENCIAS, DatosGovCoRues)
-from app.modulos.enriquecimiento.infraestructura.adaptadores.rues_datos_gov import RuesDatosGov
+    LIMITE_COINCIDENCIAS,
+    DatosGovCoRues,
+)
+from app.modulos.enriquecimiento.dominio.normalizar_titular import normalizar_ciudad
+from app.modulos.enriquecimiento.infraestructura.adaptadores.rues_datos_gov import (
+    RuesDatosGov,
+)
 from tests.falsos import RegistroCostosFalso
 
 BACKEND = Path(__file__).resolve().parents[3]
@@ -369,3 +377,20 @@ def test_una_natural_colada_junto_a_la_sas_deja_ambiguo_y_no_sube():
 @pytest.mark.parametrize("org", [None, ""])
 def test_sin_organizacion_juridica_no_se_afirma_que_es_juridica(org):
     assert _con(_coincidencia(org=org)).verificar(uuid4(), NOMBRE, "Bogotá", "CO").tipo_titular == "desconocido"
+
+
+# --- Alias de ciudad: OSM trae "Cali", DIVIPOLA dice "Santiago de Cali" (T054) -------------------------------------
+
+def test_el_nombre_corto_de_la_ciudad_coincide_con_la_sede_divipola():
+    alias = alias_de_ciudad(CAMARAS, normalizar_ciudad)
+    v = RuesDatosGov(_BuscadorFalso(_coincidencia(camara="08")), MUNICIPIOS, alias)
+
+    r = v.verificar(uuid4(), NOMBRE, "Cali", "CO")
+
+    assert (r.tipo_titular, r.motivo) == ("juridica", "match_unico")
+
+
+def test_sin_alias_el_nombre_corto_no_coincide():
+    r = _con(_coincidencia(camara="08")).verificar(uuid4(), NOMBRE, "Cali", "CO")
+
+    assert r.tipo_titular == "desconocido"

@@ -39,3 +39,25 @@ def test_no_hay_codigos_de_camara_repetidos():
     codigos = [m.group(1) for ln in lineas if (m := re.match(r'^"(\d+)":', ln))]
 
     assert len(codigos) == len(set(codigos))
+
+
+def test_yaml_real_cubre_las_58_camaras_del_rues():
+    # Los 58 códigos de c82u-588k ($group=codigo_camara, consultado 2026-10-18).
+    assert set(cargar_camaras(CAMARAS_YAML)) == {f"{i:02d}" for i in range(1, 59)}
+
+
+def test_casos_puntuales_de_sede_y_departamento():
+    c = cargar_camaras(CAMARAS_YAML)
+    assert (c["21"].municipio_sede, c["21"].departamentos) == ("Medellín", frozenset({"05"}))
+    assert (c["08"].municipio_sede, c["08"].departamentos) == ("Santiago de Cali", frozenset({"76"}))
+    assert (c["03"].municipio_sede, c["03"].departamentos) == ("Barranquilla", frozenset({"08"}))
+    assert (c["05"].municipio_sede, c["05"].departamentos) == ("Bucaramanga", frozenset({"68"}))
+
+
+def test_alias_del_nombre_corto_apuntan_a_la_sede():
+    from app.modulos.descubrimiento.aplicacion.camaras import alias_de_ciudad
+
+    alias = alias_de_ciudad(cargar_camaras(CAMARAS_YAML), normalizar_ciudad)
+    assert alias[normalizar_ciudad("Cali")] == normalizar_ciudad("Santiago de Cali")
+    assert alias[normalizar_ciudad("Cúcuta")] == normalizar_ciudad("San José de Cúcuta")
+    assert alias[normalizar_ciudad("Cartagena")] == normalizar_ciudad("Cartagena de Indias")
