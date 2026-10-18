@@ -38,16 +38,18 @@ def test_conteo_por_fuente_y_motivo_de_las_descartadas():
 
 def test_ignorados_son_los_criterios_que_la_fuente_no_aplica_y_el_ciiu_traducido_no_cuenta():
     caso, _, _ = _caso()
-    criterios = CriteriosICP(pais="CO", filtros={"ciiu": "4711", "departamento": "Cundinamarca", "ciudad": "Bogotá",
-                                                 "ingresos_min": "1000000"})
+    # El orden de inserción NO es el alfabético: un `ignorados` que no ordena se delata.
+    criterios = CriteriosICP(pais="CO", filtros={"ingresos_min": "1000000", "macrosector": "comercio", "ciiu": "4711",
+                                                 "departamento": "Cundinamarca", "ciudad": "Bogotá"})
 
     r = caso.ejecutar(criterios, "email", Decimal("5.00"), None)
 
     por_clave = {f.clave: f.ignorados for f in r.fuentes}
-    # Croma aplica ciiu, departamento e ingresos_min; no tiene `ciudad`: es lo único que ignora.
-    # OSM aplica ciudad; ignora departamento e ingresos_min (ordenados). El ciiu no cuenta como ignorado:
+    # Croma aplica ciiu, departamento e ingresos_min; ignora ciudad y macrosector (su YAML de prueba no lo declara).
+    # OSM aplica ciudad; ignora departamento, ingresos_min y macrosector. El ciiu no cuenta como ignorado:
     # lo aplica traducido a tipo_negocio.
-    assert por_clave == {"osm_overpass": ("departamento", "ingresos_min"), "croma_supersociedades_co": ("ciudad",)}
+    assert por_clave == {"osm_overpass": ("departamento", "ingresos_min", "macrosector"),
+                         "croma_supersociedades_co": ("ciudad", "macrosector")}
 
 
 def test_crea_busqueda_en_borrador_con_criterios():

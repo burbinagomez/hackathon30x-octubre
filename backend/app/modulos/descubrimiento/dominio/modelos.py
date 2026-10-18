@@ -1,5 +1,6 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
+from decimal import Decimal
 from datetime import datetime
 from typing import Literal, NamedTuple
 from uuid import UUID
@@ -17,6 +18,16 @@ TipoTitular = Literal["juridica", "natural", "desconocido"]
 class CriteriosICP:
     pais: str  # ISO 3166-1 alfa-2, mayúsculas
     filtros: Mapping[str, str | tuple[str, ...]]  # vocabulario de fuentes.yaml; tupla = varios valores
+
+
+@dataclass(frozen=True)
+class Borrador:
+    """Una búsqueda guardada con estado `borrador`: criterios congelados y el formulario común."""
+    id: UUID
+    criterios: CriteriosICP
+    canal_preferido: str | None
+    tope_gasto_usd: Decimal
+    mensaje_base: str | None
 
 
 @dataclass(frozen=True)

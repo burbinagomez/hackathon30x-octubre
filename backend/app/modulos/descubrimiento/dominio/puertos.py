@@ -1,8 +1,9 @@
 from collections.abc import Mapping
+from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
-from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, EmpresaCruda, Lead, MetaFuente, PaginaEmpresas
+from app.modulos.descubrimiento.dominio.modelos import Borrador, CriteriosICP, EmpresaCruda, Lead, MetaFuente, PaginaEmpresas
 
 
 class FuenteDescubrimiento(Protocol):
@@ -14,6 +15,19 @@ class FuenteDescubrimiento(Protocol):
 class RepositorioLeads(Protocol):
     def crear_busqueda(self, criterios: CriteriosICP) -> UUID:
         """Transacción propia, confirmada antes de llamar a los adaptadores."""
+        ...
+
+    def crear_borrador(self, criterios: CriteriosICP, canal_preferido: str | None, tope_gasto_usd: Decimal,
+                       mensaje_base: str | None) -> UUID:
+        """P2. Estado `borrador`, criterios congelados. Transacción propia, confirmada antes de pedir las fuentes."""
+        ...
+
+    def obtener_borrador(self, busqueda_id: UUID) -> Borrador | None:
+        """None si no existe, es de otro tenant o ya no está en `borrador`."""
+        ...
+
+    def pasar_a_ejecutando(self, busqueda_id: UUID) -> bool:
+        """`UPDATE … WHERE estado = 'borrador'`: True solo para quien hizo la transición (una sola ejecución)."""
         ...
 
     def obtener_o_crear_lead(self, e: EmpresaCruda, licencia: str) -> tuple[UUID, bool]:

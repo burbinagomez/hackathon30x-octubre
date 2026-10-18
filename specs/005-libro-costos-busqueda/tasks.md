@@ -158,12 +158,14 @@
 
     **Mutación:** iterar sobre un subconjunto fijo de claves (sin `datos_gov_co_rues`) → falla el segundo caso; o `<` en lugar de `≤` → falla el borde.
   - `::test_reporta_creditos_y_requests_restantes`: 63 y 288. **Mutación:** devolver lo usado en lugar de lo restante.
-- [ ] T025 [MIN] [Paso 5] **Verde:**
+- [x] T025 [MIN] [Paso 5] **Verde:**
   - `descubrimiento/aplicacion/vista_previa.py`, que recibe `FabricaFuentes`;
   - los métodos de borrador de `RepositorioLeads` (P2);
   - `ignorados` derivado (P7, corregido): `sorted(…)` como en plan.md P7.
 
   La implementación real de `FabricaFuentes` va en `app/api` (raíz de composición). `aplicacion/` no importa el catálogo concreto, y lo vigila import-linter.
+  *Hecho 2026-10-18 (parte [MIN]): `crear_borrador`, `obtener_borrador` y `pasar_a_ejecutando` en el Protocol y en `RepositorioLeadsPostgres` (4 tests en `test_leads_repo.py`), `Borrador` en el dominio, `VistaPrevia` con `ignorados` ordenado (P7 corregido). Sabotajes vistos en rojo: copiar `ignoradas`, `crear_busqueda` del 002, fuentes antes del borrador, ciiu traducido como ignorado, `ignorados` sin ordenar, `obtener_borrador` sin filtro de estado, `pasar_a_ejecutando` sin `AND estado='borrador'`.*
+
 - [ ] T026 [MIN] [Paso 5] **Rojo (advisor, costos y cumplimiento):** `backend/tests/unit/descubrimiento/test_ejecutar_con_tope.py`, con la misma `FabricaFuentes` falsa de T024:
   - `::test_no_ejecuta_si_costo_maximo_supera_tope`: `TopeExcedido`, 0 requests, estado `borrador`. **Mutación:** chequear el tope después de `pasar_a_ejecutando`.
   - `::test_corta_antes_de_la_llamada_que_pasaria_el_tope`. **Mutación:** chequear después de llamar → OSM se llama.
