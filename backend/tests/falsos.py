@@ -5,6 +5,8 @@ from uuid import UUID, uuid4
 from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, EmpresaCruda, MetaFuente, PaginaEmpresas
 from app.modulos.enriquecimiento.dominio.puertos import Encaje
+from app.modulos.enriquecimiento.infraestructura.adaptadores.jev_clasificador import (
+    operacion_jev, validar_salida, validar_tokens)
 
 
 class RepositorioLeadsFalso:
@@ -77,11 +79,16 @@ class FuenteFalsa:
 
 
 class JevFalso:
-    """ClasificadorEncaje en memoria: devuelve la salida configurada ({"etiqueta", "probabilidad"})."""
+    """ClasificadorEncaje en memoria: valida y registra jev_tokens igual que JevClasificador, sin HTTP."""
 
-    def __init__(self, salida: dict | None = None):
+    def __init__(self, salida: dict | None, costos: "RegistroCostosFalso", tokens_in: int = 500,
+                 usd_in_por_M: Decimal = Decimal("0.042")):
         self.salida = salida or {"etiqueta": "encaja", "probabilidad": 0.9}
+        self.costos = costos
+        self.tokens_in = tokens_in
+        self.usd_in_por_M = usd_in_por_M
 
     def clasificar(self, lead_id: UUID, descripcion_icp: str, nombre: str, ciudad: str | None,
                    actividad: str | None) -> Encaje:
-        return Encaje("encaja", 1.0)
+        self.costos.registrar(operacion_jev(lead_id, validar_tokens(self.tokens_in), self.usd_in_por_M))
+        return validar_salida(self.salida)

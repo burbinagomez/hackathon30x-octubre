@@ -8,3 +8,7 @@ class DemasiadasRedirecciones(RuntimeError):
 
 class SalidaJevInvalida(ValueError):
     """jev devolvió una etiqueta fuera del enum o una probabilidad fuera de [0,1]. El costo ya quedó registrado."""
+
+
+class UsoJevInvalido(RuntimeError):
+    """jev no informó tokens_in medibles (falta, no es entero o es negativo). Sin fila de costo; corta la corrida."""

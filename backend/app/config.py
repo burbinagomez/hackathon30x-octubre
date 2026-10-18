@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     cifrado_key: SecretStr
     # SecretStr: no sale en repr ni en logs. Solo la CLI de búsqueda la usa.
     croma_api_key: SecretStr | None = None
+    # Credencial de jev (TypeSafe). Solo la usa JevClasificador.
+    typesafe_api_key: SecretStr | None = None
     # Overpass: None = la constante del adaptador. repo_url va en el User-Agent (política de Overpass).
     overpass_url: str | None = None
     # datos.gov.co: None = la constante del adaptador / sin token (SODA limita por IP).
