@@ -611,6 +611,7 @@ table.tabla-leads {
     grid-template-columns: 11rem 1fr;
     gap: 0.5rem;
   }
+}
 /* Tarjeta de las puertas, como las de Dapti: borde sutil, esquinas redondeadas, acciones agrupadas a la derecha. */
 .tarjeta {
   display: grid;
