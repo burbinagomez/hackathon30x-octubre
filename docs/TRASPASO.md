@@ -14,7 +14,7 @@ Los checkboxes de `tasks.md` no siempre están al día. Para saber qué está he
 
 | Slice | Rama | PR | Estado | Depende de |
 |---|---|---|---|---|
-| 012 seguridad del repo | `feature/012-config-repo` | #23 (borrador) | Arreglo del CI en curso: se borra `codeql.yml`, porque el default setup de CodeQL ya publica Analyze, y se agrega el guard de `ANTHROPIC_API_KEY` | — |
+| 012 seguridad del repo | `feature/012-config-repo` | #23 (borrador) | CI arreglado (`d788170`): sin `codeql.yml`, porque el default setup de CodeQL ya publica Analyze; `revision-seguridad` avisa y sale en 0 si falta `ANTHROPIC_API_KEY` (`.github/scripts/revision_seguridad.sh`) | — |
 | 002 puertos + Supersociedades | `feature/002-puertos-registro-supersociedades` | #24 (borrador) | Las tareas [MIN] que faltaban (T021, T023, T025 y T039) están en verde: repositorio de leads, costos en Postgres, `sembrar_tenant.py` y `EjecutarBusqueda` con `lote_id = busqueda_id`. Va a Pulido: T026, T027, T040, T041 (CLI) y T043 (doc) | main |
 | 003 OSM + dedup | `feature/003-osm-dedup` | #25 (borrador) | En verde: T012–T015, T037–T041, T044, T047 y T048. Falta del [MIN]: T016a/b, T042, T049, T051, T052, T053 y T055 (cierre). T048b solo si se decide adelantar 002 T034/T035 | 002 en main |
 | 011 datos.gov.co (RUES) | `feature/011-datos-gov-co` | #26 (borrador) | T003–T008 en verde. T012 tiene el stub. T013–T016 tienen 4 rojos, marcados con xfail strict. Lo que sigue es T017: el advisor revisa los tests. Después T018 (verde) y la Fase 4 en adelante | 002 en main (puerto de caché, `tests/contratos/fabricas.py`), 005 para el tablero |
