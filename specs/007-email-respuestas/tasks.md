@@ -11,9 +11,9 @@
 
 ## Fase 1: Puerta y setup (Paso 0)
 
-- [ ] T001 [Paso 0] Daniel aprueba el DDL de la 0010 (plan, "Migración"). Hasta entonces, solo Fases 2 y 3.
+- [x] T001 [Paso 0] Daniel aprobó el DDL con condiciones: número = siguiente libre en `main` al mergear; grants/revokes también en las vistas; P1 con `--dry-run` previo, tope 20, elegibilidad y `EMAIL_MODO=prueba`.
 - [ ] T002 [P] [Paso 0] Esqueletos de `app/modulos/contacto/{dominio,aplicacion,infraestructura}` con firmas y `raise NotImplementedError`; `app.modulos.contacto` en `containers` de import-linter y contrato `contacto.dominio` ↛ `smtplib`, `cryptography`.
-- [ ] T003 [P] [Paso 0] `Settings`: `smtp_host`, `smtp_port`, `smtp_usuario`, `smtp_clave: SecretStr`, `smtp_seguridad` (`ssl|starttls|ninguna`), `remitente`, `baja_secret: SecretStr`, `api_base_url`.
+- [ ] T003 [P] [Paso 0] `Settings`: `smtp_host`, `smtp_port`, `smtp_usuario`, `smtp_clave: SecretStr`, `smtp_seguridad` (`ssl|starttls|ninguna`), `remitente`, `baja_secret: SecretStr`, `api_base_url`, `email_modo` (`prueba` por defecto | `real`), `email_prueba_destinos: list[str]`. `::test_email_modo_por_defecto_es_prueba`. Mutación `sabotaje_modo_real_por_defecto`. (security)
 - [ ] T004 [P] [Paso 0] `tests/smtp_falso.py`: `socketserver` con EHLO, AUTH PLAIN, MAIL, RCPT, DATA, QUIT; guarda los mensajes y puede rechazar un RCPT con 550 o cortar en DATA.
 
 ## Fase 2: Dominio (Paso 1)
@@ -33,8 +33,8 @@
 
 ## Fase 4: Migración (Paso 3) — después de T001
 
-- [ ] T030 [Paso 3] `supabase/migrations/0010_contactos.sql` con el DDL aprobado; `app/modelos.py` suma `contactos`.
-- [ ] T031 [Paso 3] `test_rls[contactos]` y `test_privilegios_supabase` en verde sin tocarlos; `test_migraciones` (drift vacío). `::test_un_solo_email_por_lead`: `INSERT` duplicado → `23505`.
+- [ ] T030 [Paso 3] `supabase/migrations/<siguiente libre>_contactos.sql` con el DDL aprobado; `app/modelos.py` suma `contactos`. El número se recalcula contra `main` antes del merge.
+- [ ] T031 [Paso 3] `test_rls[contactos]` y `test_privilegios_supabase` en verde sin tocarlos; `test_migraciones` (drift vacío). `::test_un_solo_email_por_lead`: `INSERT` duplicado → `23505`. `::test_privilegios_vistas`: `app_rt` tiene `SELECT` en las dos vistas y `anon`/`authenticated` no tienen nada. Mutación `sabotaje_vista_sin_revoke`: sacar el revoke de una vista. (security)
 
 ## Fase 5: Envío (Paso 4) — advisor
 
@@ -43,7 +43,11 @@
 - [ ] T042 [Paso 4] `::test_persona_natural_no_se_envia` y `::test_sin_canal_publicado_no_se_envia`. Mutación `sabotaje_natural`: sacar el filtro `tipo_titular`. (security)
 - [ ] T043 [Paso 4] `::test_dos_envios_en_paralelo_mandan_uno` (dos hilos, conexiones distintas) y `::test_limite_diario_deja_el_exceso_aprobado`. Mutación `sabotaje_sin_reclamo`: `UPDATE` sin `WHERE estado='aprobado'`.
 - [ ] T044 [Paso 4] `::test_costo_en_libro_por_envio`: N envíos → N filas `email_envio` con `lote_id = busqueda_id`, también en los que fallaron.
-- [ ] T045 [Paso 4] Implementar `EnviarABusqueda`, `repositorio_contactos.py` y `app.cli enviar [--dry-run]` hasta verde. `--dry-run` no imprime direcciones.
+- [ ] T046 [Paso 4] `::test_enviar_sin_dry_run_falla`: sin `--dry-run` previo → `SinVistaPrevia`, 0 mensajes, 0 costos. `::test_lead_nuevo_despues_del_dry_run_no_sale`. Mutación `sabotaje_enviar_crea_contactos`: que `enviar` cree el contacto si no existe. (security)
+- [ ] T047 [Paso 4] `::test_tope_20_por_corrida`: 25 elegibles con dry-run → 20 mensajes, 5 quedan `aprobado`. Mutación `sabotaje_sin_tope`.
+- [ ] T048 [Paso 4] `::test_modo_prueba_solo_destinos_de_prueba`: modo `prueba`, un lead en la lista y otro no → 1 mensaje, el otro `aprobado`, 1 costo. `::test_modo_prueba_lista_vacia_no_manda`. Mutación `sabotaje_prueba_sin_filtro`: ignorar la lista en modo `prueba`. (security)
+- [ ] T049 [Paso 4] `::test_sin_fila_de_cumplimiento_no_envia` y `::test_con_opt_out_no_envia`. Mutación `sabotaje_sin_chequeo_opt_out`. (security)
+- [ ] T045 [Paso 4] Implementar `EnviarABusqueda`, `repositorio_contactos.py` y `app.cli enviar [--dry-run]` hasta verde (también T046–T049). `--dry-run` no imprime direcciones.
 
 ## Fase 6: Baja (Paso 5) — security
 
@@ -68,12 +72,12 @@
 ## Dependencias
 
 - T001 bloquea la Fase 4; la 4 bloquea la 5, 6 y 7.
-- Fases 2 y 3 corren sin la 0010 y en paralelo.
+- Fases 2 y 3 corren sin la migración y en paralelo.
 - `LeadsContactablesPostgres` espera el merge de la 0008 (006); hasta entonces, el falso.
 
 ## Orden de corte
 
 1. Fase 7 queda en `respondio` + `tasa-respuesta` por CLI (ya es el mínimo).
 2. `GET /baja/{token}` con página de confirmación → solo `POST` y baja manual por CLI.
-3. Límite diario (T043, segunda mitad).
-Nunca se cortan: base legal, costo por envío, enlace de baja, baja que cierra todos los canales, logs sin contacto.
+3. Límite diario (T043, segunda mitad). El tope de 20 por corrida (T047) no se corta.
+Nunca se cortan: base legal, costo por envío, enlace de baja, baja que cierra todos los canales, logs sin contacto, `--dry-run` previo, tope por corrida, `EMAIL_MODO=prueba` por defecto.

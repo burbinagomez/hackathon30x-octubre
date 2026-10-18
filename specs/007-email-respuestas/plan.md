@@ -20,7 +20,7 @@ enlace público o marcada a mano, setea `cumplimiento.opt_out_at` y cierra todos
 
 - **Language/Version:** Python 3.12.
 - **Primary Dependencies:** `smtplib`, `email.message`, `hmac` y `hashlib` de la stdlib. FastAPI y SQLAlchemy Core de la 002. **Ninguna dependencia nueva**: el servidor SMTP falso de los tests es un `socketserver` de ~50 líneas en `tests/smtp_falso.py`.
-- **Storage:** Postgres, una migración a mano, la `0010` (abajo, pendiente de aprobación).
+- **Storage:** Postgres, una migración a mano (abajo, aprobada; número = siguiente libre en `main` al mergear).
 - **Testing:** pytest. Unit con falsos en memoria y contrato del adaptador contra el SMTP falso por socket. Integración contra Postgres real como `app_rt`. **Cero envíos reales en tests.**
 - **Constraints:** ~6 h, un solo envío real avisado al final (a una casilla nuestra), cupo diario por `limites.email_max_por_dia` en `fuentes.yaml`.
 - **Scale/Scope:** 1 módulo, 1 tabla, 2 vistas, 2 rutas públicas, 4 comandos de CLI.
@@ -32,7 +32,7 @@ enlace público o marcada a mano, setea `cumplimiento.opt_out_at` y cierra todos
 | I Hexagonal | `CanalContacto` y `LeadsContactables` son Protocols en `contacto/aplicacion/puertos.py`. `app.modulos.contacto` entra al `containers` de import-linter, y un contrato prohíbe `smtplib` y `cryptography` en `contacto.dominio`. | ✅ |
 | II Test primero | Cada test con su mutación con nombre (ver `tasks.md`). Esqueletos antes del rojo: nunca `ImportError`. | ✅ |
 | III Tenant/RLS | `contactos` con RLS `tenant_aislado`; vistas `security_invoker`. `test_rls[contactos]` y `test_privilegios_supabase` la toman solos. El tenant de `/baja/{token}` sale del token verificado. | ✅ |
-| IV Migraciones | `0010` a mano, `app/modelos.py` suma `contactos`, drift vacío. | ⏸ DDL pendiente |
+| IV Migraciones | A mano, `app/modelos.py` suma `contactos`, drift vacío. | ✅ DDL aprobado |
 | V Seguridad | `SMTP_HOST/PORT/USUARIO/CLAVE`, `REMITENTE`, `BAJA_SECRET`, `API_BASE_URL` por `Settings`; clave y secreto como `SecretStr`. `smtp_seguridad='ninguna'` solo con host `localhost`/`127.0.0.1`. Ni la dirección ni la clave van a logs (`test_contacto_no_aparece_en_logs`, con `SMTPRecipientsRefused`). | ✅ |
 | VI Contacto | La dirección sale descifrada solo dentro del adaptador de `LeadsContactables` y viaja en un campo `repr=False`. `contactos` no guarda la dirección. | ✅ |
 | VII Cumplimiento | Solo `tipo_titular='juridica'` con canal publicado y sin `opt_out_at`. `base_legal='persona_juridica_canal_publicado'` en la misma transacción del reclamo; sin ella, `SinBaseLegal` y `descartado`. | ✅ |
@@ -76,15 +76,20 @@ class LeadContactable:
 
 - **Dominio (`contacto/dominio/`)**: `plantilla.componer(mensaje_base, remitente, canal_origen, url_baja)` y `plantilla.validar(...)` (pie completo, URL de baja exacta, < 100 palabras). `tokens.firmar(proposito, tenant_id, contacto_id)` / `verificar(...)`: HMAC-SHA256 truncado, `hmac.compare_digest`, propósito `baja` ≠ `msgid`. Errores: `SinBaseLegal`, `CanalNoDisponible`.
 - **Aplicación**: `EnviarABusqueda(busqueda_id)` por lead: crear o tomar el `contacto` (`UNIQUE` por lead y canal), reclamar `aprobado→enviando` y setear `base_legal` en una transacción, chequear cupo, enviar fuera de la transacción, cerrar en `enviado` o volver a `aprobado`. `DarDeBaja(lead_id, via)`. `MarcarRespondio(contacto_id)`. `TasaRespuesta()`.
-- **Aprobación humana**: el `mensaje_base` lo escribe una persona en la búsqueda, y `app.cli enviar --busqueda <id>` lo corre una persona que ve antes la vista previa (`--dry-run` imprime asunto, cuerpo y cantidad, sin direcciones). Ver P1.
+- **Aprobación humana** (P1, condiciones de Daniel):
+  - `enviar --dry-run --busqueda <id>` compone los mensajes, imprime asunto, cuerpo y cantidad (sin direcciones) y deja cada `contacto` en `aprobado` con ese asunto y cuerpo. Es la constancia de la vista previa; no manda nada.
+  - `enviar --busqueda <id>` solo manda `contactos` que ya existen: nunca crea uno. Sin `--dry-run` previo no hay filas y falla con `SinVistaPrevia`. Un lead que aparece después del `--dry-run` no sale hasta otro `--dry-run`.
+  - Tope de **20 envíos por corrida** (`TOPE_POR_CORRIDA`); el resto queda `aprobado` para la próxima.
+  - Elegible: jurídica, canal publicado, fila en `cumplimiento`, mensaje con enlace de baja, sin opt-out.
+  - `EMAIL_MODO` (`prueba` por defecto | `real`). En `prueba` solo se manda a direcciones de `EMAIL_PRUEBA_DESTINOS`; las demás quedan `aprobado`, sin SMTP ni costo. `real` lo cambia solo Daniel en Railway.
 - **Infraestructura**: `smtp_email.py` (`SMTP_SSL` en 465, `STARTTLS` en 587, texto plano, headers `List-Unsubscribe` + `List-Unsubscribe-Post` + `Message-ID` con el token). `repositorio_contactos.py`. `api/baja.py`: `GET /baja/{token}` confirma, `POST` da de baja (idempotente, one-click RFC 8058), token inválido → `404` genérico.
 - **API**: `RUTAS_PUBLICAS = {"/health", "/baja/{token}"}` en `app/api/`, y `test_sin_token_da_401` pasa a excluir esa lista; `test_rutas_publicas_son_exactamente_estas` la fija.
 
 ## Migración
 
-### DDL de la 0010 — PENDIENTE DE APROBACIÓN DE DANIEL
+### DDL — APROBADO POR DANIEL (número: siguiente libre en `main` al mergear)
 
-No hay archivo en `supabase/migrations` hasta que lo apruebes.
+Sin columnas nuevas por las condiciones de P1: la constancia del `--dry-run` son las filas de `contactos`.
 
 ```sql
 create table public.contactos (
@@ -126,6 +131,7 @@ create view public.v_tasa_respuesta_canal with (security_invoker = true) as
                / nullif(count(*) filter (where enviado_en is not null), 0), 4) as tasa
   from public.contactos group by canal;
 grant select on v_leads_con_opt_out, v_tasa_respuesta_canal to app_rt;
+-- + el mismo bloque de la 0002 que revoca a anon/authenticated si existen, también sobre las dos vistas.
 ```
 
 - `message_id` no se guarda: sale del token firmado con `contacto_id`, así no hay columna que filtre.
@@ -167,9 +173,9 @@ front de Mensajes y Respuestas, evals, `email_hmac` y opt-out recursivo por fusi
 
 | # | Pregunta | Propuesta |
 |---|---|---|
-| P1 | ¿Alcanza como aprobación humana que una persona escriba el `mensaje_base` y corra `enviar` después de ver el `--dry-run`? La spec pide aprobar cada borrador. | Sí para la demo: sin redactor LLM, todos los mensajes de una búsqueda son el mismo texto. Por eso `contactos` nace en `aprobado`. |
+| P1 | Aprobación a nivel de búsqueda. | **Aceptada por Daniel** con condiciones: `--dry-run` previo, tope 20 por corrida, elegibilidad completa, `EMAIL_MODO=prueba` por defecto. Ver "Aprobación humana". |
 | P2 | Remitente y dominio de Resend. | `REMITENTE` por Settings; el dominio verificado en Resend es tuyo (panel externo). |
-| P3 | Cupo diario. | `limites.email_max_por_dia: 20` en `fuentes.yaml`. |
+| P3 | Cupo. | Tope de 20 por corrida (P1). El cupo diario queda en el orden de corte. |
 | P4 | El envío real de la demo. | Uno solo, a una casilla nuestra, avisado antes. |
 
 ## Complexity Tracking
