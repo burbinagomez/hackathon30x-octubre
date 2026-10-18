@@ -52,3 +52,25 @@ Envío del `mensaje_base` de una búsqueda a leads jurídicos con canal publicad
 `tablero/.../repositorio_tablero.py`, sin DDL, bajo la RLS de la sesión. Un lead de dos fuentes cuenta en las dos; el total no duplica.
 `sin_atribuir` (costo sin lead) devuelve `null` en los cuatro; una fuente con leads y sin enriquecimiento devuelve 0 real. Solo `count`: el
 repositorio nunca selecciona nombre, dirección ni contacto (lo vigila `test_cifrado.py`).
+
+## Login con Supabase Auth: `usuarios` y alta y baja de usuarios (spec 005)
+
+El correo y la clave viven en `auth.users` (panel de Supabase); la api no los ve ni los guarda. `public.usuarios` es la autoridad del
+acceso: `auth_user_id` (PK, el claim `sub` del access token), `tenant_id` e `idioma`.
+
+- **Verificación del token:** `app/modulos/acceso/infraestructura/verificador_jwks.py`, con `PyJWKClient(AUTH_JWKS_URL, timeout=5)` (~5 s:
+  un JWKS colgado no deja colgada la api), `algorithms=["ES256","RS256"]` (nunca HS256, sería confusión de algoritmo), `audience="authenticated"`,
+  `issuer=AUTH_ISSUER` y `require: exp, sub, aud, iss`. JWKS inaccesible = 503 (`auth_no_disponible`), token inválido = 401 (`no_autenticado`).
+  `AUTH_JWKS_URL` y `AUTH_ISSUER` son URLs públicas y obligatorias en `SettingsApi` (la CLI no las pide): sin secreto de firma en la api.
+- **`tenant_de_usuario(p_auth_user_id)`** (SECURITY DEFINER con `search_path = public, pg_temp`, 0006): devuelve el tenant y los dos idiomas
+  (usuario y tenant) de ESE `sub`; `app_rt` no tiene ningún privilegio sobre `usuarios`, entra solo por las funciones. El tenant nunca sale
+  del token ni del request. Sin fila en `usuarios` la sesión es 403 (`sin_acceso`).
+- **`fijar_idioma(p_auth_user_id, p_idioma)`** (SECURITY DEFINER, 0012): el usuario cambia su idioma sin que `app_rt` tenga `UPDATE` sobre
+  `usuarios`; filtra por `auth_user_id` **y** `tenant_id = current_setting('app.tenant_id')` y devuelve las filas cambiadas. Sin `app.tenant_id`
+  seteado falla, en vez de actualizar sin filtro. La ruta `PATCH /usuarios/me` llega con la 012.
+- **Alta:** el dueño crea la cuenta en el panel (Authentication → Users) y después
+  `uv run python scripts/crear_usuario.py --auth-user-id <uuid> --tenant <uuid> [--idioma es|en]`; la URL de postgres va por `getpass`, nunca
+  por argumento ni por entorno. Sin fila en `usuarios`, el token no sirve para nada.
+- **Baja:** borrar la fila (`DELETE FROM usuarios WHERE auth_user_id = ...`) y deshabilitar la cuenta en el panel de Supabase (paso humano).
+  Desde el borrado `tenant_de_usuario` devuelve 0 filas, así que las peticiones con ese token responden 403 aunque el token siga vigente; la
+  cuenta deshabilitada corta además el login y el refresh. El mismo procedimiento está en el docstring de `scripts/crear_usuario.py`.
