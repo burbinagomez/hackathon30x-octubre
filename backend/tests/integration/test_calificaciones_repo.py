@@ -6,7 +6,8 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from app.modulos.calificacion.dominio.modelos import ResultadoCalificacion
 from app.modulos.calificacion.infraestructura.persistencia.postgres_calificaciones import PostgresCalificaciones
@@ -113,9 +114,11 @@ def test_importada_escribe_calificacion_y_costo(rt, admin, tenant):
     with admin.connect() as c:
         calif = c.execute(text("SELECT calificado, calificado_en, minutos FROM calificaciones "
                                "WHERE tenant_id = :t AND lead_id = :l"), {"t": tenant, "l": lead_id}).one()
-        costo = c.execute(text("SELECT tipo, unidades, lead_id FROM costos WHERE tenant_id = :t"), {"t": tenant}).one()
+        costo = c.execute(text("SELECT tipo, unidades, costo_unitario, moneda, proveedor, fuente, canal, lead_id, "
+                               "lote_id, gratis, ts FROM costos WHERE tenant_id = :t"), {"t": tenant}).one()
     assert calif == (True, FECHA, Decimal("2"))
-    assert costo == ("dapta_llamada", Decimal("2"), lead_id)
+    assert costo == ("dapta_llamada", Decimal("2"), Decimal("0.333"), "USD", "dapta", None, None, lead_id,
+                     None, False, FECHA)
 
 
 def test_duplicada_mismo_resultado_no_escribe_costo_de_nuevo(rt, admin, tenant):
@@ -158,9 +161,22 @@ def test_calificacion_y_costo_en_la_misma_transaccion(rt, admin, tenant):
                                     moneda="USD", proveedor="dapta", fuente=None, canal=None, lead_id=lead_id,
                                     lote_id=None, gratis=False, ts=resultado.fecha)
 
-    with pytest.raises(Exception):
+    with pytest.raises(IntegrityError):
         PostgresCalificaciones(rt, tenant).guardar(resultado, costo_invalido)
 
     with admin.connect() as c:
         assert c.execute(text("SELECT count(*) FROM calificaciones WHERE tenant_id = :t"), {"t": tenant}).scalar() == 0
         assert c.execute(text("SELECT count(*) FROM costos WHERE tenant_id = :t"), {"t": tenant}).scalar() == 0
+
+
+def test_mismo_calificado_con_otros_minutos_es_conflicto(rt, admin, tenant):
+    """Duplicada = mismo (calificado, minutos). Otros minutos cambian el costo: es conflicto, no un no-op."""
+    lead_id = _lead(admin, tenant)
+    primero = ResultadoCalificacion(lead_id, True, FECHA, Decimal("2"))
+    repo = PostgresCalificaciones(rt, tenant)
+    repo.guardar(primero, _costo(primero))
+
+    otros_minutos = ResultadoCalificacion(lead_id, True, FECHA, Decimal("5"))
+    estado = repo.guardar(otros_minutos, _costo(otros_minutos))
+
+    assert estado == "conflicto"
