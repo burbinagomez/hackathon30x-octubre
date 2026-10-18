@@ -60,6 +60,13 @@ type = "forbidden"
 source_modules = ["app.modulos.descubrimiento.dominio"]
 forbidden_modules = ["cryptography", "httpx"]
 
+[[tool.importlinter.contracts]]
+name = "App no importa evals"
+type = "forbidden"
+# evals es tooling hermano de app y no entra en la imagen de api: evals -> app vale, al revés no.
+source_modules = ["app"]
+forbidden_modules = ["evals"]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
