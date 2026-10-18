@@ -280,7 +280,8 @@
       "omitida_por_tope": "no se consultó, pasaría el tope de gasto"
     },
     "ninguna_respondio": "Ninguna fuente respondió. Probá de nuevo más tarde.",
-    "ver_tablero": "Ver el tablero"
+    "ver_tablero": "Ver el tablero",
+    "ver_leads": "Ver los leads de esta búsqueda"
   },
   "comun": {
     "cargando": "Cargando…"

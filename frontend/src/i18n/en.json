@@ -280,7 +280,8 @@
       "omitida_por_tope": "not queried, it would exceed the spending cap"
     },
     "ninguna_respondio": "No source responded. Try again later.",
-    "ver_tablero": "View the dashboard"
+    "ver_tablero": "View the dashboard",
+    "ver_leads": "See this search's leads"
   },
   "comun": {
     "cargando": "Loading…"

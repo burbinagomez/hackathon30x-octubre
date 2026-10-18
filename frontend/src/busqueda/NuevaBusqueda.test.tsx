@@ -162,9 +162,11 @@ test("buscar_ejecuta_sin_body_y_muestra_el_resultado_por_fuente_antes_de_ir_al_t
   expect(location.pathname).not.toBe("/tablero"); // primero se lee el resultado
   expect(boton("Buscar")).toBeDisabled(); // la búsqueda ya no es borrador: otro clic sería un 409
 
-  fireEvent.click(boton("Ver el tablero"));
+  // QA 2026-10-18: lo que sigue de "200 empresas" son esas empresas, no el tablero general.
+  expect(boton("Ver el tablero")).toBeDefined();
+  fireEvent.click(boton("Ver los leads de esta búsqueda"));
 
-  expect(location.pathname).toBe("/tablero");
+  expect(location.pathname).toBe("/busquedas/b-1/leads");
 });
 
 test("si_ninguna_fuente_respondio_lo_dice_y_no_es_un_error_de_red", async () => {
