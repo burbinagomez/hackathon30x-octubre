@@ -73,7 +73,7 @@
 
 ## Fase 8: Revisión, corrida real y docs (Paso 7)
 
-- [ ] T070 [Paso 7] security revisa cumplimiento y secretos sobre el diff (parada).
+- [x] T070 [Paso 7] security revisa cumplimiento y secretos sobre el diff (parada).
 - [ ] T071 [Paso 7] Un envío real a una casilla nuestra, avisado antes; baja por el enlace desde esa casilla.
 - [x] T072 [P] [Paso 7] `docs/arquitectura-backend.md`: módulo `contacto`, puertos y `RUTAS_PUBLICAS`.
 

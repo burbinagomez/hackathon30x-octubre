@@ -14,11 +14,24 @@ hallazgo, "Medido" y "No verificado".
 | 3 | `reclamar` sobrescribe `base_legal` sin condición | `repositorio_contactos.py:49` | bajo | cumplimiento |
 | 4 | `smtp_usuario` es `str`, no `SecretStr`: sale en `repr(SettingsEmail)` y el test de repr no lo cubre | `backend/app/config.py:83`; `backend/tests/unit/test_config_email.py:55-59` | bajo | A04 |
 | 5 | Cupo diario recortado por decisión documentada: `enviar` repetido no tiene techo por día | `backend/app/modulos/contacto/aplicacion/envio.py:13`; `specs/007-email-respuestas/tasks.md:90` | info | cumplimiento |
-| 6 | El REVOKE a `anon`/`authenticated` solo corre si existen los dos roles | `supabase/migrations/0008_contactos.sql:46-48` | info | A02 |
+| 6 | El REVOKE a `anon`/`authenticated` solo corre si existen los dos roles | `supabase/migrations/0009_contactos.sql:46-48` | info | A02 |
 | 7 | GET con token firmado de un contacto inexistente responde 200; POST responde 404 | `backend/app/api/baja.py:26-31` vs `:34-38` | info | A01 |
 | 8 | El flujo real de `enviar` es inalcanzable hoy: el armado Postgres lanza `NotImplementedError` | `backend/app/cli.py:128-130` | info | alcance |
 
 0 críticos, 0 altos, 1 medio, 3 bajos, 4 info.
+
+## Estado después de los arreglos
+
+| # | Estado | Commit |
+|---|--------|--------|
+| 1 | Arreglado: la guarda de modo real hace GET a `API_BASE_URL/baja/<token>` con un token firmado por la `BAJA_SECRET` local y exige 200 | 401e05a |
+| 2 | Arreglado: solo la primera baja anexa a `solicitudes` | d5d1043 |
+| 3 | Arreglado: `COALESCE(base_legal, :bl)` | d5d1043 |
+| 4 | Arreglado: `smtp_usuario` es `SecretStr` y el test de repr lo cubre | d5d1043 |
+| 5 | Abierto, documentado en el PR | — |
+| 6 | Abierto, documentado en el PR | — |
+| 7 | Se mantiene a propósito: el GET no muta ni expone datos, y la guarda del #1 depende de ese 200 | — |
+| 8 | Arreglado: `LeadsContactablesPostgres` y `_armar_envio_postgres`, con e2e de la CLI en modo prueba | 2b9a0ce |
 
 ## Hallazgos
 
