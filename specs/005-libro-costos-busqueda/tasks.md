@@ -60,25 +60,28 @@
   - `::test_usuarios_tiene_rls`. **Mutación:** sin `ENABLE ROW LEVEL SECURITY`, o sin la política.
   - `::test_tenant_b_no_fusiona_con_lead_de_a`: como `app_rt` con el tenant B, un `UPDATE` de un lead de B con `fusionado_en` = id de un lead de A lanza `ForeignKeyViolation` (sqlstate `23503`). Rojo hoy, porque la FK simple de T005 no pasa por RLS y el `UPDATE` funciona. Control positivo: el mismo `UPDATE` hacia otro lead de B funciona. **Mutación:** FK simple.
 - [ ] T010 [MIN] [P] [Paso 1] **Rojo (advisor):** `backend/tests/integration/test_privilegios_supabase.py::test_anon_y_authenticated_sin_privilegios` (de la 002) suma `pg_views`, con el assert previo de que esté `v_tablero_fuentes`. **Mutación:** sacar `pg_views` de la unión (falla el assert previo), o `GRANT SELECT ON v_tablero_fuentes TO anon`.
+  - **LOW (security):** `::test_anon_y_authenticated_sin_execute_en_funciones_de_public`: recorre `pg_proc` de `public` y falla si `anon` o `authenticated` pueden ejecutar **cualquier** función (hoy `tenant_de_usuario` y las que vengan). **Mutación:** sacar el `REVOKE` de una función.
 - [ ] T011 [MIN] [Paso 1] **Verde:**
   - `security_invoker = true` en las 9 vistas;
   - la RLS de `usuarios`;
   - `FOREIGN KEY (tenant_id, fusionado_en) REFERENCES leads (tenant_id, id)`, que se apoya en `leads_tenant_id_id_key` (002 migración:41).
 - [ ] T012 [MIN] [Paso 1] **Rojo (security, RLS):** `backend/tests/integration/test_usuarios_repo.py`:
-  - `::test_app_rt_no_lee_usuarios_directo`. **Nace verde:** `app_rt` nunca tuvo `SELECT` sobre `usuarios`. Es una guarda. **Sabotaje:** `GRANT SELECT ON usuarios TO app_rt` → rojo, y se revierte.
+  - `::test_app_rt_no_lee_usuarios_directo`. **Nace verde:** `app_rt` nunca tuvo `SELECT` sobre `usuarios`. Es una guarda. **Sabotaje:** `GRANT SELECT ON usuarios TO app_rt` → rojo, y se revierte. **LOW (security):** el test fija `app.tenant_id` del tenant dueño de la fila y exige sqlstate `42501` (privilegio insuficiente), para que no pase por un error de `current_setting`.
   - `::test_tenant_de_usuario_devuelve_solo_ese_usuario`. Con usuarios de 2 tenants, `tenant_de_usuario(<auth_user_id de A>)` devuelve 1 fila (tenant de A, `idioma_usuario`, `idioma_tenant`) y un uuid inexistente devuelve 0. Rojo hoy: el stub `WHERE false` devuelve 0 filas. **Mutación:** sin el `WHERE u.auth_user_id = p_auth_user_id` → 2 filas.
   - `::test_fijar_idioma_no_cruza_tenants` **(Pulido)**. Control positivo con el tenant de A: `fijar_idioma(<uid de A>, 'en')` modifica 1 fila. Rojo hoy: el stub modifica 0. Después, con el tenant de B sobre el usuario de A, modifica 0. **Mutación:** sin `AND tenant_id = current_setting(...)` → B modifica 1 fila.
   - `::test_funcion_es_security_definer_con_search_path[tenant_de_usuario|fijar_idioma]`, con el `ALTER DEFAULT PRIVILEGES` en `supabase_simulado.sql` (ya está). **Mutación:** sin el `REVOKE` → `anon` tiene `EXECUTE`.
 - [ ] T012b [MIN] [P] [Paso 1] **Rojo (security):** `backend/tests/unit/acceso/test_verificar_token.py`, sin red: el test genera un par EC P-256 y le pasa al verificador un JWKS local.
   - `::test_token_valido_devuelve_sub`: devuelve el `sub` (uuid). Rojo hoy: el esqueleto devuelve un `sub` fijo distinto.
   - `::test_token_invalido_lanza[caso]` → `TokenInvalido`: vencido, sin `exp`, sin `sub`, `aud` distinto, `iss` distinto, firmado con otra clave, `alg=none`, HS256 firmado con la clave pública como secreto (confusión de algoritmo) y `kid` ausente del JWKS. Rojo hoy: el esqueleto no lanza (falla el `pytest.raises`). **Mutaciones:** `algorithms` con `HS256`; sin `audience`; sin `issuer`; sin `require`.
+  - **LOW (security):** `::test_sub_que_no_es_uuid_lanza[caso]` (`sub` ausente de forma de uuid, vacío, numérico): `TokenInvalido`, nunca un `ValueError` sin capturar. **Mutación:** `UUID(sub)` fuera del `try`.
 - [ ] T013 [MIN] [Paso 1] **Verde:**
   - `tenant_de_usuario` real (`SECURITY DEFINER` con `search_path`), el `REVOKE`/`GRANT` y el `DO` con el guard de `pg_roles`;
-  - `acceso/infraestructura/verificador_jwks.py` (`PyJWKClient`, `algorithms=["ES256","RS256"]`, `audience`, `issuer`, `require`); `pyjwt[crypto]` en `pyproject.toml`;
+  - `acceso/infraestructura/verificador_jwks.py` (`PyJWKClient`, `algorithms=["ES256","RS256"]`, `audience`, `issuer`, `require`); `pyjwt[crypto]` en `pyproject.toml`; **LOW:** `PyJWKClient(..., timeout=5)` (~5 s): un JWKS colgado no deja colgada la API.
   - `AUTH_JWKS_URL` y `AUTH_ISSUER` en `Settings`, `.env.example` y `docs/referencia-configuracion.md` si existe;
   - `backend/scripts/crear_usuario.py` con `getpass`: inserta la fila de `usuarios` (`--auth-user-id`, `--tenant`);
   - se borran `acceso/dominio/email.py` y `hmac_email`.
   - **El `.sql` final de la 0004 es el bloque aprobado de plan.md**, con `backend/tests/arquitectura/test_migracion_0004.py` que lo compara (rojo antes: el archivo es el esqueleto).
+  - **Procedimiento de baja** (LOW): se borra la fila de `usuarios` (la cuenta de Supabase se deshabilita aparte, paso humano); queda escrito en `docs/arquitectura-backend.md` (T049) y en el docstring de `crear_usuario.py`.
 
 **Checkpoint**: vistas, RLS, privilegios y usuarios verdes.
 
@@ -202,7 +205,7 @@
   - `limites_app` en `tarifas.yaml` (P11);
   - `nombre_es`/`nombre_en` en `actividades.yaml`;
   - el verde del tablero de naturales: `DISTINCT ON (fuente) … ORDER BY fuente, creado_en DESC` (la columna ya existe en la 002) sobre las búsquedas `completada`, o `IN ('completada','terminada')` según lo que decida el dueño en P1; **viene de 011 (D7)** (T049 de la 011).
-- [ ] T033 [MIN] [Paso 7] `EXCLUIDOS` de los tests de arquitectura de la 002 suma `repositorio_tablero.py` y `repositorio_usuarios.py` (P10). `uv run lint-imports` verde.
+- [ ] T033 [MIN] [Paso 7] `EXCLUIDOS` de los tests de arquitectura de la 002 suma `repositorio_tablero.py` y `repositorio_usuarios.py` (P10). `uv run lint-imports` verde. **LOW (security):** `usuarios` entra a `EXCLUIDAS` de `test_rls.py` con el motivo "`app_rt` no tiene privilegios; entra solo por `tenant_de_usuario`; su RLS la prueba `test_usuarios_tiene_rls`".
 
 ## Fase 9: Front (Paso 8)
 
@@ -226,6 +229,7 @@
   - `frontend/src/acceso/Login.test.tsx::login_con_supabase_pide_usuarios_me`: inicia sesión con `supabase-js` (mockeado) y llama a `GET /usuarios/me` con el access token. **Mutación:** llamar a la API sin el `Bearer`.
   - `frontend/src/acceso/Login.test.tsx::selector_sin_sesion_no_guarda`. **Mutación:** `PATCH` sin mirar la sesión.
   - `frontend/src/api/cliente.test.ts::un_401_lleva_al_login_y_borra_el_token`. **Mutación:** no borrar el token.
+  - **LOW (security):** `frontend/tests/arquitectura/sin_secretos.test.ts`: ningún archivo de `src/` ni el build contiene `sb_secret_` ni `service_role`; solo se permite `VITE_SUPABASE_PUBLISHABLE_KEY`. **Mutación:** pegar `sb_secret_x` en un archivo de `src/`.
 - [ ] T040 [MIN] [P] [Paso 8] **Rojo:** `frontend/src/busqueda/NuevaBusqueda.test.tsx`, los 6 tests de spec:251-257. **Mutación:** habilitar Buscar comparando el estimado en lugar del máximo; no invalidar la vista previa al cambiar un filtro.
 - [ ] T041 [MIN] [P] [Paso 8] **Rojo:** `frontend/src/tablero/Tablero.test.tsx`:
   - los 6 de spec:259-268. **Mutación:** formatear `null` como `0`; un texto de atribución hardcodeado.

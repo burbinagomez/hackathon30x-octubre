@@ -158,9 +158,9 @@ Va un único archivo, `supabase/migrations/NNNN_libro_costos_busqueda.sql` (el n
 
 `app/modelos.py` suma las columnas y `usuarios`.
 
-### DDL de la 0004 (PROPUESTO tras Supabase Auth, pendiente de aprobación)
+### DDL de la 0004 v2 (security OK, pendiente de aprobación del dueño)
 
-Basado en el aprobado: mismo `CHECK` de estados, mismas vistas, mismos `REVOKE` y mismos default privileges de funciones. Cambia solo `usuarios` y la función de acceso (`auth_user_id` sin FK, `tenant_de_usuario(uuid)`). Si el dueño lo aprueba, `test_migracion_0004.py` compara contra este bloque y el aprobado de abajo queda como histórico.
+Reemplaza al "PROPUESTO" anterior. Basado en el aprobado: mismo `CHECK` de estados, mismas vistas y `REVOKE`; cambia `usuarios` (`auth_user_id`, sin FK) y la función de acceso `tenant_de_usuario(uuid)`, y suma el `REVOKE` global de `EXECUTE` a `PUBLIC` en funciones nuevas. **No está en `supabase/migrations/`** hasta el OK del dueño y las enmiendas. Cuando se apruebe, `test_migracion_0004.py` compara el archivo con este bloque.
 
 ```sql
 -- 0004: libro de costos y búsqueda [MIN]. SQL a mano. Corre como postgres (dueño). Va después de la 0003.
@@ -228,6 +228,10 @@ CREATE VIEW public.v_atribuciones WITH (security_invoker = true) AS
   WHERE EXISTS (SELECT 1 FROM public.lead_fuentes lf WHERE lf.fuente = a.fuente);
 
 GRANT SELECT ON public.v_tablero_fuentes, public.v_atribuciones TO app_rt;
+
+-- El EXECUTE a PUBLIC de las funciones nuevas es un default GLOBAL de Postgres: un ALTER DEFAULT PRIVILEGES
+-- ... IN SCHEMA no lo puede sacar, y anon/authenticated lo heredan por PUBLIC. Se cierra para todo lo que cree postgres.
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 
 -- Roles de Supabase. Supabase da EXECUTE en funciones nuevas de public a anon/authenticated por default
 -- privileges; la 0002 solo cerró TABLES y SEQUENCES. Solo si existen (en vanilla no hay nada que revocar).
@@ -360,7 +364,7 @@ $$;
 |---|---|---|
 | `CLAUDE.md:23` | "Postgres en Supabase (solo Postgres: sin Auth, Storage, Edge Functions ni Data API sobre `public`)" | Pasa a usar Auth. Storage, Edge Functions y Data API siguen apagados. |
 | `.specify/memory/constitution.md:30` (V) | "Ninguna key de Supabase (anon, service_role, publishable, secret) existe en el entorno de `api` ni de `web`: la app no arranca si la ve." | `supabase-js` en el front necesita `VITE_SUPABASE_URL` y la publishable key. Enmienda mínima: la publishable key se permite **solo en `web`**; `service_role`, secret y todo lo de Supabase en `api` siguen prohibidos. |
-| `.specify/memory/constitution.md:3` | Cabecera con las versiones (1.2.0 "Postgres en Supabase") | La enmienda sube la versión (1.5.0). |
+| `.specify/memory/constitution.md:3` | Cabecera con las versiones (1.2.0 "Postgres en Supabase") | La enmienda cambia un principio (V) y el alcance de Supabase: es MAJOR, versión 2.0.0. |
 | `.specify/memory/constitution.md:22` (III) | "`anon` y `authenticated` no tienen privilegios sobre tablas de `public`" | Sigue valiendo: la api entra como `app_rt`, nunca con el rol del token. No es conflicto, pero Auth hace que `authenticated` exista de verdad: `test_privilegios_supabase` pasa a ser más importante. |
 | `.specify/memory/constitution.md:34` (VI) | "correos… se cifran en reposo" | Sin conflicto: el email del operador no está en nuestra base. |
 | `backend/app/config.py:10-11, 87-89` y `backend/tests/arquitectura/test_secrets.py:38-39` | `verificar_entorno` corta si ve `SUPABASE_*`, `sb_publishable_` o un JWT con rol `anon`/`service_role` en el entorno de `api` | Sin cambio **si** la api usa `AUTH_JWKS_URL` y `AUTH_ISSUER`. Si el dueño prefiere `SUPABASE_URL` en la api, hay que cambiar esa guarda. |
