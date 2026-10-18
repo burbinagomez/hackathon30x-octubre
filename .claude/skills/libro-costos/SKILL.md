@@ -19,7 +19,7 @@ class OperacionCosto:
     unidades: Decimal              # segundos, tokens, créditos, mensajes, minutos
     costo_unitario: Decimal        # desde config/tarifas.yaml
     moneda: str                    # "USD"
-    proveedor: str                 # "datos.gov.co" | "osm" | "croma" | "jev" | "anthropic" | "smtp" | "meta" | "dapta" | "humano"
+    proveedor: str                 # "datos.gov.co" | "osm" | "croma" | "web" | "jev" | "anthropic" | "smtp" | "meta" | "dapta" | "humano"
     fuente: str | None             # fuente de descubrimiento a la que se atribuye
     canal: str | None              # "email" | "whatsapp" | None
     lead_id: UUID | None           # None = costo de lote, se prorratea

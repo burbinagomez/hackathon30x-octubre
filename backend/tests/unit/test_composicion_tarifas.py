@@ -18,7 +18,9 @@ def test_dapta_null_es_none_no_cero(tmp_path):
     yaml_sintetico = tmp_path / "tarifas.yaml"
     yaml_sintetico.write_text(
         "computo_seg_usd: 0.0000070\n"
+        "web_fetch_usd: 0.00001\n"
         "croma: { usd_por_credito: 0.00099 }\n"
+        "jev: { in_usd_por_M: 0.042 }\n"
         "dapta: { usd_por_minuto: null }\n"
     )
 

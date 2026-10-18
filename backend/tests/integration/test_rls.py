@@ -147,7 +147,7 @@ def test_tenant_b_no_cuelga_filas_de_un_lead_de_a(rt, datos, tabla):
 
 
 # Vistas del libro. Con datos solo de A (la siembra trae costos, un lead y una lead_fuentes de osm_overpass).
-VISTAS = ["v_tablero_fuentes", "v_atribuciones", "v_cpql"]
+VISTAS = ["v_tablero_fuentes", "v_atribuciones", "v_leads_icp", "v_cpql"]
 
 
 def _filas_de_la_vista(rt, tenant, vista):

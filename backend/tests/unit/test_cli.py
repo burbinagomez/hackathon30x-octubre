@@ -1,13 +1,19 @@
-"""CLI `buscar`: sin red y sin Postgres. Los falsos viven en tests/, nunca en app/."""
+"""CLI `buscar` y `enriquecer`: sin red y sin Postgres. Los falsos viven en tests/, nunca en app/."""
+import base64
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
 import pytest
 
-from app.cli import Persistencia, main
-from app.modulos.descubrimiento.dominio.modelos import Actividad, EmpresaCruda, PaginaEmpresas
-from tests.falsos import FuenteFalsa, RegistroCostosFalso, RepositorioLeadsFalso
+from app.cli import Persistencia, _adaptadores_enriquecer, main
+from app.composicion import cargar_tarifas
+from app.config import Settings
+from app.modulos.descubrimiento.dominio.modelos import Actividad, EmpresaCruda, LeadParaEnriquecer, PaginaEmpresas
+from app.modulos.enriquecimiento.dominio.puertos import ContactoPublicado
+from app.modulos.enriquecimiento.infraestructura.adaptadores.jev_clasificador import JevClasificador
+from tests.falsos import (EnriquecedorFalso, FuenteFalsa, RegistroCostosFalso, RepositorioLeadsFalso,
+                          VerificadorFalso)
 
 AS_OF = datetime(2026, 10, 1, tzinfo=UTC)
 API_KEY = "clave-croma-falsa-9f3a"
@@ -158,3 +164,76 @@ def test_datos_gov_co_sin_variables_usa_los_defaults_del_adaptador(persistencia,
     (kwargs,) = _GrabaKwargs.armadas
     assert "url" not in kwargs
     assert kwargs.get("app_token") is None
+
+
+# --- enriquecer (T030) ---
+
+TELEFONO = "+57 601 555 0101"
+EMAIL = "ventas@andinos.invalid"
+
+
+class RepoParaEnriquecer(RepositorioLeadsFalso):
+    def __init__(self, leads):
+        super().__init__()
+        self.pendientes = list(leads)
+        self.guardados = {}
+
+    def sin_enriquecer(self, busqueda_id):
+        return [lead for lead in self.pendientes if lead.id not in self.guardados]
+
+    def guardar_enriquecimiento(self, lead_id, r):
+        self.guardados[lead_id] = r
+
+
+def _lead_con_web():
+    return LeadParaEnriquecer(id=uuid4(), tipo_titular="juridica", nombre="Transportes Andinos", ciudad="Bogotá",
+                              web="andinos.invalid", actividad="4923", descripcion_icp="transporte de carga")
+
+
+def _enriquecer(persistencia, argv=None):
+    def adaptadores(ajustes, costos, tarifas):
+        sitio = {"andinos.invalid": ContactoPublicado((EMAIL,), ((TELEFONO, "sitio_web"),), "ok")}
+        return VerificadorFalso(costos), EnriquecedorFalso(costos, sitio), None
+    argv = argv or ["enriquecer", "--tenant", str(uuid4()), "--busqueda", str(uuid4())]
+    return main(argv, persistencia=persistencia, adaptadores=adaptadores)
+
+
+def test_enriquecer_imprime_solo_conteos_sin_contacto(entorno, capsys):
+    persistencia = Persistencia(repo=RepoParaEnriquecer([_lead_con_web()]), costos=RegistroCostosFalso())
+    codigo = _enriquecer(persistencia)
+    captura = capsys.readouterr()
+    salida = captura.out + captura.err
+    assert codigo == 0
+    assert "procesados 1 · contactables 1 · clasificados 0 · sin_clasificar 1 · cortado no" in captura.out
+    assert TELEFONO not in salida and EMAIL not in salida and "andinos" not in salida.lower()
+    assert len(persistencia.repo.guardados) == 1
+
+
+def test_enriquecer_sin_tenant_falla(entorno, capsys):
+    persistencia = Persistencia(repo=RepoParaEnriquecer([_lead_con_web()]), costos=RegistroCostosFalso())
+    assert _enriquecer(persistencia, ["enriquecer", "--busqueda", str(uuid4())]) != 0
+    assert persistencia.repo.guardados == {}
+
+
+def test_sin_typesafe_api_key_no_hay_clasificador(entorno, monkeypatch):
+    monkeypatch.setenv("CIFRADO_KEY", base64.b64encode(b"k" * 32).decode())
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    monkeypatch.setenv("TYPESAFE_URL", "https://jev.invalido/clasificar")
+    *_, clasificador = _adaptadores_enriquecer(Settings(), RegistroCostosFalso(), cargar_tarifas())
+    assert clasificador is None
+
+
+def test_con_typesafe_api_key_y_url_arma_jev(entorno, monkeypatch):
+    monkeypatch.setenv("CIFRADO_KEY", base64.b64encode(b"k" * 32).decode())
+    monkeypatch.setenv("TYPESAFE_API_KEY", "clave-jev-falsa-4b2e")
+    monkeypatch.setenv("TYPESAFE_URL", "https://jev.invalido/clasificar")
+    *_, clasificador = _adaptadores_enriquecer(Settings(), RegistroCostosFalso(), cargar_tarifas())
+    assert isinstance(clasificador, JevClasificador)
+    assert "clave-jev-falsa-4b2e" not in repr(vars(clasificador))
+
+
+def test_verificador_bloqueado_no_asciende_a_juridica(entorno, monkeypatch):
+    # P1 abierto: ascender sin consultar pasaría el nombre de una persona natural a claro.
+    monkeypatch.setenv("CIFRADO_KEY", base64.b64encode(b"k" * 32).decode())
+    verificador, *_ = _adaptadores_enriquecer(Settings(), RegistroCostosFalso(), cargar_tarifas())
+    assert verificador.verificar(uuid4(), "doña rosa gomez", None).tipo_titular == "desconocido"
