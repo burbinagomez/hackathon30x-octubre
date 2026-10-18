@@ -1,10 +1,13 @@
 from pathlib import Path
 
 import pytest
+import yaml
 
 from app.modulos.descubrimiento.aplicacion.registro import cargar_registro
 from app.modulos.descubrimiento.dominio.errores import RegistroInvalido
 from app.modulos.descubrimiento.infraestructura.adaptadores import catalogo
+
+ROJO_T040 = pytest.mark.xfail(strict=True, raises=AssertionError, reason="rojo T038/T043; verde en T040")
 
 FUENTES_YAML = Path(__file__).resolve().parents[3] / "config" / "fuentes.yaml"
 
@@ -98,3 +101,16 @@ def test_osm_overpass_carga_con_el_catalogo_real():
     registro = cargar_registro(FUENTES_YAML, catalogo)
     assert "osm_overpass" in registro.fuentes
     assert "osm_overpass" not in registro.sin_implementacion
+
+
+@ROJO_T040
+def test_datos_gov_co_rues_del_yaml_real_se_carga():
+    """Conectada por config (`habilitado: true`): cargada, con implementación y con el dataset de la spec."""
+    registro = cargar_registro(FUENTES_YAML, catalogo)
+    entrada = yaml.safe_load(FUENTES_YAML.read_text())["fuentes_descubrimiento"]["datos_gov_co_rues"]
+
+    assert "datos_gov_co_rues" in registro.fuentes
+    assert "datos_gov_co_rues" not in registro.sin_implementacion
+    assert entrada["dataset"] == "c82u-588k"
+    assert entrada["filtros"] == ["ciiu", "departamento"]
+    assert entrada["licencia"] == "CC-BY-SA-4.0"
