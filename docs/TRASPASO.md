@@ -84,6 +84,10 @@ El 5433 está ocupado por otro proyecto: no lo toques.
 
 ## Reglas que no se negocian
 
+- **Proceso para agilizar (cambio del dueño, 2026-10-17):**
+  - El lead corre TDD con rojo real, pero solo los tests de su slice contra su propio Postgres. No corre suite completa, `lint-imports`, front, audits ni `docker build`: eso lo corre el CI.
+  - Antes de pushear no se vuelven a correr las suites. El orden es: `fetch` → `merge origin/main` (si hay conflictos, se para y se resuelven a mano) → tests de la slice tocada → push sin `--force`. El CI es el gate completo; si algo falla ahí, se arregla en la rama.
+  - Se mantiene: el advisor revisa los rojos antes del Verde, y el security revisa cada PR mientras falte el secret `ANTHROPIC_API_KEY`.
 - **Nada sin spec:** no se desarrolla nada sin `specs/NNN-.../spec.md`.
 - **TDD con rojo real:** el test falla primero por assert. No sirve que falle por import ni por `NotImplementedError`. Si se marca, va `xfail(strict=True, raises=AssertionError)`. Un test que nace verde necesita un sabotaje con nombre que lo ponga en rojo.
 - **Aislamiento por tenant:** RLS con `app.tenant_id` y FKs compuestas `(tenant_id, x_id)`. El `tenant_id` sale del contexto, nunca del input.
