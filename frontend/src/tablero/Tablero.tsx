@@ -12,7 +12,7 @@ const COLUMNAS = [
 function Fila({ fila, total = false }: { fila: FilaTablero; total?: boolean }) {
   const { t } = useTranslation();
   return (
-    <tr>
+    <tr className={total ? "total" : undefined}>
       <td>{total ? t("tablero.total") : t(`fuentes.${fila.fuente}`)}</td>
       <td>{entero(fila.encontrados)}</td>
       <td>{entero(fila.unicos)}</td>
@@ -30,15 +30,24 @@ function Fila({ fila, total = false }: { fila: FilaTablero; total?: boolean }) {
 export default function Tablero() {
   const { t } = useTranslation();
   const [datos, setDatos] = useState<DatosTablero | null>(null);
+  const [fallo, setFallo] = useState(false);
 
   useEffect(() => {
-    obtenerTablero().then(setDatos).catch(() => undefined);
+    obtenerTablero().then(setDatos).catch(() => setFallo(true));
   }, []);
 
-  if (!datos) return null;
+  if (!datos) {
+    return (
+      <main className="pantalla pantalla-ancha">
+        <h1>{t("tablero.titulo")}</h1>
+        {fallo && <p role="alert" className="error">{t("tablero.error")}</p>}
+      </main>
+    );
+  }
   return (
-    <main>
+    <main className="pantalla pantalla-ancha">
       <h1>{t("tablero.titulo")}</h1>
+      <div className="tabla-scroll">
       <table>
         <thead>
           <tr>
@@ -50,10 +59,13 @@ export default function Tablero() {
           <Fila fila={datos.total} total />
         </tbody>
       </table>
-      <p>{t("tablero.costo_evals", { monto: moneda(datos.costo_evals) })}</p>
-      <p>{t("tablero.revisiones_pendientes", { n: entero(datos.revisiones_pendientes) })}</p>
+      </div>
+      <div className="metricas">
+        <p className="metrica">{t("tablero.costo_evals", { monto: moneda(datos.costo_evals) })}</p>
+        <p className="metrica">{t("tablero.revisiones_pendientes", { n: entero(datos.revisiones_pendientes) })}</p>
+      </div>
       <h2>{t("tablero.cobertura")}</h2>
-      <ul>
+      <ul className="lista">
         {datos.cobertura.map((c) => (
           <li key={c.pais}>{c.pais}: {c.fuentes.map((f) => t(`fuentes.${f}`)).join(", ")}</li>
         ))}

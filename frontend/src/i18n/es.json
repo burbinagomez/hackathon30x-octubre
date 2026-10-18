@@ -12,6 +12,9 @@
     "pais": "La fuente no cubre este país",
     "sin_geografia": "La fuente necesita un departamento o ciudad"
   },
+  "config": {
+    "incompleta": "Configuración incompleta"
+  },
   "salud": {
     "estado": "API: {{api}} · DB: {{db}}"
   },
@@ -71,7 +74,8 @@
     "cobertura": "Cobertura por país",
     "revisiones_pendientes": "Revisiones pendientes: {{n}}",
     "atribucion": "Atribución de datos",
-    "desperdicio_real": "Desperdicio (real)"
+    "desperdicio_real": "Desperdicio (real)",
+    "error": "No se pudo cargar el tablero. Probá de nuevo."
   },
   "idioma": {
     "etiqueta": "Idioma",

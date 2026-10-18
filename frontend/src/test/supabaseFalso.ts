@@ -23,7 +23,8 @@ export const auth = {
   }),
 };
 
-export const moduloFalso = { createClient: () => ({ auth }) };
+export const createClient = vi.fn(() => ({ auth }));
+export const moduloFalso = { createClient };
 
 export function reiniciarSupabase() {
   estado.sesion = null;
@@ -32,4 +33,5 @@ export function reiniciarSupabase() {
   auth.getSession.mockClear();
   auth.signInWithPassword.mockClear();
   auth.signOut.mockClear();
+  createClient.mockClear();
 }

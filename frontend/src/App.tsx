@@ -1,6 +1,7 @@
 import { useEffect, useState, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 import Login from "./acceso/Login";
+import { configuracionValida } from "./api/supabase";
 import NuevaBusqueda from "./busqueda/NuevaBusqueda";
 import { aplicarIdioma } from "./compartido/idioma";
 import SelectorIdioma from "./compartido/SelectorIdioma";
@@ -27,11 +28,12 @@ function Salud() {
       .catch(() => setEstado({ api: "error", db: "error" }));
   }, []);
 
-  return <div>{t("salud.estado", { api: estado.api, db: estado.db })}</div>;
+  return <div className="salud">{t("salud.estado", { api: estado.api, db: estado.db })}</div>;
 }
 
 /** Raíz de composición: el router mínimo (por pathname y popstate) y el idioma de arranque. */
 export default function App() {
+  const { t } = useTranslation();
   const [ruta, setRuta] = useState(location.pathname);
   // Antes del primer render: la elección guardada tiene que ganar sin un parpadeo en otro idioma.
   useState(aplicarIdioma);
@@ -42,12 +44,17 @@ export default function App() {
     return () => window.removeEventListener("popstate", alNavegar);
   }, []);
 
+  if (!configuracionValida) return <main className="pantalla pantalla-tarjeta aviso" role="alert">{t("config.incompleta")}</main>;
   const Pantalla = RUTAS[ruta];
   if (!Pantalla) return <Salud />;
   return (
     <>
       {/* Login lleva su propio selector. */}
-      {ruta !== "/login" && <SelectorIdioma />}
+      {ruta !== "/login" && (
+        <div className="barra">
+          <SelectorIdioma />
+        </div>
+      )}
       <Pantalla />
     </>
   );
