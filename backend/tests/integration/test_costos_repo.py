@@ -156,7 +156,6 @@ def test_socrata_descarga_escribe_fila_en_costos(rt, admin, tenant):
     assert tipo_costo == "numeric"
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="rojo hasta T018")
 def test_juez_escribe_filas_llm_en_costos(rt, admin, tenant):
     """Principio VIII para el juez: JuezClaude (Messages API falsa) contra el libro real como app_rt deja 2 filas llm."""
     lote = uuid4()

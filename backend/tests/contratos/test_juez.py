@@ -1,6 +1,6 @@
 """Suite de contrato del puerto `Juez`: todo adaptador la pasa.
 
-`[claude]` corre con la Messages API falsa (sin red) y está en rojo contra el stub de T013 hasta T018.
+`[claude]` corre con la Messages API falsa (sin red); nació rojo contra el stub de T013 y está verde desde T018.
 `[falso]` nace verde: `JuezFalso` existe desde T009 y no se reimplementa acá.
 `test_registra_costo` es solo `[claude]`: `JuezFalso` es la exclusión cerrada de test_costos_por_adaptador.py.
 """
@@ -11,8 +11,6 @@ from evals.jueces.puerto import Veredicto
 from tests.anthropic_falso import CASO, juez
 from tests.falsos import RegistroCostosFalso
 
-ROJO_T018 = pytest.mark.xfail(strict=True, raises=AssertionError, reason="rojo hasta T018")
-
 
 def _construir(nombre, costos):
     if nombre == "claude":
@@ -20,7 +18,7 @@ def _construir(nombre, costos):
     return JuezFalso({CASO["id"]: [0.8]})  # sabotaje probado: [1.5] -> "assert 1.5 <= 1.0"
 
 
-@pytest.mark.parametrize("nombre", [pytest.param("claude", marks=ROJO_T018), "falso"])
+@pytest.mark.parametrize("nombre", ["claude", "falso"])
 def test_devuelve_probabilidad_en_rango(nombre):
     veredicto = _construir(nombre, RegistroCostosFalso()).juzgar("encaje_icp", CASO)
 
@@ -29,7 +27,7 @@ def test_devuelve_probabilidad_en_rango(nombre):
     assert isinstance(veredicto.razon, str)
 
 
-@pytest.mark.parametrize("nombre", [pytest.param("claude", marks=ROJO_T018)])
+@pytest.mark.parametrize("nombre", ["claude"])
 def test_registra_costo(nombre):
     costos = RegistroCostosFalso()
     _construir(nombre, costos).juzgar("encaje_icp", CASO)
