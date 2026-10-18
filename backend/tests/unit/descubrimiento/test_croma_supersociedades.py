@@ -212,3 +212,25 @@ def test_200_que_no_parsea_cobra_el_credito_y_no_filtra_el_cuerpo(cuerpo):
 
     assert [(f.unidades, f.costo_unitario) for f in costos.filas] == [(Decimal(1), TARIFA)]  # Croma cobró el 200
     assert "foo" not in str(error.value) and "clave-secreta" not in str(error.value)
+
+
+# Forma real de Croma (curl de Daniel, 2026-10-18): todo va dentro de "data" y la lista se llama "results".
+REAL_VACIO = {"data": {"as_of": "2026-10-12T10:04:44.075Z", "total": 0, "total_is_exact": True, "page": 1,
+                       "per_page": 5, "total_pages": 0, "count": 0, "fiscal_year": 2025, "results": []}}
+
+
+def test_la_forma_real_vacia_no_es_respuesta_ilegible():
+    a, _, _ = _con_respuestas(httpx.Response(200, json=REAL_VACIO))
+
+    pagina = a.buscar(CRITERIOS, 1)
+
+    assert (pagina.total, pagina.empresas) == (0, ())
+
+
+def test_la_forma_real_con_resultados_mapea_igual():
+    real = {"data": {"total": 2015, "results": EMPRESAS["data"]}}
+    a, _, _ = _con_respuestas(httpx.Response(200, json=real))
+
+    pagina = a.buscar(CRITERIOS, 1)
+
+    assert pagina.total == 2015 and [e.id_fiscal for e in pagina.empresas] == ["900123456"]
