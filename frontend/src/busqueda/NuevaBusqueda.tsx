@@ -148,7 +148,6 @@ export default function NuevaBusqueda() {
         </select>
       </Campo>
       {tope}
-      <p className="nota">{t("busqueda.tope_nota")}</p>
       <Campo id="mensaje" etiqueta={t("busqueda.mensaje")}>
         <textarea id="mensaje" value={form.mensaje} onChange={(e) => cambiar("mensaje", e.target.value)} />
       </Campo>

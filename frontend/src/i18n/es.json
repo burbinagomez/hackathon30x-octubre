@@ -40,13 +40,14 @@
     "ninguna_fuente_cubre": "Ninguna fuente cubre esta búsqueda.",
     "costo_estimado": "Costo estimado: {{monto}}",
     "costo_maximo": "Costo máximo: {{monto}}",
+    "dentro_del_tope": "Dentro del tope: la búsqueda puede correr.",
+    "fuera_del_tope": "Fuera del tope: sube el tope o acota la búsqueda.",
     "tope_linea": "Tope: {{monto}}",
     "creditos_restantes": "Créditos de Croma restantes este mes: {{n}}",
     "requests_restantes": "Consultas de Croma restantes en 24 h: {{n}}",
     "descartadas": "Fuentes descartadas",
     "ignorados": "se ignora: {{lista}}",
-    "error": "No se pudo completar la operación. Probá de nuevo.",
-    "tope_nota": "Se guarda; todavía no se aplica."
+    "error": "No se pudo completar la operación. Probá de nuevo."
   },
   "fuentes": {
     "croma_supersociedades_co": "Supersociedades (Croma)",
