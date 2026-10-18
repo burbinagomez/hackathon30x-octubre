@@ -134,6 +134,7 @@ def test_datos_del_caso_van_delimitados():
 @ROJO_T018
 def test_header_lleva_exactamente_la_key(monkeypatch):
     # La key sale del constructor, nunca del entorno: con otra en ANTHROPIC_API_KEY, el header no cambia.
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)  # primera vuelta: entorno sin key, de verdad
     for entorno in (None, "sk-ant-test-OTRA"):
         if entorno:
             monkeypatch.setenv("ANTHROPIC_API_KEY", entorno)
@@ -155,28 +156,30 @@ def _cadena(e: BaseException) -> str:
 
 @ROJO_T018
 def test_error_http_no_filtra_la_key():
-    capturados = []
+    costos, capturados = RegistroCostosFalso(), []
     http = httpx.Response(401, json={"type": "error", "error": {"type": "authentication_error",
                                                                 "message": f"invalid x-api-key {CLAVE_FALSA}"}})
-    error = _lanza(juez(RegistroCostosFalso(), capturados, http=http), Exception)
+    # Tipo concreto: httpx.HTTPStatusError (raise_for_status). Si T018 elige otro, se cambia acá y en plan.md.
+    error = _lanza(juez(costos, capturados, http=http), httpx.HTTPStatusError)
 
-    assert error is not None, "un 401 tiene que lanzar"
+    assert error is not None, "un 401 tiene que lanzar httpx.HTTPStatusError"
     assert len(capturados) == 1
+    assert costos.filas == []  # un 401 no trae usage: no hay tokens que registrar
     assert CLAVE_FALSA not in _cadena(error)
 
 
 @ROJO_T018
 def test_salida_no_filtra_la_key(capsys, caplog):
-    caplog.set_level(logging.DEBUG, logger="httpx")
-    caplog.set_level(logging.DEBUG, logger="httpcore")
+    caplog.set_level(logging.DEBUG)  # root: cualquier logger (httpx, httpcore, el del juez)
     capturados = []
     juez(RegistroCostosFalso(), capturados).juzgar("encaje_icp", CASO)
-    lanzo = _lanza(juez(RegistroCostosFalso(), capturados, **INVALIDAS["texto"])) is not None
+    error = _lanza(juez(RegistroCostosFalso(), capturados, **INVALIDAS["texto"]))
 
-    assert len(capturados) == 2
-    assert lanzo
     out, err = capsys.readouterr()
-    assert CLAVE_FALSA not in out + err + caplog.text
+    assert CLAVE_FALSA not in out + err + caplog.text  # primero: el sabotaje "juez loguea la key" cae acá
+    assert len(capturados) == 2
+    assert error is not None
+    assert CLAVE_FALSA not in _cadena(error)
 
 
 def test_repr_no_muestra_la_key():

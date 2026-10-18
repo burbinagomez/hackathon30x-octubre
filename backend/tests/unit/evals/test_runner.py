@@ -247,7 +247,9 @@ def test_salida_invalida_falla_el_caso_con_motivo(tmp_path, correr):
     (ENCAJE, _dataset({**_caso("a"), "etiqueta": None})),
     (CALIBRACION, [{**_mensaje("m-a"), "pertinente": None}]),
     (ENCAJE, _dataset({k: v for k, v in _caso("a").items() if k != "etiqueta"})),
-    (ENCAJE, _dataset()),  # casos: [] → nace verde; sabotaje "sin chequeo de vacío": borrar el `sin casos` de _preparar
+    # casos: [] → nace verde; sabotaje "sin chequeo de vacío" (borrar el `sin casos` de _preparar) da rojo
+    # por ZeroDivisionError en _correr, no por assert: main() explota antes de devolver un código.
+    (ENCAJE, _dataset()),
 ], ids=["etiqueta", "pertinente", "etiqueta_ausente", "casos_vacios"])
 def test_etiqueta_invalida_es_config_invalida(tmp_path, correr, nombre, datos):
     config = _config(tmp_path, {nombre: {"datos": datos}})
