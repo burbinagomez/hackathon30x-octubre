@@ -79,13 +79,16 @@ class LeadParaEnriquecer:
 @dataclass(frozen=True)
 class ConstanciaTitular:
     """Evidencia de una verificación de titular contra un registro público, para `cumplimiento.solicitudes`.
-    Datos de la empresa (NIT, razón social, municipio), nunca contacto ni el nombre con que llegó el lead."""
+    Datos de la empresa (NIT, razón social, cámara, organización y estado de la matrícula), nunca contacto ni el nombre con que llegó el lead."""
     motivo: str
     fuente: str
     dataset: str
     nit: str | None = None
     razon_social: str | None = None
-    municipio: str | None = None
+    municipio_sede_camara: str | None = None  # el RUES no trae municipio: es la sede de la cámara de la matrícula
+    codigo_camara: str | None = None
+    organizacion_juridica: str | None = None
+    estado_matricula: str | None = None
     candidatos: int | None = None  # solo si fue ambiguo: cuántos NIT cumplían
     naturales_homonimas: int | None = None  # solo si una persona natural con ese nombre vuelve ambiguo el match
 

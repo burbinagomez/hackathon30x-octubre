@@ -51,6 +51,7 @@ def _armar(clave, tmp_path, modo):
 
 
 CLAVES = ["croma_rues_co", "rues_datos_gov_co"]
+ESPERADO_CON_MATCH = {"croma_rues_co": "desconocido", "rues_datos_gov_co": "juridica"}
 MODOS = ["match", "vacia", "caida", "timeout", "basura"]
 
 
@@ -101,6 +102,8 @@ def test_juridica_solo_con_match_unico_y_con_constancia_coherente(clave, modo, t
 
     r = verificador.verificar(uuid4(), NOMBRE_SECRETO, "Bogotá", "CO")
 
+    if modo == "match":  # incondicional: el stub falla cerrado y el real sube con un match único
+        assert r.tipo_titular == ESPERADO_CON_MATCH[clave]
     if r.tipo_titular == "juridica":
         assert r.motivo == "match_unico" and r.constancia is not None and r.constancia.nit
     else:

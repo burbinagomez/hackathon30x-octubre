@@ -62,7 +62,8 @@ def test_match_exacto_unico_en_la_misma_ciudad_es_juridica():
     assert (r.tipo_titular, r.motivo) == ("juridica", "match_unico")
     c = r.constancia
     assert (c.motivo, c.fuente, c.dataset) == ("match_unico", "datos_gov_co_rues", "c82u-588k")
-    assert (c.nit, c.razon_social, c.municipio) == ("900111222", "TRANSPORTES ANDINOS S.A.S.", "Bogotá")
+    assert (c.nit, c.razon_social, c.municipio_sede_camara) == ("900111222", "TRANSPORTES ANDINOS S.A.S.", "Bogotá")
+    assert (c.codigo_camara, c.organizacion_juridica, c.estado_matricula) == ("04", SAS, "ACTIVA")
 
 
 def test_el_nombre_y_la_ciudad_se_comparan_normalizados():

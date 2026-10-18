@@ -101,7 +101,8 @@ def test_match_unico_sube_a_juridica_y_deja_la_evidencia_en_cumplimiento(admin, 
     (entrada,) = _solicitudes(admin, lead)
     assert {k: v for k, v in entrada.items() if k != "ts"} == {
         "tipo": "paso_a_claro", "motivo": "match_unico", "fuente": "datos_gov_co_rues", "dataset": "c82u-588k",
-        "nit": "900111222", "razon_social": "TRANSPORTES ANDINOS S.A.S.", "municipio": "Bogotá"}
+        "nit": "900111222", "razon_social": "TRANSPORTES ANDINOS S.A.S.", "municipio_sede_camara": "Bogotá",
+        "codigo_camara": "04", "organizacion_juridica": SAS, "estado_matricula": "ACTIVA"}
     assert "ts" in entrada
     assert TELEFONO not in json.dumps(entrada) and "555" not in json.dumps(entrada)  # nunca el contacto
 

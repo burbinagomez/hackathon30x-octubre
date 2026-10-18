@@ -13,7 +13,7 @@ from app.modulos.costos.dominio.modelos import ContextoCosto
 from app.modulos.descubrimiento.dominio.errores import FuenteNoDisponible
 from app.modulos.descubrimiento.dominio.modelos import ConstanciaTitular
 from app.modulos.enriquecimiento.dominio.normalizar_titular import normalizar_ciudad, normalizar_nombre
-from app.modulos.enriquecimiento.dominio.puertos import BuscadorRazonSocialRues, VerificacionTitular
+from app.modulos.enriquecimiento.dominio.puertos import BuscadorRazonSocialRues, CoincidenciaRues, VerificacionTitular
 
 FUENTE = "datos_gov_co_rues"
 DATASET = "c82u-588k"
@@ -46,9 +46,9 @@ class RuesDatosGov:
         candidatas = list(busqueda.coincidencias)
         if busqueda.truncada:
             return _desconocido("ambiguo")
-        # NIT -> (razón social, municipio): varias matrículas del mismo NIT son una sola empresa. El servidor ya filtra
+        # Varias matrículas del mismo NIT son una sola empresa. El servidor ya filtra
         # activas y jurídicas; acá se revisa igual, y una natural que llegue con el mismo nombre en la misma ciudad se cuenta.
-        exactas: dict[str, tuple[str, str]] = {}
+        exactas: dict[str, tuple[CoincidenciaRues, str]] = {}  # NIT -> (fila, municipio)
         naturales_en_respuesta = 0
         for c in candidatas:
             municipio = self._municipios.get(c.camara or "")
@@ -59,7 +59,7 @@ class RuesDatosGov:
             if organizacion == "PERSONA NATURAL":
                 naturales_en_respuesta += 1
             elif organizacion and (c.estado_matricula or "").strip().upper() == "ACTIVA":
-                exactas.setdefault(c.nit, (c.razon_social, municipio))
+                exactas.setdefault(c.nit, (c, municipio))
         if naturales_en_respuesta:
             return VerificacionTitular("desconocido", "ambiguo", ConstanciaTitular(
                 "ambiguo", FUENTE, DATASET, naturales_homonimas=naturales_en_respuesta))
@@ -77,6 +77,8 @@ class RuesDatosGov:
         if naturales > 0:
             return VerificacionTitular("desconocido", "ambiguo", ConstanciaTitular(
                 "ambiguo", FUENTE, DATASET, naturales_homonimas=naturales))
-        (nit, (razon_social, municipio)), = exactas.items()
+        (nit, (c, municipio)), = exactas.items()
         return VerificacionTitular("juridica", "match_unico", ConstanciaTitular(
-            "match_unico", FUENTE, DATASET, nit=nit, razon_social=razon_social, municipio=municipio))
+            "match_unico", FUENTE, DATASET, nit=nit, razon_social=c.razon_social, municipio_sede_camara=municipio,
+            codigo_camara=c.camara, organizacion_juridica=c.organizacion_juridica.strip(),
+            estado_matricula=c.estado_matricula.strip().upper()))

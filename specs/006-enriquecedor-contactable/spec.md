@@ -181,16 +181,19 @@ Este slice corre `uv run python -m evals.run --eval encaje_icp` con el `jev` rea
 - ninguno cumple, o el nombre no es exacto (`sin_match`);
 - el lead no trae ciudad (`sin_ciudad`; no se consulta ni se cobra);
 - la ciudad no coincide, o la cámara del candidato no tiene municipio en `config/camaras_co.yaml` (`sin_match`);
-- la búsqueda devuelve el tope de 100 filas (`ambiguo`: la respuesta pudo cortar un segundo candidato);
+- el servidor devolvió el tope de 100 filas **crudas** (`ambiguo`: pudo cortar un segundo candidato; cuenta aunque el cliente descarte alguna por inválida);
+- existe al menos una **persona natural** matriculada con ese nombre en la cámara de la ciudad (`ambiguo`): el servidor las excluye de la búsqueda, así que se cuentan en un segundo request de solo `count(*)` (mismo `LIKE`, `organizacion_juridica = 'PERSONA NATURAL'`, `codigo_camara` de la ciudad; nunca se traen nombres de personas) que solo se hace si ya hay un match único y que también escribe su costo;
+- el lead no es de CO (`pais_no_soportado`; sin request ni costo): el RUES es colombiano y una ciudad que coincida en otro país no prueba nada;
+- la matrícula del candidato no es `ACTIVA` o su organización no viene, o es `PERSONA NATURAL` (el verificador lo revisa aunque el servidor ya filtre; una natural que llegue con el mismo nombre y ciudad cuenta como homónima y deja `ambiguo`);
 - la fuente falla o agota el timeout (`fuente_no_disponible`): el resultado es `desconocido`, **no** frena el enriquecimiento del resto.
 
 **Normalización (la misma para nombre y ciudad).** Mayúsculas, sin tildes, sin puntuación (los puntos se borran: `S.A.S.` -> `SAS`; el resto de la puntuación separa palabras), espacios colapsados.
 - **Sufijos societarios (`SAS`, `SA`, `LTDA`, `LTD`, `EU`, `SCA`, `SCS`) al final del nombre: SE IGNORAN** al comparar, en los dos lados. Razón: OSM casi nunca los trae ("Transportes Andinos") y el RUES siempre ("TRANSPORTES ANDINOS S.A.S."); sin ignorarlos no matchea ningún OSM real. Es seguro porque la unicidad se cuenta después: "X LTDA" y "X SAS" en la misma ciudad son dos NIT, y quedan `ambiguo`. Solo al final y repetidos (`X S.A.S. LTDA`); un nombre que quedaría vacío (`SAS`) no se consulta.
 - **Ciudad:** además se ignora un `D.C.` final (`Bogotá D.C.` = `Bogotá`).
 - El RUES (`c82u-588k`) **no trae municipio** (verificado en la 011): la "ciudad del RUES" es el `municipio_sede` de la cámara (`codigo_camara` -> `config/camaras_co.yaml`). Consecuencia consciente: un negocio de Chía registrado en la Cámara de Bogotá queda `desconocido`, y una ciudad cuya cámara no esté en el YAML nunca matchea. Menos cobertura, nunca un falso positivo.
-- La regla literal pide una sola empresa **en la misma ciudad**: otra empresa con el mismo nombre en una ciudad distinta no vuelve ambiguo el match.
+- La regla literal pide una sola empresa **en la misma ciudad**: otra empresa con el mismo nombre en una ciudad distinta **no cuenta como ambigüedad** y no impide el match. Es decisión del dueño ("nombre + ciudad"), no un descuido.
 
-**Evidencia en `cumplimiento`.** Toda verificación (también las que terminan `desconocido`) agrega una entrada a `cumplimiento.solicitudes` (sin DDL): `tipo` (`paso_a_claro` si sube, `verificacion_titular` si no), `motivo`, `fuente: datos_gov_co_rues`, `dataset: c82u-588k`, `ts` y, si hay match, `nit`, `razon_social` y `municipio`; si es `ambiguo`, `candidatos` (conteo). **Nunca** teléfono, email ni el nombre del lead.
+**Evidencia en `cumplimiento`.** Toda verificación (también las que terminan `desconocido`) agrega una entrada a `cumplimiento.solicitudes` (sin DDL): `tipo` (`paso_a_claro` si sube, `verificacion_titular` si no), `motivo`, `fuente: datos_gov_co_rues`, `dataset: c82u-588k`, `ts` y, si hay match, `nit`, `razon_social`, `municipio_sede_camara` (el RUES no trae municipio: es la sede de la cámara), `codigo_camara`, `organizacion_juridica` y `estado_matricula`; si es `ambiguo`, `candidatos` o `naturales_homonimas` (solo conteos). **Nunca** teléfono, email ni el nombre del lead.
 
 **Costos.** Cada request a datos.gov.co escribe `socrata_descarga` (segundos de cómputo a `computo_seg_usd`, valor de lista, igual que el descubrimiento de la 011), `proveedor='datos.gov.co'`, con `lead_id` set, **antes de devolver** y por intento. `fuente=NULL`: es costo de enriquecimiento, atribuido al lead y no a la fuente de descubrimiento (misma decisión de esta spec para `croma_consulta`, `web_fetch` y `jev_tokens`); el dataset queda en la evidencia.
 
@@ -204,4 +207,6 @@ Este slice corre `uv run python -m evals.run --eval encaje_icp` con el `jev` rea
 - `tests/contratos/test_verificador_titular.py`: suite de contrato del puerto `VerificadorTitular` sobre el registro (el stub y el real).
 - `tests/integration/test_enriquecimiento.py`: la evidencia queda en `cumplimiento`; la fuente caída de un lead no frena al siguiente; un lead OSM con teléfono que matchea queda contactable y aparece en `GET /calificaciones/exportar`.
 
-**Fuera del alcance:** ampliar `camaras_co.yaml` a las 58 cámaras (T054 de la 011); países distintos de CO; desambiguar por CIIU o dirección.
+**Riesgo para decidir por Daniel (no resuelto por código).** Una persona natural **sin matrícula mercantil** en el RUES cuyo nombre coincide con una SAS de la misma ciudad (p. ej. el comerciante informal "Juan Pérez" y la sociedad "JUAN PEREZ SAS") es indistinguible de la SAS con estos datos: el conteo de naturales solo ve a las matriculadas. Con la regla "nombre + ciudad" ese lead sube a `juridica` y se contacta, y el contacto sería de una persona natural (SIC 17-96489). El código no puede cerrarlo sin otro dato (dirección, CIIU, dominio del sitio contra la sociedad). Decisión pendiente: aceptar el riesgo residual, exigir un segundo dato (p. ej. dominio web) o limitar la regla a nombres que no parezcan de persona.
+
+**Fuera del alcance:** ampliar `camaras_co.yaml` a las 58 cámaras (T054 de la 011); países distintos de CO (el verificador los deja `pais_no_soportado`); desambiguar por CIIU o dirección.

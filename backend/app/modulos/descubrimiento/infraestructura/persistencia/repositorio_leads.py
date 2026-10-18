@@ -279,7 +279,9 @@ class RepositorioLeadsPostgres:
         if k is None:
             return {"tipo": "paso_a_claro", "motivo": "match_unico", "fuente": "croma_rues_co"} if claro else None
         entrada = {"tipo": "paso_a_claro" if claro else "verificacion_titular", "motivo": k.motivo, "fuente": k.fuente,
-                   "dataset": k.dataset, "nit": k.nit, "razon_social": k.razon_social, "municipio": k.municipio,
+                   "dataset": k.dataset, "nit": k.nit, "razon_social": k.razon_social, "municipio_sede_camara": k.municipio_sede_camara,
+                   "codigo_camara": k.codigo_camara, "organizacion_juridica": k.organizacion_juridica,
+                   "estado_matricula": k.estado_matricula,
                    "candidatos": k.candidatos, "naturales_homonimas": k.naturales_homonimas}
         return {clave: valor for clave, valor in entrada.items() if valor is not None}
 
