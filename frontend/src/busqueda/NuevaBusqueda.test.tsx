@@ -135,12 +135,19 @@ test("cambiar_un_filtro_invalida_la_vista_previa", async () => {
   expect(fila("OpenStreetMap")).toBeUndefined();
 });
 
-test("buscar_ejecuta_sin_body_y_lleva_al_tablero", async () => {
+test("buscar_ejecuta_sin_body_y_muestra_el_resultado_por_fuente_antes_de_ir_al_tablero", async () => {
   const ejecuciones: string[] = [];
   server.use(
     http.post("*/busquedas/:id/ejecutar", async ({ request, params }) => {
       ejecuciones.push(`${params.id}|${await request.text()}`);
-      return HttpResponse.json({ estado: "completada" });
+      return HttpResponse.json({
+        estado: "completada",
+        por_fuente: {
+          osm_overpass: { estado: "con_resultados", encontrados: 12 },
+          datos_gov_co_rues: { estado: "sin_resultados", encontrados: 0 },
+          croma_supersociedades_co: { estado: "no_disponible", encontrados: 0 },
+        },
+      });
     }),
   );
   await previsualizar();
@@ -148,8 +155,35 @@ test("buscar_ejecuta_sin_body_y_lleva_al_tablero", async () => {
 
   fireEvent.click(boton("Buscar"));
 
-  await waitFor(() => expect(location.pathname).toBe("/tablero"));
+  await waitFor(() => expect(fila("OpenStreetMap: 12 empresas")).toBeDefined());
+  expect(fila("RUES (datos.gov.co): sin resultados para este filtro")).toBeDefined();
+  expect(fila("Supersociedades (Croma): no disponible ahora")).toBeDefined();
   expect(ejecuciones).toEqual(["b-1|"]);
+  expect(location.pathname).not.toBe("/tablero"); // primero se lee el resultado
+  expect(boton("Buscar")).toBeDisabled(); // la búsqueda ya no es borrador: otro clic sería un 409
+
+  fireEvent.click(boton("Ver el tablero"));
+
+  expect(location.pathname).toBe("/tablero");
+});
+
+test("si_ninguna_fuente_respondio_lo_dice_y_no_es_un_error_de_red", async () => {
+  server.use(
+    http.post("*/busquedas/:id/ejecutar", () =>
+      HttpResponse.json({
+        estado: "error",
+        por_fuente: { osm_overpass: { estado: "no_disponible", encontrados: 0 } },
+      }),
+    ),
+  );
+  await previsualizar();
+  await waitFor(() => expect(boton("Buscar")).toBeEnabled());
+
+  fireEvent.click(boton("Buscar"));
+
+  await waitFor(() => expect(fila("OpenStreetMap: no disponible ahora")).toBeDefined());
+  expect(screen.getByText(es.ejecucion.ninguna_respondio)).toBeInTheDocument();
+  expect(screen.queryByText(es.busqueda.error)).not.toBeInTheDocument();
 });
 
 test("cambia_idioma", async () => {
@@ -366,10 +400,30 @@ test("la_ciudad_queda_deshabilitada_si_la_division_no_tiene_municipios", async (
 });
 
 test.each([["es", "Se guarda; todavía no se aplica"], ["en", "Saved; not enforced yet"]])(
-  "el_tope_avisa_que_se_guarda_pero_todavia_no_se_aplica[%s]",
+  "el_tope_ya_no_avisa_que_no_se_aplica[%s]",
   async (idioma, aviso) => {
     await i18n.changeLanguage(idioma);
     await montarGeografia();
-    expect(screen.queryByText(aviso, { exact: false })).toBeInTheDocument();
+    expect(screen.queryByText(aviso, { exact: false })).not.toBeInTheDocument();
   },
 );
+
+const fino = (idioma: string, valor: string) =>
+  new Intl.NumberFormat(idioma, { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 6 })
+    .format(Number(valor)).replace(/\s/g, " ");
+
+test("la_vista_previa_muestra_costo_maximo_con_fracciones_de_centavo_y_dentro_del_tope", async () => {
+  await previsualizar(respuestaVistaPreviaMinima({ costo_maximo_usd: "0.00126", dentro_del_tope: true }));
+
+  await waitFor(() => expect(screen.queryByText(`Costo máximo: ${fino("es", "0.00126")}`)).toBeInTheDocument());
+  expect(screen.queryByText(es.busqueda.dentro_del_tope)).toBeInTheDocument();  // y no "$0.00"
+  expect(boton("Buscar")).toBeEnabled();
+});
+
+test("la_vista_previa_fuera_del_tope_lo_dice_y_deshabilita_buscar", async () => {
+  await previsualizar(respuestaVistaPreviaMinima({ costo_maximo_usd: "0.00126", dentro_del_tope: false }), "0.0001");
+
+  await waitFor(() => expect(screen.queryByText(es.busqueda.fuera_del_tope)).toBeInTheDocument());
+  expect(screen.queryByText(es.busqueda.dentro_del_tope)).not.toBeInTheDocument();
+  expect(boton("Buscar")).toBeDisabled();
+});

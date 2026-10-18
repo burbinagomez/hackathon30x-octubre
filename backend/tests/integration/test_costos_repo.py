@@ -212,3 +212,24 @@ def test_gasto_busqueda_sin_filas_es_cero(rt, tenant):
 
     assert type(gasto) is Decimal
     assert gasto == Decimal("0")
+
+
+def test_croma_consulta_escribe_fila_en_costos_y_entra_al_gasto_del_lote(rt, tenant):
+    from app.modulos.descubrimiento.infraestructura.adaptadores.croma_supersociedades import CromaSupersociedadesCo
+
+    meta = cargar_registro(BACKEND / "config" / "fuentes.yaml",
+                           {"croma_supersociedades_co": CromaSupersociedadesCo}).fuentes["croma_supersociedades_co"][1]
+    lote, libro = uuid4(), PostgresCostos(rt, tenant)
+    adaptador = CromaSupersociedadesCo(
+        meta=meta, registro_costos=libro, transporte=httpx.MockTransport(lambda r: httpx.Response(200, json={"data": [], "total": 0})),
+        costo_unitario=Decimal("0.00099"), lote_id=lote, api_key="clave-de-prueba",
+        limites={"croma_requests_por_24h": 100, "croma_creditos_gratis_mes": 1500})
+
+    adaptador.buscar(CriteriosICP("CO", {"ciiu": "4711"}), 1)
+
+    with db.unidad_de_trabajo(rt, tenant) as c:
+        filas = c.execute(text("SELECT tipo, unidades, costo_unitario, proveedor, fuente, gratis, lote_id, lead_id, tenant_id "
+                               "FROM costos")).all()
+    assert filas == [("croma_consulta", Decimal(1), Decimal("0.00099"), "croma", "croma_supersociedades_co", True, lote, None, tenant)]
+    assert libro.gasto_busqueda(lote) == Decimal("0.00099")  # lo que el tope ve
+    assert (libro.requests_24h("croma"), libro.creditos_mes("croma")) == (1, Decimal(1))

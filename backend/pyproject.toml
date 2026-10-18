@@ -44,7 +44,8 @@ name = "Capas de los modulos"
 type = "layers"
 # "(aplicacion)": capa opcional; costos todavía no la tiene.
 layers = ["infraestructura", "(aplicacion)", "dominio"]
-containers = ["app.modulos.descubrimiento", "app.modulos.costos", "app.modulos.acceso", "app.modulos.contacto"]
+containers = ["app.modulos.descubrimiento", "app.modulos.costos", "app.modulos.acceso", "app.modulos.calificacion",
+              "app.modulos.intake", "app.modulos.contacto"]
 
 [[tool.importlinter.contracts]]
 name = "Descubrimiento no usa la infraestructura de costos"
@@ -54,10 +55,17 @@ source_modules = ["app.modulos.descubrimiento"]
 forbidden_modules = ["app.modulos.costos.infraestructura"]
 
 [[tool.importlinter.contracts]]
+name = "Intake no importa descubrimiento ni la infraestructura de costos"
+type = "forbidden"
+# Los puertos de intake son Protocol: los adaptadores los cumplen por estructura y solo la composición los une.
+source_modules = ["app.modulos.intake"]
+forbidden_modules = ["app.modulos.descubrimiento", "app.modulos.costos.infraestructura"]
+
+[[tool.importlinter.contracts]]
 name = "Cifrado fuera del dominio"
 type = "forbidden"
 # El dominio maneja texto en claro; cifrar y llamar por HTTP son adaptadores (principio I).
-source_modules = ["app.modulos.descubrimiento.dominio"]
+source_modules = ["app.modulos.descubrimiento.dominio", "app.modulos.intake.dominio"]
 forbidden_modules = ["cryptography", "httpx"]
 
 [[tool.importlinter.contracts]]
@@ -66,6 +74,14 @@ type = "forbidden"
 # El dominio compone y firma; mandar por SMTP y descifrar la dirección son adaptadores (principio I).
 source_modules = ["app.modulos.contacto.dominio"]
 forbidden_modules = ["smtplib", "cryptography"]
+
+[[tool.importlinter.contracts]]
+name = "Intake no importa enriquecimiento"
+type = "forbidden"
+# El consumidor es dueño de su puerto (BuscadorRazonSocial, Protocol estructural): intake no conoce al adaptador que
+# lo cumple. Solo la raíz de composición ve a los dos.
+source_modules = ["app.modulos.intake"]
+forbidden_modules = ["app.modulos.enriquecimiento"]
 
 [[tool.importlinter.contracts]]
 name = "App no importa evals"

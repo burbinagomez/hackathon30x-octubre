@@ -40,13 +40,28 @@
     "ninguna_fuente_cubre": "Ninguna fuente cubre esta búsqueda.",
     "costo_estimado": "Costo estimado: {{monto}}",
     "costo_maximo": "Costo máximo: {{monto}}",
+    "dentro_del_tope": "Dentro del tope: la búsqueda puede correr.",
+    "fuera_del_tope": "Fuera del tope: sube el tope o acota la búsqueda.",
     "tope_linea": "Tope: {{monto}}",
     "creditos_restantes": "Créditos de Croma restantes este mes: {{n}}",
     "requests_restantes": "Consultas de Croma restantes en 24 h: {{n}}",
     "descartadas": "Fuentes descartadas",
     "ignorados": "se ignora: {{lista}}",
     "error": "No se pudo completar la operación. Probá de nuevo.",
-    "tope_nota": "Se guarda; todavía no se aplica."
+    "pestanas": {
+      "lookalike": "Ya me compran",
+      "frase": "En una frase",
+      "filtros": "Filtros"
+    },
+    "frase": {
+      "etiqueta": "¿A quién le vendés y qué ofrecés?",
+      "ayuda": "Una o dos frases. Ejemplo: vendo software contable a ferreterías medianas en Antioquia.",
+      "sugerir": "Sugerir filtros",
+      "pensando": "Pensando…",
+      "revisar": "Prellenamos los filtros con tu frase. Revisalos y ajustalos antes de la vista previa.",
+      "error_no_disponible": "La sugerencia con IA no está disponible ahora. Usá los filtros directamente.",
+      "error_interpretacion": "No pudimos interpretar la frase. Probá con otra redacción o usá los filtros."
+    }
   },
   "fuentes": {
     "croma_supersociedades_co": "Supersociedades (Croma)",
@@ -82,7 +97,12 @@
     "revisiones_pendientes": "Revisiones pendientes: {{n}}",
     "atribucion": "Atribución de datos",
     "desperdicio_real": "Desperdicio (real)",
-    "error": "No se pudo cargar el tablero. Probá de nuevo."
+    "error": "No se pudo cargar el tablero. Probá de nuevo.",
+    "ver_busquedas": "Ver búsquedas",
+    "licencia": "Licencia",
+    "calificados": "Calificados",
+    "pct_calificados": "% calificados (de únicos)",
+    "cpql": "CPQL (lista)"
   },
   "idioma": {
     "etiqueta": "Idioma",
@@ -105,5 +125,79 @@
       "BR": "Estado",
       "PE": "Departamento"
     }
+  },
+  "leads": {
+    "titulo_busquedas": "Búsquedas",
+    "titulo_leads": "Leads de la búsqueda",
+    "sin_busquedas": "Todavía no hay búsquedas.",
+    "sin_leads": "Esta búsqueda no trajo leads.",
+    "error_busquedas": "No se pudieron cargar las búsquedas.",
+    "error_leads": "No se pudieron cargar los leads. Probá de nuevo.",
+    "no_encontrada": "No se encontró la búsqueda.",
+    "resumen_busqueda": "{{pais}} · {{lugar}} · {{fecha}} · {{estado}} · {{total}} leads",
+    "departamento": "Dpto. {{codigo}}",
+    "todo_el_pais": "Todo el país",
+    "volver": "Volver a búsquedas",
+    "natural_protegida": "Persona natural (datos protegidos)",
+    "nombre": "Nombre",
+    "tipo": "Tipo",
+    "fuentes": "Fuentes",
+    "ciudad": "Ciudad",
+    "web": "Sitio web",
+    "telefono": "Teléfono",
+    "email": "Correo",
+    "licencia": "Licencia",
+    "si": "Sí",
+    "no": "No",
+    "anterior": "Anterior",
+    "siguiente": "Siguiente",
+    "pagina_de": "Página {{pagina}} de {{paginas}}",
+    "total": "{{total}} leads",
+    "tipo_titular": {
+      "juridica": "Persona jurídica",
+      "natural": "Persona natural",
+      "desconocido": "Sin determinar"
+    },
+    "estado": {
+      "creada": "Creada",
+      "borrador": "Borrador",
+      "ejecutando": "Ejecutando",
+      "terminada": "Terminada",
+      "con_errores": "Con errores"
+    },
+    "titulo_de_fuente": "Leads de {{fuente}}",
+    "titulo_todos": "Todos los leads"
+  },
+  "intake": {
+    "lookalike": {
+      "titulo": "Ya me compran",
+      "ayuda": "Pegá una empresa por línea (de 5 a 50) y te sugerimos los filtros para buscar otras parecidas.",
+      "nombres": "Empresas que ya te compran",
+      "ejemplo": "Usar ejemplo",
+      "sugerir": "Sugerir filtros",
+      "enviando": "Buscando…",
+      "resueltos": "{{n}} empresas encontradas",
+      "explicacion": "Por qué estos filtros",
+      "ciiu": "Actividad (CIIU)",
+      "departamento": "Departamento (código)",
+      "no_resueltos": "No pudimos identificar estas empresas (no cuentan en la sugerencia)",
+      "rango": "Pegá entre 5 y 50 empresas, una por línea.",
+      "no_disponible": "La búsqueda de empresas no está disponible ahora. Probá de nuevo o usá los filtros.",
+      "error": "No pudimos sugerir filtros. Probá de nuevo o usá los filtros."
+    }
+  },
+  "ejecucion": {
+    "titulo": "Resultado por fuente",
+    "estado": {
+      "con_resultados_one": "{{n}} empresa",
+      "con_resultados_other": "{{n}} empresas",
+      "sin_resultados": "sin resultados para este filtro",
+      "no_disponible": "no disponible ahora",
+      "no_soporta_criterio": "no admite este criterio de búsqueda",
+      "limite_agotado": "límite de la fuente alcanzado",
+      "omitida_por_tope": "no se consultó, pasaría el tope de gasto"
+    },
+    "ninguna_respondio": "Ninguna fuente respondió. Probá de nuevo más tarde.",
+    "ver_tablero": "Ver el tablero"
   }
 }

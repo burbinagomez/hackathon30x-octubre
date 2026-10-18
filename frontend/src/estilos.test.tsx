@@ -55,6 +55,16 @@ test("el lima solo va de fondo, nunca como color de texto", () => {
   expect(css()).not.toMatch(/(^|[;{\s])color:\s*var\(--color-acento\)/);
 });
 
+test("estilos.css usa los tokens semánticos y no las variables de marca para superficie, texto o borde", () => {
+  const texto = css();
+  for (const t of ["superficie", "texto", "borde", "acento-texto", "foco"]) {
+    expect(texto, t).toMatch(new RegExp(`var\\(--color-${t}\\)`));
+  }
+  expect(texto).not.toMatch(/(background|color|border[a-z-]*):[^;]*var\(--color-(fondo|gris|blanco)\)/);
+  expect(texto).not.toMatch(/(^|[;{\s])(color|outline):[^;]*var\(--color-oscuro\)/);
+  expect(texto).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+});
+
 test("login: card centrada con labels asociados a sus inputs", () => {
   const { container } = render(<Login />);
   expect(container.querySelector("main.pantalla.pantalla-tarjeta")).not.toBeNull();

@@ -34,12 +34,16 @@ def _arbol_modulos(raiz: Path, archivo: str, contenido: str) -> None:
     # Réplica mínima de app.modulos, con la config real copiada al lado.
     shutil.copy(BACKEND / "pyproject.toml", raiz)
     paquetes = ["app", "app/modulos",
-                "app/modulos/descubrimiento", "app/modulos/costos", "app/modulos/acceso",
+                "app/modulos/descubrimiento", "app/modulos/costos", "app/modulos/acceso", "app/modulos/calificacion",
+                "app/modulos/intake", "app/modulos/enriquecimiento",
+                *(f"app/modulos/intake/{c}" for c in ("dominio", "aplicacion", "infraestructura")),
                 *(f"app/modulos/descubrimiento/{c}" for c in ("dominio", "aplicacion", "infraestructura")),
                 *(f"app/modulos/costos/{c}" for c in ("dominio", "infraestructura")),
                 *(f"app/modulos/acceso/{c}" for c in ("dominio", "infraestructura")),
                 "app/modulos/contacto",
-                *(f"app/modulos/contacto/{c}" for c in ("dominio", "aplicacion", "infraestructura"))]
+                *(f"app/modulos/contacto/{c}" for c in ("dominio", "aplicacion", "infraestructura")),
+                *(f"app/modulos/calificacion/{c}" for c in ("dominio", "infraestructura")),
+                *(f"app/modulos/intake/{c}" for c in ("dominio", "aplicacion", "infraestructura"))]
     for p in paquetes:
         (raiz / p).mkdir(parents=True, exist_ok=True)
         (raiz / p / "__init__.py").touch()
@@ -127,3 +131,54 @@ def test_smtp_y_cifrado_no_entran_al_dominio_de_contacto(tmp_path, libreria):
 
     assert r.returncode != 0, r.stdout + r.stderr
     assert f"{SMTP_FUERA} BROKEN" in r.stdout
+
+
+SIN_ENRIQUECIMIENTO = "Intake no importa enriquecimiento"
+AISLADO = "Intake no importa descubrimiento ni la infraestructura de costos"
+
+
+def test_intake_no_importa_enriquecimiento(tmp_path):
+    # El consumidor es dueño de su puerto (BuscadorRazonSocial): solo la raíz de composición conoce a los dos.
+    _arbol_modulos(tmp_path, "app/modulos/intake/infraestructura/x.py", "import app.modulos.enriquecimiento\n")
+
+    r = lint_imports(tmp_path)
+
+    assert r.returncode != 0
+    assert f"{SIN_ENRIQUECIMIENTO} BROKEN" in r.stdout
+
+
+def test_intake_no_importa_descubrimiento(tmp_path):
+    # Intake pide sus puertos por estructura (Protocol): quien cumple se enchufa en la raíz de composición.
+    _arbol_modulos(tmp_path, "app/modulos/intake/aplicacion/x.py", "import app.modulos.descubrimiento.dominio\n")
+
+    r = lint_imports(tmp_path)
+
+    assert r.returncode != 0
+    assert f"{AISLADO} BROKEN" in r.stdout
+
+
+def test_intake_no_importa_costos_infraestructura(tmp_path):
+    _arbol_modulos(tmp_path, "app/modulos/intake/aplicacion/x.py", "import app.modulos.costos.infraestructura\n")
+
+    r = lint_imports(tmp_path)
+
+    assert r.returncode != 0
+    assert f"{AISLADO} BROKEN" in r.stdout
+
+
+def test_intake_dominio_no_importa_su_infraestructura(tmp_path):
+    _arbol_modulos(tmp_path, "app/modulos/intake/dominio/x.py", "import app.modulos.intake.infraestructura\n")
+
+    r = lint_imports(tmp_path)
+
+    assert r.returncode != 0
+    assert f"{CAPAS} BROKEN" in r.stdout
+
+
+def test_intake_respeta_las_capas(tmp_path):
+    _arbol_modulos(tmp_path, "app/modulos/intake/dominio/x.py", "import app.modulos.intake.aplicacion\n")
+
+    r = lint_imports(tmp_path)
+
+    assert r.returncode != 0
+    assert f"{CAPAS} BROKEN" in r.stdout

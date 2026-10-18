@@ -1,43 +1,76 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { entero, moneda } from "../compartido/formato";
-import { obtenerTablero } from "./api";
-import type { FilaTablero, Tablero as DatosTablero } from "./tipos";
+import Atribuciones from "../compartido/Atribuciones";
+import Enlace from "../compartido/Enlace";
+import { RUTA_BUSQUEDAS, RUTA_LEADS } from "../compartido/rutas";
+import { entero, moneda, monedaFina, porcentaje } from "../compartido/formato";
+import { obtenerCpql, obtenerTablero } from "./api";
+import type { Cpql, FilaCpql, FilaTablero, Tablero as DatosTablero } from "./tipos";
 
-const BASICAS = ["fuente", "encontrados", "unicos"] as const;
-const DE_COSTO = [
-  "costo_lista", "costo_real", "desperdicio_lista", "desperdicio_real", "cpl_lista", "cpl_real", "naturales",
-] as const;
+type Columna =
+  | "costo_lista" | "costo_real" | "desperdicio_lista" | "desperdicio_real" | "cpl_lista" | "cpl_real" | "naturales"
+  | "calificados" | "pct_calificados" | "cpql";
 
-function Fila({ fila, total = false, conCostos }: { fila: FilaTablero; total?: boolean; conCostos: boolean }) {
+const SIN_ATRIBUIR = "sin_atribuir";
+
+type PropsFila = { fila: FilaTablero; total?: boolean; columnas: Columna[]; cpql?: FilaCpql };
+
+function Fila({ fila, total = false, columnas, cpql }: PropsFila) {
   const { t } = useTranslation();
+  const sinAtribuir = fila.fuente === SIN_ATRIBUIR;
+  // "Sin atribuir" es costo sin fuente: no tiene calificados, % ni CPQL propios (el costo sí, en sus columnas).
+  const calificados = cpql?.calificados ?? null;
+  const celdas: Record<Columna, string> = {
+    costo_lista: moneda(fila.costo_lista),
+    costo_real: moneda(fila.costo_real),
+    desperdicio_lista: moneda(fila.desperdicio_lista),
+    desperdicio_real: moneda(fila.desperdicio_real),
+    cpl_lista: moneda(fila.cpl_lista),
+    cpl_real: moneda(fila.cpl_real),
+    naturales: total ? "" : fila.cuenta_naturales ? entero(fila.naturales_no_contactables) : t("tablero.no_aplica"),
+    calificados: sinAtribuir ? "" : entero(calificados),
+    pct_calificados: sinAtribuir ? "" : porcentaje(calificados, fila.unicos),
+    cpql: sinAtribuir ? "" : monedaFina(cpql?.cpql_lista ?? null),
+  };
+  const nombre = total ? t("tablero.total") : t(`fuentes.${fila.fuente}`);
+  // Cada fila lleva a sus leads; "sin atribuir" son costos sin lead, no hay lista.
+  const etiqueta = sinAtribuir ? nombre : (
+    <Enlace a={total ? RUTA_LEADS : `${RUTA_LEADS}?fuente=${encodeURIComponent(fila.fuente)}`}>{nombre}</Enlace>
+  );
   return (
-    <tr className={total ? "total" : undefined}>
-      <td>{total ? t("tablero.total") : t(`fuentes.${fila.fuente}`)}</td>
+    <tr className={total ? "total" : sinAtribuir ? "sin-atribuir" : undefined}>
+      <td>{etiqueta}</td>
       <td>{entero(fila.encontrados)}</td>
       <td>{entero(fila.unicos)}</td>
-      {conCostos && (
-        <>
-      <td>{moneda(fila.costo_lista)}</td>
-      <td>{moneda(fila.costo_real)}</td>
-      <td>{moneda(fila.desperdicio_lista)}</td>
-      <td>{moneda(fila.desperdicio_real)}</td>
-      <td>{moneda(fila.cpl_lista)}</td>
-      <td>{moneda(fila.cpl_real)}</td>
-      <td>{total ? "" : fila.cuenta_naturales ? entero(fila.naturales_no_contactables) : t("tablero.no_aplica")}</td>
-        </>
-      )}
+      {columnas.map((c) => <td key={c}>{celdas[c]}</td>)}
     </tr>
   );
+}
+
+/** Solo las columnas que la API ya calcula: lo que viene null en toda la tabla no se pinta (no hay columna de "—"). */
+function columnasConDatos(d: DatosTablero, cpql: Cpql | null): Columna[] {
+  const filas = [...d.fuentes, d.total];
+  const hay = (c: keyof FilaTablero) => filas.some((f) => f[c] !== null);
+  const columnas: Columna[] = [];
+  const conCostos = hay("costo_lista");
+  if (conCostos) columnas.push("costo_lista", "costo_real");
+  if (hay("desperdicio_lista")) columnas.push("desperdicio_lista", "desperdicio_real");
+  if (conCostos) columnas.push("cpl_lista", "cpl_real");  // con costos, el CPL sin divisor se ve como "—"
+  if (filas.some((f) => f.cuenta_naturales)) columnas.push("naturales");
+  if (cpql?.fuentes.length) columnas.push("calificados", "pct_calificados", "cpql");
+  return columnas;
 }
 
 export default function Tablero() {
   const { t } = useTranslation();
   const [datos, setDatos] = useState<DatosTablero | null>(null);
   const [fallo, setFallo] = useState(false);
+  const [cpql, setCpql] = useState<Cpql | null>(null);
 
   useEffect(() => {
     obtenerTablero().then(setDatos).catch(() => setFallo(true));
+    // El CPQL es un agregado: si falla, el tablero se ve como sin él (sin columnas nuevas, sin error).
+    obtenerCpql().then(setCpql).catch(() => setCpql(null));
   }, []);
 
   if (!datos) {
@@ -48,12 +81,16 @@ export default function Tablero() {
       </main>
     );
   }
-  // La API del [MIN] manda null en todo lo que aún no calcula: esas columnas y secciones no se pintan.
-  const conCostos = datos.total.costo_lista !== null;
-  const columnas = conCostos ? [...BASICAS, ...DE_COSTO] : BASICAS;
+  // La API manda null en todo lo que aún no calcula: esas columnas y secciones no se pintan.
+  const extra = columnasConDatos(datos, cpql);
+  const cpqlPorFuente = new Map(cpql?.fuentes.map((f) => [f.fuente, f]));
+  // "Sin atribuir" va al final, antes del total.
+  const fuentes = [...datos.fuentes.filter((f) => f.fuente !== SIN_ATRIBUIR), ...datos.fuentes.filter((f) => f.fuente === SIN_ATRIBUIR)];
+  const columnas = ["fuente", "encontrados", "unicos", ...extra];
   return (
     <main className="pantalla pantalla-ancha">
       <h1>{t("tablero.titulo")}</h1>
+      <Enlace a={RUTA_BUSQUEDAS}>{t("tablero.ver_busquedas")}</Enlace>
       <div className="tabla-scroll">
       <table>
         <thead>
@@ -62,8 +99,8 @@ export default function Tablero() {
           </tr>
         </thead>
         <tbody>
-          {datos.fuentes.map((f) => <Fila key={f.fuente} fila={f} conCostos={conCostos} />)}
-          <Fila fila={datos.total} total conCostos={conCostos} />
+          {fuentes.map((f) => <Fila key={f.fuente} fila={f} columnas={extra} cpql={cpqlPorFuente.get(f.fuente)} />)}
+          <Fila fila={datos.total} total columnas={extra} cpql={cpql?.total ?? undefined} />
         </tbody>
       </table>
       </div>
@@ -87,15 +124,7 @@ export default function Tablero() {
           </ul>
         </>
       )}
-      {datos.atribuciones.length > 0 && (
-        <footer aria-label={t("tablero.atribucion")}>
-          {datos.atribuciones.map((a) => (
-            <p key={a.fuente}>
-              <a href={a.url} target="_blank" rel="noreferrer">{a.texto}</a>
-            </p>
-          ))}
-        </footer>
-      )}
+      <Atribuciones atribuciones={datos.atribuciones} />
     </main>
   );
 }

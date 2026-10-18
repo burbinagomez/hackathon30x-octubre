@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     cifrado_key: SecretStr
     # SecretStr: no sale en repr ni en logs. Solo la CLI de búsqueda la usa.
     croma_api_key: SecretStr | None = None
+    # Croma: None = la constante del adaptador. Para apuntar a un stub en local (nunca a otra cuenta).
+    croma_base_url: str | None = None
     # Overpass: None = la constante del adaptador. repo_url va en el User-Agent (política de Overpass).
     overpass_url: str | None = None
     # datos.gov.co: None = la constante del adaptador / sin token (SODA limita por IP).
@@ -64,6 +66,12 @@ class SettingsApi(Settings):
     auth_issuer: str = Field(min_length=1)
     # La misma clave que firma el enlace de baja en SettingsEmail. Sin ella, /baja/{token} responde 404.
     baja_secret: SecretStr | None = Field(None, min_length=32)
+
+    # Puerta B de intake (frase -> ICP): proveedor Anthropic. Opcionales: sin key, sin modelo o con un modelo sin tarifa
+    # en config/tarifas.yaml la API arranca igual y la ruta responde 503 ia_no_disponible (sin tarifa no hay costo que
+    # registrar, principio VIII). Solo backend, nunca VITE_.
+    ia_api_key: SecretStr | None = None
+    ia_modelo: str | None = None
 
 
 

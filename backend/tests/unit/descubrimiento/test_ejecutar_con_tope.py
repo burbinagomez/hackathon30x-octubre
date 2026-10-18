@@ -1,5 +1,5 @@
-"""T026 [MIN]: ejecutar un borrador guardado. El tope (y las palabras clave) son Pulido; acá solo lo que el [MIN] necesita
-y lo que protege costos y cumplimiento: una ejecución por borrador, criterios congelados, lote = búsqueda, estado final."""
+"""T026: ejecutar un borrador guardado. Una ejecución por borrador, criterios congelados, lote = búsqueda, estado final y
+el TOPE DE GASTO (revisión del advisor: costos). Las palabras clave son Pulido (T022-T023)."""
 import inspect
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -9,10 +9,12 @@ import pytest
 
 from app.modulos.descubrimiento.aplicacion.ejecutar_busqueda import EjecutarBorrador
 from app.modulos.descubrimiento.dominio.errores import (
+    LimiteFuenteAgotado,
     BusquedaNoEncontrada,
     BusquedaYaEjecutada,
     CriterioNoSoportado,
     FuenteNoDisponible,
+    TopeExcedido,
 )
 from app.modulos.descubrimiento.dominio.modelos import Actividad, CriteriosICP, EmpresaCruda, MetaFuente
 from tests.falsos import FabricaFalsa, RegistroCostosFalso, RepositorioLeadsFalso
@@ -20,14 +22,17 @@ from tests.falsos import FabricaFalsa, RegistroCostosFalso, RepositorioLeadsFals
 AS_OF = datetime(2026, 10, 1, tzinfo=UTC)
 
 
-def _meta(clave, filtros):
+def _meta(clave, filtros, costo_maximo_llamada):
     return MetaFuente(clave=clave, proveedor=clave.split("_")[0], paises=frozenset({"CO"}), filtros=frozenset(filtros),
-                      trae=frozenset({"nombre"}), tipo="live", licencia=f"lic_{clave}")
+                      trae=frozenset({"nombre"}), tipo="live", licencia=f"lic_{clave}",
+                      costo_maximo_llamada=costo_maximo_llamada)
 
 
+CS, OSM = Decimal("0.00099"), Decimal("0.00042")  # 1 crédito de Croma; 2 intentos x 30 s de Overpass
+MAXIMO = CS + OSM  # 0.00141: lo que el caso de uso declara como peor caso de la búsqueda
 METAS = {
-    "croma_supersociedades_co": _meta("croma_supersociedades_co", {"ciiu", "departamento"}),
-    "osm_overpass": _meta("osm_overpass", {"tipo_negocio", "departamento"}),
+    "croma_supersociedades_co": _meta("croma_supersociedades_co", {"ciiu", "departamento"}, CS),
+    "osm_overpass": _meta("osm_overpass", {"tipo_negocio", "departamento"}, OSM),
 }
 ACTIVIDADES = {"1081": ("shop=bakery",)}
 GUARDADOS = CriteriosICP(pais="CO", filtros={"ciiu": "1081", "departamento": "Antioquia"})
@@ -38,13 +43,13 @@ def _empresa(fuente, nit, titular="juridica"):
                         as_of=AS_OF, actividad=Actividad("1081", "CIIU"), id_fiscal=nit, tipo_titular=titular)
 
 
-def _caso(errores=None, empresas=None, repo=None):
-    repo, costos = repo or RepositorioLeadsFalso(), RegistroCostosFalso()
+def _caso(errores=None, empresas=None, repo=None, tope=Decimal("5.00"), gasto=None, costos=None, metas=METAS, criterios=GUARDADOS):
+    repo, costos = repo or RepositorioLeadsFalso(), costos or RegistroCostosFalso()
     empresas = empresas if empresas is not None else {"croma_supersociedades_co": (_empresa("croma_supersociedades_co", "900000001"),),
                                                        "osm_overpass": (_empresa("osm_overpass", "900000002"),)}
-    fabrica = FabricaFalsa(costos, METAS, empresas, errores)
-    borrador_id = repo.crear_borrador(GUARDADOS, "email", Decimal("5.00"), None)
-    return EjecutarBorrador(repo, fabrica, ACTIVIDADES), repo, costos, fabrica, borrador_id
+    fabrica = FabricaFalsa(costos, metas, empresas, errores, gasto)
+    borrador_id = repo.crear_borrador(criterios, "email", tope, None)
+    return EjecutarBorrador(repo, fabrica, ACTIVIDADES, costos), repo, costos, fabrica, borrador_id
 
 
 def test_usa_los_criterios_guardados():
@@ -156,14 +161,15 @@ def test_ninguna_fuente_cubre_el_icp_termina_completada_sin_llamar_a_nadie():
     assert repo.leads == {}
 
 
-def test_error_inesperado_deja_la_busqueda_en_error_y_no_se_traga():
+def test_error_inesperado_en_todas_deja_la_busqueda_en_error_y_el_error_viaja_en_el_resultado():
+    # Spec 015: ya no se propaga (era un 500); sigue sin tragarse: queda por fuente en `errores`.
     caso, repo, _, _, borrador_id = _caso(errores={"osm_overpass": RuntimeError("bug"),
                                                    "croma_supersociedades_co": RuntimeError("bug")})
 
-    with pytest.raises(RuntimeError):
-        caso.ejecutar(borrador_id)
+    r = caso.ejecutar(borrador_id)
 
     assert repo.busquedas[borrador_id] == "error"  # no se queda en `ejecutando` para siempre
+    assert set(r.errores) == {"osm_overpass", "croma_supersociedades_co"}
 
 
 def test_criterio_no_soportado_por_una_fuente_no_tumba_la_busqueda():
@@ -179,3 +185,140 @@ def test_criterio_no_soportado_por_una_fuente_no_tumba_la_busqueda():
     assert repo.busquedas[borrador_id] == "completada"
     assert set(r.errores) == {"osm_overpass"} and isinstance(r.errores["osm_overpass"], CriterioNoSoportado)
     assert r.encontrados == 1
+
+
+# --- tope de gasto (advisor, costos) --------------------------------------------------------------------------
+
+def test_no_ejecuta_si_costo_maximo_supera_tope():
+    # Un cien-milésimo bajo el peor caso (0.00141): ni siquiera la primera fuente se llama.
+    caso, repo, costos, fabrica, borrador_id = _caso(tope=Decimal("0.00140"))
+
+    with pytest.raises(TopeExcedido):
+        caso.ejecutar(borrador_id)
+
+    assert costos.filas == [] and fabrica.criterios_por_fuente == {}  # 0 requests, 0 filas de costo
+    assert repo.busquedas[borrador_id] == "borrador"  # sigue en borrador: el usuario puede subir el tope y reintentar
+    assert repo.leads == {} and repo.lead_fuentes == set()
+
+
+def test_el_borde_del_tope_es_inclusivo():
+    caso, repo, costos, _, borrador_id = _caso(tope=MAXIMO)  # tope == costo máximo: entra (<=, no <)
+
+    r = caso.ejecutar(borrador_id)
+
+    assert repo.busquedas[borrador_id] == "completada" and len(costos.filas) == 2 and r.omitidas_por_tope == ()
+
+
+def test_lo_ya_gastado_en_el_lote_cuenta_para_el_costo_maximo():
+    class LibroConGastoPrevio(RegistroCostosFalso):
+        def gasto_busqueda(self, busqueda_id):  # lo que la vista previa ya gastó en este lote, a valor de lista
+            return Decimal("0.00113") + super().gasto_busqueda(busqueda_id)
+
+    # Alcanza para las dos fuentes solas (0.00141), no para las dos más lo ya gastado (0.00254).
+    caso, repo, costos, fabrica, borrador_id = _caso(tope=Decimal("0.0020"), costos=LibroConGastoPrevio())
+
+    with pytest.raises(TopeExcedido):
+        caso.ejecutar(borrador_id)
+
+    assert costos.filas == [] and fabrica.criterios_por_fuente == {}
+
+
+def test_corta_antes_de_la_llamada_que_pasaria_el_tope():
+    # Defensa en profundidad: el peor caso cabía (0.00141 <= 0.01), pero Croma terminó costando 0.0099 (10 créditos).
+    # Con eso el tope alcanza para haber llamado a Croma y no para llamar a OSM: OSM no se llama.
+    caso, repo, costos, fabrica, borrador_id = _caso(tope=Decimal("0.01"),
+                                                    gasto={"croma_supersociedades_co": Decimal("0.0099")})
+
+    r = caso.ejecutar(borrador_id)
+
+    assert list(fabrica.criterios_por_fuente) == ["croma_supersociedades_co"]  # OSM nunca recibió buscar()
+    assert [f.fuente for f in costos.filas] == ["croma_supersociedades_co"]  # y no dejó fila de costo
+    assert r.omitidas_por_tope == ("osm_overpass",)
+    assert repo.busquedas[borrador_id] == "tope_alcanzado"
+    assert ("CO", "900000001") in repo.leads and ("CO", "900000002") not in repo.leads  # lo de Croma queda guardado
+    assert len(repo.cumplimiento) == 1  # y con su cumplimiento
+
+
+def test_si_el_tope_alcanza_justo_para_la_segunda_fuente_se_llama():
+    # 0.0099 gastados + 0.00042 = 0.01032: con tope exactamente ese valor entra (<=).
+    caso, repo, costos, fabrica, borrador_id = _caso(tope=Decimal("0.01032"),
+                                                    gasto={"croma_supersociedades_co": Decimal("0.0099")})
+
+    r = caso.ejecutar(borrador_id)
+
+    assert list(fabrica.criterios_por_fuente) == ["croma_supersociedades_co", "osm_overpass"]
+    assert r.omitidas_por_tope == () and repo.busquedas[borrador_id] == "completada"
+
+
+def test_un_error_de_fuente_no_se_confunde_con_el_tope():
+    caso, repo, _, fabrica, borrador_id = _caso(errores={"croma_supersociedades_co": FuenteNoDisponible()})
+
+    r = caso.ejecutar(borrador_id)
+
+    assert r.omitidas_por_tope == () and set(r.errores) == {"croma_supersociedades_co"}
+    assert repo.busquedas[borrador_id] == "completada" and "osm_overpass" in fabrica.criterios_por_fuente
+
+
+def test_sin_fuente_que_cubra_el_icp_no_hay_tope_que_aplicar():
+    # El peor caso de cero fuentes es lo ya gastado: con el tope más bajo posible sigue siendo `completada`.
+    caso, repo, costos, _, _ = _caso()
+    pe = CriteriosICP(pais="PE", filtros={"ciiu": "1081", "departamento": "Lima"})
+    borrador_id = repo.crear_borrador(pe, None, Decimal("0.00001"), None)
+
+    caso.ejecutar(borrador_id)
+
+    assert repo.busquedas[borrador_id] == "completada" and costos.filas == []
+
+
+def test_ya_ejecutada_gana_sobre_tope_excedido():
+    # Tope excedido Y búsqueda ya ejecutada: manda el 409 de "ya ejecutada" (no se revela ni se evalúa nada de más).
+    caso, repo, _, _, borrador_id = _caso(tope=Decimal("0.00140"))
+    repo.busquedas[borrador_id] = "completada"
+
+    with pytest.raises(BusquedaYaEjecutada):
+        caso.ejecutar(borrador_id)
+
+
+def test_el_tope_exige_el_libro_de_costos_en_el_constructor():
+    # Guarda estructural: sin `costos` obligatorio alguien arma EjecutarBorrador sin tope y gasta sin freno.
+    param = inspect.signature(EjecutarBorrador.__init__).parameters["costos"]
+    assert param.default is inspect.Parameter.empty
+
+
+def test_el_chequeo_previo_suma_las_tres_fuentes_no_un_subconjunto_fijo():
+    metas = {**METAS, "datos_gov_co_rues": _meta("datos_gov_co_rues", {"ciiu", "departamento"}, Decimal("0.00084"))}
+    # 0.0020 alcanza para Croma + OSM (0.00141) y no para las tres (0.00225): mata "subconjunto fijo de claves".
+    caso, repo, costos, fabrica, borrador_id = _caso(tope=Decimal("0.0020"), metas=metas)
+
+    with pytest.raises(TopeExcedido):
+        caso.ejecutar(borrador_id)
+    assert costos.filas == [] and repo.busquedas[borrador_id] == "borrador"
+
+    caso, repo, costos, fabrica, borrador_id = _caso(tope=Decimal("0.00225"), metas=metas)
+    caso.ejecutar(borrador_id)
+    assert len(costos.filas) == 3  # con el tope justo, corren las tres
+
+
+def test_el_chequeo_previo_cuenta_solo_las_fuentes_seleccionadas():
+    metas = {
+        "croma_supersociedades_co": METAS["croma_supersociedades_co"],  # solo CO: no cubre PE
+        "osm_overpass": MetaFuente(clave="osm_overpass", proveedor="osm", paises=frozenset({"CO", "PE"}),
+                                   filtros=frozenset({"tipo_negocio", "departamento"}), trae=frozenset({"nombre"}),
+                                   tipo="live", licencia="lic_osm", costo_maximo_llamada=OSM)}
+    pe = CriteriosICP(pais="PE", filtros={"ciiu": "1081", "departamento": "Lima"})
+    # 0.0005 cubre OSM (0.00042) y no Croma + OSM (0.00141): si sumara las no seleccionadas, daría TopeExcedido.
+    caso, repo, costos, fabrica, borrador_id = _caso(tope=Decimal("0.0005"), metas=metas, criterios=pe)
+
+    caso.ejecutar(borrador_id)
+
+    assert list(fabrica.criterios_por_fuente) == ["osm_overpass"] and repo.busquedas[borrador_id] == "completada"
+
+
+def test_limite_de_croma_que_corta_la_busqueda_termina_en_tope_alcanzado():
+    # El límite (24 h o cupo mensual) es la otra cara del tope de gasto: se llegó a lo que se podía gastar.
+    caso, repo, _, _, borrador_id = _caso(errores={"croma_supersociedades_co": LimiteFuenteAgotado()})
+
+    r = caso.ejecutar(borrador_id)
+
+    assert repo.busquedas[borrador_id] == "tope_alcanzado"
+    assert set(r.errores) == {"croma_supersociedades_co"}  # y el motivo viaja por fuente, no se esconde

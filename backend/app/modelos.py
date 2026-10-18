@@ -142,6 +142,17 @@ costos = Table(
     Index("costos_tenant_proveedor_ts_idx", "tenant_id", "proveedor", "ts"),
 )
 
+calificaciones = Table(
+    "calificaciones", metadata,
+    Column("tenant_id", UUID(as_uuid=True), ForeignKey("tenants.id"), primary_key=True),
+    Column("lead_id", UUID(as_uuid=True), primary_key=True),
+    Column("calificado", Boolean, nullable=False),
+    Column("calificado_en", DateTime(timezone=True), nullable=False),
+    Column("minutos", Numeric, nullable=False),
+    Column("importado_en", DateTime(timezone=True), nullable=False, server_default=_AHORA),
+    ForeignKeyConstraint(["tenant_id", "lead_id"], ["leads.tenant_id", "leads.id"]),
+)
+
 fuente_cache = Table(
     "fuente_cache", metadata,
     _id(),

@@ -10,9 +10,9 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app import db
-from app.api import actividades, baja, busquedas, geografia, tablero, usuarios
+from app.api import actividades, baja, busquedas, calificaciones, geografia, intake, intake_lookalike, leads, tablero, usuarios
 from app.api.sesion import tenant_actual
-from app.composicion import CONFIG, cargar_geografia, cargar_tarifas, registro_api
+from app.composicion import CONFIG, calificador_api, cargar_geografia, cargar_tarifas, cargar_tarifas_llm, registro_api
 from app.config import SettingsApi, verificar_entorno
 from app.modulos.acceso.infraestructura.verificador_jwks import VerificadorJwks, cliente_jwks
 from app.modulos.descubrimiento.infraestructura.adaptadores import catalogo
@@ -32,9 +32,16 @@ async def lifespan(app: FastAPI):
     app.state.cifrador = Cifrador(app.state.settings.cifrado_key.get_secret_value())
     app.state.transporte_http = httpx.HTTPTransport()
     app.state.actividades_yaml = yaml.safe_load((CONFIG / "actividades.yaml").read_text()) or {}
-    app.state.registro = registro_api(CONFIG / "fuentes.yaml", catalogo)
-    app.state.canales_contacto = (yaml.safe_load((CONFIG / "fuentes.yaml").read_text()) or {}).get("canales_contacto") or {}
+    fuentes_yaml = yaml.safe_load((CONFIG / "fuentes.yaml").read_text()) or {}
+    # Sin CROMA_API_KEY la fuente de Croma queda fuera del catálogo (-> sin_implementacion): no rompe el arranque.
+    sin_key = app.state.settings.croma_api_key is None
+    app.state.registro = registro_api(
+        CONFIG / "fuentes.yaml", {c: k for c, k in catalogo.items() if not (sin_key and c.startswith("croma_"))})
+    app.state.limites = fuentes_yaml.get("limites") or {}
+    app.state.canales_contacto = fuentes_yaml.get("canales_contacto") or {}
     app.state.tarifas = cargar_tarifas()
+    app.state.calificador = calificador_api(CONFIG / "fuentes.yaml")
+    app.state.tarifas_llm = cargar_tarifas_llm()
     # Un archivo por país en config/geografia/: la estructura admite MX/PE/BR sin tocar código; sin archivo, no se ofrece.
     app.state.geografia = cargar_geografia(CONFIG / "geografia")
     app.state.camaras_yaml = CONFIG / "camaras_co.yaml"
@@ -76,7 +83,8 @@ def health(request: Request):
 
 
 # La dependencia va en el include: una ruta nueva no puede quedar sin auth por olvido.
-for _router in (busquedas.router, tablero.router, actividades.router, geografia.router, usuarios.router):
+for _router in (busquedas.router, leads.router, tablero.router, actividades.router, geografia.router, usuarios.router,
+                calificaciones.router, intake.router, intake_lookalike.router):
     app.include_router(_router, dependencies=[Depends(tenant_actual)])
 
 # Pública a propósito: el enlace de baja llega por mail, sin sesión. Está en RUTAS_PUBLICAS y su test la fija.

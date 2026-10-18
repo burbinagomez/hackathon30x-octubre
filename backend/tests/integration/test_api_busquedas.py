@@ -8,7 +8,9 @@ Contrato que fija este archivo para el verde (T032):
 Sin red: los dos hosts (Overpass y datos.gov.co) los atiende un MockTransport. Datos sintéticos.
 """
 import json
+from decimal import Decimal
 import re
+from decimal import Decimal
 from types import SimpleNamespace
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -146,6 +148,86 @@ def test_ejecutar_dos_veces_da_409_y_no_vuelve_a_llamar_ni_a_cobrar(api, admin, 
     assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=busqueda_id) == "completada"
 
 
+# --- tope de gasto (advisor, costos) --------------------------------------------------------------------------
+
+def test_ejecutar_con_costo_maximo_sobre_tope_da_409(api, admin, usuarios):
+    # OSM (0.00042) + datos.gov.co (0.00084) = 0.00126 de peor caso: el tope de 0.0001 no alcanza ni para una.
+    r = _vista_previa(api, usuarios["a"], tope_gasto_usd="0.0001")
+    assert r.status_code == 201
+    assert r.json()["dentro_del_tope"] is False
+    assert r.json()["costo_maximo_usd"] is not None and Decimal(r.json()["costo_maximo_usd"]) == Decimal("0.00126")
+    busqueda_id = r.json()["busqueda_id"]
+    filas_antes = _contar(admin, "SELECT count(*) FROM costos WHERE tenant_id = :a", a=usuarios["tenant_a"])
+
+    ejecutada = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert ejecutada.status_code == 409
+    assert ejecutada.json() == {"detail": "tope_excedido"}  # un código; distinto de "ya_ejecutada"
+    assert api.pedidas == []  # 0 requests a las fuentes
+    assert _contar(admin, "SELECT count(*) FROM costos WHERE tenant_id = :a", a=usuarios["tenant_a"]) == filas_antes
+    assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=busqueda_id) == "borrador"
+    assert _contar(admin, "SELECT count(*) FROM leads WHERE tenant_id = :a", a=usuarios["tenant_a"]) == 0
+
+
+def test_tope_justo_para_el_costo_maximo_ejecuta(api, admin, usuarios):
+    busqueda_id = _crear(api, usuarios["a"], tope_gasto_usd="0.00126")
+
+    r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert r.status_code == 200 and r.json()["estado"] == "completada"
+    assert len(api.pedidas) > 0
+
+
+def _con_croma(api):
+    """Lo que arma el lifespan cuando hay CROMA_API_KEY: Croma en el registro, la key en Settings y los límites del YAML."""
+    from pydantic import SecretStr
+
+    from app.composicion import registro_api
+    from app.modulos.descubrimiento.infraestructura.adaptadores import catalogo
+
+    estado = api.app.state
+    estado.settings = estado.settings.model_copy(update={"croma_api_key": SecretStr("clave-de-prueba")})
+    estado.registro = registro_api(BACKEND / "config" / "fuentes.yaml", catalogo)
+    estado.limites = yaml.safe_load((BACKEND / "config" / "fuentes.yaml").read_text())["limites"]
+    previo = estado.transporte_http
+
+    def responder(request):
+        if request.url.host == "api.croma.run":
+            api.pedidas.append(request)
+            return httpx.Response(200, json={"total": 1, "data": [
+                {"nit": "900.555.444-3", "name": "EMPRESA SINTETICA S.A.S.", "city": "BOGOTÁ", "ciiu_code": "4711"}]})
+        return previo.handle_request(request)
+
+    estado.transporte_http = httpx.MockTransport(responder)
+
+
+def test_con_croma_el_tope_corta_antes_de_gastar_un_credito(api, admin, usuarios):
+    _con_croma(api)
+    r = _vista_previa(api, usuarios["a"], tope_gasto_usd="0.0013")  # OSM + datos.gov.co (0.00126) caben; con Croma (0.00225) no
+    assert r.json()["dentro_del_tope"] is False and Decimal(r.json()["costo_maximo_usd"]) == Decimal("0.00225")
+
+    ejecutada = _ejecutar_o_500(api, usuarios["a"], r.json()["busqueda_id"])
+
+    assert (ejecutada.status_code, ejecutada.json()) == (409, {"detail": "tope_excedido"})
+    assert api.pedidas == []
+    assert _contar(admin, "SELECT count(*) FROM costos WHERE tenant_id = :a", a=usuarios["tenant_a"]) == 0
+
+
+def test_con_croma_y_tope_suficiente_deja_fila_croma_consulta_del_lote_y_lead_juridico(api, admin, usuarios):
+    _con_croma(api)
+    busqueda_id = _crear(api, usuarios["a"])  # tope 5
+
+    r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert r.status_code == 200
+    assert _contar(admin, "SELECT count(*) FROM costos WHERE tenant_id = :a AND tipo = 'croma_consulta' AND proveedor = 'croma' "
+                          "AND lote_id = :l AND unidades = 1", a=usuarios["tenant_a"], l=busqueda_id) == 1
+    assert _contar(admin, "SELECT tipo_titular FROM leads WHERE tenant_id = :a AND id_fiscal = '900555444'",
+                   a=usuarios["tenant_a"]) == "juridica"
+    assert _contar(admin, "SELECT count(*) FROM cumplimiento WHERE tenant_id = :a AND fuente = 'croma_supersociedades_co' "
+                          "AND licencia LIKE '%Croma%' AND url_origen LIKE '%?nit=900555444'", a=usuarios["tenant_a"]) == 1
+
+
 # --- validación -----------------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("cambios, campo", [
@@ -185,12 +267,14 @@ def test_vista_previa_devuelve_motivos_como_codigo(api, admin, usuarios):
     UUID(cuerpo["busqueda_id"])
     assert [f["fuente"] for f in cuerpo["fuentes"]] == ["datos_gov_co_rues"]
     assert cuerpo["descartadas"] == [{"fuente": "osm_overpass", "motivo": "sin_mapeo_actividad"}]
-    # [MIN]: sin `contar` no hay conteo ni costos, y la API no inventa números: null, nunca 0.
+    # Sin `contar` (Pulido) no hay conteo ni estimado: null, nunca 0. El tope sí se aplica: costo máximo y veredicto.
     assert cuerpo["fuentes"][0] == {"fuente": "datos_gov_co_rues", "conteo": None, "motivo": "sin_conteo",
                                     "ignorados": ["ciudad"], "truncado": False}
-    for clave in ("costo_vista_previa_usd", "costo_estimado_usd", "costo_maximo_usd", "creditos_restantes_mes",
-                  "requests_restantes_24h", "dentro_del_tope"):
-        assert cuerpo[clave] is None, clave  # el tope no se aplica todavía: no se declara "dentro" ni "fuera"
+    for clave in ("costo_vista_previa_usd", "costo_estimado_usd", "creditos_restantes_mes", "requests_restantes_24h"):
+        assert cuerpo[clave] is None, clave
+    assert cuerpo["costo_maximo_usd"] is not None
+    assert Decimal(cuerpo["costo_maximo_usd"]) == Decimal("0.00084")  # solo datos.gov.co: 2 x 2 x 30 s x 0.0000070
+    assert cuerpo["dentro_del_tope"] is True  # tope 5
     assert api.pedidas == []  # la vista previa del [MIN] no sale a ninguna fuente
     assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=cuerpo["busqueda_id"]) == "borrador"
 
@@ -281,18 +365,65 @@ def test_tablero_devuelve_encontrados_y_unicos_del_tenant(api, admin, usuarios):
     assert minimo(como_b["total"]) == {"fuente": "TOTAL", "encontrados": 1, "unicos": 1}
 
 
-def test_tablero_completa_con_null_lo_que_el_minimo_no_calcula(api, admin, usuarios):
+def test_tablero_completa_con_null_lo_que_aun_no_se_calcula(api, admin, usuarios):
     _sembrar(admin, usuarios["tenant_a"], [(uuid4(), uuid4(), "osm_overpass")])
 
     t = _tablero(api, usuarios["a"])
 
-    for clave in ("costo_evals", "cobertura", "revisiones_pendientes"):
+    for clave in ("cobertura", "revisiones_pendientes"):
         assert t[clave] is None, clave  # null = "sin dato"; nunca [] ni 0
+    # Sin filas en `costos`: costo, CPL y evals son "sin dato" (null), no "0".
+    assert t["costo_evals"] is None
     for fila in [*t["fuentes"], t["total"]]:
-        for clave in ("icp", "costo_lista", "costo_real", "desperdicio_lista", "desperdicio_real", "cpl_lista", "cpl_real",
+        for clave in ("icp", "desperdicio_lista", "desperdicio_real", "costo_lista", "costo_real", "cpl_lista", "cpl_real",
                       "naturales_no_contactables"):
             assert fila[clave] is None, clave
         assert fila["cuenta_naturales"] is False
+
+
+def _costo(admin, tenant, fuente, unidades, unitario, gratis=False):
+    with admin.begin() as c:
+        c.execute(text("INSERT INTO costos (tenant_id, tipo, unidades, costo_unitario, moneda, proveedor, fuente, gratis) "
+                       "VALUES (:t, 'overpass_query', :u, :c, 'USD', 'p', :f, :g)"),
+                  {"t": tenant, "u": unidades, "c": unitario, "f": fuente, "g": gratis})
+
+
+def test_tablero_devuelve_costo_y_cpl_como_decimales_en_string(api, admin, usuarios):
+    a, osm = usuarios["tenant_a"], "osm_overpass"
+    _sembrar(admin, a, [(uuid4(), uuid4(), osm), (uuid4(), uuid4(), osm)])
+    _costo(admin, a, osm, 3, "0.10")
+    _costo(admin, a, osm, 1, "0.10", gratis=True)
+    _costo(admin, a, "evals", 1, "1.00")
+
+    t = _tablero(api, usuarios["a"])
+
+    (fila,) = t["fuentes"]
+    assert (Decimal(fila["costo_lista"]), Decimal(fila["costo_real"])) == (Decimal("0.40"), Decimal("0.30"))
+    assert (Decimal(fila["cpl_lista"]), Decimal(fila["cpl_real"])) == (Decimal("0.20"), Decimal("0.15"))
+    assert all(isinstance(fila[k], str) for k in ("costo_lista", "costo_real", "cpl_lista", "cpl_real"))
+    assert Decimal(t["total"]["cpl_lista"]) == Decimal("0.20") and Decimal(t["costo_evals"]) == Decimal("1.00")
+
+
+def test_tablero_devuelve_null_para_cpl_sin_divisor(api, admin, usuarios):
+    _costo(admin, usuarios["tenant_a"], "croma_supersociedades_co", 1, "0.50")  # costo y cero leads
+
+    t = _tablero(api, usuarios["a"])
+
+    (fila,) = t["fuentes"]
+    assert Decimal(fila["costo_lista"]) == Decimal("0.50")
+    for f in (fila, t["total"]):
+        assert f["cpl_lista"] is None and f["cpl_real"] is None  # null, no "0" ni "0.0"
+
+
+def test_tablero_no_mezcla_costos_de_otro_tenant(api, admin, usuarios):
+    _sembrar(admin, usuarios["tenant_a"], [(uuid4(), uuid4(), "osm_overpass")])
+    _costo(admin, usuarios["tenant_a"], "osm_overpass", 1, "0.10")
+    _costo(admin, usuarios["tenant_b"], "osm_overpass", 1, "50")
+    _costo(admin, usuarios["tenant_b"], "evals", 1, "50")
+
+    t = _tablero(api, usuarios["a"])
+
+    assert Decimal(t["total"]["costo_lista"]) == Decimal("0.10") and t["costo_evals"] is None
 
 
 # --- de punta a punta -----------------------------------------------------------------------------------------
@@ -510,3 +641,95 @@ def test_tolima_con_el_yaml_real_de_camaras_no_tumba_la_busqueda_porque_no_hay_c
     with admin.connect() as c:
         filas = c.execute(text("SELECT proveedor FROM costos WHERE lote_id = :l"), {"l": busqueda_id}).all()
     assert [f.proveedor for f in filas] == ["osm"]
+
+
+# --- 015: resultado por fuente -------------------------------------------------------------------------------
+
+def _osm_con(api, respuesta):
+    """Overpass responde `respuesta` (una Response o una excepción a lanzar); datos.gov.co sigue con las filas de prueba."""
+    previo = api.app.state.transporte_http
+
+    def responder(request):
+        if request.url.host == "www.datos.gov.co":
+            return previo.handle_request(request)
+        api.pedidas.append(request)
+        if isinstance(respuesta, Exception):
+            raise respuesta
+        return respuesta
+
+    api.app.state.transporte_http = httpx.MockTransport(responder)
+
+
+@pytest.mark.parametrize("causa", [
+    pytest.param(httpx.ReadTimeout("t"), id="overpass_timeout"),
+    pytest.param(httpx.ConnectError("c"), id="overpass_sin_conexion"),
+])
+def test_tolima_no_da_500(api, admin, usuarios, causa):
+    """Tolima + Ibagué con el YAML real de cámaras (datos.gov.co: criterio no soportado) y Overpass caído por red:
+    antes, la excepción de httpx no la atrapa nadie y la API devuelve 500 con la búsqueda en `error`."""
+    api.app.state.geografia = GEOGRAFIA_DE_PRUEBA
+    _osm_con(api, causa)
+    busqueda_id = _crear(api, usuarios["a"], departamento="73", ciudad="Ibagué")
+
+    r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert r.status_code == 200
+    assert r.json()["por_fuente"] == {
+        "osm_overpass": {"estado": "no_disponible", "encontrados": 0},
+        "datos_gov_co_rues": {"estado": "no_soporta_criterio", "encontrados": 0}}
+    assert r.json()["estado"] == "error"  # las dos fallaron; la respuesta sigue siendo 200
+    assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=busqueda_id) == "error"
+
+
+
+def test_ejecutar_devuelve_por_fuente(api, usuarios):
+    busqueda_id = _crear(api, usuarios["a"])
+
+    r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert r.status_code == 200
+    por_fuente = r.json()["por_fuente"]
+    assert set(por_fuente) == {"osm_overpass", "datos_gov_co_rues"}
+    assert all(set(v) == {"estado", "encontrados"} and v["estado"] == "con_resultados" and v["encontrados"] > 0
+               for v in por_fuente.values())
+    assert sum(v["encontrados"] for v in por_fuente.values()) == r.json()["encontrados"]
+    assert CODIGO.match(por_fuente["osm_overpass"]["estado"])  # un código, no una frase
+
+
+def test_overpass_sin_elementos_es_sin_resultados_y_la_busqueda_completa(api, usuarios):
+    _osm_con(api, httpx.Response(200, json={"osm3s": {"timestamp_osm_base": "2026-10-01T00:00:00Z"}, "elements": []}))
+    busqueda_id = _crear(api, usuarios["a"])
+
+    r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert r.status_code == 200 and r.json()["estado"] == "completada"
+    assert r.json()["por_fuente"]["osm_overpass"] == {"estado": "sin_resultados", "encontrados": 0}
+    assert r.json()["por_fuente"]["datos_gov_co_rues"]["estado"] == "con_resultados"
+
+
+def test_log_de_fuente_caida_no_trae_el_mensaje(api, usuarios, caplog):
+    import logging
+
+    _osm_con(api, httpx.ReadTimeout("ACME SAS 900123456 https://overpass.test/?data=secreto"))
+    busqueda_id = _crear(api, usuarios["a"])
+
+    with caplog.at_level(logging.DEBUG):
+        r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert r.status_code == 200
+    registros = [x for x in caplog.records if "osm_overpass" in x.getMessage()]
+    assert registros and "ReadTimeout" in registros[0].getMessage()
+    for x in caplog.records:
+        assert x.exc_info is None and x.exc_text is None
+        assert "ACME" not in x.getMessage() and "secreto" not in x.getMessage() and "900123456" not in x.getMessage()
+
+
+def test_actividades_devuelve_el_catalogo_real_ampliado(api, usuarios):
+    r = api.get("/actividades", headers=_bearer(usuarios["a"]))
+
+    assert r.status_code == 200
+    por_codigo = {a["codigo"]: a for a in r.json()}
+    assert len(por_codigo) >= 20
+    for codigo in ("4711", "5611", "4752", "4773", "4771", "9602", "4520", "6201", "4923"):
+        assert codigo in por_codigo, codigo
+    assert por_codigo["6201"]["nombre_es"] and por_codigo["6201"]["nombre_en"]

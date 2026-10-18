@@ -19,8 +19,11 @@ from tests.integration.ayudas_osm import FIXTURE, buscar_osm
 BACKEND = Path(__file__).resolve().parents[2]
 APP = BACKEND / "app"
 REPOSITORIO = APP / "modulos" / "descubrimiento" / "infraestructura" / "persistencia" / "repositorio_leads.py"
+# PostgresCalificaciones (008) lee leads para el chequeo juridica+cumplimiento antes de importar: solo
+# tipo_titular e id, nunca nombre/direccion/nombre_cifrado/direccion_cifrada.
+CALIFICACIONES = APP / "modulos" / "calificacion" / "infraestructura" / "persistencia" / "postgres_calificaciones.py"
 # modelos.py y el catálogo nombran columnas, no ejecutan SQL sobre ellas.
-PERMITIDOS = (REPOSITORIO, APP / "modelos.py", APP / "seguridad" / "catalogo_sensibles.py")
+PERMITIDOS = (REPOSITORIO, CALIFICACIONES, APP / "modelos.py", APP / "seguridad" / "catalogo_sensibles.py")
 # Leen leads para la elegibilidad legal (tipo_titular), nunca una columna cifrada.
 SIN_CIFRADAS = (APP / "modulos" / "contacto" / "infraestructura" / "repositorio_contactos.py",)
 NOMBRE = "Tienda Doña Rosa"  # sintéticos
@@ -224,3 +227,9 @@ def test_contacto_no_queda_en_claro_en_columnas_no_catalogadas(rt, admin, tenant
     assert len(filas) == len([e for e in FIXTURE["elements"] if e["tags"].get("name")])
     assert {(nombre, direccion) for nombre, direccion, *_ in filas} == {(None, None)}
     assert [f for f in filas if any(n in str(f) for n in _sensibles_de_la_fixture())] == []
+
+
+def test_el_repo_de_calificaciones_no_lee_nombre_ni_direccion():
+    """Está en PERMITIDOS porque toca `leads`, pero solo para filtrar juridica + cumplimiento: nunca el contacto."""
+    sql = CALIFICACIONES.read_text()
+    assert "nombre" not in sql and "direccion" not in sql
