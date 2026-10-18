@@ -22,14 +22,20 @@ export function leerIdiomas(): Idiomas {
   };
 }
 
+// El tipo no existe en runtime: lo que llega del servidor se valida antes de escribirlo.
+function guardar(clave: string, valor: string | null): void {
+  const idioma = comoIdioma(valor);
+  if (idioma) sessionStorage.setItem(clave, idioma);
+  else sessionStorage.removeItem(clave);
+}
+
 export function guardarIdiomas(r: RespuestaUsuario): void {
-  sessionStorage.setItem(CLAVES.tenant, r.idioma_tenant);
-  if (r.idioma_usuario) sessionStorage.setItem(CLAVES.usuario, r.idioma_usuario);
-  else sessionStorage.removeItem(CLAVES.usuario);
+  guardar(CLAVES.tenant, r.idioma_tenant);
+  guardar(CLAVES.usuario, r.idioma_usuario);
 }
 
 export function fijarIdiomaUsuario(idioma: IdiomaGuardado): void {
-  sessionStorage.setItem(CLAVES.usuario, idioma);
+  guardar(CLAVES.usuario, idioma);
 }
 
 export async function tokenActual(): Promise<string | null> {
