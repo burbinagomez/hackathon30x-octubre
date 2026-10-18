@@ -18,7 +18,7 @@
 
   El default de P4 frena solo la Fase 4, que es Pulido: el [MIN] arranca sin él.
 - [ ] T002 [MIN] [P] [Paso 0] `backend/pyproject.toml` suma `PyJWT`. `uv lock`.
-- [ ] T003 [MIN] [P] [Paso 0] `frontend/package.json` suma `react-i18next` e `i18next` como dependencias, y `eslint`, `typescript-eslint`, `eslint-plugin-boundaries`, `eslint-plugin-import`, `eslint-import-resolver-typescript` y `eslint-plugin-i18next` como devDependencies.
+- [x] T003 [MIN] [P] [Paso 0] `frontend/package.json` suma `react-i18next` e `i18next` como dependencias, y `eslint`, `typescript-eslint`, `eslint-plugin-boundaries`, `eslint-plugin-import`, `eslint-import-resolver-typescript` y `eslint-plugin-i18next` como devDependencies.
 - [ ] T004 [MIN] [Paso 0] **Esqueletos de Python.** Las firmas del plan, que devuelven valores equivocados para que los rojos sean por aserción:
   - `contar` → `-1` en Croma y OSM. **`datos_gov_co_rues` queda afuera:** la 011 ya implementa `contar` completo (011 tasks c64c5f8:163-173), y un stub rompería `test_contar_usa_count_con_el_mismo_where` de la 011;
   - `FabricaFuentes` (Protocol en `descubrimiento/dominio/`);
