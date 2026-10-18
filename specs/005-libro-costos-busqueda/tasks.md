@@ -33,7 +33,7 @@
 
 ## Fase 2: Migración y vistas (Paso 1)
 
-- [ ] T005 [MIN] [Paso 1] **Esqueleto de la migración** `supabase/migrations/NNNN_libro_costos_busqueda.sql`:
+- [ ] T005 [MIN] [Paso 1] **Esqueleto de la migración** `supabase/migrations/NNNN_libro_costos_busqueda.sql`: *(hecho: esqueleto de las dos vistas y el `CHECK`; falta `usuarios` y `tenant_de_usuario`, pausado)*
   - las columnas e índices de plan §Migración. `leads.fusionado_en` va con FK **simple** `REFERENCES leads(id)`; la compuesta entra en T011, después del rojo;
   - `usuarios` con sus columnas (`auth_user_id uuid PRIMARY KEY`, `tenant_id`, `idioma`, `creado_en`; sin email), **sin** `CHECK` y **sin** RLS;
   - `tenant_de_usuario` (y `fijar_idioma`, Pulido) como stubs `… WHERE false`, **sin** `SECURITY DEFINER` ni `REVOKE`;
@@ -41,7 +41,7 @@
 
   `app/modelos.py` se actualiza a la par.
 - [ ] T006 [MIN] [Paso 1] `backend/tests/arquitectura/test_migraciones.py::test_migrar_local_desde_vacio_dos_veces_sin_drift` (de la 002) sigue verde con la migración nueva. Se confirma que `compare_metadata` no reporta las vistas. **Mutación:** borrar `fusionado_en` de `modelos.py` → drift.
-- [ ] T007 [MIN] [Paso 1] **Rojo (advisor):** `backend/tests/integration/test_vistas_costos.py`, con el fixture de spec:77-112, sembrado con `postgres` y leído como `app_rt`. Cada test, con su mutación:
+- [x] T007 [MIN] [Paso 1] **Rojo (advisor):** `backend/tests/integration/test_vistas_costos.py`, con el fixture de spec:77-112, sembrado con `postgres` y leído como `app_rt`. Cada test, con su mutación: *(parte [MIN] hecha)*
   - `::test_cpl_por_fuente_fixture_10_leads`: la tabla exacta, con `type is Decimal`. **Mutación:** `unicos = count(*)` en lugar de `count(DISTINCT lead_id)` → osm 8 ≠ 7. **Segunda mutación:** `::float8` en `cpl_lista` → rojo por el tipo.
   - `::test_costo_por_lead_conserva_el_total`. **Mutación:** `v_costo_por_lead` sin el costo directo (`lead_id IS NOT NULL`) → Σ cs se queda corto por 0.05.
   - `::test_lote_sin_leads_es_desperdicio`. **Mutación:** `v_prorrateo` agrupa por `fuente_ef` sin `lote_id` → la fila 5 se reparte entre los leads de L1.
@@ -53,15 +53,15 @@
   - `::test_costo_por_canal`: email 0.05 y whatsapp 0.30. **Mutación:** sin `WHERE canal IS NOT NULL` → aparece una fila `None`.
   - `::test_fila_con_lote_y_lead_va_al_lead`: B = 0.25/0.15 y Σ parte (L1, cs) = 0.80/0.40. **Mutación:** el prorrateo filtra `lote_id IS NOT NULL` en lugar de `lead_id IS NULL` → Σ parte 0.85.
   - `::test_lead_fusionado_no_cuenta`: únicos 6, encontrados 7, prorrateo L2 `Decimal("0.20")`. **Mutación:** `v_leads_icp` sin `fusionado_en IS NULL` → 7 y 0.16.
-- [ ] T008 [MIN] [Paso 1] **Verde:** los cuerpos de las 9 vistas de spec:313-335, el `GRANT SELECT` a `app_rt` y el `CHECK` de `estado` (P1). **Sin `security_invoker`:** esa opción entra solo en T011, para que T009 nazca rojo.
-- [ ] T009 [MIN] [Paso 1] **Rojo (advisor, RLS):** `backend/tests/integration/test_rls.py`:
+- [x] T008 [MIN] [Paso 1] **Verde:** los cuerpos de las 9 vistas de spec:313-335, el `GRANT SELECT` a `app_rt` y el `CHECK` de `estado` (P1). **Sin `security_invoker`:** esa opción entra solo en T011, para que T009 nazca rojo.
+- [ ] T009 [MIN] [Paso 1] **Rojo (advisor, RLS):** `backend/tests/integration/test_rls.py`: *(hecho: `[vista]` sobre las dos vistas [MIN] y `test_toda_vista_es_security_invoker`; falta `test_usuarios_tiene_rls`, pausado por Supabase Auth)*
   - `::test_tenant_b_no_accede_a_datos_de_a[vista]`, sobre cada `v_*`: control positivo de A ≥ 1 fila, B ve 0 filas y 0 filas `TOTAL`. La siembra de A trae una `lead_fuentes` de `osm_overpass`. Rojo hoy: las vistas sin `security_invoker` corren como `postgres`. **Mutación tras el verde:** quitar `security_invoker` de una vista, o quitar `HAVING count(*) > 0` → B ve una fila `TOTAL`.
   - `::test_toda_vista_es_security_invoker`, desde `pg_class`. **Mutación:** una vista sin la opción.
   - `::test_usuarios_tiene_rls`. **Mutación:** sin `ENABLE ROW LEVEL SECURITY`, o sin la política.
   - `::test_tenant_b_no_fusiona_con_lead_de_a`: como `app_rt` con el tenant B, un `UPDATE` de un lead de B con `fusionado_en` = id de un lead de A lanza `ForeignKeyViolation` (sqlstate `23503`). Rojo hoy, porque la FK simple de T005 no pasa por RLS y el `UPDATE` funciona. Control positivo: el mismo `UPDATE` hacia otro lead de B funciona. **Mutación:** FK simple.
-- [ ] T010 [MIN] [P] [Paso 1] **Rojo (advisor):** `backend/tests/integration/test_privilegios_supabase.py::test_anon_y_authenticated_sin_privilegios` (de la 002) suma `pg_views`, con el assert previo de que esté `v_tablero_fuentes`. **Mutación:** sacar `pg_views` de la unión (falla el assert previo), o `GRANT SELECT ON v_tablero_fuentes TO anon`.
+- [x] T010 [MIN] [P] [Paso 1] **Rojo (advisor):** `backend/tests/integration/test_privilegios_supabase.py::test_anon_y_authenticated_sin_privilegios` (de la 002) suma `pg_views`, con el assert previo de que esté `v_tablero_fuentes`. **Mutación:** sacar `pg_views` de la unión (falla el assert previo), o `GRANT SELECT ON v_tablero_fuentes TO anon`.
   - **LOW (security):** `::test_anon_y_authenticated_sin_execute_en_funciones_de_public`: recorre `pg_proc` de `public` y falla si `anon` o `authenticated` pueden ejecutar **cualquier** función (hoy `tenant_de_usuario` y las que vengan). **Mutación:** sacar el `REVOKE` de una función.
-- [ ] T011 [MIN] [Paso 1] **Verde:**
+- [ ] T011 [MIN] [Paso 1] **Verde:** *(hecho: `security_invoker`; falta la RLS de `usuarios`, pausado por Supabase Auth)*
   - `security_invoker = true` en las 9 vistas;
   - la RLS de `usuarios`;
   - `FOREIGN KEY (tenant_id, fusionado_en) REFERENCES leads (tenant_id, id)`, que se apoya en `leads_tenant_id_id_key` (002 migración:41).

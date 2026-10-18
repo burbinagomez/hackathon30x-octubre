@@ -5,7 +5,7 @@ ALTER TABLE public.busquedas
     'creada', 'terminada', 'con_errores',
     'borrador', 'ejecutando', 'completada', 'tope_alcanzado', 'error'));
 
-CREATE VIEW public.v_tablero_fuentes AS
+CREATE VIEW public.v_tablero_fuentes WITH (security_invoker = true) AS
   SELECT fuente, count(*) AS encontrados, count(DISTINCT lead_id) AS unicos
   FROM public.lead_fuentes
   GROUP BY fuente
@@ -14,7 +14,7 @@ CREATE VIEW public.v_tablero_fuentes AS
   FROM public.lead_fuentes
   HAVING count(*) > 0;
 
-CREATE VIEW public.v_atribuciones AS
+CREATE VIEW public.v_atribuciones WITH (security_invoker = true) AS
   SELECT a.fuente, a.texto, a.url, a.orden
   FROM (VALUES
     ('osm_overpass', '© OpenStreetMap contributors', 'https://www.openstreetmap.org/copyright', 1),
