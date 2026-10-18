@@ -12,3 +12,7 @@ class SinVistaPrevia(Exception):
 
 class MensajeCambio(Exception):
     """El `mensaje_base` de la búsqueda cambió desde el `--dry-run`: hace falta otro."""
+
+
+class PlantillaInvalida(Exception):
+    """El mensaje no cumple la regla 7. `args[0]` es el nombre de la regla."""

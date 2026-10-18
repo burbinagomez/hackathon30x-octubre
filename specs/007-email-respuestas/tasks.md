@@ -18,9 +18,9 @@
 
 ## Fase 2: Dominio (Paso 1)
 
-- [ ] T010 [Paso 1] `tests/unit/contacto/test_tokens.py`: `::test_ida_y_vuelta`, `::test_un_bit_cambiado_falla`, `::test_proposito_distinto_falla`, `::test_otro_tenant_falla`, `::test_compara_con_compare_digest` (spy). Mutación `sabotaje_token_sin_proposito`: firmar sin el propósito.
-- [ ] T011 [Paso 1] `tests/unit/contacto/test_plantilla.py`: `::test_mensaje_lleva_enlace_de_baja` (URL exacta con el token de ese contacto), `::test_pie_completo` (identificación, origen según `canal_origen`, `/privacidad`), `::test_url_de_baja_de_otro_contacto_no_valida`, `::test_menos_de_100_palabras`. Mutación `sabotaje_mensaje_sin_baja`: `componer` sin la línea de baja. (security)
-- [ ] T012 [Paso 1] Implementar `tokens.py` y `plantilla.py` hasta verde.
+- [x] T010 [Paso 1] `tests/unit/contacto/test_tokens.py`: `::test_ida_y_vuelta`, `::test_un_bit_cambiado_falla`, `::test_proposito_distinto_falla`, `::test_otro_tenant_falla`, `::test_compara_con_compare_digest` (spy). Mutación `sabotaje_token_sin_proposito`: firmar sin el propósito.
+- [x] T011 [Paso 1] `tests/unit/contacto/test_plantilla.py`: `::test_mensaje_lleva_enlace_de_baja` (URL exacta con el token de ese contacto), `::test_pie_completo` (identificación, origen según `canal_origen`, `/privacidad`), `::test_url_de_baja_de_otro_contacto_no_valida`, `::test_menos_de_100_palabras`. Mutación `sabotaje_mensaje_sin_baja`: `componer` sin la línea de baja. (security)
+- [x] T012 [Paso 1] Implementar `tokens.py` y `plantilla.py` hasta verde.
 
 ## Fase 3: Adaptador `smtp_email` (Paso 2) — security
 
