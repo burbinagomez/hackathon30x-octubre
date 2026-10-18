@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { expect, test } from "vitest";
 import en from "../i18n/en.json";
@@ -9,11 +9,13 @@ import { server } from "../test/servidor";
 import NuevaBusqueda from "./NuevaBusqueda";
 
 const FRASE = "vendo software contable a ferreterías medianas en Antioquia";
+const PREGUNTA = "¿Vendés a ferreterías de qué tamaño?";
+const EXPLICACION = "Busco ferreterías medianas en Antioquia porque venden insumos de obra.";
 const SUGERENCIA = {
   pais: "CO",
   ciiu: "4631",
   departamento: "05",
-  ciudad: "Medellín",
+  ciudad: "05001",
   ingresos_min: 500000000,
   palabras_clave: ["ferretería", "tornillos"],
   exclusiones: ["cadenas"],
@@ -22,7 +24,7 @@ const SUGERENCIA = {
 type Estado = { frase: boolean; lookalike: boolean };
 
 /** Monta Nueva búsqueda con el estado de las puertas dado. Devuelve los body que llegaron a /intake/frase y a vista-previa. */
-async function montar(estado: Estado | "falla" = { frase: true, lookalike: false }, frase: () => Response | Promise<Response> = () => HttpResponse.json({ sugerencia: SUGERENCIA, costo_usd: "0.00005" })) {
+async function montar(estado: Estado | "falla" = { frase: true, lookalike: false }, frase: () => Response | Promise<Response> = () => HttpResponse.json({ sugerencia: SUGERENCIA, pregunta: null, explicacion: EXPLICACION, costo_usd: "0.00005" })) {
   const frases: unknown[] = [];
   const vistas: unknown[] = [];
   server.use(
@@ -47,26 +49,61 @@ async function montar(estado: Estado | "falla" = { frase: true, lookalike: false
 
 const pestana = (nombre: string) => screen.queryByRole("tab", { name: nombre });
 
-async function escribirYSugerir(texto = FRASE) {
-  fireEvent.click(pestana(es.busqueda.pestanas.frase)!);
+function enviar(texto = FRASE) {
   fireEvent.change(campo(es.busqueda.frase.etiqueta), { target: { value: texto } });
-  fireEvent.click(boton(es.busqueda.frase.sugerir));
+  fireEvent.click(boton(es.busqueda.frase.enviar));
 }
 
-test("escribe_una_frase_y_prellena_el_formulario_editable", async () => {
+function escribirYSugerir(texto = FRASE) {
+  fireEvent.click(pestana(es.busqueda.pestanas.frase)!);
+  enviar(texto);
+}
+
+const conversacion = () => within(screen.getByRole("log"));
+const verTarjeta = () => screen.findByRole("region", { name: es.busqueda.frase.voy_a_buscar });
+const editarEnFiltros = async () => {
+  await verTarjeta();
+  fireEvent.click(boton(es.busqueda.frase.editar_en_filtros));
+};
+
+test("una_frase_clara_muestra_la_explicacion_y_la_tarjeta_voy_a_buscar_sin_saltar_a_filtros", async () => {
   const { frases, vistas } = await montar();
 
-  await escribirYSugerir();
+  escribirYSugerir();
+
+  const tarjeta = await verTarjeta();
+  expect(frases).toEqual([{ frase: FRASE, historial: [] }]);
+  expect(pestana(es.busqueda.pestanas.frase)).toHaveAttribute("aria-selected", "true");
+  expect(conversacion().getByText(FRASE)).toBeInTheDocument();
+  expect(conversacion().getByText(EXPLICACION)).toBeInTheDocument();
+  // Resumen legible: nombres, no códigos.
+  const resumen = within(tarjeta);
+  expect(resumen.getByText("Comercio al por mayor de alimentos")).toBeInTheDocument();
+  expect(resumen.getByText("Antioquia")).toBeInTheDocument();
+  expect(resumen.getByText("Medellín")).toBeInTheDocument();
+  expect(resumen.getByText("ferretería, tornillos")).toBeInTheDocument();
+  expect(resumen.getByText("cadenas")).toBeInTheDocument();
+  expect(resumen.getByText(/500\.000\.000|500,000,000/)).toBeInTheDocument();
+  expect(resumen.queryByText("05001")).not.toBeInTheDocument();
+  expect(resumen.queryByText("4631")).not.toBeInTheDocument();
+  // El tope arranca en 1 y nunca llama a la vista previa por sí misma.
+  expect(campo(es.busqueda.tope)).toHaveValue(1);
+  expect(vistas).toEqual([]);
+});
+
+test("editar_en_filtros_prellena_el_formulario_editable_y_salta_a_filtros", async () => {
+  const { vistas } = await montar();
+  escribirYSugerir();
+
+  await editarEnFiltros();
 
   await waitFor(() => expect(pestana(es.busqueda.pestanas.filtros)).toHaveAttribute("aria-selected", "true"));
-  expect(frases).toEqual([{ frase: FRASE }]);
   await waitFor(() => expect(campo("Departamento")).toHaveValue("05"));  // las divisiones llegan después
   expect(campo("Actividad")).toHaveValue("4631");
-  expect(campo("Ciudad (opcional)")).toHaveValue("Medellín");
+  expect(campo("Ciudad (opcional)")).toHaveValue("05001");
   expect(campo("Ingresos mínimos (USD)")).toHaveValue(500000000);
   expect(campo("Palabras clave (separadas por coma)")).toHaveValue("ferretería, tornillos");
   expect(campo("Exclusiones (separadas por coma)")).toHaveValue("cadenas");
-  // Nunca llama a vista previa por sí misma, y avisa que hay que revisar.
   expect(vistas).toEqual([]);
   expect(screen.queryByRole("status")).toHaveTextContent(es.busqueda.frase.revisar);
 
@@ -76,9 +113,207 @@ test("escribe_una_frase_y_prellena_el_formulario_editable", async () => {
   fireEvent.click(boton("Vista previa"));
   await waitFor(() => expect(vistas).toHaveLength(1));
   expect(vistas[0]).toEqual({
-    pais: "CO", ciiu: "4631", departamento: "05", ciudad: "Medellín", ingresos_min: 500000000,
+    pais: "CO", ciiu: "4631", departamento: "05", ciudad: "05001", ingresos_min: 500000000,
     palabras_clave: ["tornillos"], exclusiones: ["cadenas"], canal_preferido: "email", tope_gasto_usd: 5, mensaje_base: "",
   });
+});
+
+test("una_sugerencia_con_campos_null_deja_esos_campos_vacios", async () => {
+  await montar({ frase: true, lookalike: false }, () =>
+    HttpResponse.json({ sugerencia: { ...SUGERENCIA, ciiu: null, departamento: null, ciudad: null, ingresos_min: null, palabras_clave: [], exclusiones: [] }, pregunta: null, explicacion: null, costo_usd: "0" }));
+
+  escribirYSugerir();
+  await editarEnFiltros();
+
+  await waitFor(() => expect(pestana(es.busqueda.pestanas.filtros)).toHaveAttribute("aria-selected", "true"));
+  expect(campo("Actividad")).toHaveValue("");
+  expect(campo("Ingresos mínimos (USD)")).toHaveValue(null);
+  expect(campo("Palabras clave (separadas por coma)")).toHaveValue("");
+});
+
+test("sin_actividad_no_se_puede_hacer_la_vista_previa_y_dice_que_hacer", async () => {
+  await montar({ frase: true, lookalike: false }, () =>
+    HttpResponse.json({ sugerencia: { ...SUGERENCIA, ciiu: null }, pregunta: null, explicacion: EXPLICACION, costo_usd: "0" }));
+
+  escribirYSugerir();
+
+  await verTarjeta();
+  expect(boton("Vista previa")).toBeDisabled();
+  expect(screen.getByText(es.busqueda.frase.sin_actividad)).toBeInTheDocument();
+});
+
+test("la_sugerencia_no_pisa_canal_tope_ni_mensaje", async () => {
+  await montar();
+  fireEvent.change(campo("Tope de gasto (USD)"), { target: { value: "7" } });
+  fireEvent.change(campo("Mensaje base"), { target: { value: "Hola" } });
+
+  escribirYSugerir();
+  await editarEnFiltros();
+
+  await waitFor(() => expect(pestana(es.busqueda.pestanas.filtros)).toHaveAttribute("aria-selected", "true"));
+  expect(campo("Tope de gasto (USD)")).toHaveValue(7);
+  expect(campo("Mensaje base")).toHaveValue("Hola");
+});
+
+test("el_tope_editado_en_el_chat_viaja_a_filtros", async () => {
+  await montar();
+  escribirYSugerir();
+  await verTarjeta();
+  fireEvent.change(campo(es.busqueda.tope), { target: { value: "3" } });
+
+  fireEvent.click(boton(es.busqueda.frase.editar_en_filtros));
+
+  await waitFor(() => expect(campo("Actividad")).toHaveValue("4631"));
+  expect(campo("Tope de gasto (USD)")).toHaveValue(3);
+});
+
+test("si_la_ia_pregunta_aparece_como_mensaje_y_el_segundo_envio_lleva_el_historial", async () => {
+  let n = 0;
+  const { frases } = await montar({ frase: true, lookalike: false }, () =>
+    ++n === 1
+      ? HttpResponse.json({ sugerencia: { ...SUGERENCIA, ciiu: null }, pregunta: PREGUNTA, explicacion: null, costo_usd: "0" })
+      : HttpResponse.json({ sugerencia: SUGERENCIA, pregunta: null, explicacion: EXPLICACION, costo_usd: "0" }));
+
+  escribirYSugerir("vendo software contable");
+
+  await waitFor(() => expect(conversacion().getByText(PREGUNTA)).toBeInTheDocument());
+  expect(conversacion().getByText("vendo software contable")).toBeInTheDocument();
+  expect(conversacion().getByText(es.busqueda.frase.asistente)).toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: es.busqueda.frase.voy_a_buscar })).not.toBeInTheDocument();  // aún no hay qué buscar
+  expect(campo(es.busqueda.frase.etiqueta)).toHaveValue("");  // se responde en el mismo cuadro
+
+  enviar("ferreterías medianas");
+
+  await verTarjeta();
+  expect(frases).toEqual([
+    { frase: "vendo software contable", historial: [] },
+    {
+      frase: "ferreterías medianas",
+      historial: [{ rol: "usuario", texto: "vendo software contable" }, { rol: "asistente", texto: PREGUNTA }],
+    },
+  ]);
+  expect(conversacion().getByText(EXPLICACION)).toBeInTheDocument();
+});
+
+test("la_lista_de_mensajes_es_un_log_que_se_anuncia_con_cortesia", async () => {
+  await montar();
+  fireEvent.click(pestana(es.busqueda.pestanas.frase)!);
+
+  expect(screen.getByRole("log")).toHaveAttribute("aria-live", "polite");
+});
+
+test("mientras_la_ia_lee_se_ve_la_pildora_y_el_boton_queda_deshabilitado", async () => {
+  let responder: (r: Response) => void = () => undefined;
+  await montar({ frase: true, lookalike: false }, () => new Promise<Response>((r) => { responder = r; }));
+
+  escribirYSugerir();
+
+  await waitFor(() => expect(screen.getByRole("status", { name: es.busqueda.trabajando.frase })).toBeInTheDocument());
+  expect(boton(es.busqueda.frase.pensando)).toBeDisabled();
+  responder(HttpResponse.json({ sugerencia: SUGERENCIA, pregunta: null, explicacion: EXPLICACION, costo_usd: "0" }));
+  await verTarjeta();
+  expect(screen.queryByRole("status", { name: es.busqueda.trabajando.frase })).not.toBeInTheDocument();
+  expect(boton(es.busqueda.frase.enviar)).toBeDisabled();  // el cuadro quedó vacío
+});
+
+test("vista_previa_manda_la_sugerencia_con_el_tope_y_muestra_el_resultado_en_la_misma_pestana", async () => {
+  const { vistas } = await montar();
+  escribirYSugerir();
+  await verTarjeta();
+  fireEvent.change(campo(es.busqueda.tope), { target: { value: "4" } });
+
+  fireEvent.click(boton("Vista previa"));
+
+  await waitFor(() => expect(vistas).toHaveLength(1));
+  expect(vistas[0]).toEqual({
+    pais: "CO", ciiu: "4631", departamento: "05", ciudad: "05001", ingresos_min: 500000000,
+    palabras_clave: ["ferretería", "tornillos"], exclusiones: ["cadenas"], canal_preferido: "email", tope_gasto_usd: 4, mensaje_base: "",
+  });
+  expect(await screen.findByText(es.busqueda.conteo_antes_de_filtros)).toBeInTheDocument();
+  expect(pestana(es.busqueda.pestanas.frase)).toHaveAttribute("aria-selected", "true");
+});
+
+test("buscar_ejecuta_y_muestra_el_resultado_por_fuente_sin_cambiar_de_pestana", async () => {
+  const ejecuciones: string[] = [];
+  server.use(
+    http.post("*/busquedas/:id/ejecutar", ({ params }) => {
+      ejecuciones.push(String(params.id));
+      return HttpResponse.json({
+        busqueda_id: "b-1", estado: "completada",
+        por_fuente: { osm_overpass: { estado: "con_resultados", encontrados: 12 } },
+      });
+    }),
+  );
+  await montar();
+  escribirYSugerir();
+  await verTarjeta();
+  expect(boton("Buscar")).toBeDisabled();  // antes se calcula la vista previa
+  fireEvent.click(boton("Vista previa"));
+  await waitFor(() => expect(boton("Buscar")).toBeEnabled());
+
+  fireEvent.click(boton("Buscar"));
+
+  expect(await screen.findByText("OpenStreetMap: 12 empresas")).toBeInTheDocument();
+  expect(ejecuciones).toEqual(["b-1"]);
+  expect(pestana(es.busqueda.pestanas.frase)).toHaveAttribute("aria-selected", "true");
+});
+
+test("empezar_de_nuevo_limpia_la_conversacion_la_tarjeta_y_los_resultados", async () => {
+  await montar();
+  escribirYSugerir();
+  await verTarjeta();
+  fireEvent.click(boton("Vista previa"));
+  await screen.findByText(es.busqueda.conteo_antes_de_filtros);
+
+  fireEvent.click(boton(es.busqueda.frase.empezar_de_nuevo));
+
+  expect(screen.queryByText(FRASE)).not.toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: es.busqueda.frase.voy_a_buscar })).not.toBeInTheDocument();
+  expect(screen.queryByText(es.busqueda.conteo_antes_de_filtros)).not.toBeInTheDocument();
+  expect(campo(es.busqueda.frase.etiqueta)).toHaveValue("");
+});
+
+test("la_conversacion_sobrevive_a_un_paseo_por_filtros", async () => {
+  await montar();
+  escribirYSugerir();
+  await verTarjeta();
+
+  fireEvent.click(pestana(es.busqueda.pestanas.filtros)!);
+  fireEvent.click(pestana(es.busqueda.pestanas.frase)!);
+
+  expect(conversacion().getByText(EXPLICACION)).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: es.busqueda.frase.voy_a_buscar })).toBeInTheDocument();
+});
+
+test("a_los_seis_turnos_avisa_y_ofrece_empezar_de_nuevo", async () => {
+  let n = 0;
+  await montar({ frase: true, lookalike: false }, () =>
+    HttpResponse.json({ sugerencia: { ...SUGERENCIA, ciiu: null }, pregunta: `pregunta ${++n}`, explicacion: null, costo_usd: "0" }));
+
+  escribirYSugerir("uno");
+  await screen.findByText("pregunta 1");
+  enviar("dos");
+  await screen.findByText("pregunta 2");
+  enviar("tres");
+  await screen.findByText("pregunta 3");
+
+  expect(screen.getByText(es.busqueda.frase.limite_turnos)).toBeInTheDocument();
+  fireEvent.change(campo(es.busqueda.frase.etiqueta), { target: { value: "cuatro" } });
+  expect(boton(es.busqueda.frase.enviar)).toBeDisabled();
+  fireEvent.click(boton(es.busqueda.frase.empezar_de_nuevo));
+  expect(screen.queryByText(es.busqueda.frase.limite_turnos)).not.toBeInTheDocument();
+});
+
+test("el_boton_de_enviar_exige_un_mensaje", async () => {
+  await montar();
+  fireEvent.click(pestana(es.busqueda.pestanas.frase)!);
+  expect(boton(es.busqueda.frase.enviar)).toBeDisabled();
+
+  fireEvent.change(campo(es.busqueda.frase.etiqueta), { target: { value: "   " } });
+  expect(boton(es.busqueda.frase.enviar)).toBeDisabled();
+
+  fireEvent.change(campo(es.busqueda.frase.etiqueta), { target: { value: FRASE } });
+  expect(boton(es.busqueda.frase.enviar)).toBeEnabled();
 });
 
 test("una_sugerencia_con_campos_null_deja_esos_campos_vacios", async () => {
@@ -116,18 +351,6 @@ test("filtros_es_la_pestana_por_defecto_y_la_de_frase_trae_su_texto", async () =
   expect(screen.queryByLabelText("Actividad")).not.toBeInTheDocument();
 });
 
-test("el_boton_de_sugerir_exige_una_frase", async () => {
-  await montar();
-  fireEvent.click(pestana(es.busqueda.pestanas.frase)!);
-  expect(boton(es.busqueda.frase.sugerir)).toBeDisabled();
-
-  fireEvent.change(campo(es.busqueda.frase.etiqueta), { target: { value: "   " } });
-  expect(boton(es.busqueda.frase.sugerir)).toBeDisabled();
-
-  fireEvent.change(campo(es.busqueda.frase.etiqueta), { target: { value: FRASE } });
-  expect(boton(es.busqueda.frase.sugerir)).toBeEnabled();
-});
-
 test("puerta_b_oculta_si_frase_es_false", async () => {
   await montar({ frase: false, lookalike: false });
 
@@ -158,22 +381,25 @@ test("ya_me_compran_aparece_cuando_lookalike_es_true", async () => {
   expect(pestana(es.busqueda.pestanas.filtros)).toHaveAttribute("aria-selected", "true");
 });
 
-test("la_ia_no_disponible_se_avisa_y_no_toca_el_formulario", async () => {
+test("la_ia_no_disponible_se_avisa_en_la_conversacion_sin_perder_lo_escrito", async () => {
   await montar({ frase: true, lookalike: false }, () => HttpResponse.json({ detail: "ia_no_disponible" }, { status: 503 }));
 
-  await escribirYSugerir();
+  escribirYSugerir();
 
-  await waitFor(() => expect(screen.queryByRole("alert")).toHaveTextContent(es.busqueda.frase.error_no_disponible));
+  await waitFor(() => expect(conversacion().getByRole("alert")).toHaveTextContent(es.busqueda.frase.error_no_disponible));
   expect(pestana(es.busqueda.pestanas.frase)).toHaveAttribute("aria-selected", "true");  // sigue en la frase
+  expect(campo(es.busqueda.frase.etiqueta)).toHaveValue(FRASE);
 });
 
-test("una_salida_ilegible_se_avisa_con_su_texto", async () => {
+test("una_salida_ilegible_se_avisa_en_la_conversacion_sin_perder_lo_escrito", async () => {
   await montar({ frase: true, lookalike: false }, () => HttpResponse.json({ detail: "ia_salida_invalida" }, { status: 502 }));
 
-  await escribirYSugerir();
+  escribirYSugerir();
 
-  await waitFor(() => expect(screen.queryByRole("alert")).toHaveTextContent(es.busqueda.frase.error_interpretacion));
-  expect(screen.getByLabelText(es.busqueda.frase.etiqueta)).toHaveValue(FRASE);  // la frase no se pierde
+  await waitFor(() => expect(conversacion().getByRole("alert")).toHaveTextContent(es.busqueda.frase.error_interpretacion));
+  expect(campo(es.busqueda.frase.etiqueta)).toHaveValue(FRASE);  // la frase no se pierde
+  expect(conversacion().queryByText(FRASE)).not.toBeInTheDocument();  // y no quedó como mensaje enviado
+  expect(boton(es.busqueda.frase.enviar)).toBeEnabled();  // se puede reintentar
 });
 
 test("textos_en_ingles", async () => {
@@ -184,8 +410,13 @@ test("textos_en_ingles", async () => {
   expect(pestana(en.busqueda.pestanas.filtros)).toBeInTheDocument();
   fireEvent.click(pestana(en.busqueda.pestanas.frase)!);
   fireEvent.change(campo(en.busqueda.frase.etiqueta), { target: { value: FRASE } });
-  fireEvent.click(boton(en.busqueda.frase.sugerir));
-  await waitFor(() => expect(screen.queryByRole("status")).toHaveTextContent(en.busqueda.frase.revisar));
+  fireEvent.click(boton(en.busqueda.frase.enviar));
+
+  const tarjeta = await screen.findByRole("region", { name: en.busqueda.frase.voy_a_buscar });
+  expect(within(screen.getByRole("log")).getByText(en.busqueda.frase.asistente)).toBeInTheDocument();
+  expect(within(tarjeta).getByText("Comercio al por mayor de alimentos")).toBeInTheDocument();
+  expect(boton(en.busqueda.frase.editar_en_filtros)).toBeInTheDocument();
+  expect(boton(en.busqueda.frase.empezar_de_nuevo)).toBeInTheDocument();
 });
 
 test("ya_me_compran_prellena_los_filtros_y_muestra_la_explicacion", async () => {
