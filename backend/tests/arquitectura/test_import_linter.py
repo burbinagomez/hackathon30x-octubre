@@ -73,6 +73,21 @@ def test_cryptography_no_entra_al_dominio(tmp_path):
     assert "Cifrado fuera del dominio BROKEN" in r.stdout
 
 
+SIN_EVALS = "App no importa evals"
+
+
+def test_app_no_importa_evals(tmp_path):
+    # evals es tooling hermano de app: evals -> app vale, app -> evals no (la imagen de api no trae evals).
+    _arbol_modulos(tmp_path, "app/x.py", "import evals\n")
+    (tmp_path / "evals").mkdir()
+    (tmp_path / "evals/__init__.py").touch()
+
+    r = lint_imports(tmp_path)
+
+    assert r.returncode != 0, r.stdout + r.stderr
+    assert f"{SIN_EVALS} BROKEN" in r.stdout
+
+
 def test_repo_cumple_contratos():
     r = lint_imports(BACKEND)
     assert r.returncode == 0, r.stdout + r.stderr
