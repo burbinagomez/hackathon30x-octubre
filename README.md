@@ -31,7 +31,10 @@ backend/scripts/migrar_local.sh postgresql://postgres@localhost:5432/postgres
 
 # Back
 cd backend && uv sync
-DATABASE_URL=postgresql+psycopg://app_rt@localhost:5432/postgres CORS_ORIGINS=http://localhost:5173 \
+# CIFRADO_KEY es obligatoria (sin ella la app no arranca): 32 bytes en base64, p. ej.
+#   python3 -c "import base64,os; print(base64.b64encode(os.urandom(32)).decode())"
+# En Railway va como variable de `api`; nunca en el repo. Perderla deja ilegibles los datos cifrados.
+CIFRADO_KEY=<clave> DATABASE_URL=postgresql+psycopg://app_rt@localhost:5432/postgres CORS_ORIGINS=http://localhost:5173 \
   uv run uvicorn app.main:app --reload            # http://localhost:8000/health
 
 # Front (otra terminal)

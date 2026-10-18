@@ -4,29 +4,54 @@ import json
 import os
 from urllib.parse import urlsplit
 
-from pydantic import SecretStr
-from pydantic_settings import BaseSettings
+from pydantic import SecretStr, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # sbp_: access token del CLI. `migrar` ya no lo usa (usa SUPABASE_DB_URL), pero en la api sigue prohibido.
 PREFIJOS_PROHIBIDOS = ("sb_publishable_", "sb_secret_", "sbp_")
 ROLES_SUPABASE = {"anon", "service_role"}
 
 
+class ConfigInvalida(RuntimeError):
+    """Configuración que impide arrancar. El mensaje nombra la variable, nunca su valor."""
+
+
+def decodificar_clave_de_cifrado(valor: str | None) -> bytes:
+    """CIFRADO_KEY: 32 bytes en base64. Sin ella (o mal formada) no hay arranque; el error no trae el valor."""
+    try:
+        clave = base64.b64decode(valor or "", validate=True)
+    except (binascii.Error, ValueError):
+        clave = b""
+    if len(clave) != 32:
+        raise ConfigInvalida("CIFRADO_KEY debe ser 32 bytes en base64")
+    return clave
+
+
 class Settings(BaseSettings):
+    # hide_input_in_errors: un valor inválido de una clave no puede salir en el ValidationError.
+    model_config = SettingsConfigDict(hide_input_in_errors=True)
+
     database_url: str
+    # Sin default: la app no arranca sin clave de cifrado (principio VI).
+    cifrado_key: SecretStr
     # SecretStr: no sale en repr ni en logs. Solo la CLI de búsqueda la usa.
     croma_api_key: SecretStr | None = None
     # Overpass: None = la constante del adaptador. repo_url va en el User-Agent (política de Overpass).
     overpass_url: str | None = None
     repo_url: str = "https://github.com/burbinagomez/hackathon30x-octubre"
 
+    @field_validator("cifrado_key")
+    @classmethod
+    def _cifrado_key_valida(cls, valor: SecretStr) -> SecretStr:
+        try:
+            decodificar_clave_de_cifrado(valor.get_secret_value())
+        except ConfigInvalida as error:
+            raise ValueError(str(error)) from None
+        return valor
+
 
 class SecretProhibido(RuntimeError):
     pass
-
-
-class ConfigInvalida(RuntimeError):
-    """Configuración que impide arrancar. El mensaje nombra la variable, nunca su valor."""
 
 
 def _rol_jwt(valor: str) -> str | None:
