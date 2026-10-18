@@ -1,5 +1,4 @@
 import json
-import os
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -7,7 +6,7 @@ from uuid import uuid4
 
 import httpx
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 
 from app import db
 from app.modulos.costos.infraestructura.postgres_costos import PostgresCostos
@@ -21,27 +20,6 @@ BACKEND = Path(__file__).resolve().parents[2]
 FIXTURE = json.loads((BACKEND / "tests" / "fixtures" / "osm" / "bogota_4711.json").read_text())
 TARIFA = Decimal("0.0000070")
 ICP = CriteriosICP("CO", {"ciiu": "4711", "ciudad": "Bogotá"})
-
-
-def _url(nombre):
-    url = os.environ.get(nombre)
-    if not url:
-        pytest.fail(f"falta {nombre}: los tests de integración fallan, no se saltan (R6)")
-    return url
-
-
-@pytest.fixture
-def rt():
-    engine = db.crear_engine(_url("TEST_DATABASE_URL"))
-    yield engine
-    engine.dispose()
-
-
-@pytest.fixture
-def admin():
-    engine = create_engine(_url("TEST_ADMIN_DATABASE_URL"))
-    yield engine
-    engine.dispose()
 
 
 @pytest.fixture
