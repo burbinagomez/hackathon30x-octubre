@@ -11,6 +11,12 @@ el formulario y salta a "Filtros". Los nombres viven solo en el estado del compo
 ## ListaLeads: filtro "Solo con contacto"
 `ListaLeads` guarda el estado del checkbox y llama `cargar(pagina, conContacto)`; al cambiarlo vuelve a la página 1. `api.ts` agrega `con_contacto=true` solo cuando está marcado. Teléfono y Correo se pintan "Sí" o "—"; `null` (natural) queda vacío.
 
+## Libro de costos (`costos/`)
+
+Ruta `/costos` (opcional `?busqueda_id=`, solo si es uuid). `Costos.tsx`: total y subtotales por tipo y por fuente arriba, tabla de operaciones
+en `.tabla-scroll` (scroll horizontal dentro del contenedor, sirve a 360 px) y paginación de a 50. Enlaces: "Ver costos" en el Tablero y en cada fila
+de `/busquedas`. Textos en `costos.*` (es/en).
+
 ## Tablero: embudo por fuente
 
 `Tablero.tsx` pinta, bajo la tabla, una sección `region` "Embudo por fuente" con un grupo por fuente (y el total): encontrados, únicos,

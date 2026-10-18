@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import Enlace from "../compartido/Enlace";
 import Esqueleto from "../compartido/Esqueleto";
+import { RUTA_COSTOS } from "../compartido/rutas";
 import { entero } from "../compartido/formato";
 import { listarBusquedas } from "./api";
 import type { Busqueda } from "./tipos";
@@ -38,6 +39,8 @@ export default function ListaBusquedas() {
                   total: entero(b.total_leads),
                 })}
               </Enlace>
+              {" "}
+              <Enlace a={`${RUTA_COSTOS}?busqueda_id=${b.id}`}>{t("costos.ver_costos")}</Enlace>
             </li>
           ))}
         </ul>

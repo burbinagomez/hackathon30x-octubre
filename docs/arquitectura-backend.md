@@ -66,6 +66,13 @@ datos.gov.co (`c82u-588k`, activa) en la misma ciudad. Decisión del dueño: "S�
 - Tests: `tests/unit/enriquecimiento/test_normalizar_titular.py`, `test_rues_datos_gov.py`, `tests/unit/test_composicion_verificador.py`,
   `tests/contratos/test_verificador_titular.py`, `tests/integration/test_verificacion_titular_rues.py`.
 
+## Libro de costos: pantalla de solo lectura (spec 005)
+
+`GET /costos?pagina=N[&busqueda_id=]` (`api/costos.py`, `costos/infraestructura/repositorio_libro.py`): SQL inline sobre `costos`, sin DDL, bajo
+la RLS de la sesión. 50 por página, `ts` descendente. Trae `total_usd` (valor de lista), `total_real_usd` (sin lo gratis) y subtotales
+`por_tipo` y `por_fuente` de TODO el libro (o de la búsqueda filtrada), no de la página. `busqueda_id` = `lote_id` (el lote es la búsqueda); el
+filtro deja fuera los costos por lead sin lote. `lead` sale como booleano: el `lead_id` no sale nunca.
+
 ## Tablero: embudo por fuente (spec 005)
 
 `GET /tablero/fuentes` suma por fuente y en `total` cuatro conteos de leads únicos: `enriquecidos` (`enriquecido_en` no nulo), `contactables`,

@@ -115,7 +115,7 @@ def test_fuente_caida_es_503_con_codigo_y_deja_su_costo(api, admin, usuarios):
     api.app.state.transporte_http = httpx.MockTransport(lambda req: httpx.Response(503, json=[]))
     r = _post(api, usuarios["a"])
     assert (r.status_code, r.json()) == (503, {"detail": "fuente_no_disponible"})
-    assert _n(admin, "SELECT count(*) FROM costos WHERE tenant_id = :a AND fuente = 'intake'", a=usuarios["tenant_a"]) == 2
+    assert _n(admin, "SELECT count(*) FROM costos WHERE tenant_id = :a AND fuente = 'intake'", a=usuarios["tenant_a"]) == 1  # un intento: el plazo de búsqueda (composicion) no reintenta
 
 
 def test_los_nombres_pegados_no_salen_en_ningun_log(api, usuarios, caplog):

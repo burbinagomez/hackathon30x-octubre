@@ -626,9 +626,14 @@ def test_tolima_e_ibague_llegan_a_datos_gov_con_sus_camaras_y_a_osm_con_la_ciuda
     assert "Ibagu" in unquote_plus(_cuerpo(osm[0]))
 
 
-def test_tolima_con_el_yaml_real_de_camaras_no_tumba_la_busqueda_porque_no_hay_camaras_de_73(api, admin, usuarios):
-    api.app.state.geografia = GEOGRAFIA_DE_PRUEBA
-    busqueda_id = _crear(api, usuarios["a"], departamento="73", ciudad="Ibagué")
+VICHADA = {"iso_3166_2": "CO-VID", "codigo_nativo": "99", "nombre_es": "Vichada", "nombre_en": "Vichada",
+           "municipios": [{"codigo_nativo": "99001", "nombre": "Puerto Carreño"}]}
+
+
+def test_un_departamento_sin_camaras_en_el_yaml_real_no_tumba_la_busqueda(api, admin, usuarios):
+    # Con las 58 cámaras (T054) Tolima ya tiene cámaras; Vichada (99) sigue sin ninguna con sede allí.
+    api.app.state.geografia = {"CO": {"pais": "CO", "divisiones": [VICHADA]}}
+    busqueda_id = _crear(api, usuarios["a"], departamento="99", ciudad="Puerto Carreño")
 
     r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
 
@@ -664,12 +669,13 @@ def _osm_con(api, respuesta):
     pytest.param(httpx.ReadTimeout("t"), id="overpass_timeout"),
     pytest.param(httpx.ConnectError("c"), id="overpass_sin_conexion"),
 ])
-def test_tolima_no_da_500(api, admin, usuarios, causa):
-    """Tolima + Ibagué con el YAML real de cámaras (datos.gov.co: criterio no soportado) y Overpass caído por red:
-    antes, la excepción de httpx no la atrapa nadie y la API devuelve 500 con la búsqueda en `error`."""
-    api.app.state.geografia = GEOGRAFIA_DE_PRUEBA
+def test_departamento_sin_camaras_y_overpass_caido_no_da_500(api, admin, usuarios, causa):
+    """Un departamento sin cámaras en el YAML real (datos.gov.co: criterio no soportado) y Overpass caído por red:
+    antes, la excepción de httpx no la atrapa nadie y la API devuelve 500 con la búsqueda en `error`.
+    Era Tolima; con las 58 cámaras (T054) Tolima tiene cámaras y el caso pasa a Vichada."""
+    api.app.state.geografia = {"CO": {"pais": "CO", "divisiones": [VICHADA]}}
     _osm_con(api, causa)
-    busqueda_id = _crear(api, usuarios["a"], departamento="73", ciudad="Ibagué")
+    busqueda_id = _crear(api, usuarios["a"], departamento="99", ciudad="Puerto Carreño")
 
     r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
 

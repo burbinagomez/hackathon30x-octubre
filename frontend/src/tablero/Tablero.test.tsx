@@ -177,6 +177,11 @@ test("enlaza_a_ver_busquedas", async () => {
   expect(screen.getByRole("link", { name: "Ver búsquedas" })).toHaveAttribute("href", "/busquedas");
 });
 
+test("enlaza_al_libro_de_costos", async () => {
+  await montar(respuestaTablero());
+  expect(screen.getByRole("link", { name: "Ver costos" })).toHaveAttribute("href", "/costos");
+});
+
 test("cada_fila_de_fuente_lleva_a_sus_leads_y_el_total_a_todos", async () => {
   await montar(respuestaTablero());
   expect(screen.getByRole("link", { name: "Supersociedades (Croma)" })).toHaveAttribute("href", "/leads?fuente=croma_supersociedades_co");

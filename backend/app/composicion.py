@@ -16,13 +16,17 @@ import yaml
 from app.config import Settings
 from app.modulos.calificacion.infraestructura.dapta_csv import DaptaCSV
 from app.modulos.costos.dominio.puertos import RegistroCostos
-from app.modulos.descubrimiento.aplicacion.camaras import cargar_camaras
+from app.modulos.descubrimiento.aplicacion.camaras import (
+    alias_de_ciudad,
+    cargar_camaras,
+)
 from app.modulos.descubrimiento.aplicacion.registro import Registro, cargar_registro
 from app.modulos.descubrimiento.dominio.modelos import MetaFuente
 from app.modulos.descubrimiento.dominio.puertos import (
     FabricaFuentes,
     FuenteDescubrimiento,
 )
+from app.modulos.enriquecimiento.dominio.normalizar_titular import normalizar_ciudad
 from app.modulos.intake.infraestructura.llm.interpretador_claude import (
     InterpretadorClaude,
 )
@@ -69,6 +73,12 @@ def ia_configurada(ajustes, tarifas_llm: Mapping[str, Mapping]) -> bool:
     return bool(key and key.get_secret_value().strip() and modelo in tarifas_llm and _proveedor(ajustes) in URL_IA)
 
 
+# Cloudflare corta a los 100 s y las fuentes de una búsqueda corren en serie (OSM 30 s + Croma ~21 s):
+# datos.gov.co, con sus dos requests, no puede pasar de 40 s. El costo máximo sigue calculado con el peor caso del cliente.
+DATOS_GOV_TIMEOUT_BUSQUEDA = 20.0
+DATOS_GOV_INTENTOS_BUSQUEDA = 1
+
+
 def generador_de_frase(ajustes, tarifas_llm: Mapping[str, Mapping], costos: RegistroCostos,
                        transporte: httpx.BaseTransport, codigos_ciiu=None) -> InterpretadorClaude | InterpretadorOpenRouter | None:
     """El adaptador de la Puerta B atado a este tenant (por `costos`), o None si la IA no está disponible."""
@@ -108,7 +118,8 @@ def armador_de_fuente(
                 dormir=time.sleep, costos=costos, cache=None,
                 camaras=cargar_camaras(camaras_yaml()),
                 tarifas={"computo_seg_usd": tarifas["datos.gov.co"]}, lote_id=lote_id, meta=meta,
-                app_token=token.get_secret_value() if token else None, **extra,
+                app_token=token.get_secret_value() if token else None,
+                timeout_seg=DATOS_GOV_TIMEOUT_BUSQUEDA, intentos=DATOS_GOV_INTENTOS_BUSQUEDA, **extra,
             )
         kwargs = {"meta": meta, "registro_costos": costos, "transporte": transporte(), "lote_id": lote_id}
         if meta.proveedor in tarifas:
@@ -164,9 +175,15 @@ def verificador_titular(ajustes, costos: RegistroCostos, tarifas: Mapping, trans
                         ruta_yaml: Path = CONFIG / "fuentes.yaml"):
     """`rues_datos_gov_co` (nombre + ciudad contra el RUES de datos.gov.co) si `fuentes.yaml` lo habilita; si no, el stub
     `CromaRues`, que falla cerrado. Es un flag: ni el dominio ni el caso de uso saben cuál de los dos es."""
-    from app.modulos.descubrimiento.infraestructura.adaptadores.datos_gov_co_rues import DatosGovCoRues
-    from app.modulos.enriquecimiento.infraestructura.adaptadores.croma_rues import CromaRues
-    from app.modulos.enriquecimiento.infraestructura.adaptadores.rues_datos_gov import RuesDatosGov
+    from app.modulos.descubrimiento.infraestructura.adaptadores.datos_gov_co_rues import (
+        DatosGovCoRues,
+    )
+    from app.modulos.enriquecimiento.infraestructura.adaptadores.croma_rues import (
+        CromaRues,
+    )
+    from app.modulos.enriquecimiento.infraestructura.adaptadores.rues_datos_gov import (
+        RuesDatosGov,
+    )
 
     config = ((yaml.safe_load(Path(ruta_yaml).read_text()) or {}).get("enriquecedores") or {}).get("rues_datos_gov_co") or {}
     if not config.get("habilitado"):
@@ -182,15 +199,20 @@ def verificador_titular(ajustes, costos: RegistroCostos, tarifas: Mapping, trans
         costos=costos, cache=None, camaras=camaras, tarifas={"computo_seg_usd": tarifas["datos.gov.co"]}, lote_id=None,
         meta=meta, app_token=token.get_secret_value() if token else None, timeout_seg=TIMEOUT_VERIFICACION_SEG,
         intentos=1, **extra)
-    return RuesDatosGov(cliente, {c.codigo: c.municipio_sede for c in camaras.values()})
+    return RuesDatosGov(cliente, {c.codigo: c.municipio_sede for c in camaras.values()},
+                        alias_de_ciudad(camaras, normalizar_ciudad))
 
 
 def adaptadores_enriquecer(ajustes, costos: RegistroCostos, tarifas: Mapping, transporte: httpx.BaseTransport,
                            resolver=_resolver_dns, ruta_yaml: Path = CONFIG / "fuentes.yaml"):
     """Verificador de titular, sitio web y jev (006), los mismos para la CLI y la API. Sin TYPESAFE_API_KEY o TYPESAFE_URL
     no hay clasificador: encaje queda NULL. `resolver` lo usa la guarda SSRF del sitio web; los tests lo reemplazan."""
-    from app.modulos.enriquecimiento.infraestructura.adaptadores.jev_clasificador import JevClasificador
-    from app.modulos.enriquecimiento.infraestructura.adaptadores.sitio_web import SitioWeb
+    from app.modulos.enriquecimiento.infraestructura.adaptadores.jev_clasificador import (
+        JevClasificador,
+    )
+    from app.modulos.enriquecimiento.infraestructura.adaptadores.sitio_web import (
+        SitioWeb,
+    )
 
     clasificador = None
     if ajustes.typesafe_api_key and ajustes.typesafe_url:

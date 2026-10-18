@@ -43,3 +43,15 @@ test("si la API falla muestra el error", async () => {
   render(<ListaBusquedas />);
   await waitFor(() => expect(screen.queryByRole("alert")).toHaveTextContent("No se pudieron cargar las búsquedas."));
 });
+
+test("cada busqueda enlaza a sus costos", async () => {
+  await montar([busqueda(ID1), busqueda(ID2)]);
+  await waitFor(() => expect(screen.queryAllByRole("link", { name: "Ver costos" })).toHaveLength(2));
+  expect(screen.queryAllByRole("link", { name: "Ver costos" }).map((e) => e.getAttribute("href"))).toEqual([
+    `/costos?busqueda_id=${ID1}`, `/costos?busqueda_id=${ID2}`]);
+});
+
+test("el enlace a costos sale en ingles", async () => {
+  await montar([busqueda(ID1)], "en");
+  await waitFor(() => expect(screen.queryByRole("link", { name: "View costs" })).toBeInTheDocument());
+});
