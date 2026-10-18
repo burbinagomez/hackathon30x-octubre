@@ -1,23 +1,27 @@
 import json
 import os
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
 
 import httpx
 import pytest
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import event, text
 
 from app import db
 from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.costos.infraestructura.postgres_costos import PostgresCostos
+from app.modulos.descubrimiento.aplicacion.camaras import cargar_camaras
 from app.modulos.descubrimiento.aplicacion.registro import cargar_registro
-from app.modulos.descubrimiento.dominio.modelos import CriteriosICP
+from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, MetaFuente
+from app.modulos.descubrimiento.infraestructura.adaptadores.datos_gov_co_rues import DatosGovCoRues
 from app.modulos.descubrimiento.infraestructura.adaptadores.osm_overpass import OsmOverpass
 
 PROVEEDOR = "croma"
 BACKEND = Path(__file__).resolve().parents[2]
 FIXTURE_OSM = BACKEND / "tests" / "fixtures" / "osm" / "bogota_4711.json"
+FIXTURE_DATOS_GOV = BACKEND / "tests" / "fixtures" / "datos_gov_co" / "filas.json"
 
 
 def _url(nombre):
@@ -25,20 +29,6 @@ def _url(nombre):
     if not url:
         pytest.fail(f"falta {nombre}: los tests de integración fallan, no se saltan (R6)")
     return url
-
-
-@pytest.fixture
-def rt():
-    engine = db.crear_engine(_url("TEST_DATABASE_URL"))
-    yield engine
-    engine.dispose()
-
-
-@pytest.fixture
-def admin():
-    engine = create_engine(_url("TEST_ADMIN_DATABASE_URL"))
-    yield engine
-    engine.dispose()
 
 
 @pytest.fixture
@@ -131,4 +121,33 @@ def test_overpass_query_escribe_fila_en_costos(rt, admin, tenant):
         tipo_costo = c.execute(text("SELECT data_type FROM information_schema.columns "
                                     "WHERE table_schema = 'public' AND table_name = 'costos' AND column_name = 'costo_unitario'")).scalar()
     assert filas == [(tenant, "overpass_query", Decimal(2), Decimal("0.0000070"), "USD", "osm", "osm_overpass", None, lote, False)]
+    assert tipo_costo == "numeric"
+
+
+def test_socrata_descarga_escribe_fila_en_costos(rt, admin, tenant):
+    """datos.gov.co real contra el libro real: 1 request deja 1 fila `socrata_descarga` del tenant (rol app_rt)."""
+    reloj = [datetime(2026, 10, 17, 12, 0, tzinfo=UTC)]
+
+    def responder(request):
+        reloj[0] += timedelta(seconds=2)  # el request "dura" 2 s
+        return httpx.Response(200, json=json.loads(FIXTURE_DATOS_GOV.read_text()))
+
+    meta = MetaFuente(clave="datos_gov_co_rues", proveedor="datos.gov.co", paises=frozenset({"CO"}),
+                      filtros=frozenset({"ciiu", "departamento"}), trae=frozenset({"nit", "nombre", "ciiu", "ciudad_camara"}),
+                      tipo="dataset", licencia="CC-BY-SA-4.0")
+    lote = uuid4()
+    adaptador = DatosGovCoRues(transporte=httpx.MockTransport(responder), reloj=lambda: reloj[0], dormir=lambda _s: None,
+                               costos=PostgresCostos(rt, tenant), cache=None,
+                               camaras=cargar_camaras(BACKEND / "config" / "camaras_co.yaml"),
+                               tarifas={"computo_seg_usd": 0.0000070}, lote_id=lote, meta=meta)
+
+    adaptador.buscar(CriteriosICP("CO", {"ciiu": "4711", "departamento": "11"}), 1)
+
+    with admin.connect() as c:
+        filas = c.execute(text("SELECT tenant_id, tipo, unidades, costo_unitario, moneda, proveedor, fuente, lead_id, "
+                               "lote_id, gratis FROM costos WHERE tenant_id = :t"), {"t": tenant}).all()
+        tipo_costo = c.execute(text("SELECT data_type FROM information_schema.columns "
+                                    "WHERE table_schema = 'public' AND table_name = 'costos' AND column_name = 'costo_unitario'")).scalar()
+    assert filas == [(tenant, "socrata_descarga", Decimal(2), Decimal("0.0000070"), "USD", "datos.gov.co",
+                      "datos_gov_co_rues", None, lote, False)]
     assert tipo_costo == "numeric"

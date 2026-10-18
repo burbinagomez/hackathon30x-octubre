@@ -114,7 +114,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`.
   - Registra la fila **antes** de decidir.
   - La espera pasa por `dormir`, que no se mide.
   - `FuenteNoDisponible` lleva solo el status.
-- [ ] T036 [MIN] [002] [Paso 6] **Guarda (advisor):** `backend/tests/integration/test_costos_repo.py::test_socrata_descarga_escribe_fila_en_costos`, con `postgres_costos` real, rol `app_rt` y `SET LOCAL` del tenant. *[MIN: es la prueba de tenant y de rol `app_rt` sobre `costos`.]*
+- [X] T036 [MIN] [002] [Paso 6] **Guarda (advisor):** `backend/tests/integration/test_costos_repo.py::test_socrata_descarga_escribe_fila_en_costos`, con `postgres_costos` real, rol `app_rt` y `SET LOCAL` del tenant. *[MIN: es la prueba de tenant y de rol `app_rt` sobre `costos`.]*
   - Valida `unidades == Decimal(2)`, el `costo_unitario` como `numeric`, `gratis=false` y el `tenant_id`.
   - **Nace verde**, porque el CHECK de `costos.tipo` de la 002 ya incluye `socrata_descarga` (plan 002, línea 210) y el adaptador ya registra desde T030.
   - **Mutación:** registrar `unidades=0` (falla `== Decimal(2)`) o un `tipo` fuera del CHECK (falla la constraint) tiene que ponerlo en rojo. Se revierte.
