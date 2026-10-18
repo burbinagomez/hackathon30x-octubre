@@ -41,6 +41,8 @@ describe("tokens.css", () => {
 });
 
 // Compara el hostname parseado: un `includes` sobre la URL aceptaría cualquier host que lo contenga.
+const esDominioOsubdominio = (h: string, dominio: string) => h === dominio || h.endsWith(`.${dominio}`);
+
 const host = (href: string | null) => {
   try {
     return new URL(href ?? "").hostname;
@@ -55,20 +57,30 @@ describe("index.html", () => {
     expect(meta?.getAttribute("content")).toBe("width=device-width, initial-scale=1");
   });
 
-  test("carga Poppins y DM Sans de Google Fonts con preconnect y display=swap", () => {
-    const doc = leerHtml();
-    const preconnect = Array.from(doc.querySelectorAll('link[rel="preconnect"]'), (l) =>
-      l.getAttribute("href"),
-    );
-    expect(preconnect.some((h) => host(h) === "fonts.googleapis.com")).toBe(true);
-    expect(preconnect.some((h) => host(h) === "fonts.gstatic.com")).toBe(true);
+  test("no carga fuentes de Google: se sirven desde el propio sitio", () => {
+    const hrefs = Array.from(leerHtml().querySelectorAll("link"), (l) => host(l.getAttribute("href")));
+    expect(hrefs.filter((h) => esDominioOsubdominio(h, "googleapis.com") || esDominioOsubdominio(h, "gstatic.com"))).toEqual([]);
+  });
+});
 
-    const hojas = Array.from(doc.querySelectorAll('link[rel="stylesheet"]'), (l) =>
-      l.getAttribute("href") ?? "",
-    ).filter((h) => host(h) === "fonts.googleapis.com");
-    expect(hojas.some((h) => h.includes("family=Poppins"))).toBe(true);
-    expect(hojas.some((h) => h.includes("family=DM+Sans"))).toBe(true);
-    expect(hojas.every((h) => h.includes("display=swap"))).toBe(true);
+describe("fuentes.css", () => {
+  test("declara Poppins y DM Sans en woff2 propios con display swap", () => {
+    const fuentes = import.meta.glob<string>("./fuentes.css", { query: "?raw", import: "default", eager: true });
+    expect(Object.keys(fuentes)).toContain("./fuentes.css");
+    const caras = fuentes["./fuentes.css"].match(/@font-face\s*\{[^}]*\}/g) ?? [];
+    const de = (familia: string) =>
+      caras.filter((c) => c.includes(`"${familia}"`)).map((c) => c.match(/font-weight:\s*(\d+)/)?.[1]);
+    expect(de("Poppins")).toEqual(["500", "600", "700"]);
+    expect(de("DM Sans")).toEqual(["400", "500", "700"]);
+    // Un woff2 que falta no rompe nada visible: cae en silencio a system-ui. Por eso se cruza con public/.
+    const enDisco = Object.keys(
+      import.meta.glob("../public/fuentes/*.woff2", { query: "?url", import: "default", eager: true }),
+    ).map((r) => r.replace("../public", ""));
+    for (const c of caras) {
+      expect(c).toMatch(/font-display:\s*swap/);
+      const url = c.match(/url\("(\/fuentes\/[a-z0-9-]+\.woff2)"\)/)?.[1];
+      expect(enDisco).toContain(url);
+    }
   });
 });
 
