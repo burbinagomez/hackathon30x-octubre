@@ -17,12 +17,12 @@
   - el default de P2 no está aprobado.
 
   El default de P4 frena solo la Fase 4, que es Pulido: el [MIN] arranca sin él.
-- [x] T002 [MIN] [P] [Paso 0] `backend/pyproject.toml` suma `PyJWT`. `uv lock`.
-- [ ] T003 [MIN] [P] [Paso 0] `frontend/package.json` suma `react-i18next` e `i18next` como dependencias, y `eslint`, `typescript-eslint`, `eslint-plugin-boundaries`, `eslint-plugin-import`, `eslint-import-resolver-typescript` y `eslint-plugin-i18next` como devDependencies.
+- [x] T002 [MIN] [P] [Paso 0] `backend/pyproject.toml` suma `PyJWT`. `uv lock`. *(Con Supabase Auth pasa a `pyjwt[crypto]`; el cambio entra en T013.)*
+- [ ] T003 [MIN] [P] [Paso 0] `frontend/package.json` suma `react-i18next` e `i18next` como dependencias, y `eslint`, `typescript-eslint`, `eslint-plugin-boundaries`, `eslint-plugin-import`, `eslint-import-resolver-typescript` y `eslint-plugin-i18next` como devDependencies. Suma también `@supabase/supabase-js` (login con Supabase Auth, P15).
 - [ ] T004 [MIN] [Paso 0] **Esqueletos de Python.** Las firmas del plan, que devuelven valores equivocados para que los rojos sean por aserción:
   - `contar` → `-1` en Croma y OSM. **`datos_gov_co_rues` queda afuera:** la 011 ya implementa `contar` completo (011 tasks c64c5f8:163-173), y un stub rompería `test_contar_usa_count_con_el_mismo_where` de la 011;
   - `FabricaFuentes` (Protocol en `descubrimiento/dominio/`);
-  - `hmac_email` → `b""`;
+  - `VerificadorToken` (Protocol) y `TokenInvalido` en `acceso/dominio/`; el verificador esqueleto devuelve un `sub` fijo sin validar. *(El `hmac_email` del esqueleto ya hecho se borra en T013.)*
   - `gasto_busqueda` → `Decimal("-1")`;
   - `costo_maximo_llamada = Decimal("0")`;
   - `filtrar_por_palabras` → `[]`;
@@ -35,8 +35,8 @@
 
 - [ ] T005 [MIN] [Paso 1] **Esqueleto de la migración** `supabase/migrations/NNNN_libro_costos_busqueda.sql`:
   - las columnas e índices de plan §Migración. `leads.fusionado_en` va con FK **simple** `REFERENCES leads(id)`; la compuesta entra en T011, después del rojo;
-  - `usuarios` con sus columnas (`email_hmac bytea UNIQUE`, sin email), **sin** `CHECK` y **sin** RLS;
-  - `usuario_para_login` y `fijar_idioma` como stubs `… WHERE false`, **sin** `SECURITY DEFINER` ni `REVOKE`;
+  - `usuarios` con sus columnas (`auth_user_id uuid PRIMARY KEY`, `tenant_id`, `idioma`, `creado_en`; sin email), **sin** `CHECK` y **sin** RLS;
+  - `tenant_de_usuario` (y `fijar_idioma`, Pulido) como stubs `… WHERE false`, **sin** `SECURITY DEFINER` ni `REVOKE`;
   - las 9 vistas con sus columnas finales, `WHERE false` y **sin** `security_invoker`.
 
   `app/modelos.py` se actualiza a la par.
@@ -66,24 +66,19 @@
   - `FOREIGN KEY (tenant_id, fusionado_en) REFERENCES leads (tenant_id, id)`, que se apoya en `leads_tenant_id_id_key` (002 migración:41).
 - [ ] T012 [MIN] [Paso 1] **Rojo (security, RLS):** `backend/tests/integration/test_usuarios_repo.py`:
   - `::test_app_rt_no_lee_usuarios_directo`. **Nace verde:** `app_rt` nunca tuvo `SELECT` sobre `usuarios`. Es una guarda. **Sabotaje:** `GRANT SELECT ON usuarios TO app_rt` → rojo, y se revierte.
-  - `::test_usuario_para_login_devuelve_solo_ese_email`. Con usuarios de 2 tenants, `usuario_para_login(hmac_email('a@x.co'))` devuelve 1 fila (la de A), y un HMAC inexistente devuelve 0. Rojo hoy: el stub `WHERE false` devuelve 0 filas. **Mutación:** sin el `WHERE email_hmac = p_email_hmac` → 2 filas.
-  - `::test_fijar_idioma_no_cruza_tenants`. Control positivo: con el tenant de A, `fijar_idioma` sobre el usuario de A modifica 1 fila. Rojo hoy: el stub modifica 0. Después, con el tenant de B sobre el usuario de A, modifica 0. **Mutación:** sin `AND tenant_id = current_setting(...)` → B modifica 1 fila.
-  - `::test_funcion_es_security_definer_con_search_path[usuario_para_login|fijar_idioma]`, con el `ALTER DEFAULT PRIVILEGES` en `supabase_simulado.sql`. **Mutación:** sin el `REVOKE` → `anon` tiene `EXECUTE`.
-- [ ] T012b [MIN] [P] [Paso 1] **Rojo (security):** `backend/tests/unit/acceso/test_email_hmac.py::test_hmac_normaliza_y_depende_de_la_clave`. Reemplaza a `test_email_se_guarda_en_minusculas` (P13, decidida: `email_hmac`). El test asierta cuatro cosas:
-  - `hmac_email(" A@X.co ", k)` es `bytes` de 32;
-  - es igual a `hmac_email("a@x.co", k)`;
-  - es distinto de `hmac_email("a@x.co", otra_k)`;
-  - es igual a `hmac.new(k, b"a@x.co", sha256).digest()`.
-
-  Rojo hoy: el esqueleto devuelve `b""` y el largo 32 falla. **Mutaciones:**
-  - sin `lower()`/`strip()` → falla la igualdad;
-  - `sha256(email)` sin clave → falla la desigualdad entre claves.
+  - `::test_tenant_de_usuario_devuelve_solo_ese_usuario`. Con usuarios de 2 tenants, `tenant_de_usuario(<auth_user_id de A>)` devuelve 1 fila (tenant de A, `idioma_usuario`, `idioma_tenant`) y un uuid inexistente devuelve 0. Rojo hoy: el stub `WHERE false` devuelve 0 filas. **Mutación:** sin el `WHERE u.auth_user_id = p_auth_user_id` → 2 filas.
+  - `::test_fijar_idioma_no_cruza_tenants` **(Pulido)**. Control positivo con el tenant de A: `fijar_idioma(<uid de A>, 'en')` modifica 1 fila. Rojo hoy: el stub modifica 0. Después, con el tenant de B sobre el usuario de A, modifica 0. **Mutación:** sin `AND tenant_id = current_setting(...)` → B modifica 1 fila.
+  - `::test_funcion_es_security_definer_con_search_path[tenant_de_usuario|fijar_idioma]`, con el `ALTER DEFAULT PRIVILEGES` en `supabase_simulado.sql` (ya está). **Mutación:** sin el `REVOKE` → `anon` tiene `EXECUTE`.
+- [ ] T012b [MIN] [P] [Paso 1] **Rojo (security):** `backend/tests/unit/acceso/test_verificar_token.py`, sin red: el test genera un par EC P-256 y le pasa al verificador un JWKS local.
+  - `::test_token_valido_devuelve_sub`: devuelve el `sub` (uuid). Rojo hoy: el esqueleto devuelve un `sub` fijo distinto.
+  - `::test_token_invalido_lanza[caso]` → `TokenInvalido`: vencido, sin `exp`, sin `sub`, `aud` distinto, `iss` distinto, firmado con otra clave, `alg=none`, HS256 firmado con la clave pública como secreto (confusión de algoritmo) y `kid` ausente del JWKS. Rojo hoy: el esqueleto no lanza (falla el `pytest.raises`). **Mutaciones:** `algorithms` con `HS256`; sin `audience`; sin `issuer`; sin `require`.
 - [ ] T013 [MIN] [Paso 1] **Verde:**
-  - las funciones reales, `SECURITY DEFINER` con `search_path`;
-  - el `REVOKE`/`GRANT` y el `DO` con el guard de `pg_roles`;
-  - `acceso/dominio/email.py::hmac_email`;
-  - `EMAIL_HMAC_CLAVE` en `Settings`;
-  - `backend/scripts/crear_usuario.py` con `getpass`, que guarda solo el HMAC.
+  - `tenant_de_usuario` real (`SECURITY DEFINER` con `search_path`), el `REVOKE`/`GRANT` y el `DO` con el guard de `pg_roles`;
+  - `acceso/infraestructura/verificador_jwks.py` (`PyJWKClient`, `algorithms=["ES256","RS256"]`, `audience`, `issuer`, `require`); `pyjwt[crypto]` en `pyproject.toml`;
+  - `AUTH_JWKS_URL` y `AUTH_ISSUER` en `Settings`, `.env.example` y `docs/referencia-configuracion.md` si existe;
+  - `backend/scripts/crear_usuario.py` con `getpass`: inserta la fila de `usuarios` (`--auth-user-id`, `--tenant`);
+  - se borran `acceso/dominio/email.py` y `hmac_email`.
+  - **El `.sql` final de la 0004 es el bloque aprobado de plan.md**, con `backend/tests/arquitectura/test_migracion_0004.py` que lo compara (rojo antes: el archivo es el esqueleto).
 
 **Checkpoint**: vistas, RLS, privilegios y usuarios verdes.
 
@@ -170,23 +165,22 @@
 ## Fase 7: Auth (Paso 6) — security
 
 - [ ] T029 [MIN] [Paso 6] **Rojo (security):** `backend/tests/integration/test_auth.py`:
-  - `::test_sesion_con_clave_correcta_devuelve_token`: el login con `" A@X.co "` encuentra al usuario, porque la API llama a `usuario_para_login(hmac_email(...))`. **Mutación:** `exp` de 8 min; o pasar el email crudo sin `hmac_email` → 401.
-  - `::test_clave_incorrecta_y_email_inexistente_dan_el_mismo_401`, con un spy sobre `hashlib.scrypt` llamado en los dos casos. **Mutación:** `return 401` sin el scrypt de relleno.
-  - `::test_sin_token_da_401[ruta]`, sobre `app.routes`. **Mutación:** una ruta sin la dependencia `tenant_actual`.
-  - `::test_token_invalido_da_401[caso]`: vencido, otra clave, `alg=none`, sin `exp`, sin `tenant_id`. **Mutación:** sacar `require` → los casos sin `exp` y sin `tenant_id` pasan.
-  - `::test_app_no_arranca_sin_secreto[session_secret|email_hmac_clave]`. **Mutación:** sin el validador de largo mínimo en cualquiera de los dos.
+  - `::test_token_valido_resuelve_el_tenant_desde_usuarios`: un token con `tenant_id` (o `user_metadata.tenant_id`) de B y el `sub` de un usuario de A actúa como A. **Mutación:** leer el tenant del claim.
+  - `::test_token_valido_sin_fila_en_usuarios_da_403`: cuerpo `sin_acceso`; y borrar la fila corta el acceso con el mismo token. **Mutación:** `tenant_actual` cae a un tenant por defecto.
+  - `::test_sin_token_da_401[ruta]`, sobre `app.routes` menos `/health`. **Mutación:** una ruta sin la dependencia `tenant_actual`.
+  - `::test_token_invalido_da_401[caso]`: los de T012b, por la API. **Mutación:** `except Exception: pass` en el verificador.
+  - `::test_app_no_arranca_sin_auth_jwks_url_ni_issuer`, y `::test_jwks_inaccesible_da_503` (nunca 200). **Mutación:** devolver el `sub` sin verificar si el JWKS falla.
   - `::test_docs_desactivadas`. **Mutación:** `docs_url` por defecto.
   - `::test_cors_solo_permite_web_origin`. **Mutación:** `allow_origins=["*"]`.
-  - `::test_clave_no_aparece_en_logs`. **Mutación:** `logger.info(body)`.
-  - `::test_sesion_devuelve_idioma[caso]`. **Mutación:** `COALESCE(usuarios.idioma, tenants.idioma)` → `idioma_usuario` nunca es `null`.
-  - `::test_fijar_idioma_persiste`. **Mutación:** devolver 204 sin llamar a `fijar_idioma`.
-  - `::test_fijar_idioma_invalido_da_422[caso]`. **Mutación:** modelo sin `extra='forbid'`.
+  - `::test_token_no_aparece_en_logs`. **Mutación:** `logger.info(authorization)`.
+  - `::test_usuarios_me_devuelve_idioma[caso]`. **Mutación:** `COALESCE(usuarios.idioma, tenants.idioma)` → `idioma_usuario` nunca es `null`.
+  - `::test_fijar_idioma_persiste` **(Pulido)**. **Mutación:** devolver 204 sin llamar a `fijar_idioma`.
+  - `::test_fijar_idioma_invalido_da_422[caso]` **(Pulido)**. **Mutación:** modelo sin `extra='forbid'`.
 - [ ] T030 [MIN] [Paso 6] **Verde:**
-  - `acceso/dominio/claves.py` (scrypt con n=2¹⁷, r=8, p=1 y `maxmem=2²⁸`);
-  - `repositorio_usuarios.py`;
-  - `app/api/sesion.py`;
-  - `/auth/sesion` y `PATCH /usuarios/me`;
-  - `session_secret` y `web_origin` en `Settings`;
+  - `repositorio_usuarios.py` (llama a `tenant_de_usuario`);
+  - `app/api/sesion.py` (Bearer → `VerificadorToken` → `tenant_de_usuario(sub)` → `tenant_actual`);
+  - `GET /usuarios/me` y `PATCH /usuarios/me`;
+  - `web_origin` en `Settings`;
   - docs off y CORS.
 
 ## Fase 8: Endpoints (Paso 7)
@@ -229,6 +223,7 @@
   - `frontend/src/i18n/elegirIdioma.test.ts::precedencia[caso]`. **Mutación:** el tenant antes que el navegador.
 - [ ] T038 [MIN] [Paso 8] **Verde:** `src/i18n/` y la regla `i18next/no-literal-string`.
 - [ ] T039 [MIN] [P] [Paso 8] **Rojo:**
+  - `frontend/src/acceso/Login.test.tsx::login_con_supabase_pide_usuarios_me`: inicia sesión con `supabase-js` (mockeado) y llama a `GET /usuarios/me` con el access token. **Mutación:** llamar a la API sin el `Bearer`.
   - `frontend/src/acceso/Login.test.tsx::selector_sin_sesion_no_guarda`. **Mutación:** `PATCH` sin mirar la sesión.
   - `frontend/src/api/cliente.test.ts::un_401_lleva_al_login_y_borra_el_token`. **Mutación:** no borrar el token.
 - [ ] T040 [MIN] [P] [Paso 8] **Rojo:** `frontend/src/busqueda/NuevaBusqueda.test.tsx`, los 6 tests de spec:251-257. **Mutación:** habilitar Buscar comparando el estimado en lugar del máximo; no invalidar la vista previa al cambiar un filtro.
@@ -247,7 +242,7 @@
 
 ## Fase 10: E2E local (Paso 9) — recortable, segundo en el orden de corte
 
-- [ ] T043 [Pulido] [Paso 9] **Rojo:** `frontend/e2e/busqueda.spec.ts::login_vista_previa_buscar_tablero`, con `backend/tests/stubs/servidor_fuentes.py` vía `CROMA_BASE_URL` y `OVERPASS_URL`. Nunca contra Railway.
+- [ ] T043 [Pulido] [Paso 9] **Rojo:** `frontend/e2e/busqueda.spec.ts::login_vista_previa_buscar_tablero`, con `backend/tests/stubs/servidor_fuentes.py` vía `CROMA_BASE_URL` y `OVERPASS_URL`. Nunca contra Railway. El stub sirve además `/auth/v1/token` y un JWKS firmado con una clave de prueba.
 - [ ] T044 [Pulido] [Paso 9] **Verde:** el job de CI levanta api, web, Postgres y el stub.
 
 ## Fase 11: Cola de revisión (Paso 10) — recortable, primero en el orden de corte
@@ -337,7 +332,7 @@
 - la del [MIN]:
   - `busquedas`: el `CHECK` de estado (P1);
   - `usuarios` con RLS;
-  - `usuario_para_login`;
+  - `tenant_de_usuario`;
   - `v_tablero_fuentes` reducida a `fuente`, `encontrados` y `unicos`, con fila `TOTAL`;
   - `v_atribuciones`;
   - el `DO` de `REVOKE`.
@@ -349,20 +344,20 @@ Lo que no figura acá va a Pulido.
 
 | Tarea | Entra al [MIN] | Por qué (dudosas) |
 |---|---|---|
-| T004 | `FabricaFuentes`, `hmac_email`, `VistaPrevia`, `EjecutarBusqueda` y los routers | `contar`, `gasto_busqueda`, `costo_maximo_llamada` y `filtrar_por_palabras` no los usa el [MIN] |
+| T004 | `FabricaFuentes`, `VerificadorToken`, `VistaPrevia`, `EjecutarBusqueda` y los routers | `contar`, `gasto_busqueda`, `costo_maximo_llamada` y `filtrar_por_palabras` no los usa el [MIN] |
 | T005 | La migración [MIN] de arriba, con stubs, sin `security_invoker` y sin RLS en `usuarios` | `fusionado_en` es de la cola de dedup |
-| T006 | Todo. La mutación pasa a ser "borrar `usuarios.email_hmac` de `modelos.py`" | `fusionado_en` no está en el [MIN] |
+| T006 | Todo. La mutación pasa a ser "borrar `usuarios.auth_user_id` de `modelos.py`" | `fusionado_en` no está en el [MIN] |
 | T007 | Dos tests: `::test_lead_de_dos_fuentes_cuenta_una_vez_en_total` y uno nuevo, `::test_encontrados_y_unicos_por_fuente` | El nuevo usa el fixture de spec:77-112 y asierta solo `fuente`, `encontrados` y `unicos`. **Mutación:** `unicos = count(*)` → osm 8 ≠ 7. Es el conteo que muestra el tablero, sin costos |
 | T008 | Los cuerpos de `v_tablero_fuentes` reducida y de `v_atribuciones`, el `GRANT` y el `CHECK` de estado (P1) | |
 | T009 | `[vista]` sobre las dos vistas [MIN], `::test_toda_vista_es_security_invoker` y `::test_usuarios_tiene_rls` | `::test_tenant_b_no_fusiona_con_lead_de_a` va con `fusionado_en` |
 | T011 | `security_invoker` y la RLS de `usuarios` | La FK compuesta va con `fusionado_en` |
-| T012 | `::test_app_rt_no_lee_usuarios_directo`, `::test_usuario_para_login_devuelve_solo_ese_email` y `::test_funcion_es_security_definer_con_search_path[usuario_para_login]` | Elegir el idioma (`fijar_idioma`) no hace falta para ver leads: el idioma sale de la sesión y del navegador |
+| T012 | `::test_app_rt_no_lee_usuarios_directo`, `::test_tenant_de_usuario_devuelve_solo_ese_usuario` y `::test_funcion_es_security_definer_con_search_path[tenant_de_usuario]` | `fijar_idioma` y su test van a Pulido |
 | T013 | Todo, menos `fijar_idioma` | |
 | T024 | Dos cosas: `::test_crea_busqueda_en_borrador_con_criterios`, sin la parte de la fábrica, y la parte de motivos de `::test_conteo_por_fuente_y_motivo_de_las_descartadas` | Sin `contar`, la vista previa no arma fuentes. **Mutación:** usar `crear_busqueda` de la 002 → estado `creada`; o no copiar `ignoradas` |
 | T025 | `crear_borrador`, `obtener_borrador` y `pasar_a_ejecutando` (P2) | `fijar_estimados` y `ignorados` (P7) son de los conteos |
 | T026 | `::test_solo_ejecuta_borrador` y `::test_usa_los_criterios_guardados` | Tope y palabras clave, a Pulido |
 | T027 | `EjecutarBusqueda` sobre el borrador, con `lote_id = busqueda.id` y el estado final (P1) | Tope y `naturales_por_fuente`, a Pulido |
-| T029 | Todo, menos `::test_fijar_idioma_persiste` y `::test_fijar_idioma_invalido_da_422` | `::test_sesion_devuelve_idioma` queda: `elegirIdioma` (T037) lo usa |
+| T029 | Todo, menos `::test_fijar_idioma_persiste` y `::test_fijar_idioma_invalido_da_422` | `::test_usuarios_me_devuelve_idioma` queda: `elegirIdioma` (T037) lo usa |
 | T030 | Todo, menos `PATCH /usuarios/me` | |
 | T031 | Siete tests: `::test_tenant_sale_del_token_no_del_body`, `::test_tenant_b_no_ejecuta_busqueda_de_a`, `::test_ejecutar_dos_veces_da_409`, `::test_validacion[caso]` (sin los casos de tope), `::test_vista_previa_devuelve_motivos_como_codigo`, `::test_actividades_trae_ambos_nombres` y `::test_tablero_atribucion_solo_de_fuentes_presentes[caso]`. Más uno nuevo: `::test_tablero_devuelve_encontrados_y_unicos_del_tenant` | El nuevo siembra leads en A y en B, y como A asierta que salen sus filas y la `TOTAL`. **Mutación:** serializar `unicos` desde `encontrados`. La atribución entra porque ODbL la exige al mostrar datos de OSM. Las actividades entran porque sin ellas el formulario no elige CIIU |
 | T032 | Los routers `busquedas`, `tablero` (reducido) y `actividades`, `repositorio_tablero.py`, y `nombre_es`/`nombre_en` en `actividades.yaml` | `limites_app` (P11) es del tope, y naturales (D7) va a Pulido |
