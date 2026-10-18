@@ -5,7 +5,7 @@ import Esqueleto from "../compartido/Esqueleto";
 import Enlace from "../compartido/Enlace";
 import { RUTA_BUSQUEDAS, RUTA_LEADS } from "../compartido/rutas";
 import { entero, moneda, monedaFina, porcentaje } from "../compartido/formato";
-import { obtenerCpql, obtenerTablero } from "./api";
+import { obtenerCpql, exportarParaDapta, obtenerTablero } from "./api";
 import type { Cpql, FilaCpql, FilaTablero, Tablero as DatosTablero } from "./tipos";
 
 type Columna =
@@ -125,6 +125,7 @@ export default function Tablero() {
   const [datos, setDatos] = useState<DatosTablero | null>(null);
   const [fallo, setFallo] = useState(false);
   const [cpql, setCpql] = useState<Cpql | null>(null);
+  const [falloExport, setFalloExport] = useState(false);
 
   useEffect(() => {
     obtenerTablero().then(setDatos).catch(() => setFallo(true));
@@ -149,7 +150,13 @@ export default function Tablero() {
   return (
     <main className="pantalla pantalla-ancha">
       <h1>{t("tablero.titulo")}</h1>
-      <Enlace a={RUTA_BUSQUEDAS}>{t("tablero.ver_busquedas")}</Enlace>
+      <div className="acciones acciones-fin">
+        <Enlace a={RUTA_BUSQUEDAS}>{t("tablero.ver_busquedas")}</Enlace>
+        <button type="button" className="boton" onClick={() => exportarParaDapta().catch(() => setFalloExport(true))}>
+          {t("tablero.exportar_dapta")}
+        </button>
+      </div>
+      {falloExport && <p role="alert" className="error">{t("tablero.error_exportar")}</p>}
       <div className="tabla-scroll">
       <table>
         <thead>

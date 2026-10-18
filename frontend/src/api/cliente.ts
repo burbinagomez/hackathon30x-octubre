@@ -32,3 +32,14 @@ export async function pedir<T>(ruta: string, { metodo, cuerpo }: Opciones = {}):
   if (!respuesta.ok) throw new ErrorApi(respuesta.status);
   return respuesta.status === 204 ? (undefined as T) : ((await respuesta.json()) as T);
 }
+
+/** Igual que `pedir`, pero devuelve el cuerpo como archivo (un CSV para bajar). */
+export async function descargar(ruta: string): Promise<Blob> {
+  if (!RUTA_API.test(ruta)) throw new Error("ruta_invalida");
+  const token = await tokenActual();
+  const respuesta = await fetch(`${import.meta.env.VITE_API_URL ?? ""}${ruta}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!respuesta.ok) throw new ErrorApi(respuesta.status);
+  return respuesta.blob();
+}

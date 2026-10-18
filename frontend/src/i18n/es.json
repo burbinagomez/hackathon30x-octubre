@@ -121,7 +121,9 @@
     "embudo_contactables": "Contactables",
     "embudo_con_telefono": "Con teléfono",
     "embudo_calificados": "Calificados",
-    "embudo_ayuda": "Cada barra se mide contra los leads únicos de la fuente."
+    "embudo_ayuda": "Cada barra se mide contra los leads únicos de la fuente.",
+    "exportar_dapta": "Exportar para Dapta (CSV)",
+    "error_exportar": "No se pudo exportar. Probá de nuevo."
   },
   "idioma": {
     "etiqueta": "Idioma",
