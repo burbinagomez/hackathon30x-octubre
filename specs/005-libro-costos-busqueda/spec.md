@@ -406,7 +406,7 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
 | `leads` | `+ fusionado_en uuid NULL`, `FOREIGN KEY (tenant_id, fusionado_en) REFERENCES leads (tenant_id, id)` (se apoya en `leads_tenant_id_id_key` de la 002; una FK simple no pasa por RLS: `test_rls.py::test_tenant_b_no_fusiona_con_lead_de_a`) |
 | `revision_dedup` | `+ motivo text NULL` |
 | `usuarios` | nueva, con RLS e `idioma` (arriba) |
-| `usuario_para_login(text)` | función `SECURITY DEFINER` (arriba), devuelve también los dos idiomas |
+| `usuario_para_login(bytea)` | función `SECURITY DEFINER` (arriba), devuelve también los dos idiomas |
 | `fijar_idioma(uuid, text)` | función `SECURITY DEFINER` (arriba) |
 | `costos` | índice `(tenant_id, lote_id)` |
 | `lead_fuentes` | índice `(busqueda_id, fuente)` |
