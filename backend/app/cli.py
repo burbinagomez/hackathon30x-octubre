@@ -71,6 +71,7 @@ def _parser() -> argparse.ArgumentParser:
     b.add_argument("--pais", required=True)
     b.add_argument("--ciiu")
     b.add_argument("--departamento")
+    b.add_argument("--ciudad")
     return p
 
 
@@ -102,7 +103,7 @@ def main(argv=None, *, catalogo=catalogo, persistencia=None) -> int:
 
     costos = _ContadorDeCreditos(persistencia.costos)
     tarifas = _cargar_tarifas()
-    filtros = {k: v for k, v in (("ciiu", args.ciiu), ("departamento", args.departamento)) if v}
+    filtros = {k: v for k, v in (("ciiu", args.ciiu), ("departamento", args.departamento), ("ciudad", args.ciudad)) if v}
 
     def fabrica(clase, meta):
         def armar(lote_id: UUID):

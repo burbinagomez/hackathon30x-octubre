@@ -93,7 +93,7 @@ Nota de proceso: T049 nació verde porque T016b se hizo antes (el orden de esta 
 
 ## Fase 6: CLI y corrida real (Paso 10)
 
-- [ ] T052 [MIN] [Paso 10] **Rojo + Verde:** `backend/tests/unit/test_cli.py::test_ciudad_llega_a_los_criterios`. Con `catalogo={"osm_overpass": FuenteFalsa}`, `--ciudad Bogotá` llega en `criterios.filtros["ciudad"]`. El rojo es por mutación: primero `--ciudad` entra en `argparse` sin pasar a los criterios, y falla el assert. Después, el verde en `app/cli.py`. El resumen detallado va a `T052p`. — 002: T040, T041 (en `main`, T041 ya lee `tarifas.yaml` con `Decimal(str(v))`)
+- [x] T052 [MIN] [Paso 10] **Rojo + Verde:** `backend/tests/unit/test_cli.py::test_ciudad_llega_a_los_criterios`. Con `catalogo={"osm_overpass": FuenteFalsa}`, `--ciudad Bogotá` llega en `criterios.filtros["ciudad"]`. El rojo es por mutación: primero `--ciudad` entra en `argparse` sin pasar a los criterios, y falla el assert. Después, el verde en `app/cli.py`. El resumen detallado va a `T052p`. — 002: T040, T041 (en `main`, T041 ya lee `tarifas.yaml` con `Decimal(str(v))`)
 - [ ] T053 [MIN] [Paso 10] **Una** corrida real contra Overpass (Bogotá, 4711), **avisada antes**. Se anotan los segundos, los elementos y el `name` real de la relación de Bogotá, sin copiar ningún dato de contacto. Si difiere de la fixture, se corrige la fixture y se vuelve a la Fase 3. Dudosa: es [MIN] porque la fixture es sintética, y sin una corrida real no está probado que OSM devuelva leads. — 002: T041 (vía T052)
 
 ---
