@@ -23,14 +23,27 @@ test.each([
   ["secret key", "sb_" + "secret_abcdefghijkl"],
   ["vacía", ""],
 ])("rechaza_una_key_que_no_es_publishable[%s]", async (_caso, key) => {
-  let error: unknown;
-  await cargar(key).catch((e) => (error = e));
-  expect(error, "el módulo cargó con una key que no es publishable").toBeInstanceOf(Error);
-  // El mensaje no repite el valor: un secreto no puede terminar en los logs.
-  if (key) expect((error as Error).message).not.toContain(key);
+  const aviso = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  const modulo = await cargar(key).catch(() => ({}) as Partial<Awaited<ReturnType<typeof cargar>>>);
+  // El módulo ya no rompe la carga (pantalla en blanco): declara la configuración inválida y no crea el cliente.
+  expect(modulo.configuracionValida).toBe(false);
+  expect(modulo.supabase).toBeNull();
+  const { createClient } = await import("@supabase/supabase-js");
+  expect(createClient).not.toHaveBeenCalled();
+  // Nada imprime el valor: un secreto no puede terminar en los logs.
+  if (key) expect(JSON.stringify(aviso.mock.calls)).not.toContain(key);
+  aviso.mockRestore();
+});
+
+test("sin_url_de_supabase_tampoco_crea_el_cliente", async () => {
+  vi.stubEnv("VITE_SUPABASE_URL", "");
+  const modulo = await cargar("sb_publishable_abcdefghijkl").catch(() => ({}) as Partial<Awaited<ReturnType<typeof cargar>>>);
+  expect(modulo.configuracionValida).toBe(false);
+  expect(modulo.supabase).toBeNull();
 });
 
 test("acepta_una_key_publishable", async () => {
   const modulo = await cargar("sb_publishable_abcdefghijkl");
-  expect(modulo.supabase).toBeDefined();
+  expect(modulo.configuracionValida).toBe(true);
+  expect(modulo.supabase).not.toBeNull();
 });

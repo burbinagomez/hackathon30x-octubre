@@ -34,7 +34,9 @@ cd backend && uv sync
 # CIFRADO_KEY es obligatoria (sin ella la app no arranca): 32 bytes en base64, p. ej.
 #   python3 -c "import base64,os; print(base64.b64encode(os.urandom(32)).decode())"
 # En Railway va como variable de `api`; nunca en el repo. Perderla deja ilegibles los datos cifrados.
+# AUTH_JWKS_URL y AUTH_ISSUER (URLs públicas de Supabase Auth, sin secreto) también son obligatorias en la api; valores de ejemplo:
 CIFRADO_KEY=<clave> DATABASE_URL=postgresql+psycopg://app_rt@localhost:5432/postgres CORS_ORIGINS=http://localhost:5173 \
+  AUTH_JWKS_URL=https://<ref>.supabase.co/auth/v1/.well-known/jwks.json AUTH_ISSUER=https://<ref>.supabase.co/auth/v1 \
   uv run uvicorn app.main:app --reload            # http://localhost:8000/health
 
 # Front (otra terminal)

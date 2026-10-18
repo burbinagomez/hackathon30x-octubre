@@ -1,7 +1,13 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 // Cada slice con UI suma acá sus rutas (regla responsive, docs/decisiones.md).
-const RUTAS = ["/"];
+// `listo` es el elemento propio de la pantalla que se espera antes de medir; "/" espera el /^API:/ de health.
+const RUTAS = [
+  { ruta: "/", listo: (page: Page) => page.getByText(/^API:/) },
+  { ruta: "/login", listo: (page: Page) => page.getByRole("heading", { level: 1 }) },
+  { ruta: "/busqueda/nueva", listo: (page: Page) => page.getByRole("heading", { level: 1 }) },
+  { ruta: "/tablero", listo: (page: Page) => page.getByRole("heading", { level: 1 }) },
+];
 
 // Sin spread de devices[...]: traen defaultBrowserType "webkit" y el único proyecto es chromium.
 const VIEWPORTS = [
@@ -16,11 +22,11 @@ for (const v of VIEWPORTS) {
   test.describe(v.nombre, () => {
     test.use({ viewport: v.viewport, isMobile: v.isMobile, hasTouch: v.hasTouch });
 
-    for (const ruta of RUTAS) {
+    for (const { ruta, listo } of RUTAS) {
       test(`${ruta} respeta marca y responsive`, async ({ page }) => {
         await page.goto(ruta);
-        // Medir antes de que /health conteste mediría una página a medias.
-        await expect(page.getByText(/^API:/)).toBeVisible();
+        // Medir antes de que la pantalla (o /health) conteste mediría una página a medias.
+        await expect(listo(page).first()).toBeVisible();
 
         const medida = await page.evaluate(() => ({
           scroll: document.documentElement.scrollWidth,
@@ -55,6 +61,16 @@ for (const v of VIEWPORTS) {
         expect.soft(colores.length, "elementos con texto visible").toBeGreaterThan(0);
         const enLima = colores.filter((c) => c.color === LIMA).map((c) => c.tag);
         expect.soft(enLima, "texto en lima").toEqual([]);
+
+        // Regla 4: objetivos táctiles de al menos 44 x 44 px (controles y links visibles).
+        const chicos = await page.evaluate(() =>
+          Array.from(document.querySelectorAll("button, input, select, textarea, a[href]"))
+            .filter((el) => el.checkVisibility())
+            .map((el) => ({ el, r: el.getBoundingClientRect() }))
+            .filter(({ r }) => r.width < 44 || r.height < 44)
+            .map(({ el, r }) => `${el.tagName} ${Math.round(r.width)}x${Math.round(r.height)}`),
+        );
+        expect.soft(chicos, "objetivos táctiles menores a 44x44").toEqual([]);
 
         // Canario, última aserción: prueba que la medición detecta un desborde. Después no se mide nada.
         const desborde = await page.evaluate(() => {

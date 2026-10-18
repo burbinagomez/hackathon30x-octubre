@@ -25,6 +25,8 @@ def entorno(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://app_rt:x@localhost/db")
     monkeypatch.setenv("CORS_ORIGINS", "http://localhost:5173")
     monkeypatch.setenv("CIFRADO_KEY", nueva_clave_de_cifrado())  # sin ella la app no arranca
+    monkeypatch.setenv("AUTH_JWKS_URL", "https://proyecto.example/auth/v1/.well-known/jwks.json")  # obligatorias
+    monkeypatch.setenv("AUTH_ISSUER", "https://proyecto.example/auth/v1")
     return monkeypatch
 
 

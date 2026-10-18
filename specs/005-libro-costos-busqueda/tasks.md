@@ -167,7 +167,7 @@
 
 ## Fase 7: Auth (Paso 6) — security
 
-- [ ] T029 [MIN] [Paso 6] **Rojo (security):** `backend/tests/integration/test_auth.py`:
+- [x] T029 [MIN] [Paso 6] **Rojo (security):** `backend/tests/integration/test_auth.py`:
   - `::test_token_valido_resuelve_el_tenant_desde_usuarios`: un token con `tenant_id` (o `user_metadata.tenant_id`) de B y el `sub` de un usuario de A actúa como A. **Mutación:** leer el tenant del claim.
   - `::test_token_valido_sin_fila_en_usuarios_da_403`: cuerpo `sin_acceso`; y borrar la fila corta el acceso con el mismo token. **Mutación:** `tenant_actual` cae a un tenant por defecto.
   - `::test_sin_token_da_401[ruta]`, sobre `app.routes` menos `/health`. **Mutación:** una ruta sin la dependencia `tenant_actual`.
@@ -179,11 +179,11 @@
   - `::test_usuarios_me_devuelve_idioma[caso]`. **Mutación:** `COALESCE(usuarios.idioma, tenants.idioma)` → `idioma_usuario` nunca es `null`.
   - `::test_fijar_idioma_persiste` **(Pulido)**. **Mutación:** devolver 204 sin llamar a `fijar_idioma`.
   - `::test_fijar_idioma_invalido_da_422[caso]` **(Pulido)**. **Mutación:** modelo sin `extra='forbid'`.
-- [ ] T030 [MIN] [Paso 6] **Verde:**
+- [x] T030 [MIN] [Paso 6] **Verde:**
   - `repositorio_usuarios.py` (llama a `tenant_de_usuario`);
   - `app/api/sesion.py` (Bearer → `VerificadorToken` → `tenant_de_usuario(sub)` → `tenant_actual`);
-  - `GET /usuarios/me` y `PATCH /usuarios/me`;
-  - `web_origin` en `Settings`;
+  - `GET /usuarios/me` y `PATCH /usuarios/me` → Pulido;
+  - `web_origin` en `Settings` → reemplazado por `CORS_ORIGINS` (plan.md:359);
   - docs off y CORS.
 
 ## Fase 8: Endpoints (Paso 7)

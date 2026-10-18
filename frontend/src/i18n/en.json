@@ -12,6 +12,9 @@
     "pais": "The source does not cover this country",
     "sin_geografia": "The source needs a state or city"
   },
+  "config": {
+    "incompleta": "Incomplete configuration"
+  },
   "salud": {
     "estado": "API: {{api}} · DB: {{db}}"
   },
@@ -55,6 +58,7 @@
     "ingresos_min": "Minimum revenue"
   },
   "tablero": {
+    "error": "The dashboard could not be loaded. Try again.",
     "titulo": "Dashboard by source",
     "fuente": "Source",
     "encontrados": "Found",
