@@ -65,6 +65,18 @@ services:
       CROMA_API_KEY: ${CROMA_API_KEY:-}
       TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
       TYPESAFE_URL: ${TYPESAFE_URL:-}
+      # Email (spec 007): los lee `enviar` de la CLI; BAJA_SECRET también la api (/baja). Vacías, la api arranca igual.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USUARIO: ${SMTP_USUARIO:-}
+      SMTP_CLAVE: ${SMTP_CLAVE:-}
+      SMTP_SEGURIDAD: ${SMTP_SEGURIDAD:-ssl}
+      REMITENTE: ${REMITENTE:-}
+      BAJA_SECRET: ${BAJA_SECRET:-}
+      API_BASE_URL: http://localhost:8000
+      URL_PRIVACIDAD: ${URL_PRIVACIDAD:-}
+      EMAIL_MODO: ${EMAIL_MODO:-prueba}
+      EMAIL_PRUEBA_DESTINOS: ${EMAIL_PRUEBA_DESTINOS:-}
     ports: ["8000:8000"]
 
   web:
