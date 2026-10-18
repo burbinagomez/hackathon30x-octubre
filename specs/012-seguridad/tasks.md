@@ -14,13 +14,13 @@
 ## Fase 1: Puerta y setup
 
 - [ ] T001 [Paso 0] [MIN] `swarm`: `git fetch origin`; confirmar en `origin/main` el estado de D1–D7 (tabla del plan, verificada en 550928d) y escribir el resultado en el PR. Confirmar que `supabase/migrations/` sigue sin una 0007: la migración de E4 está **fijada en 0007** (P4); si otra rama la tomó, avisar a Daniel antes de seguir.
-- [ ] T002 [Paso 0] [MIN] **Daniel**: responder P1 (fuentes) y P2 (sesión). Las propuestas del plan (self-host, `sessionStorage`) no se aplican sin su respuesta.
+- [x] T002 [Paso 0] [MIN] **Daniel**: respondió P1–P7 el 2026-10-17 ("sí a todo"): self-host de fuentes y sesión en `sessionStorage`. Ver la tabla de decisiones del plan.
 
 ## Fase 2: E1 — CSP y cabeceras en `frontend/vercel.json`
 
-- [ ] T010 [P] [Paso 1] [MIN] `lead` **Rojo**: `frontend/tests/arquitectura/cabeceras.test.ts`: parsea `frontend/vercel.json` y para `source: "/(.*)"` exige la CSP **exacta** (directiva por directiva), HSTS, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy` y COOP; `connect-src` con `'self'`, un origen `https://<ref>.supabase.co` y el origen de la api (más los de `VITE_SUPABASE_URL` / `VITE_API_URL` si están seteadas); y que el rewrite a `/index.html` siga. Hoy falla en el assert porque `vercel.json` no tiene `headers`. Pegar el output.
+- [ ] T010 [P] [Paso 1] [MIN] `lead` **Rojo**: `frontend/tests/arquitectura/cabeceras.test.ts`: parsea `frontend/vercel.json` y para `source: "/(.*)"` exige la CSP **exacta** (directiva por directiva), HSTS, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy` y COOP; `connect-src` exactamente `'self' https://ouhetsbchchwsyqxwhxb.supabase.co https://api.profitdata.tech`; y que el rewrite a `/index.html` siga. Hoy falla en el assert porque `vercel.json` no tiene `headers`. Pegar el output.
 - [ ] T011 (advisor) Revisa T010: que la CSP se compare exacta (no `contains`), que el test lea el `vercel.json` real y no una copia, y que falle por el motivo correcto.
-- [ ] T012 [Paso 1] [MIN] **Daniel**: dictar los dos orígenes públicos de `connect-src` (el de `VITE_SUPABASE_URL` y el de `VITE_API_URL` cargadas en Vercel). Son públicos; ningún secreto va a `vercel.json`.
+- [x] T012 [Paso 1] [MIN] **Daniel**: dictó los dos orígenes públicos de `connect-src`: `https://ouhetsbchchwsyqxwhxb.supabase.co` (`VITE_SUPABASE_URL`) y `https://api.profitdata.tech` (`VITE_API_URL`). Son públicos; ningún secreto va a `vercel.json`.
 - [ ] T013 [Paso 1] [MIN] `lead` **Verde**: bloque `headers` en `frontend/vercel.json` (plan §E1), con los dos orígenes literales de T012 y sin tocar el rewrite. T010 en verde.
 - [ ] T014 [Paso 1] [MIN] **Mutación** `lead`: sacar `frame-ancestors 'none'` → T010 rojo. Sacar el origen de Supabase de `connect-src` → rojo. Restaurar.
 - [ ] T016 [Paso 1] [MIN] **Daniel**: deploy en Vercel y `curl -sI https://www.profitdata.tech/` con la CSP en la respuesta. Frontera humana.
@@ -28,10 +28,10 @@
 
 ## Fase 3: E2 — Google Fonts fuera de `index.html`
 
-- [ ] T020 [P] [Paso 2] [MIN] `lead` **Rojo**: `frontend/src/test/index_html.test.ts::no_carga_recursos_de_terceros`: lee `frontend/index.html` y falla si hay un `href` o `src` con `https://` (P1 = self-host) o con un origen que no está en la CSP de `vercel.json` (P1 = permitir Google). Hoy falla en el assert por `fonts.googleapis.com`.
-- [ ] T021 [Paso 2] [MIN] `lead` **Verde** (P1 = self-host): DM Sans 400/500/700 y Poppins 500/600/700 en `frontend/public/fuentes/*.woff2`, `@font-face` en `frontend/src/estilos/fuentes.css`, y fuera los tres `<link>` de Google de `index.html`. Con P1 = permitir Google: sumar `https://fonts.googleapis.com` a `style-src` y `https://fonts.gstatic.com` a `font-src` en `vercel.json` y en `cabeceras.test.ts`. T020 en verde.
+- [ ] T020 [P] [Paso 2] [MIN] `lead` **Rojo**: `frontend/src/test/index_html.test.ts::no_carga_recursos_de_terceros`: lee `frontend/index.html` y falla si hay un `href` o `src` con `https://` (P1 = self-host). Hoy falla en el assert por `fonts.googleapis.com`.
+- [ ] T021 [Paso 2] [MIN] `lead` **Verde** (P1, self-host): DM Sans 400/500/700 y Poppins 500/600/700 en `frontend/public/fuentes/*.woff2`, `@font-face` en `frontend/src/estilos/fuentes.css`, y fuera los tres `<link>` de Google de `index.html`. T020 en verde.
 - [ ] T022 [Paso 2] [MIN] **Mutación** `lead`: volver a pegar el `<link>` de Google en `index.html` → T020 rojo. Restaurar.
-- [ ] T023 [Paso 2] `swarm`: confirmar la licencia OFL de las dos familias y anotarla en el PR (solo si P1 = self-host).
+- [ ] T023 [Paso 2] `swarm`: confirmar la licencia OFL de las dos familias y anotarla en el PR.
 
 ## Fase 4: E3 — Sesión de supabase-js
 
@@ -74,7 +74,7 @@
 ## Fase 7: E5 — Rate limit del login
 
 - [ ] T070 [Paso 8] **Daniel**: copiar de Supabase (Authentication → Rate Limits) los valores vigentes a `docs/seguridad/revision-002-008.md`, sección "Login". Frontera humana: el panel es de Daniel.
-- [ ] T071 [Paso 8] `security`: con esos valores, recomendar en el mismo documento si el riesgo sigue aceptado (P3). No construye limitador: `test_sin_login_propio.py` ya fija que la api no tiene login.
+- [ ] T071 [Paso 8] `security`: con esos valores, confirmar en el mismo documento que el riesgo sigue aceptado (P3, decidido). No construye limitador: `test_sin_login_propio.py` ya fija que la api no tiene login.
 
 ## Fase 8: E2E de seguridad
 
@@ -88,14 +88,14 @@
 
 - T001 y T002 bloquean todo.
 - Las fases 2, 3, 4 y 6 son independientes entre sí: un `lead` por fase.
-- La Fase 3 depende de la 2 solo si P1 = permitir Google (cambia la CSP).
+- La Fase 3 no depende de la 2: con self-host (P1) la CSP no cambia.
 - La Fase 5 espera la aprobación de T040 para T048; T041–T047 pueden avanzar antes, sin mergear.
 - La Fase 8 va al final: necesita deploy de E1, E2 y E3.
 - Los [P] dentro de una fase se escriben en paralelo.
 
 ## Orden de corte
 
-Si falta tiempo, se corta en este orden (P7, propuesta pendiente de Daniel):
+Si falta tiempo, se corta en este orden (P7, decidido por Daniel):
 1. pantalla de cumplimiento (T066);
 2. límites por tenant (T063–T065);
 3. proxy same-origin (P5, no está en estas tareas).

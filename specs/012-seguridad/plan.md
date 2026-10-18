@@ -2,7 +2,7 @@
 
 **Branch**: `feature/012-seguridad` | **Date**: 2026-10-18 | **Spec**: [spec.md](./spec.md)
 
-> La spec es anterior a la decisión de Supabase Auth (005 plan:335, constitución 2.0.0). Este plan no la reescribe: marca qué partes quedan superadas ("Qué cambió desde la spec") y planifica lo que sigue valiendo, más cinco entradas nuevas que pidió el dueño (E1–E5). Lo que la spec no decide va a **Preguntas abiertas**, con una propuesta que no se aplica hasta que la apruebe Daniel.
+> La spec es anterior a la decisión de Supabase Auth (005 plan:335, constitución 2.0.0). Este plan no la reescribe: marca qué partes quedan superadas ("Qué cambió desde la spec") y planifica lo que sigue valiendo, más cinco entradas nuevas que pidió el dueño (E1–E5). Lo que la spec no decide va a **Preguntas abiertas**, con la decisión final de Daniel (2026-10-17).
 >
 > Artefactos: como en la 002, la 005 y la 011, este slice entrega solo `plan.md` y `tasks.md`.
 
@@ -10,8 +10,8 @@
 
 La 012 entrega:
 - **E1.** CSP y cabeceras de seguridad en `frontend/vercel.json` (el front se publica en Vercel, #39), con `cabeceras.test.ts` sobre ese archivo; el `Caddyfile` queda solo como alternativa;
-- **E2.** las fuentes de Google fuera de `index.html` (o permitidas en la CSP, P1), con un test que lo fija;
-- **E3.** la sesión de supabase-js fuera de `localStorage` (o la decisión escrita de dejarla, P2);
+- **E2.** las fuentes de Google fuera de `index.html` (self-host, P1), con un test que lo fija;
+- **E3.** la sesión de supabase-js fuera de `localStorage` (a `sessionStorage`, P2);
 - **E4.** `PATCH /usuarios/me` con la función `fijar_idioma` (`SECURITY DEFINER`), DDL **pendiente de aprobación de Daniel**;
 - **E5.** el rate limit del login: sigue como riesgo aceptado (005 plan:357); la 012 solo deja escrito y verificable qué límite pone Supabase Auth;
 - lo de la spec que sigue vigente: revisión `security` de 002–008, PII transversal en logs (middleware de errores y 422 sin `input`), límites por tenant en las rutas que gastan créditos y la pantalla de cumplimiento.
@@ -58,7 +58,7 @@ La spec diseña una sesión propia. Con Supabase Auth esas partes no se construy
 | `check_cabeceras.sh` sobre la imagen `web` | **Cambia (E1)** | El front productivo no es la imagen: el test pasa a `cabeceras.test.ts` sobre `vercel.json`. |
 | Revisión `security` 002–008, PII transversal, límites por tenant, pantalla de cumplimiento | **Sigue** | No dependen de cómo se loguea. |
 
-La enmienda de la spec, si Daniel aprueba P6, va en un PR aparte y marca lo reemplazado sin borrarlo.
+La enmienda de la spec (P6, decidida) va en un PR aparte y marca lo reemplazado sin borrarlo.
 
 ## Diseño por entrada
 
@@ -73,7 +73,7 @@ El front se publica en Vercel (#39, `docs/decisiones.md:18`). Hoy `frontend/verc
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://<ref>.supabase.co https://<api-railway>; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" },
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://ouhetsbchchwsyqxwhxb.supabase.co https://api.profitdata.tech; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" },
         { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
         { "key": "X-Content-Type-Options", "value": "nosniff" },
         { "key": "Referrer-Policy", "value": "no-referrer" },
@@ -85,14 +85,14 @@ El front se publica en Vercel (#39, `docs/decisiones.md:18`). Hoy `frontend/verc
 }
 ```
 
-- `vercel.json` es estático: no lee variables de entorno. Los dos orígenes de `connect-src` van **literales**: el de `VITE_SUPABASE_URL` (`https://<ref>.supabase.co`) y el de `VITE_API_URL` (la api en Railway). Son orígenes públicos, sin path; los dicta Daniel desde las variables de Vercel (T017). Si cambia uno, cambia `vercel.json` en el mismo PR.
-- `style-src` y `font-src` quedan en `'self'` solo si E2 se resuelve con self-host (P1).
+- `vercel.json` es estático: no lee variables de entorno. Los dos orígenes de `connect-src` van **literales**: `https://ouhetsbchchwsyqxwhxb.supabase.co` (el de `VITE_SUPABASE_URL`) y `https://api.profitdata.tech` (el de `VITE_API_URL`). Son orígenes públicos, sin path; los dictó Daniel (T012). Si cambia uno, cambia `vercel.json` en el mismo PR.
+- `style-src` y `font-src` quedan en `'self'` porque E2 se resuelve con self-host (P1).
 - Lo que Vercel no hace como Caddy: sacar `Server` (Vercel manda `Server: Vercel`) y cortar el body con 413. El front es estático y no recibe POST; el límite de body y el `Cache-Control: no-store` de las respuestas de la api son de la api en Railway, no de esta entrada.
 - **Caddyfile, solo alternativa:** si `web` vuelve a Railway, el mismo juego de cabeceras va en un bloque `header { … -Server }` con `request_body { max_size 1MB }` y los orígenes por `{$SUPABASE_ORIGEN} {$API_ORIGEN}`. No entra en el [MIN] ni lleva test mientras Vercel sea el deploy.
 
 **Test propuesto** (`frontend/tests/arquitectura/cabeceras.test.ts`, junto a `sin_secretos.test.ts`):
 - parsea `frontend/vercel.json`; para `source: "/(.*)"` exige la CSP **exacta** (comparada directiva por directiva), HSTS, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy` y COOP;
-- `connect-src` trae `'self'`, un origen que matchea `^https://[a-z0-9]+\.supabase\.co$` y el origen de la api; si `VITE_SUPABASE_URL` o `VITE_API_URL` están seteadas en el entorno del test, sus orígenes tienen que estar (el E2E contra el deploy cubre el desfasaje con lo que carga Vercel);
+- `connect-src` es exactamente `'self' https://ouhetsbchchwsyqxwhxb.supabase.co https://api.profitdata.tech` (el E2E contra el deploy cubre el desfasaje con lo que carga Vercel);
 - el rewrite a `/index.html` sigue presente (no se pisa el arreglo de #39).
 - **Rojo:** hoy `vercel.json` no tiene `headers` → falla en el primer assert.
 - **Mutaciones:** sacar `frame-ancestors 'none'` → rojo; sacar el origen de Supabase de `connect-src` → rojo.
@@ -102,8 +102,8 @@ El front se publica en Vercel (#39, `docs/decisiones.md:18`). Hoy `frontend/verc
 
 `frontend/index.html` hace `preconnect` a `fonts.googleapis.com` y `fonts.gstatic.com` y carga el CSS de DM Sans y Poppins desde Google. Con la CSP de E1, `style-src 'self'` y `font-src 'self'` lo bloquean: la página carga con la fuente del sistema y el E2E de CSP da rojo.
 
-Dos caminos (fork real, P1):
-- **Self-host (propuesta, pendiente de Daniel):** los `.woff2` en `frontend/public/fuentes/` con su `@font-face` en el CSS del proyecto. La CSP no cambia, no hay request a Google (sin IP del usuario a un tercero) y no hay dependencia de red externa en la demo. Costo: bajar los archivos una vez y revisar la licencia (OFL, permite redistribuir).
+Decidido (P1): self-host.
+- **Self-host (decidido):** los `.woff2` en `frontend/public/fuentes/` con su `@font-face` en el CSS del proyecto. La CSP no cambia, no hay request a Google (sin IP del usuario a un tercero) y no hay dependencia de red externa en la demo. Costo: bajar los archivos una vez y revisar la licencia (OFL, permite redistribuir).
 - **Permitir Google:** `style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com`. Cero archivos nuevos, pero la CSP se abre a un tercero y cada visita le avisa a Google.
 
 **Test propuesto:**
@@ -115,7 +115,7 @@ Dos caminos (fork real, P1):
 
 `frontend/src/api/supabase.ts` llama `createClient(url, key)` sin `auth.storage`: supabase-js guarda access y refresh en `localStorage` (`sb-<ref>-auth-token`). Persiste al cerrar el navegador y lo comparten todas las pestañas.
 
-- **`sessionStorage` (propuesta, pendiente de Daniel):** `createClient(url, key, { auth: { storage: sessionStorage } })`. La sesión muere al cerrar la pestaña y no se comparte entre pestañas.
+- **`sessionStorage` (decidido, P2):** `createClient(url, key, { auth: { storage: sessionStorage } })`. La sesión muere al cerrar la pestaña y no se comparte entre pestañas.
 - **Lo que no cambia:** ante un XSS, `sessionStorage` está tan expuesto como `localStorage`. La mitigación real del robo de token es la CSP de E1; E3 achica la ventana (sesiones olvidadas en una máquina compartida), no el vector.
 - **Costo de UX (P2):** abrir un link en otra pestaña pide login de nuevo. Para la demo, una sola pestaña.
 
@@ -179,9 +179,9 @@ Riesgo aceptado (005 plan:357): no hay login en la api (`test_sin_login_propio.p
 
 **Test propuesto:** ninguno en la api; no hay ruta que probar. Lo que se puede dejar:
 - una línea en `docs/seguridad/revision-002-008.md` con los valores de rate limit de Auth del proyecto de Supabase (panel → Authentication → Rate Limits), que copia el dueño (paso humano, frontera de Daniel);
-- opcional (P3): un check manual, no de CI, que con la Management API lea `rate_limit_*` del proyecto y compare contra un mínimo escrito. Requiere un token de admin que no puede vivir en CI; por eso no es test.
+- descartado (P3): un check manual, no de CI, que con la Management API lea `rate_limit_*` del proyecto y compare contra un mínimo escrito. Requiere un token de admin que no puede vivir en CI; por eso no es test.
 
-La decisión de si el riesgo sigue aceptado es del dueño (P3).
+Decidido (P3): el riesgo sigue aceptado, sin check por Management API.
 
 ### Lo que sigue de la spec
 
@@ -203,8 +203,8 @@ La decisión de si el riesgo sigue aceptado es del dueño (P3).
 frontend/vercel.json                                 E1 (headers)
 frontend/tests/arquitectura/cabeceras.test.ts        E1
 frontend/index.html                                  E2 (sin Google)
-frontend/public/fuentes/*.woff2                      E2 (si P1 = self-host)
-frontend/src/estilos/fuentes.css                     E2 (si P1 = self-host)
+frontend/public/fuentes/*.woff2                      E2 (P1)
+frontend/src/estilos/fuentes.css                     E2 (P1)
 frontend/src/test/index_html.test.ts                 E2
 frontend/src/api/supabase.ts / supabase.test.ts      E3
 frontend/e2e/seguridad.spec.ts                       E1, E3
@@ -219,9 +219,9 @@ docs/seguridad/revision-002-008.md                   revisión + E5
 
 ## Preguntas abiertas
 
-Sin decidir. La columna "Propuesta" es **propuesta pendiente de Daniel**: no se aplica hasta que la apruebe.
+Decididas por Daniel el 2026-10-17 ("sí a todo"). La columna "Decisión" es la versión final.
 
-| Id | Pregunta | Propuesta (pendiente de Daniel) |
+| Id | Pregunta | Decisión (Daniel, 2026-10-17) |
 |----|----------|---------------------------------|
 | P1 | Fuentes (E2): ¿self-host de DM Sans y Poppins o permitir `fonts.googleapis.com` y `fonts.gstatic.com` en la CSP? | Servir las fuentes desde el propio sitio, sin Google. |
 | P2 | Sesión (E3): ¿`sessionStorage` (cerrar la pestaña cierra la sesión, no se comparte entre pestañas) o seguir con `localStorage`? | Sí, la sesión va a `sessionStorage`. |
