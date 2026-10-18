@@ -1,13 +1,11 @@
-import os
 from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
-from app import db
 from app.modulos.descubrimiento.dominio.modelos import Actividad, CriteriosICP, EmpresaCruda
 from app.modulos.descubrimiento.infraestructura.persistencia.repositorio_leads import RepositorioLeadsPostgres
 
@@ -16,27 +14,6 @@ EMPRESA = EmpresaCruda(
     as_of=datetime(2026, 10, 1, tzinfo=UTC), actividad=Actividad("4711", "CIIU"),
     id_fiscal="900123456", tipo_titular="juridica", ciudad="Bogotá",
 )
-
-
-def _url(nombre):
-    url = os.environ.get(nombre)
-    if not url:
-        pytest.fail(f"falta {nombre}: los tests de integración fallan, no se saltan (R6)")
-    return url
-
-
-@pytest.fixture
-def rt():
-    engine = db.crear_engine(_url("TEST_DATABASE_URL"))
-    yield engine
-    engine.dispose()
-
-
-@pytest.fixture
-def admin():
-    engine = create_engine(_url("TEST_ADMIN_DATABASE_URL"))
-    yield engine
-    engine.dispose()
 
 
 @pytest.fixture
@@ -59,8 +36,8 @@ def _contar(admin, sql, **params):
         return c.execute(text(sql), params).scalar()
 
 
-def test_unico_por_tenant_pais_id_fiscal(rt, admin, tenants):
-    repo = RepositorioLeadsPostgres(rt, tenants["a"])
+def test_unico_por_tenant_pais_id_fiscal(rt, admin, tenants, cifrador):
+    repo = RepositorioLeadsPostgres(rt, tenants["a"], cifrador)
     primero = repo.obtener_o_crear_lead(EMPRESA, "licencia-x")
     segundo = repo.obtener_o_crear_lead(EMPRESA, "licencia-x")
     assert segundo == (primero[0], False)
@@ -68,15 +45,15 @@ def test_unico_por_tenant_pais_id_fiscal(rt, admin, tenants):
                    t=tenants["a"], f=EMPRESA.id_fiscal) == 1
 
 
-def test_mismo_id_fiscal_en_otro_tenant_es_otro_lead(rt, admin, tenants):
-    lead_a, _ = RepositorioLeadsPostgres(rt, tenants["a"]).obtener_o_crear_lead(EMPRESA, "licencia-x")
-    lead_b, nuevo = RepositorioLeadsPostgres(rt, tenants["b"]).obtener_o_crear_lead(EMPRESA, "licencia-x")
+def test_mismo_id_fiscal_en_otro_tenant_es_otro_lead(rt, admin, tenants, cifrador):
+    lead_a, _ = RepositorioLeadsPostgres(rt, tenants["a"], cifrador).obtener_o_crear_lead(EMPRESA, "licencia-x")
+    lead_b, nuevo = RepositorioLeadsPostgres(rt, tenants["b"], cifrador).obtener_o_crear_lead(EMPRESA, "licencia-x")
     assert nuevo is True and lead_b != lead_a
     assert _contar(admin, "SELECT tenant_id FROM leads WHERE id = :id", id=lead_b) == tenants["b"]
 
 
-def test_unico_lead_fuente_busqueda(rt, admin, tenants):
-    repo = RepositorioLeadsPostgres(rt, tenants["a"])
+def test_unico_lead_fuente_busqueda(rt, admin, tenants, cifrador):
+    repo = RepositorioLeadsPostgres(rt, tenants["a"], cifrador)
     repo.agregar_lead_fuente(tenants["lead"], tenants["busqueda"], EMPRESA, "licencia-x")
     repo.agregar_lead_fuente(tenants["lead"], tenants["busqueda"], EMPRESA, "licencia-x")  # ON CONFLICT DO NOTHING
     assert _contar(admin, "SELECT count(*) FROM lead_fuentes WHERE lead_id = :l AND busqueda_id = :b AND fuente = :f",
@@ -84,28 +61,30 @@ def test_unico_lead_fuente_busqueda(rt, admin, tenants):
 
 
 @pytest.mark.parametrize("tipo_titular", ["juridica", "desconocido"])
-def test_lead_persistido_conserva_tipo_titular(rt, admin, tenants, tipo_titular):
+def test_lead_persistido_conserva_tipo_titular(rt, admin, tenants, cifrador, tipo_titular):
     empresa = replace(EMPRESA, tipo_titular=tipo_titular)
-    lead_id, _ = RepositorioLeadsPostgres(rt, tenants["a"]).obtener_o_crear_lead(empresa, "licencia-x")
+    repo = RepositorioLeadsPostgres(rt, tenants["a"], cifrador)
+    lead_id, _ = repo.obtener_o_crear_lead(empresa, "licencia-x")
     with admin.connect() as c:
-        fila = c.execute(text("SELECT tipo_titular, pais, id_fiscal, nombre FROM leads WHERE id = :id"),
+        fila = c.execute(text("SELECT tipo_titular, pais, id_fiscal FROM leads WHERE id = :id"),
                          {"id": lead_id}).one_or_none()
         cumplimiento = c.execute(text("SELECT fuente, licencia, url_origen, as_of FROM cumplimiento WHERE lead_id = :id"),
                                  {"id": lead_id}).one_or_none()
-    assert fila == (tipo_titular, "CO", "900123456", "Acme SAS")
+    assert fila == (tipo_titular, "CO", "900123456")
+    assert repo.obtener_lead(lead_id).nombre == "Acme SAS"  # el nombre solo se lee por el repositorio
     assert cumplimiento == (EMPRESA.fuente, "licencia-x", EMPRESA.url_origen, EMPRESA.as_of)
 
 
-def test_lead_nuevo_y_cumplimiento_en_una_transaccion(rt, admin, tenants):
+def test_lead_nuevo_y_cumplimiento_en_una_transaccion(rt, admin, tenants, cifrador):
     # licencia NULL: el INSERT del lead pasa y el de cumplimiento viola NOT NULL.
     with pytest.raises(IntegrityError):
-        RepositorioLeadsPostgres(rt, tenants["a"]).obtener_o_crear_lead(EMPRESA, None)
+        RepositorioLeadsPostgres(rt, tenants["a"], cifrador).obtener_o_crear_lead(EMPRESA, None)
     assert _contar(admin, "SELECT count(*) FROM leads WHERE tenant_id = :t AND id_fiscal = :f",
                    t=tenants["a"], f=EMPRESA.id_fiscal) == 0
 
 
-def test_crear_busqueda_se_confirma_antes(rt, admin, tenants):
-    busqueda_id = RepositorioLeadsPostgres(rt, tenants["a"]).crear_busqueda(
+def test_crear_busqueda_se_confirma_antes(rt, admin, tenants, cifrador):
+    busqueda_id = RepositorioLeadsPostgres(rt, tenants["a"], cifrador).crear_busqueda(
         CriteriosICP(pais="CO", filtros={"ciiu": ("4711",)}))
     # otra conexión, antes de que nadie llame a un adaptador
     with admin.connect() as c:
@@ -114,8 +93,8 @@ def test_crear_busqueda_se_confirma_antes(rt, admin, tenants):
     assert fila == (tenants["a"], "CO", "creada")
 
 
-def test_cerrar_busqueda_guarda_estado(rt, admin, tenants):
-    repo = RepositorioLeadsPostgres(rt, tenants["a"])
+def test_cerrar_busqueda_guarda_estado(rt, admin, tenants, cifrador):
+    repo = RepositorioLeadsPostgres(rt, tenants["a"], cifrador)
     busqueda_id = repo.crear_busqueda(CriteriosICP(pais="CO", filtros={}))
     repo.cerrar_busqueda(busqueda_id, "con_errores")
     assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=busqueda_id) == "con_errores"

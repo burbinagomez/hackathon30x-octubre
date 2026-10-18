@@ -14,6 +14,13 @@ def clave_cifrado() -> str:
     return nueva_clave_de_cifrado()
 
 
+@pytest.fixture
+def cifrador(clave_cifrado):
+    from app.seguridad.cifrado import Cifrador
+
+    return Cifrador(clave_cifrado)
+
+
 @pytest.fixture(autouse=True)
 def _cifrado_key_de_test(monkeypatch):
     # La app no arranca sin CIFRADO_KEY; los tests que la necesitan ausente la quitan con delenv.
