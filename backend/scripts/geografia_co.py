@@ -114,22 +114,21 @@ def construir(filas: list[dict], fecha: str, dataset: str | None) -> str:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Genera config/geografia/co.yaml desde DIVIPOLA (datos.gov.co).")
     p.add_argument("--sin-municipios", action="store_true", help="solo los departamentos; no sale a la red")
-    p.add_argument("--dataset", default=DATASET)
-    p.add_argument("--salida", type=Path, default=SALIDA)
     args = p.parse_args(argv)
 
     filas: list[dict] = []
     if not args.sin_municipios:
-        respuesta = httpx.get(URL.format(dataset=args.dataset), timeout=60, params={
+        respuesta = httpx.get(URL.format(dataset=DATASET), timeout=60, params={
             "$select": "cod_dpto,cod_mpio,nom_mpio", "$limit": "50000", "$order": "cod_mpio"})
         respuesta.raise_for_status()
         filas = respuesta.json()
         if not filas:
             print("el dataset no devolvió filas: no se escribe nada", file=sys.stderr)
             return 1
-    args.salida.parent.mkdir(parents=True, exist_ok=True)
-    args.salida.write_text(construir(filas, date.today().isoformat(), None if args.sin_municipios else args.dataset))
-    print(f"escrito {args.salida} ({len(filas)} municipios)")
+    # Ruta y dataset fijos: la línea de comandos no decide dónde se escribe ni qué se consulta.
+    SALIDA.parent.mkdir(parents=True, exist_ok=True)
+    SALIDA.write_text(construir(filas, date.today().isoformat(), None if args.sin_municipios else DATASET))
+    print(f"escrito {SALIDA} ({len(filas)} municipios)")
     return 0
 
 

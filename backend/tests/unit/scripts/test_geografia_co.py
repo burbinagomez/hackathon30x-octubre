@@ -101,3 +101,11 @@ def test_el_co_yaml_versionado_tiene_todos_los_codigos_entre_comillas():
     lineas = _lineas_de_codigos((BACKEND / "config" / "geografia" / "co.yaml").read_text())
     sin_comillas = [l for l in lineas if not re.fullmatch(r"(- )?(codigo_nativo|iso_3166_2): ['\"][^'\"]+['\"]", l)]
     assert lineas and sin_comillas == []
+
+
+@pytest.mark.parametrize("argumento", [["--salida", "/tmp/fuera.yaml"], ["--dataset", "../../otra-cosa"]])
+def test_la_salida_y_el_dataset_no_se_eligen_por_linea_de_comandos(argumento):
+    # Ruta de escritura y dataset fijos en el script: nada externo decide dónde escribe ni qué consulta.
+    with pytest.raises(SystemExit) as error:
+        geografia_co.main(argumento)
+    assert error.value.code == 2
