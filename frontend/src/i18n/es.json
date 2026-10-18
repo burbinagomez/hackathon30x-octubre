@@ -338,5 +338,6 @@
     },
     "viabilidad": "Arquitectura hexagonal: cada fuente es un adaptador que se conecta por configuración · RLS, cifrado y libro de cumplimiento.",
     "cta": "Más leads, menor costo. Y medido."
-  }
+  },
+  "envio": {"titulo": "Primer mensaje", "ayuda": "Un email con enlace de baja a las empresas con contacto. En modo prueba solo llega a las casillas de prueba.", "ver": "Ver el mensaje", "enviar": "Enviar", "resumen": "Se envía a {{a_enviar}} (modo {{modo}}).", "enviados_one": "Enviado: {{count}} mensaje.", "enviados_other": "Enviados: {{count}} mensajes.", "no_configurado": "El envío de email no está configurado todavía.", "primero_vista": "Primero tocá «Ver el mensaje».", "error": "No se pudo completar. Probá de nuevo.", "contacto": "Envío {{n}}", "respondio": "Respondió", "marcar_respondio": "Marcar que respondió", "tasa": "Tasa de respuesta: {{respondieron}} de {{contactados}} ({{tasa}})", "estado": {"aprobado": "listo para enviar", "enviando": "enviando", "enviado": "enviado", "rebotado": "rebotó", "no_entregable": "no entregable", "descartado": "descartado", "pendiente_aprobacion": "pendiente"}}
 }

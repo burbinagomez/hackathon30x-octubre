@@ -34,3 +34,15 @@ export const iniciarEnriquecimiento = (id: string) =>
 
 export const estadoEnriquecimiento = (id: string) =>
   pedir<EstadoEnriquecimiento>(`/busquedas/${encodeURIComponent(id)}/enriquecimiento`);
+
+// Primer toque por email (007). EMAIL_MODO=prueba manda solo a las casillas de prueba.
+export type VistaEnvio = { modo: string; aprobados: number; a_enviar: number; asunto: string | null; cuerpo: string | null };
+export type ContactoEnvio = { id: string; estado: string; enviado_en: string | null; respondio_en: string | null };
+export type TasaCanal = { canal: string; contactados: number; respondieron: number; tasa: string | null };
+const base = (id: string) => `/busquedas/${encodeURIComponent(id)}`;
+export const vistaEnvio = (id: string) => pedir<VistaEnvio>(`${base(id)}/envio/vista-previa`, { metodo: "POST" });
+export const enviarMensajes = (id: string) => pedir<{ enviados: number }>(`${base(id)}/envio`, { metodo: "POST" });
+export const contactosDe = (id: string) => pedir<{ items: ContactoEnvio[] }>(`${base(id)}/contactos`);
+export const marcarRespondio = (contacto: string) =>
+  pedir<{ respondio: boolean }>(`/contactos/${encodeURIComponent(contacto)}/respondio`, { metodo: "POST" });
+export const tasaRespuesta = () => pedir<{ items: TasaCanal[] }>("/contactos/tasa");

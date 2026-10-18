@@ -88,6 +88,11 @@ class RepositorioContactosPostgres:
         return self._ejecutar("UPDATE contactos SET respondio_en = COALESCE(respondio_en, now()) "
                               "WHERE id = :c AND enviado_en IS NOT NULL", c=contacto_id) == 1
 
+    def de_busqueda(self, busqueda_id: UUID) -> list[tuple[UUID, str, object, object]]:
+        """Los contactos de una búsqueda para la pantalla: id, estado y fechas. Ni dirección ni nombre del lead."""
+        return self._ejecutar("SELECT id, estado, enviado_en, respondio_en FROM contactos WHERE busqueda_id = :b "
+                              "ORDER BY creado_en, id", leer=lambda r: [tuple(f) for f in r.all()], b=busqueda_id)
+
     def tasa_por_canal(self) -> list[tuple[str, int, int, Decimal | None]]:
         return self._ejecutar("SELECT canal, contactados, respondieron, tasa FROM v_tasa_respuesta_canal ORDER BY canal",
                               lambda r: [tuple(f) for f in r.all()])

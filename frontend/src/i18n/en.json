@@ -338,5 +338,6 @@
     },
     "viabilidad": "Hexagonal architecture: each source is an adapter plugged in by configuration · RLS, encryption and compliance ledger.",
     "cta": "More leads, lower cost. And measured."
-  }
+  },
+  "envio": {"titulo": "First message", "ayuda": "An email with an unsubscribe link to companies with contact. In test mode it only reaches the test inboxes.", "ver": "See the message", "enviar": "Send", "resumen": "Goes to {{a_enviar}} ({{modo}} mode).", "enviados_one": "Sent: {{count}} message.", "enviados_other": "Sent: {{count}} messages.", "no_configurado": "Email sending is not configured yet.", "primero_vista": "First tap “See the message”.", "error": "Could not complete. Try again.", "contacto": "Send {{n}}", "respondio": "Replied", "marcar_respondio": "Mark as replied", "tasa": "Reply rate: {{respondieron}} of {{contactados}} ({{tasa}})", "estado": {"aprobado": "ready to send", "enviando": "sending", "enviado": "sent", "rebotado": "bounced", "no_entregable": "undeliverable", "descartado": "discarded", "pendiente_aprobacion": "pending"}}
 }
