@@ -1,7 +1,9 @@
 """Raíz de composición: único módulo que une descubrimiento con la infraestructura de costos."""
 import argparse
 import sys
+import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from decimal import Decimal
 from functools import cache
 from pathlib import Path
@@ -14,6 +16,7 @@ from pydantic import ValidationError
 from app.config import Settings
 from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.costos.dominio.puertos import RegistroCostos
+from app.modulos.descubrimiento.aplicacion.camaras import cargar_camaras
 from app.modulos.descubrimiento.aplicacion.ejecutar_busqueda import EjecutarBusqueda
 from app.modulos.descubrimiento.aplicacion.registro import cargar_actividades, cargar_registro
 from app.modulos.descubrimiento.dominio.modelos import CriteriosICP
@@ -26,7 +29,8 @@ CONFIG = Path(__file__).resolve().parents[1] / "config"
 def _cargar_tarifas() -> dict[str, Decimal]:
     """Tarifa unitaria por proveedor desde tarifas.yaml; cada valor pasa por str para no arrastrar el error del float."""
     t = yaml.safe_load((CONFIG / "tarifas.yaml").read_text())
-    return {"croma": Decimal(str(t["croma"]["usd_por_credito"])), "osm": Decimal(str(t["computo_seg_usd"]))}
+    return {"croma": Decimal(str(t["croma"]["usd_por_credito"])), "osm": Decimal(str(t["computo_seg_usd"])),
+            "datos.gov.co": Decimal(str(t["computo_seg_usd"]))}
 
 
 @dataclass(frozen=True)
@@ -108,6 +112,18 @@ def main(argv=None, *, catalogo=catalogo, persistencia=None) -> int:
 
     def fabrica(clase, meta):
         def armar(lote_id: UUID):
+            if meta.proveedor == "datos.gov.co":
+                extra = {}
+                if ajustes().datos_gov_co_url:
+                    extra["url"] = ajustes().datos_gov_co_url
+                token = ajustes().datos_gov_co_app_token
+                return clase(
+                    transporte=httpx.HTTPTransport(), reloj=lambda: datetime.now(UTC), monotonico=time.monotonic,
+                    dormir=time.sleep, costos=costos, cache=None,
+                    camaras=cargar_camaras(CONFIG / "camaras_co.yaml"),
+                    tarifas={"computo_seg_usd": tarifas["datos.gov.co"]}, lote_id=lote_id, meta=meta,
+                    app_token=token.get_secret_value() if token else None, **extra,
+                )
             kwargs = {"meta": meta, "registro_costos": costos, "transporte": httpx.HTTPTransport(), "lote_id": lote_id}
             if meta.proveedor in tarifas:
                 kwargs["costo_unitario"] = tarifas[meta.proveedor]

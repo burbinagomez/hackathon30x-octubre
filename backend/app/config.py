@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     croma_api_key: SecretStr | None = None
     # Overpass: None = la constante del adaptador. repo_url va en el User-Agent (política de Overpass).
     overpass_url: str | None = None
+    # datos.gov.co: None = la constante del adaptador / sin token (SODA limita por IP).
+    datos_gov_co_url: str | None = None
+    datos_gov_co_app_token: SecretStr | None = None
     repo_url: str = "https://github.com/burbinagomez/hackathon30x-octubre"
 
     @field_validator("cifrado_key")

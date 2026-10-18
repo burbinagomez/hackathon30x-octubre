@@ -1,0 +1,20 @@
+/* Marca Dapta. Único lugar donde viven estos valores: el resto usa var(--…). */
+:root {
+  --color-acento: #CBE850; /* nunca como texto sobre blanco: de fondo con --color-oscuro encima, o sobre el oscuro */
+  --color-oscuro: #1A1A1C;
+  --color-fondo: #FFFFFF;
+  --color-gris: #9B9999;
+  --fuente-titulos: "Poppins", system-ui, sans-serif;
+  --fuente-texto: "DM Sans", system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: var(--color-fondo);
+  color: var(--color-oscuro);
+  font-family: var(--fuente-texto);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--fuente-titulos);
+}
