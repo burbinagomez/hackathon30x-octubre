@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 
 from app.cli import Persistencia, main
-from app.modulos.descubrimiento.dominio.modelos import Actividad, EmpresaCruda
+from app.modulos.descubrimiento.dominio.modelos import Actividad, EmpresaCruda, PaginaEmpresas
 from tests.falsos import FuenteFalsa, RegistroCostosFalso, RepositorioLeadsFalso
 
 AS_OF = datetime(2026, 10, 1, tzinfo=UTC)
@@ -50,7 +50,7 @@ def test_buscar_imprime_resumen(persistencia, entorno, capsys):
     salida = capsys.readouterr().out
     assert codigo == 0
     assert "encontrados 2 · únicos 1 · nuevos 1 · créditos 1" in salida
-    assert "sin_implementacion: croma_dian_trade_co, osm_overpass" in salida
+    assert "sin_implementacion: croma_dian_trade_co, datos_gov_co_rues, osm_overpass" in salida
     assert "sin_fuente_para" not in salida
 
 
@@ -61,7 +61,7 @@ def test_buscar_sin_adaptadores_reporta_sin_fuente_y_sin_implementacion(persiste
     assert codigo == 0
     assert list(persistencia.repo.busquedas.values()) == ["terminada"]
     assert "sin_fuente_para: CO" in salida
-    assert "sin_implementacion: croma_dian_trade_co, croma_supersociedades_co, osm_overpass" in salida
+    assert "sin_implementacion: croma_dian_trade_co, croma_supersociedades_co, datos_gov_co_rues, osm_overpass" in salida
     assert persistencia.costos.filas == []
     assert persistencia.repo.leads == {}
 
@@ -108,3 +108,41 @@ def test_ciudad_llega_a_los_criterios(persistencia, entorno):
     argv = ["buscar", "--tenant", str(uuid4()), "--pais", "CO", "--ciiu", "4711", "--ciudad", "Bogotá"]
     assert main(argv, catalogo={"osm_overpass": FuenteQueCaptura}, persistencia=persistencia) == 0
     assert [c.filtros["ciudad"] for c in recibidos] == ["Bogotá"]
+
+
+class _GrabaKwargs:
+    """Fuente que solo guarda los kwargs con los que la CLI la arma."""
+
+    armadas: list[dict] = []
+
+    def __init__(self, **kwargs):
+        type(self).armadas.append(kwargs)
+        self.meta = kwargs["meta"]
+
+    def buscar(self, criterios, pagina):
+        return PaginaEmpresas(empresas=(), total=None)
+
+
+def test_datos_gov_co_recibe_url_y_token_de_settings(persistencia, entorno, monkeypatch, capsys):
+    _GrabaKwargs.armadas = []
+    monkeypatch.setenv("DATOS_GOV_CO_URL", "http://stub.local/resource/x.json")
+    monkeypatch.setenv("DATOS_GOV_CO_APP_TOKEN", "tok-falso-123")
+
+    main(BUSCAR, catalogo={"datos_gov_co_rues": _GrabaKwargs}, persistencia=persistencia)
+
+    (kwargs,) = _GrabaKwargs.armadas
+    assert kwargs.get("url") == "http://stub.local/resource/x.json"
+    assert kwargs.get("app_token") == "tok-falso-123"
+    assert "tok-falso-123" not in capsys.readouterr().out
+
+
+def test_datos_gov_co_sin_variables_usa_los_defaults_del_adaptador(persistencia, entorno, monkeypatch):
+    _GrabaKwargs.armadas = []
+    monkeypatch.delenv("DATOS_GOV_CO_URL", raising=False)
+    monkeypatch.delenv("DATOS_GOV_CO_APP_TOKEN", raising=False)
+
+    main(BUSCAR, catalogo={"datos_gov_co_rues": _GrabaKwargs}, persistencia=persistencia)
+
+    (kwargs,) = _GrabaKwargs.armadas
+    assert "url" not in kwargs
+    assert kwargs.get("app_token") is None

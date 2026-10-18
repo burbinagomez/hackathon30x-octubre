@@ -104,3 +104,16 @@ def test_criterio_no_declarado_no_llega_al_adaptador(metas, actividades):
     assert fuentes[SUPERSOCIEDADES].recibidos[0].filtros["ingresos_min"] == "1000000000"
     assert len(fuentes[OSM].recibidos) == 1
     assert "ingresos_min" not in fuentes[OSM].recibidos[0].filtros
+
+
+def test_datos_gov_co_habilitada_recibe_ciiu_y_departamento():
+    meta = MetaFuente(
+        clave="datos_gov_co_rues", proveedor="datos.gov.co", paises=frozenset({"CO"}),
+        filtros=frozenset({"ciiu", "departamento"}), trae=frozenset({"nit"}), tipo="dataset", licencia="CC-BY-SA-4.0",
+    )
+    icp = CriteriosICP("CO", {"ciiu": "4711", "departamento": "11", "ingresos_min": "1"})
+
+    seleccionadas, ignoradas = seleccionar_fuentes([meta], icp, {})
+
+    assert ignoradas == {}
+    assert dict(seleccionadas["datos_gov_co_rues"].filtros) == {"ciiu": "4711", "departamento": "11"}
