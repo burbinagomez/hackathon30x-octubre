@@ -44,7 +44,7 @@ name = "Capas de los modulos"
 type = "layers"
 # "(aplicacion)": capa opcional; costos todavía no la tiene.
 layers = ["infraestructura", "(aplicacion)", "dominio"]
-containers = ["app.modulos.descubrimiento", "app.modulos.costos", "app.modulos.acceso"]
+containers = ["app.modulos.descubrimiento", "app.modulos.costos", "app.modulos.acceso", "app.modulos.calificacion"]
 
 [[tool.importlinter.contracts]]
 name = "Descubrimiento no usa la infraestructura de costos"
