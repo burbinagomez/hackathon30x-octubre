@@ -1,19 +1,19 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { navegar } from "../compartido/navegar";
-import { ejecutar, listarActividades, vistaPrevia } from "./api";
+import { ejecutar, listarActividades, listarGeografia, vistaPrevia } from "./api";
 import ResultadoVistaPrevia from "./ResultadoVistaPrevia";
-import type { Actividad, PedidoVistaPrevia, VistaPrevia } from "./tipos";
+import type { Actividad, Geografia, PedidoVistaPrevia, VistaPrevia } from "./tipos";
 
 const PAISES = ["CO", "MX", "BR", "PE"];
 const CANALES = ["email"];
 
 type Formulario = Record<
-  "pais" | "ciiu" | "departamento" | "ingresosMin" | "palabrasClave" | "exclusiones" | "canal" | "tope" | "mensaje",
+  "pais" | "ciiu" | "departamento" | "ciudad" | "ingresosMin" | "palabrasClave" | "exclusiones" | "canal" | "tope" | "mensaje",
   string
 >;
 const INICIAL: Formulario = {
-  pais: "CO", ciiu: "", departamento: "", ingresosMin: "", palabrasClave: "",
+  pais: "CO", ciiu: "", departamento: "", ciudad: "", ingresosMin: "", palabrasClave: "",
   exclusiones: "", canal: "email", tope: "", mensaje: "",
 };
 
@@ -23,7 +23,9 @@ function aPedido(f: Formulario): PedidoVistaPrevia {
   return {
     pais: f.pais,
     ciiu: f.ciiu,
-    departamento: f.departamento || undefined,
+    // Los códigos DIVIPOLA son de Colombia: con otro país no viaja el departamento.
+    departamento: f.pais === "CO" && f.departamento ? f.departamento : undefined,
+    ciudad: f.ciudad.trim() || undefined,
     ingresos_min: f.ingresosMin ? Number(f.ingresosMin) : undefined,
     palabras_clave: lista(f.palabrasClave),
     exclusiones: lista(f.exclusiones),
@@ -47,15 +49,18 @@ export default function NuevaBusqueda() {
   const [form, setForm] = useState<Formulario>(INICIAL);
   const [vista, setVista] = useState<VistaPrevia | null>(null);
   const [actividades, setActividades] = useState<Actividad[]>([]);
+  const [geografia, setGeografia] = useState<Geografia>({});
   const [fallo, setFallo] = useState(false);
 
   useEffect(() => {
     listarActividades().then(setActividades).catch(() => undefined);
+    listarGeografia().then(setGeografia).catch(() => undefined);
   }, []);
 
   // Cualquier cambio invalida la vista previa: el borrador congeló otros criterios.
   function cambiar(campo: keyof Formulario, valor: string) {
-    setForm((f) => ({ ...f, [campo]: valor }));
+    // Cambiar de país suelta el departamento elegido: su código no vale en otro país.
+    setForm((f) => ({ ...f, [campo]: valor, ...(campo === "pais" ? { departamento: "" } : {}) }));
     setVista(null);
   }
 
@@ -74,7 +79,8 @@ export default function NuevaBusqueda() {
     </Campo>
   );
   // Fuera del JSX: la regla de literales mira los argumentos de una llamada dentro de él.
-  const departamento = entrada("departamento", t("busqueda.departamento"));
+  const ciudad = entrada("ciudad", t("busqueda.ciudad"));
+  const departamentos = geografia[form.pais] ?? [];
   const ingresosMin = entrada("ingresosMin", t("busqueda.ingresos_min"), "number");
   const palabrasClave = entrada("palabrasClave", t("busqueda.palabras_clave"));
   const exclusiones = entrada("exclusiones", t("busqueda.exclusiones"));
@@ -97,7 +103,17 @@ export default function NuevaBusqueda() {
           {actividades.map((a) => <option key={a.codigo} value={a.codigo}>{nombre(a)}</option>)}
         </select>
       </Campo>
-      {departamento}
+      {departamentos.length > 0 && (
+        <Campo id="departamento" etiqueta={t("busqueda.departamento")}>
+          <select id="departamento" value={form.departamento} onChange={(e) => cambiar("departamento", e.target.value)}>
+            <option value="">{t("busqueda.departamento_vacio")}</option>
+            {departamentos.map((d) => (
+              <option key={d.codigo} value={d.codigo}>{i18n.language === "en" ? d.nombre_en : d.nombre_es}</option>
+            ))}
+          </select>
+        </Campo>
+      )}
+      {ciudad}
       {ingresosMin}
       {palabrasClave}
       {exclusiones}

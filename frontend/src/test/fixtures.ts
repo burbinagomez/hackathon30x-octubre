@@ -45,15 +45,32 @@ export const actividades = [
   { codigo: "4631", nombre_es: "Comercio al por mayor de alimentos", nombre_en: null },
 ];
 
-/** GET /geografia: solo un pedazo de los 33; el código es DIVIPOLA y es lo que viaja en el pedido. */
-export const geografia = {
-  CO: [
-    { codigo: "05", nombre_es: "Antioquia", nombre_en: "Antioquia" },
-    { codigo: "11", nombre_es: "Bogotá, D.C.", nombre_en: "Bogotá, D.C." },
-    { codigo: "73", nombre_es: "Tolima", nombre_en: "Tolima" },
-    { codigo: "88", nombre_es: "San Andrés y Providencia", nombre_en: "San Andrés and Providencia" },
-  ],
+/** GET /geografia (países con archivo) y GET /geografia?pais=XX (divisiones con código común, código nativo y municipios). */
+const division = (iso: string, nativo: string, es: string, en: string, municipios: [string, string][] = []) => ({
+  iso_3166_2: iso, codigo_nativo: nativo, nombre_es: es, nombre_en: en,
+  municipios: municipios.map(([codigo_nativo, nombre]) => ({ codigo_nativo, nombre })),
+});
+export const geografiaPaises = { paises: ["CO"] };
+export const geografiaPorPais: Record<string, unknown> = {
+  CO: {
+    pais: "CO",
+    divisiones: [
+      division("CO-ANT", "05", "Antioquia", "Antioquia", [["05001", "Medellín"]]),
+      division("CO-DC", "11", "Bogotá, D.C.", "Bogotá, D.C.", [["11001", "Bogotá, D.C."]]),
+      division("CO-TOL", "73", "Tolima", "Tolima", [["73001", "Ibagué"], ["73449", "Melgar"]]),
+      division("CO-SAP", "88", "San Andrés y Providencia", "San Andrés and Providencia"),
+    ],
+  },
+  PE: { pais: "PE", divisiones: [division("PE-LIM", "15", "Lima", "Lima", [["1501", "Lima"]])] },
 };
+
+/** El handler de /geografia: sin ?pais devuelve los países con archivo (por defecto solo CO). */
+export function manejarGeografia(paises: string[] = ["CO"]) {
+  return http.get("*/geografia", ({ request }) => {
+    const pais = new URL(request.url).searchParams.get("pais");
+    return pais ? HttpResponse.json(geografiaPorPais[pais]) : HttpResponse.json({ paises });
+  });
+}
 
 export function respuestaVistaPrevia(cambios: Record<string, unknown> = {}) {
   return {

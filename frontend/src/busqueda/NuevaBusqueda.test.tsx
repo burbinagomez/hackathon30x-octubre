@@ -11,7 +11,7 @@ import {
   boton,
   campo,
   espiarFijarIdioma,
-  geografia,
+  manejarGeografia,
   iniciarSesion,
   monto,
   respuestaVistaPrevia,
@@ -32,7 +32,7 @@ async function previsualizar(
   const pedidos: unknown[] = [];
   server.use(
     http.get("*/actividades", () => HttpResponse.json(actividades)),
-    http.get("*/geografia", () => HttpResponse.json(geografia)),
+    manejarGeografia(),
     http.post("*/busquedas/vista-previa", async ({ request }) => {
       pedidos.push(await request.json());
       return HttpResponse.json(vista);
@@ -181,7 +181,7 @@ test("cambia_idioma", async () => {
   await i18n.changeLanguage("es");
   server.use(
     http.get("*/actividades", () => HttpResponse.json(actividades)),
-    http.get("*/geografia", () => HttpResponse.json(geografia)),
+    manejarGeografia(),
   );
   render(<App />);
   await waitFor(() => expect(boton(en.busqueda.buscar)).toBeInTheDocument());
@@ -191,7 +191,7 @@ test("cambia_idioma", async () => {
 test("vista_previa_exige_actividad_y_tope", async () => {
   server.use(
     http.get("*/actividades", () => HttpResponse.json(actividades)),
-    http.get("*/geografia", () => HttpResponse.json(geografia)),
+    manejarGeografia(),
   );
   render(<NuevaBusqueda />);
   await waitFor(() => expect(screen.queryByRole("option", { name: actividades[0].nombre_es })).toBeInTheDocument());
@@ -217,7 +217,7 @@ test("un_error_de_la_api_se_avisa_y_no_deja_la_busqueda_a_medias", async () => {
 test("un_error_en_la_vista_previa_se_avisa", async () => {
   server.use(
     http.get("*/actividades", () => HttpResponse.json(actividades)),
-    http.get("*/geografia", () => HttpResponse.json(geografia)),
+    manejarGeografia(),
     http.post("*/busquedas/vista-previa", () => new HttpResponse(null, { status: 422 })),
   );
   render(<NuevaBusqueda />);
@@ -254,56 +254,91 @@ test("los_ignorados_de_palabras_clave_exclusiones_y_ciudad_salen_con_su_nombre",
 });
 
 const opcion = (nombre: string) => screen.queryByRole("option", { name: nombre });
+const pedido0 = (pedidos: unknown[]) => pedidos[0] as Record<string, unknown>;
 
-test("departamento_es_un_select_que_manda_el_codigo_divipola_no_el_nombre", async () => {
+/** Monta con los países pedidos (por defecto solo CO), espera las actividades y las divisiones de CO. */
+async function montarGeografia(paises = ["CO"]) {
+  server.use(http.get("*/actividades", () => HttpResponse.json(actividades)), manejarGeografia(paises));
+  render(<NuevaBusqueda />);
+  await waitFor(() => expect(opcion("Tolima")).toBeInTheDocument());
+}
+
+test("la_division_es_un_select_que_manda_el_codigo_nativo_no_el_nombre", async () => {
   const { pedidos } = await previsualizar(respuestaVistaPrevia(), "5", NuevaBusqueda, async () => {
     await waitFor(() => expect(opcion("Tolima")).toBeInTheDocument());
-    expect(campo("Departamento").tagName).toBe("SELECT");  // no texto libre: "Tolima" escrito a mano no es un código
+    expect(campo("Departamento").tagName).toBe("SELECT");  // no texto libre
     fireEvent.change(campo("Departamento"), { target: { value: "73" } });
   });
 
-  expect((pedidos[0] as { departamento?: string }).departamento).toBe("73");  // el código, nunca "Tolima"
+  expect(pedido0(pedidos).departamento).toBe("73");  // el código nativo (DIVIPOLA), nunca "Tolima" ni "CO-TOL"
   expect(opcion("Bogotá, D.C.")).toBeInTheDocument();
 });
 
-test("departamento_vacio_no_se_envia", async () => {
+test("sin_division_elegida_no_se_envia_ni_departamento_ni_ciudad", async () => {
   const { pedidos } = await previsualizar(respuestaVistaPrevia(), "5", NuevaBusqueda, async () => {
     await waitFor(() => expect(opcion("Tolima")).toBeInTheDocument());
   });
-  expect(pedidos[0]).not.toHaveProperty("departamento");
+  expect(pedido0(pedidos)).not.toHaveProperty("departamento");
+  expect(pedido0(pedidos)).not.toHaveProperty("ciudad");
 });
 
-test("ciudad_es_un_campo_de_texto_opcional_que_se_envia_como_ciudad", async () => {
-  const { pedidos } = await previsualizar(respuestaVistaPrevia(), "5", NuevaBusqueda, () => {
-    expect(campo("Ciudad").tagName).toBe("INPUT");
-    fireEvent.change(campo("Ciudad"), { target: { value: "Ibagué" } });
-  });
-  expect((pedidos[0] as { ciudad?: string }).ciudad).toBe("Ibagué");
-});
-
-test("ciudad_vacia_no_se_envia", async () => {
-  const { pedidos } = await previsualizar();
-  expect(pedidos[0]).not.toHaveProperty("ciudad");
-});
-
-test("los_nombres_de_departamento_salen_en_el_idioma_activo", async () => {
-  await i18n.changeLanguage("en");
-  server.use(
-    http.get("*/actividades", () => HttpResponse.json(actividades)),
-    http.get("*/geografia", () => HttpResponse.json(geografia)),
-  );
-  render(<NuevaBusqueda />);
-  await waitFor(() => expect(opcion("San Andrés and Providencia")).toBeInTheDocument());
-  expect(opcion("San Andrés y Providencia")).not.toBeInTheDocument();
-  expect(campo(en.busqueda.ciudad)).toBeInTheDocument();
-});
-
-test("solo_colombia_tiene_departamentos_en_la_lista", async () => {
+test("la_ciudad_es_un_input_con_los_municipios_de_la_division_y_manda_el_nombre", async () => {
   const { pedidos } = await previsualizar(respuestaVistaPrevia(), "5", NuevaBusqueda, async () => {
     await waitFor(() => expect(opcion("Tolima")).toBeInTheDocument());
     fireEvent.change(campo("Departamento"), { target: { value: "73" } });
-    fireEvent.change(campo("País"), { target: { value: "PE" } });
-    expect(screen.queryByLabelText("Departamento")).not.toBeInTheDocument();  // los códigos DIVIPOLA son de Colombia
+    const ciudad = campo(es.busqueda.ciudad);
+    expect(ciudad.tagName).toBe("INPUT");  // autocompletado: input + datalist, no un select
+    const lista = document.getElementById(ciudad.getAttribute("list") ?? "");
+    expect([...(lista?.querySelectorAll("option") ?? [])].map((o) => o.getAttribute("value"))).toEqual(["Ibagué", "Melgar"]);
+    fireEvent.change(ciudad, { target: { value: "Ibagué" } });
   });
-  expect(pedidos[0]).not.toHaveProperty("departamento");  // y el que quedó elegido no viaja a otro país
+  expect(pedido0(pedidos)).toMatchObject({ departamento: "73", ciudad: "Ibagué" });
+});
+
+test("la_ciudad_espera_a_la_division_y_se_borra_al_cambiarla", async () => {
+  await montarGeografia();
+  expect(campo(es.busqueda.ciudad)).toBeDisabled();  // si pone ciudad, la división es obligatoria: el select lo garantiza
+
+  fireEvent.change(campo("Departamento"), { target: { value: "73" } });
+  expect(campo(es.busqueda.ciudad)).toBeEnabled();
+  fireEvent.change(campo(es.busqueda.ciudad), { target: { value: "Ibagué" } });
+  fireEvent.change(campo("Departamento"), { target: { value: "05" } });
+
+  expect(campo(es.busqueda.ciudad)).toHaveValue("");  // Ibagué no es de Antioquia
+});
+
+test("el_select_de_pais_solo_ofrece_los_paises_con_archivo", async () => {
+  await montarGeografia(["CO"]);
+  expect(opcion("Colombia")).toBeInTheDocument();
+  for (const otro of ["México", "Brasil", "Perú"]) expect(opcion(otro)).not.toBeInTheDocument();
+});
+
+test("la_etiqueta_de_la_division_sale_por_pais_e_idioma", async () => {
+  const etiquetas = (idioma: object) =>
+    (idioma as { geografia?: { division?: Record<string, string> } }).geografia?.division ?? {};
+  for (const [pais, esperado] of Object.entries({
+    CO: ["Departamento", "Department"], MX: ["Estado", "State"], BR: ["Estado", "State"], PE: ["Departamento", "Region"],
+  })) {
+    expect([etiquetas(es)[pais], etiquetas(en)[pais]], pais).toEqual(esperado);
+  }
+
+  await montarGeografia(["CO", "PE"]);
+  await waitFor(() => expect(opcion("Perú")).toBeInTheDocument());
+  fireEvent.change(campo("Departamento"), { target: { value: "73" } });
+  fireEvent.change(campo("País"), { target: { value: "PE" } });
+  await waitFor(() => expect(opcion("Lima")).toBeInTheDocument());
+  expect(campo("Departamento")).toHaveValue("");  // el código de Tolima no vale en Perú
+  expect(opcion("Tolima")).not.toBeInTheDocument();
+
+  await i18n.changeLanguage("en");
+  await waitFor(() => expect(campo("Region")).toBeInTheDocument());
+});
+
+test("los_nombres_de_division_salen_en_el_idioma_activo", async () => {
+  await i18n.changeLanguage("en");
+  await montarGeografia();
+  await waitFor(() => expect(opcion("San Andrés and Providencia")).toBeInTheDocument());
+  expect(opcion("San Andrés y Providencia")).not.toBeInTheDocument();
+  expect(campo(en.busqueda.ciudad)).toBeInTheDocument();
+  expect(campo("Department")).toBeInTheDocument();
 });

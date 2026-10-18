@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app import db
-from app.api import actividades, busquedas, tablero, usuarios
+from app.api import actividades, busquedas, geografia, tablero, usuarios
 from app.api.sesion import tenant_actual
 from app.composicion import CONFIG, cargar_tarifas, registro_api
 from app.config import SettingsApi, verificar_entorno
@@ -35,6 +35,8 @@ async def lifespan(app: FastAPI):
     app.state.registro = registro_api(CONFIG / "fuentes.yaml", catalogo)
     app.state.canales_contacto = (yaml.safe_load((CONFIG / "fuentes.yaml").read_text()) or {}).get("canales_contacto") or {}
     app.state.tarifas = cargar_tarifas()
+    app.state.departamentos_yaml = {"CO": yaml.safe_load((CONFIG / "departamentos_co.yaml").read_text()) or {}}
+    app.state.camaras_yaml = CONFIG / "camaras_co.yaml"
     yield
 
 
@@ -70,5 +72,5 @@ def health(request: Request):
 
 
 # La dependencia va en el include: una ruta nueva no puede quedar sin auth por olvido.
-for _router in (busquedas.router, tablero.router, actividades.router, usuarios.router):
+for _router in (busquedas.router, tablero.router, actividades.router, geografia.router, usuarios.router):
     app.include_router(_router, dependencies=[Depends(tenant_actual)])

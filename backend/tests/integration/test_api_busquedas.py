@@ -34,6 +34,17 @@ PEDIDO = {
 }
 CODIGO = re.compile(r"^[a-z][a-z0-9_]*$")
 
+# Geografía SINTÉTICA para los tests: el co.yaml real tiene las 33 divisiones y, hasta que alguien lo corra con red, ningún
+# municipio. Tolima trae Ibagué (DIVIPOLA 73001).
+TOLIMA = {"iso_3166_2": "CO-TOL", "codigo_nativo": "73", "nombre_es": "Tolima", "nombre_en": "Tolima",
+          "municipios": [{"codigo_nativo": "73001", "nombre": "Ibagué"}, {"codigo_nativo": "73449", "nombre": "Melgar"}]}
+BOGOTA = {"iso_3166_2": "CO-DC", "codigo_nativo": "11", "nombre_es": "Bogotá, D.C.", "nombre_en": "Bogotá, D.C.",
+          "municipios": [{"codigo_nativo": "11001", "nombre": "Bogotá"}]}
+GEOGRAFIA_DE_PRUEBA = {"CO": {"pais": "CO", "divisiones": [TOLIMA]}}
+GEOGRAFIA_DEL_FLUJO = {"CO": {"pais": "CO", "divisiones": [BOGOTA, TOLIMA]}}
+
+
+
 
 @pytest.fixture
 def api(cliente):
@@ -48,7 +59,14 @@ def api(cliente):
         return httpx.Response(200, json=OSM)
 
     api.app.state.transporte_http = httpx.MockTransport(responder)
+    api.app.state.geografia = GEOGRAFIA_DEL_FLUJO  # la real no trae municipios hasta que alguien corra el script con red
     return api
+
+
+@pytest.fixture
+def api_real(cliente):
+    """El cliente tal como arranca el lifespan: la geografía y las fuentes reales, sin pisar nada."""
+    return cliente
 
 
 def _vista_previa(api, quien, **cambios):
@@ -407,30 +425,51 @@ def test_sin_palabras_clave_ni_exclusiones_no_hay_nada_que_ignorar(api, usuarios
         assert not {"palabras_clave", "exclusiones"} & set(fuente["ignorados"])
 
 
-# --- geografía: el departamento es un código DIVIPOLA, no texto libre --------------------------------------------
+# --- geografía: país -> división (código nativo) -> ciudad (municipio) ---------------------------------------------
 
-def test_geografia_lista_los_33_departamentos_de_colombia_con_codigo_y_nombres(api, usuarios):
+def test_geografia_sin_pais_lista_solo_los_paises_con_archivo(api_real, usuarios):
+    api = api_real
     r = api.get("/geografia", headers=_bearer(usuarios["a"]))
 
     assert r.status_code == 200
-    co = r.json()["CO"]
-    assert len(co) == 33 and len({d["codigo"] for d in co}) == 33  # 32 departamentos + Bogotá D.C.
-    assert all(re.fullmatch(r"\d{2}", d["codigo"]) and d["nombre_es"] and d["nombre_en"] for d in co)
-    por_codigo = {d["codigo"]: d for d in co}
-    assert por_codigo["73"]["nombre_es"] == "Tolima" and por_codigo["11"]["nombre_es"] == "Bogotá, D.C."
-    assert [d["codigo"] for d in co] == sorted(por_codigo)  # estable: por código
+    assert r.json() == {"paises": ["CO"]}  # MX, PE y BR no tienen archivo todavía: la UI no los ofrece
 
 
-@pytest.mark.parametrize("cambios", [
-    pytest.param({"departamento": "Tolima"}, id="nombre_en_vez_de_codigo"),
-    pytest.param({"departamento": "00"}, id="codigo_que_no_existe"),
-    pytest.param({"departamento": "11", "pais": "PE"}, id="departamento_de_colombia_en_otro_pais"),
+def test_geografia_de_colombia_trae_33_divisiones_con_codigo_comun_nativo_y_nombres(api_real, usuarios):
+    api = api_real
+    r = api.get("/geografia", params={"pais": "CO"}, headers=_bearer(usuarios["a"]))
+
+    assert r.status_code == 200
+    divisiones = r.json().get("divisiones", [])
+    assert len(divisiones) == 33 and len({d["codigo_nativo"] for d in divisiones}) == 33  # 32 + Bogotá, D.C.
+    assert len({d["iso_3166_2"] for d in divisiones}) == 33
+    assert all(re.fullmatch(r"CO-[A-Z]{2,3}", d["iso_3166_2"]) and re.fullmatch(r"\d{2}", d["codigo_nativo"])
+               and d["nombre_es"] and d["nombre_en"] and isinstance(d["municipios"], list) for d in divisiones)
+    por_nativo = {d["codigo_nativo"]: d for d in divisiones}
+    assert (por_nativo["73"]["iso_3166_2"], por_nativo["73"]["nombre_es"]) == ("CO-TOL", "Tolima")
+    assert (por_nativo["11"]["iso_3166_2"], por_nativo["11"]["nombre_es"]) == ("CO-DC", "Bogotá, D.C.")
+    assert [d["codigo_nativo"] for d in divisiones] == sorted(por_nativo)  # estable: por código nativo
+
+
+def test_geografia_de_un_pais_sin_archivo_es_404(api_real, usuarios):
+    api = api_real
+    assert api.get("/geografia", params={"pais": "PE"}, headers=_bearer(usuarios["a"])).status_code == 404
+
+
+@pytest.mark.parametrize("cambios, esperado", [
+    pytest.param({"departamento": "Tolima", "ciudad": None}, [("departamento", "desconocido")], id="nombre_en_vez_de_codigo"),
+    pytest.param({"departamento": "00", "ciudad": None}, [("departamento", "desconocido")], id="codigo_que_no_existe"),
+    pytest.param({"departamento": "73", "ciudad": "Bogotá"}, [("ciudad", "desconocido")], id="ciudad_de_otra_division"),
+    pytest.param({"departamento": None, "ciudad": "Ibagué"}, [("departamento", "requerido")], id="ciudad_sin_division"),
+    pytest.param({"pais": "PE", "departamento": None, "ciudad": None}, [("pais", "desconocido")], id="pais_sin_archivo_de_geografia"),
 ])
-def test_departamento_desconocido_da_422_con_codigo(api, admin, usuarios, cambios):
+def test_geografia_invalida_da_422_con_codigo(api, admin, usuarios, cambios, esperado):
+    api.app.state.geografia = GEOGRAFIA_DE_PRUEBA
+
     r = _vista_previa(api, usuarios["a"], **cambios)
 
     assert r.status_code == 422
-    assert r.json() == {"errores": [{"campo": "departamento", "codigo": "desconocido"}]}
+    assert [(e["campo"], e["codigo"]) for e in r.json()["errores"]] == esperado
     assert _contar(admin, "SELECT count(*) FROM busquedas WHERE tenant_id = :a", a=usuarios["tenant_a"]) == 0
 
 
@@ -443,6 +482,7 @@ def test_tolima_e_ibague_llegan_a_datos_gov_con_sus_camaras_y_a_osm_con_la_ciuda
     camaras = tmp_path / "camaras.yaml"
     camaras.write_text('"99": {nombre: "Ficticia", municipio_sede: "Ibagué", departamentos: ["73"]}\n')
     api.app.state.camaras_yaml = camaras
+    api.app.state.geografia = GEOGRAFIA_DE_PRUEBA
 
     busqueda_id = _crear(api, usuarios["a"], departamento="73", ciudad="Ibagué")
     r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
@@ -456,7 +496,8 @@ def test_tolima_e_ibague_llegan_a_datos_gov_con_sus_camaras_y_a_osm_con_la_ciuda
     assert "Ibagu" in unquote_plus(_cuerpo(osm[0]))
 
 
-def test_tolima_con_el_yaml_real_no_tumba_la_busqueda_porque_no_hay_camaras_de_73(api, admin, usuarios):
+def test_tolima_con_el_yaml_real_de_camaras_no_tumba_la_busqueda_porque_no_hay_camaras_de_73(api, admin, usuarios):
+    api.app.state.geografia = GEOGRAFIA_DE_PRUEBA
     busqueda_id = _crear(api, usuarios["a"], departamento="73", ciudad="Ibagué")
 
     r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)

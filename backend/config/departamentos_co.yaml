@@ -1,0 +1,37 @@
+# Departamentos de Colombia por código DIVIPOLA (DANE): 32 departamentos + Bogotá, D.C. (11).
+# Fuente de verdad del selector del formulario (GET /geografia) y de la validación de `departamento` en la API.
+# El código es lo que viaja en el pedido y lo que `datos_gov_co_rues` traduce a cámaras con camaras_co.yaml.
+# nombre_es: DANE. nombre_en: el nombre oficial es el mismo salvo San Andrés y Providencia.
+"05": {nombre_es: "Antioquia", nombre_en: "Antioquia"}
+"08": {nombre_es: "Atlántico", nombre_en: "Atlántico"}
+"11": {nombre_es: "Bogotá, D.C.", nombre_en: "Bogotá, D.C."}
+"13": {nombre_es: "Bolívar", nombre_en: "Bolívar"}
+"15": {nombre_es: "Boyacá", nombre_en: "Boyacá"}
+"17": {nombre_es: "Caldas", nombre_en: "Caldas"}
+"18": {nombre_es: "Caquetá", nombre_en: "Caquetá"}
+"19": {nombre_es: "Cauca", nombre_en: "Cauca"}
+"20": {nombre_es: "Cesar", nombre_en: "Cesar"}
+"23": {nombre_es: "Córdoba", nombre_en: "Córdoba"}
+"25": {nombre_es: "Cundinamarca", nombre_en: "Cundinamarca"}
+"27": {nombre_es: "Chocó", nombre_en: "Chocó"}
+"41": {nombre_es: "Huila", nombre_en: "Huila"}
+"44": {nombre_es: "La Guajira", nombre_en: "La Guajira"}
+"47": {nombre_es: "Magdalena", nombre_en: "Magdalena"}
+"50": {nombre_es: "Meta", nombre_en: "Meta"}
+"52": {nombre_es: "Nariño", nombre_en: "Nariño"}
+"54": {nombre_es: "Norte de Santander", nombre_en: "Norte de Santander"}
+"63": {nombre_es: "Quindío", nombre_en: "Quindío"}
+"66": {nombre_es: "Risaralda", nombre_en: "Risaralda"}
+"68": {nombre_es: "Santander", nombre_en: "Santander"}
+"70": {nombre_es: "Sucre", nombre_en: "Sucre"}
+"73": {nombre_es: "Tolima", nombre_en: "Tolima"}
+"76": {nombre_es: "Valle del Cauca", nombre_en: "Valle del Cauca"}
+"81": {nombre_es: "Arauca", nombre_en: "Arauca"}
+"85": {nombre_es: "Casanare", nombre_en: "Casanare"}
+"86": {nombre_es: "Putumayo", nombre_en: "Putumayo"}
+"88": {nombre_es: "San Andrés y Providencia", nombre_en: "San Andrés and Providencia"}
+"91": {nombre_es: "Amazonas", nombre_en: "Amazonas"}
+"94": {nombre_es: "Guainía", nombre_en: "Guainía"}
+"95": {nombre_es: "Guaviare", nombre_en: "Guaviare"}
+"97": {nombre_es: "Vaupés", nombre_en: "Vaupés"}
+"99": {nombre_es: "Vichada", nombre_en: "Vichada"}

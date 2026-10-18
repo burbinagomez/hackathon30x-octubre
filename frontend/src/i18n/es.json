@@ -25,6 +25,8 @@
     "actividad": "Actividad",
     "actividad_vacia": "Elegí una actividad",
     "departamento": "Departamento",
+    "ciudad": "Ciudad (opcional)",
+    "departamento_vacio": "Todos los departamentos",
     "ingresos_min": "Ingresos mínimos (USD)",
     "palabras_clave": "Palabras clave (separadas por coma)",
     "exclusiones": "Exclusiones (separadas por coma)",

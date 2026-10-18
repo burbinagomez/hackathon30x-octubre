@@ -25,6 +25,8 @@
     "actividad": "Activity",
     "actividad_vacia": "Pick an activity",
     "departamento": "State",
+    "ciudad": "City (optional)",
+    "departamento_vacio": "All states",
     "ingresos_min": "Minimum revenue (USD)",
     "palabras_clave": "Keywords (comma separated)",
     "exclusiones": "Exclusions (comma separated)",

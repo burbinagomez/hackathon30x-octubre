@@ -43,6 +43,7 @@ def registro_api(ruta_yaml: Path, catalogo: dict[str, type]) -> Registro:
 def armador_de_fuente(
     clase: type, meta: MetaFuente, *, ajustes: Callable[[], Settings], costos: RegistroCostos,
     tarifas: Mapping[str, Decimal], limites: Mapping, api_key, transporte: Callable[[], httpx.BaseTransport],
+    camaras_yaml: Callable[[], Path] = lambda: CONFIG / "camaras_co.yaml",
 ) -> Callable[[UUID], FuenteDescubrimiento]:
     """lote_id -> la fuente armada para esa búsqueda. `transporte` y `ajustes` se llaman al armar, no antes."""
     def armar(lote_id: UUID):
@@ -54,7 +55,7 @@ def armador_de_fuente(
             return clase(
                 transporte=transporte(), reloj=lambda: datetime.now(UTC), monotonico=time.monotonic,
                 dormir=time.sleep, costos=costos, cache=None,
-                camaras=cargar_camaras(CONFIG / "camaras_co.yaml"),
+                camaras=cargar_camaras(camaras_yaml()),
                 tarifas={"computo_seg_usd": tarifas["datos.gov.co"]}, lote_id=lote_id, meta=meta,
                 app_token=token.get_secret_value() if token else None, **extra,
             )

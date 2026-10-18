@@ -5,6 +5,7 @@ from uuid import UUID
 from app.modulos.descubrimiento.dominio.errores import (
     BusquedaNoEncontrada,
     BusquedaYaEjecutada,
+    CriterioNoSoportado,
     FuenteNoDisponible,
     LimiteFuenteAgotado,
 )
@@ -50,7 +51,7 @@ def _correr_fuentes(
         try:
             # ponytail: solo página 1; paginar cuando una fuente real devuelva más de una.
             pagina = armar(clave).buscar(criterios_fuente, 1)
-        except (LimiteFuenteAgotado, FuenteNoDisponible) as error:
+        except (LimiteFuenteAgotado, FuenteNoDisponible, CriterioNoSoportado) as error:  # una fuente caída o que no entiende el ICP no tumba a las demás
             errores[clave] = error
             continue
         for empresa in pagina.empresas:

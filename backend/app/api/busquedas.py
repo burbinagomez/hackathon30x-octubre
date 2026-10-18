@@ -21,6 +21,7 @@ from app.modulos.descubrimiento.aplicacion.vista_previa import VistaPrevia
 from app.modulos.descubrimiento.dominio.errores import (
     BusquedaNoEncontrada,
     BusquedaYaEjecutada,
+    CriterioNoSoportado,
     FuenteNoDisponible,
     LimiteFuenteAgotado,
 )
@@ -71,16 +72,20 @@ def _fabrica(request: Request, tenant_id: UUID):
     estado = request.app.state
     return fabrica_de_fuentes(
         estado.registro, ajustes=lambda: estado.settings, costos=PostgresCostos(estado.engine, tenant_id),
-        tarifas=estado.tarifas, limites={}, api_key=None,
+        tarifas=estado.tarifas, limites={}, api_key=None, camaras_yaml=lambda: request.app.state.camaras_yaml,
         transporte=lambda: request.app.state.transporte_http,  # se lee al armar cada fuente, en cada request
     )
 
 
 @router.post("/busquedas/vista-previa", status_code=201)
 def vista_previa(pedido: PedidoVistaPrevia, request: Request, tenant_id: UUID = Depends(tenant_actual)):
+    errores = []
+    if pedido.departamento is not None and pedido.departamento not in request.app.state.departamentos_yaml.get(pedido.pais, {}):
+        errores.append({"campo": "departamento", "codigo": "desconocido"})  # no es un código DIVIPOLA de ese país
     if not canal_habilitado(pedido.canal_preferido, request.app.state.canales_contacto):
-        return JSONResponse(status_code=422, content={
-            "errores": [{"campo": "canal_preferido", "codigo": "canal_no_habilitado"}]})
+        errores.append({"campo": "canal_preferido", "codigo": "canal_no_habilitado"})
+    if errores:
+        return JSONResponse(status_code=422, content={"errores": errores})
     caso = VistaPrevia(_repo(request, tenant_id), _fabrica(request, tenant_id),
                        actividades_de(request.app.state.actividades_yaml))
     r = caso.ejecutar(_criterios(pedido), pedido.canal_preferido, pedido.tope_gasto_usd, pedido.mensaje_base)
@@ -95,7 +100,8 @@ def vista_previa(pedido: PedidoVistaPrevia, request: Request, tenant_id: UUID = 
     }
 
 
-_MOTIVO_DE_ERROR = {FuenteNoDisponible: "no_disponible", LimiteFuenteAgotado: "limite_agotado"}
+_MOTIVO_DE_ERROR = {FuenteNoDisponible: "no_disponible", LimiteFuenteAgotado: "limite_agotado",
+                    CriterioNoSoportado: "criterio_no_soportado"}
 
 
 @router.post("/busquedas/{busqueda_id}/ejecutar")

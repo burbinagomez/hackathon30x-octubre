@@ -1,9 +1,14 @@
 export type Actividad = { codigo: string; nombre_es: string; nombre_en: string | null };
 
+export type Departamento = { codigo: string; nombre_es: string; nombre_en: string };
+/** GET /geografia: departamentos por país (hoy solo CO), con el código DIVIPOLA que viaja en el pedido. */
+export type Geografia = Record<string, Departamento[]>;
+
 export type PedidoVistaPrevia = {
   pais: string;
   ciiu: string;
-  departamento?: string;
+  departamento?: string; // código DIVIPOLA ("73"), nunca el nombre
+  ciudad?: string;
   ingresos_min?: number;
   palabras_clave: string[];
   exclusiones: string[];
