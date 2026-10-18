@@ -41,6 +41,8 @@ describe("tokens.css", () => {
 });
 
 // Compara el hostname parseado: un `includes` sobre la URL aceptaría cualquier host que lo contenga.
+const esDominioOsubdominio = (h: string, dominio: string) => h === dominio || h.endsWith(`.${dominio}`);
+
 const host = (href: string | null) => {
   try {
     return new URL(href ?? "").hostname;
@@ -57,7 +59,7 @@ describe("index.html", () => {
 
   test("no carga fuentes de Google: se sirven desde el propio sitio", () => {
     const hrefs = Array.from(leerHtml().querySelectorAll("link"), (l) => host(l.getAttribute("href")));
-    expect(hrefs.filter((h) => h.endsWith("googleapis.com") || h.endsWith("gstatic.com"))).toEqual([]);
+    expect(hrefs.filter((h) => esDominioOsubdominio(h, "googleapis.com") || esDominioOsubdominio(h, "gstatic.com"))).toEqual([]);
   });
 });
 
