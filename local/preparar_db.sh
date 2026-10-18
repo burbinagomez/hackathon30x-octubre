@@ -18,6 +18,6 @@ if [[ -n "${LOCAL_AUTH_USER_ID:-}" ]]; then
     <<<"INSERT INTO usuarios (auth_user_id, tenant_id, idioma) VALUES (:'u', :'t', 'es') ON CONFLICT (auth_user_id) DO NOTHING;"
   echo "usuario local listo"
 else
-  echo "AVISO: sin LOCAL_AUTH_USER_ID no vas a poder entrar (falta tu fila en usuarios)" >&2
+  echo "AVISO: sin LOCAL_AUTH_USER_ID no hay usuario local" >&2
 fi
 echo "base local lista"
