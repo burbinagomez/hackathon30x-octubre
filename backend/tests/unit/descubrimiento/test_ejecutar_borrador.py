@@ -142,3 +142,16 @@ def test_el_log_de_una_fuente_caida_lleva_clave_y_clase_nunca_el_mensaje(caplog)
     assert A in texto and "ValueError" in texto
     assert "ACME" not in texto and "secreto" not in texto and "900123456" not in texto
     assert all(r.exc_info is None and r.exc_text is None for r in caplog.records)  # el traceback también trae el mensaje
+
+
+def test_el_log_de_una_fuente_caida_lleva_el_codigo_http_y_nada_mas_del_mensaje(caplog):
+    # En prod solo se veía "FuenteNoDisponible": sin el código no se sabe si es 429, 401 o timeout.
+    caso, _, borrador_id = _caso(empresas={B: _tres(B)},
+                                 errores={A: FuenteNoDisponible("croma: http 401 ACME SAS 900123456")})
+
+    with caplog.at_level(logging.DEBUG):
+        caso.ejecutar(borrador_id)
+
+    texto = "\n".join(r.getMessage() for r in caplog.records)
+    assert "detalle=http 401" in texto
+    assert "ACME" not in texto and "900123456" not in texto
