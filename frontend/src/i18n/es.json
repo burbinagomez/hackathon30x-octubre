@@ -33,5 +33,36 @@
     "creditos_restantes": "Créditos de Croma restantes este mes: {{n}}",
     "requests_restantes": "Consultas de Croma restantes en 24 h: {{n}}",
     "descartadas": "Fuentes descartadas"
+  },
+  "fuentes": {
+    "croma_supersociedades_co": "Supersociedades (Croma)",
+    "croma_dian_trade_co": "DIAN Trade (Croma)",
+    "osm_overpass": "OpenStreetMap",
+    "datos_gov_co_rues": "RUES (datos.gov.co)",
+    "sin_atribuir": "Sin atribuir"
+  },
+  "criterios": {
+    "pais": "País",
+    "ciiu": "Actividad",
+    "departamento": "Departamento",
+    "ingresos_min": "Ingresos mínimos"
+  },
+  "tablero": {
+    "titulo": "Tablero por fuente",
+    "fuente": "Fuente",
+    "encontrados": "Encontrados",
+    "unicos": "Únicos",
+    "costo_lista": "Costo (lista)",
+    "costo_real": "Costo (real)",
+    "desperdicio_lista": "Desperdicio (lista)",
+    "cpl_lista": "CPL (lista)",
+    "cpl_real": "CPL (real)",
+    "naturales": "Naturales (no contactables)",
+    "no_aplica": "No aplica",
+    "total": "Total",
+    "costo_evals": "Costo de evals (aparte): {{monto}}",
+    "cobertura": "Cobertura por país",
+    "revisiones_pendientes": "Revisiones pendientes: {{n}}",
+    "atribucion": "Atribución de datos"
   }
 }

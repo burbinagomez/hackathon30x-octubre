@@ -33,5 +33,36 @@
     "creditos_restantes": "Croma credits left this month: {{n}}",
     "requests_restantes": "Croma requests left in 24 h: {{n}}",
     "descartadas": "Discarded sources"
+  },
+  "fuentes": {
+    "croma_supersociedades_co": "Supersociedades (Croma)",
+    "croma_dian_trade_co": "DIAN Trade (Croma)",
+    "osm_overpass": "OpenStreetMap",
+    "datos_gov_co_rues": "RUES (datos.gov.co)",
+    "sin_atribuir": "Unattributed"
+  },
+  "criterios": {
+    "pais": "Country",
+    "ciiu": "Activity",
+    "departamento": "State",
+    "ingresos_min": "Minimum revenue"
+  },
+  "tablero": {
+    "titulo": "Dashboard by source",
+    "fuente": "Source",
+    "encontrados": "Found",
+    "unicos": "Unique",
+    "costo_lista": "Cost (list)",
+    "costo_real": "Cost (actual)",
+    "desperdicio_lista": "Waste (list)",
+    "cpl_lista": "CPL (list)",
+    "cpl_real": "CPL (actual)",
+    "naturales": "Individuals (not contactable)",
+    "no_aplica": "Not applicable",
+    "total": "Total",
+    "costo_evals": "Evals cost (separate): {{monto}}",
+    "cobertura": "Coverage by country",
+    "revisiones_pendientes": "Pending reviews: {{n}}",
+    "atribucion": "Data attribution"
   }
 }
