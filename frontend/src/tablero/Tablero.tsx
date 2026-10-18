@@ -142,7 +142,7 @@ export default function Tablero() {
   useEffect(() => {
     obtenerTablero().then(setDatos).catch(() => setFallo(true));
     // El CPQL es un agregado: si falla, el tablero se ve como sin él (sin columnas nuevas, sin error).
-    cargarCpql();
+    void cargarCpql();
   }, []);
 
   const importar = async (e: ChangeEvent<HTMLInputElement>) => {
