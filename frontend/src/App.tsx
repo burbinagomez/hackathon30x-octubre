@@ -3,10 +3,12 @@ import { useTranslation } from "react-i18next";
 import Login from "./acceso/Login";
 import { configuracionValida } from "./api/supabase";
 import NuevaBusqueda from "./busqueda/NuevaBusqueda";
+import Costos from "./costos/Costos";
 import LeadsDeBusqueda from "./leads/LeadsDeBusqueda";
 import LeadsDeFuente from "./leads/LeadsDeFuente";
 import ListaBusquedas from "./leads/ListaBusquedas";
 import { aplicarIdioma } from "./compartido/idioma";
+import { RUTA_COSTOS } from "./compartido/rutas";
 import SelectorIdioma from "./compartido/SelectorIdioma";
 import Tablero from "./tablero/Tablero";
 
@@ -20,13 +22,19 @@ const RUTAS: Record<string, ComponentType> = {
 };
 
 // Solo un uuid: lo que no lo es no es una ruta (el id acaba en la URL de la API).
-const LEADS_DE_BUSQUEDA = /^\/busquedas\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/leads$/;
+const UUID_RE = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const UUID = new RegExp(`^${UUID_RE}$`);
+const LEADS_DE_BUSQUEDA = new RegExp(`^/busquedas/(${UUID_RE})/leads$`);
 
 function resolver(url: string): ReactElement | null {
   const [ruta, consulta = ""] = url.split("?");
   if (ruta === "/leads") {
     const fuente = new URLSearchParams(consulta).get("fuente");
     return <LeadsDeFuente key={fuente ?? ""} fuente={fuente} />;
+  }
+  if (ruta === RUTA_COSTOS) {
+    const busqueda = new URLSearchParams(consulta).get("busqueda_id");
+    return <Costos key={busqueda ?? ""} busquedaId={busqueda && UUID.test(busqueda) ? busqueda : null} />;
   }
   const Pantalla = RUTAS[ruta];
   if (Pantalla) return <Pantalla />;

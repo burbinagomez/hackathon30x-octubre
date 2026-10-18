@@ -54,3 +54,20 @@ test("/leads sin fuente muestra todos", async () => {
   render(<App />);
   await waitFor(() => expect(screen.queryByRole("heading", { level: 1, name: "Todos los leads" })).toBeInTheDocument());
 });
+
+test("/costos?busqueda_id= muestra el libro filtrado; un id invalido no se manda", async () => {
+  const pedidos: string[] = [];
+  server.use(http.get("*/costos", ({ request }) => {
+    pedidos.push(new URL(request.url).search);
+    return HttpResponse.json({ items: [], total: 0, pagina: 1, tamano: 50, total_usd: "0", total_real_usd: "0", por_tipo: [], por_fuente: [] });
+  }));
+  history.replaceState(null, "", `/costos?busqueda_id=${ID}`);
+  const { unmount } = render(<App />);
+  await waitFor(() => expect(screen.queryByRole("heading", { level: 1, name: "Libro de costos" })).toBeInTheDocument());
+  expect(pedidos).toEqual([`?pagina=1&busqueda_id=${ID}`]);
+  unmount();
+  history.replaceState(null, "", "/costos?busqueda_id=../x");
+  render(<App />);
+  await waitFor(() => expect(pedidos).toHaveLength(2));
+  expect(pedidos[1]).toBe("?pagina=1");
+});

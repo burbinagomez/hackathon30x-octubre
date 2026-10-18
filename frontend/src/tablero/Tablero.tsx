@@ -5,7 +5,7 @@ import Esqueleto from "../compartido/Esqueleto";
 import Trabajando from "../compartido/Trabajando";
 import { ErrorApi } from "../api/cliente";
 import Enlace from "../compartido/Enlace";
-import { RUTA_BUSQUEDAS, RUTA_LEADS } from "../compartido/rutas";
+import { RUTA_BUSQUEDAS, RUTA_COSTOS, RUTA_LEADS } from "../compartido/rutas";
 import { entero, moneda, monedaFina, porcentaje } from "../compartido/formato";
 import { obtenerCpql, exportarParaDapta, importarDeDapta, obtenerTablero } from "./api";
 import type { Cpql, FilaCpql, FilaTablero, ResumenImportacion, Tablero as DatosTablero } from "./tipos";
@@ -183,6 +183,7 @@ export default function Tablero() {
       <h1>{t("tablero.titulo")}</h1>
       <div className="acciones acciones-fin">
         <Enlace a={RUTA_BUSQUEDAS}>{t("tablero.ver_busquedas")}</Enlace>
+        <Enlace a={RUTA_COSTOS}>{t("costos.ver_costos")}</Enlace>
         <button type="button" className="boton" onClick={() => exportarParaDapta().catch(() => setFalloExport(true))}>
           {t("tablero.exportar_dapta")}
         </button>

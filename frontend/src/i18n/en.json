@@ -107,6 +107,32 @@
     "palabras_clave": "Keywords",
     "exclusiones": "Exclusions"
   },
+  "costos": {
+    "titulo": "Cost ledger",
+    "error": "Could not load the cost ledger. Try again.",
+    "filtrado": "Filtered by search.",
+    "ver_todo": "View the whole ledger",
+    "total": "Total (list)",
+    "total_real": "Total (actual)",
+    "por_tipo": "By type",
+    "por_fuente": "By source",
+    "vacio": "No costs recorded yet.",
+    "operaciones": "{{total}} operations",
+    "tabla": "Operations",
+    "si": "Yes",
+    "no": "No",
+    "anterior": "Previous",
+    "siguiente": "Next",
+    "pagina_de": "Page {{pagina}} of {{paginas}}",
+    "ver_costos": "View costs",
+    "col": {"ts": "Date", "tipo": "Type", "fuente": "Source", "proveedor": "Provider", "cantidad": "Quantity", "costo": "Cost (USD)", "gratis": "Free", "lead": "From a lead"},
+    "tipos": {
+      "socrata_descarga": "Socrata download", "overpass_query": "Overpass query", "web_fetch": "Web fetch",
+      "llm_tokens_in": "LLM tokens (in)", "llm_tokens_out": "LLM tokens (out)", "jev_tokens": "Jev tokens",
+      "croma_consulta": "Croma query", "email_envio": "Email sent", "whatsapp_plantilla": "WhatsApp template",
+      "dapta_llamada": "Dapta call", "minutos_humanos": "Human minutes"
+    }
+  },
   "tablero": {
     "error": "The dashboard could not be loaded. Try again.",
     "titulo": "Dashboard by source",
@@ -127,6 +153,7 @@
     "atribucion": "Data attribution",
     "desperdicio_real": "Waste (actual)",
     "ver_busquedas": "View searches",
+    "ver_costos": "View costs",
     "licencia": "License",
     "calificados": "Qualified",
     "pct_calificados": "% qualified (of unique)",
