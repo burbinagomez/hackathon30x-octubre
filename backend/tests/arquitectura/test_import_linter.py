@@ -62,6 +62,16 @@ def test_descubrimiento_no_importa_costos_infraestructura(tmp_path):
     assert f"{SIN_COSTOS_INFRA} BROKEN" in r.stdout
 
 
+def test_cryptography_no_entra_al_dominio(tmp_path):
+    # El cifrado es un adaptador: el dominio maneja texto en claro y nunca ve la librería (principio I).
+    _arbol_modulos(tmp_path, "app/modulos/descubrimiento/dominio/x.py", "import cryptography\n")
+
+    r = lint_imports(tmp_path)
+
+    assert r.returncode != 0
+    assert "Cifrado fuera del dominio BROKEN" in r.stdout
+
+
 def test_repo_cumple_contratos():
     r = lint_imports(BACKEND)
     assert r.returncode == 0, r.stdout + r.stderr
