@@ -80,3 +80,16 @@ def test_default_privileges_no_conceden_a_anon_ni_authenticated(admin):
         assert {rol: _concedidos(admin, rol, ["x"]) for rol in ROLES_SUPABASE} == {"anon": [], "authenticated": []}
     finally:
         transaccion.rollback()
+
+
+def test_anon_y_authenticated_sin_execute_en_funciones_de_public(admin):
+    # Supabase da EXECUTE en funciones nuevas a anon/authenticated (default privileges) y Postgres a PUBLIC:
+    # cualquier función de public tiene que cerrarse a mano. Las de extensiones (pg_trgm) viven en extensions.
+    funciones = list(admin.execute(text(
+        "SELECT p.oid::regprocedure::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace "
+        "WHERE n.nspname = 'public' AND p.prokind = 'f' "
+        "AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e')")).scalars())
+    assert any(f.startswith("tenant_de_usuario") for f in funciones)  # una lista vacía dejaría el test verde sin probar nada
+    abiertas = [(f, rol) for f in funciones for rol in ROLES_SUPABASE
+                if admin.execute(text("SELECT has_function_privilege(:rol, :f, 'EXECUTE')"), {"rol": rol, "f": f}).scalar()]
+    assert abiertas == []

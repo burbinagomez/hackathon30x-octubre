@@ -134,3 +134,11 @@ fuente_cache = Table(
     Column("as_of", DateTime(timezone=True), nullable=False),
     UniqueConstraint("proveedor", "endpoint", "hash_params", name="fuente_cache_proveedor_endpoint_hash_key"),
 )
+
+usuarios = Table(
+    "usuarios", metadata,
+    Column("auth_user_id", UUID(as_uuid=True), primary_key=True),
+    _tenant(),
+    Column("idioma", Text),
+    Column("creado_en", DateTime(timezone=True), nullable=False, server_default=_AHORA),
+)

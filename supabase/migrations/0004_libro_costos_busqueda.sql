@@ -1,9 +1,23 @@
--- ESQUELETO T005/T008 [MIN] (sin usuarios: pausado). Se reemplaza por el DDL aprobado al final.
+-- ESQUELETO T005/T008 [MIN]. Se reemplaza por el DDL aprobado al final.
 ALTER TABLE public.busquedas
   DROP CONSTRAINT busquedas_estado_check,
   ADD CONSTRAINT busquedas_estado_check CHECK (estado IN (
     'creada', 'terminada', 'con_errores',
     'borrador', 'ejecutando', 'completada', 'tope_alcanzado', 'error'));
+
+CREATE TABLE public.usuarios (
+  auth_user_id uuid PRIMARY KEY,
+  tenant_id    uuid NOT NULL REFERENCES public.tenants(id),
+  idioma       text,
+  creado_en    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE FUNCTION public.tenant_de_usuario(p_auth_user_id uuid)
+  RETURNS TABLE (tenant_id uuid, idioma_usuario text, idioma_tenant text)
+  LANGUAGE sql STABLE
+AS $$
+  SELECT NULL::uuid, NULL::text, NULL::text WHERE false
+$$;
 
 CREATE VIEW public.v_tablero_fuentes WITH (security_invoker = true) AS
   SELECT fuente, count(*) AS encontrados, count(DISTINCT lead_id) AS unicos

@@ -9,7 +9,9 @@ from app import db
 
 # fuente_cache queda fuera: es global, sin tenant_id. Guarda datos públicos de gobierno, no del tenant,
 # y no se expone por API (spec, Decisiones técnicas).
-EXCLUIDAS = {"fuente_cache"}
+EXCLUIDAS = {"fuente_cache", "usuarios"}
+# usuarios queda fuera: app_rt no tiene privilegios sobre ella (entra solo por tenant_de_usuario), así que el test de
+# tablas daría permission denied y no probaría RLS. Su aislamiento lo prueban test_usuarios_tiene_rls y test_usuarios_repo.
 TABLAS = ["tenants", "busquedas", "leads", "lead_fuentes", "cumplimiento", "costos"]
 
 PRIVILEGIO_INSUFICIENTE = "42501"  # también es el sqlstate de una violación de política RLS
@@ -163,3 +165,14 @@ def test_toda_vista_es_security_invoker(rt):
     assert set(VISTAS) <= set(vistas)  # una lista vacía dejaría el test verde sin probar nada
     sin_la_opcion = sorted(v for v, opciones in vistas.items() if "security_invoker=true" not in opciones)
     assert sin_la_opcion == []
+
+
+def test_usuarios_tiene_rls(rt):
+    with rt.connect() as c:
+        activa = c.execute(text("SELECT relrowsecurity FROM pg_class WHERE oid = 'public.usuarios'::regclass")).scalar_one()
+        politicas = c.execute(text("SELECT qual, with_check FROM pg_policies "
+                                   "WHERE schemaname = 'public' AND tablename = 'usuarios'")).all()
+    assert activa is True
+    assert len(politicas) == 1
+    assert "tenant_id" in politicas[0].qual and "app.tenant_id" in politicas[0].qual
+    assert "tenant_id" in politicas[0].with_check
