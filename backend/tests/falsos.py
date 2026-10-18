@@ -28,6 +28,9 @@ class RepositorioLeadsFalso:
         self.borradores[busqueda_id] = (criterios, canal_preferido, tope_gasto_usd, mensaje_base)
         return busqueda_id
 
+    def estado(self, busqueda_id: UUID) -> str | None:
+        return self.busquedas.get(busqueda_id)
+
     def obtener_borrador(self, busqueda_id: UUID) -> Borrador | None:
         if self.busquedas.get(busqueda_id) != "borrador":
             return None
@@ -80,7 +83,7 @@ class FuenteFalsa:
 
     def __init__(self, meta: MetaFuente, costos: RegistroCostosFalso, lote_id: UUID,
                  empresas: tuple[EmpresaCruda, ...] = (), error: Exception | None = None,
-                 recibidos: list[CriteriosICP] | None = None):
+                 recibidos: dict[str, CriteriosICP] | None = None):
         self.meta = meta
         self._recibidos = recibidos
         self._costos = costos
@@ -90,7 +93,7 @@ class FuenteFalsa:
 
     def buscar(self, criterios: CriteriosICP, pagina: int) -> PaginaEmpresas:
         if self._recibidos is not None:
-            self._recibidos.append(criterios)
+            self._recibidos[self.meta.clave] = criterios
         self._costos.registrar(OperacionCosto(
             tipo="web_fetch", unidades=Decimal(1), costo_unitario=Decimal(0), moneda="USD",
             proveedor=self.meta.proveedor, fuente=self.meta.clave, canal=None, lead_id=None,
@@ -109,7 +112,7 @@ class FabricaFalsa:
                  empresas: Mapping[str, tuple[EmpresaCruda, ...]] | None = None,
                  errores: Mapping[str, Exception] | None = None):
         self.llamadas: list[UUID | None] = []  # lote_id de cada llamada
-        self.criterios_recibidos: list[CriteriosICP] = []  # lo que recibió buscar() de cualquier fuente
+        self.criterios_por_fuente: dict[str, CriteriosICP] = {}  # clave -> lo que recibió su buscar()
         self._costos = costos
         self._metas = metas
         self._empresas = empresas or {}
@@ -118,5 +121,5 @@ class FabricaFalsa:
     def __call__(self, lote_id: UUID) -> Mapping[str, FuenteFalsa]:
         self.llamadas.append(lote_id)
         return {clave: FuenteFalsa(meta, self._costos, lote_id, self._empresas.get(clave, ()), self._errores.get(clave),
-                                  self.criterios_recibidos)
+                                  self.criterios_por_fuente)
                 for clave, meta in self._metas.items()}

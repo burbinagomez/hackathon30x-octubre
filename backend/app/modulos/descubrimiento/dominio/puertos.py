@@ -22,6 +22,10 @@ class RepositorioLeads(Protocol):
         """P2. Estado `borrador`, criterios congelados. Transacción propia, confirmada antes de pedir las fuentes."""
         ...
 
+    def estado(self, busqueda_id: UUID) -> str | None:
+        """None si no existe o es de otro tenant (RLS): el caso de uso lo traduce a 404, nunca a 409."""
+        ...
+
     def obtener_borrador(self, busqueda_id: UUID) -> Borrador | None:
         """None si no existe, es de otro tenant o ya no está en `borrador`."""
         ...

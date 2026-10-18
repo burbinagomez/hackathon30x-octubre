@@ -52,6 +52,9 @@ class RepositorioLeadsPostgres:
                  "canal": canal_preferido, "tope": tope_gasto_usd, "mensaje": mensaje_base},
             ).scalar_one()
 
+    def estado(self, busqueda_id: UUID) -> str | None:
+        return None  # esqueleto T027
+
     def obtener_borrador(self, busqueda_id: UUID) -> Borrador | None:
         with self._uow() as c:
             f = c.execute(

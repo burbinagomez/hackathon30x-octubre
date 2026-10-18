@@ -20,3 +20,7 @@ class ErrorPersistencia(RuntimeError):
 
 class BusquedaYaEjecutada(RuntimeError):
     """La búsqueda no está en `borrador` (ya corrió, está corriendo, o alguien llegó antes)."""
+
+
+class BusquedaNoEncontrada(LookupError):
+    """No existe, o es de otro tenant (RLS no deja distinguirlo, a propósito)."""

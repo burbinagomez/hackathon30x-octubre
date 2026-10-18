@@ -143,3 +143,14 @@ def test_obtener_borrador_no_devuelve_una_busqueda_que_no_es_borrador(rt, tenant
     repo = RepositorioLeadsPostgres(rt, tenants["a"], cifrador)
     assert repo.obtener_borrador(tenants["busqueda"]) is None  # sembrada en `creada`
     assert repo.pasar_a_ejecutando(tenants["busqueda"]) is False
+
+
+def test_estado_de_una_busqueda_de_otro_tenant_es_none_igual_que_si_no_existiera(rt, tenants, cifrador):
+    repo_a = RepositorioLeadsPostgres(rt, tenants["a"], cifrador)
+    repo_b = RepositorioLeadsPostgres(rt, tenants["b"], cifrador)
+    borrador = repo_a.crear_borrador(CRITERIOS, None, Decimal("1"), None)
+
+    assert repo_a.estado(borrador) == "borrador"
+    assert repo_a.estado(tenants["busqueda"]) == "creada"
+    assert repo_b.estado(borrador) is None  # 404, no 409: B no se entera de que existe
+    assert repo_a.estado(uuid4()) is None
