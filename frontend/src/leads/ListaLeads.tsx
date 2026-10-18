@@ -14,25 +14,31 @@ type Campo = "nombre" | "tipo" | "fuentes" | "ciudad" | "web" | "telefono" | "em
 export default function ListaLeads({ clave, titulo, cargar }: {
   clave: string;
   titulo: string;
-  cargar: (pagina: number) => Promise<PaginaLeads>;
+  cargar: (pagina: number, conContacto: boolean) => Promise<PaginaLeads>;
 }) {
   const { t } = useTranslation();
   const [pagina, setPagina] = useState(1);
+  const [conContacto, setConContacto] = useState(false);
   const [datos, setDatos] = useState<PaginaLeads | null>(null);
   const [fallo, setFallo] = useState<"no_encontrada" | "error_leads" | null>(null);
 
   useEffect(() => {
     setFallo(null);
-    cargar(pagina)
+    cargar(pagina, conContacto)
       .then(setDatos)
       .catch((e) => setFallo(e instanceof ErrorApi && e.estado === 404 ? "no_encontrada" : "error_leads"));
-    // `cargar` es nuevo en cada render: lo que dispara la recarga es la clave y la página.
-  }, [clave, pagina]);
+    // `cargar` es nuevo en cada render: lo que dispara la recarga es la clave, la página y el filtro.
+  }, [clave, pagina, conContacto]);
 
   const cabecera = (
     <>
       <Enlace a={RUTA_BUSQUEDAS}>{t("leads.volver")}</Enlace>
       <h1>{titulo}</h1>
+      <label className="filtro-contacto">
+        <input type="checkbox" checked={conContacto}
+          onChange={(e) => { setPagina(1); setConContacto(e.target.checked); }} />
+        {" "}{t("leads.solo_con_contacto")}
+      </label>
       {fallo && <p role="alert" className="error">{t(`leads.${fallo}`)}</p>}
     </>
   );
@@ -40,6 +46,8 @@ export default function ListaLeads({ clave, titulo, cargar }: {
 
   const paginas = Math.max(1, Math.ceil(datos.total / datos.tamano));
   const sino = (v: boolean | null) => (v === null ? "" : v ? t("leads.si") : t("leads.no"));
+  // Contacto: solo "Sí" o "—" (la API manda null para una natural: no se expone nada, ni siquiera un guion).
+  const siOGuion = (v: boolean | null) => (v === null ? "" : v ? t("leads.si") : "—");
   // Teléfono y correo: la API manda null mientras no haya dato; esa columna no se pinta (nunca un valor de contacto).
   const hay = (c: "tiene_telefono" | "tiene_email") => datos.items.some((i) => i[c] !== null);
   const campos: Campo[] = ["nombre", "tipo", "fuentes", "ciudad", "web"];
@@ -68,8 +76,8 @@ export default function ListaLeads({ clave, titulo, cargar }: {
                     fuentes: l.fuentes.map((f) => t(`fuentes.${f}`, { defaultValue: f })).join(", "),
                     ciudad: l.ciudad ?? "",
                     web: sino(l.tiene_web),
-                    telefono: sino(l.tiene_telefono),
-                    email: sino(l.tiene_email),
+                    telefono: siOGuion(l.tiene_telefono),
+                    email: siOGuion(l.tiene_email),
                     licencia: [...new Set(l.licencias)].join(", "),
                   };
                   return (

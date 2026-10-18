@@ -2,11 +2,16 @@
 Se siembra por el repo con el cifrador de la propia app: si el endpoint descifrara, el nombre saldría."""
 import json
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
-from app.modulos.descubrimiento.dominio.modelos import Actividad, CriteriosICP, EmpresaCruda
+from app.modulos.descubrimiento.dominio.modelos import (
+    Actividad,
+    CriteriosICP,
+    EmpresaCruda,
+    ResultadoEnriquecimiento,
+)
 from app.modulos.descubrimiento.infraestructura.persistencia.repositorio_leads import RepositorioLeadsPostgres
 from tests.integration.test_auth import _bearer, cliente, entorno, usuarios, verificador  # noqa: F401
 
@@ -72,7 +77,9 @@ def test_item_trae_fuentes_licencia_y_booleanos(datos):
     acme = next(i for i in r["items"] if i["nombre"] == "Acme SAS")
     assert (acme["fuentes"], acme["licencias"], acme["ciudad"], acme["tiene_web"]) == (
         ["osm_overpass"], ["lic"], "Bogotá", True)
-    assert (acme["tiene_telefono"], acme["tiene_email"]) == (None, None)
+    assert (acme["tiene_telefono"], acme["tiene_email"]) == (False, False)
+    natural = next(i for i in r["items"] if i["tipo_titular"] == "natural")
+    assert (natural["tiene_telefono"], natural["tiene_email"]) == (None, None)
     assert r["atribuciones"] == [{"fuente": "osm_overpass", "texto": "© OpenStreetMap contributors",
                                   "url": "https://www.openstreetmap.org/copyright"},
                                  {"fuente": "datos_gov_co_rues", "texto": "Datos: Confecámaras vía datos.gov.co (CC BY-SA 4.0)",
@@ -158,3 +165,54 @@ def test_fuente_desconocida_es_422(datos):
 @pytest.mark.parametrize("query", [{"tamano": 101}, {"pagina": 0}])
 def test_leads_de_fuente_parametros_fuera_de_rango_son_422(datos, query):
     assert _de_fuente(datos, "a", fuente="osm_overpass", **query).status_code == 422
+
+
+TELEFONO = "+57 601 555 0100"
+CORREO = "ventas@acme.invalid"
+
+
+def _dar_contacto(datos, nombre, titular="juridica", telefono=None, email=None):
+    repo = RepositorioLeadsPostgres(datos["api"].app.state.engine, datos["u"]["tenant_a"],
+                                                    datos["api"].app.state.cifrador)
+    ids = {i["nombre"]: i["id"] for i in _leads(datos, "a", datos["ba"], tamano=100).json()["items"] if i["nombre"]}
+    repo.guardar_enriquecimiento(UUID(ids[nombre]), ResultadoEnriquecimiento(
+        titular, (telefono, "sitio_web") if telefono else None, (email, "sitio_web") if email else None,
+        titular == "juridica", None if titular == "juridica" else "persona_natural", None))
+
+
+def test_contacto_es_booleano_y_el_valor_nunca_sale(datos):
+    _dar_contacto(datos, "Acme SAS", telefono=TELEFONO, email=CORREO)
+
+    r = _leads(datos, "a", datos["ba"], tamano=100)
+
+    acme = next(i for i in r.json()["items"] if i["nombre"] == "Acme SAS")
+    assert (acme["tiene_telefono"], acme["tiene_email"]) == (True, True)
+    assert TELEFONO not in r.text and CORREO not in r.text
+    assert all(set(i) == CLAVES_DEL_ITEM for i in r.json()["items"])
+    assert TELEFONO not in datos["api"].get("/leads", headers=_bearer(datos["u"]["a"])).text
+
+
+def test_con_contacto_filtra_en_las_dos_rutas(datos):
+    _dar_contacto(datos, "Acme SAS", telefono=TELEFONO)
+    _dar_contacto(datos, "Empresa 1 SAS", email=CORREO)
+
+    por_busqueda = _leads(datos, "a", datos["ba"], con_contacto="true").json()
+    todos = datos["api"].get("/leads", params={"con_contacto": "true"}, headers=_bearer(datos["u"]["a"])).json()
+
+    for r in (por_busqueda, todos):
+        assert {i["nombre"] for i in r["items"]} == {"Acme SAS", "Empresa 1 SAS"}
+        assert r["total"] == 2
+    assert _leads(datos, "a", datos["ba"], con_contacto="false").json()["total"] == 5
+    assert _leads(datos, "a", datos["ba"]).json()["total"] == 5
+
+
+def test_con_contacto_no_cruza_tenants(datos):
+    _dar_contacto(datos, "Acme SAS", telefono=TELEFONO)
+
+    como_b = datos["api"].get("/leads", params={"con_contacto": "true"}, headers=_bearer(datos["u"]["b"])).json()
+
+    assert (como_b["total"], como_b["items"]) == (0, [])
+
+
+def test_con_contacto_invalido_es_422(datos):
+    assert _leads(datos, "a", datos["ba"], con_contacto="quizas").status_code == 422

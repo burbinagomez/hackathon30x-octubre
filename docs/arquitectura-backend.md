@@ -17,3 +17,6 @@
 - `app/api/intake_lookalike.py`: la raíz de composición que une las dos puntas (intake no importa descubrimiento: contrato `forbidden`).
   Departamento = cámara -> `camaras_co.yaml` (si la cámara cubre varios, el de menor código). Los nombres pegados no se persisten ni se loguean.
 - Respeta `datos_gov_co_rues.habilitado` de `fuentes.yaml`: desconectada, responde 503 `lookalike_no_disponible`.
+
+## Lista de leads: contacto como booleano (005, enmienda)
+`GET /leads` y `GET /busquedas/{id}/leads` devuelven `tiene_telefono`/`tiene_email` calculados en SQL con `IS NOT NULL` sobre las columnas cifradas (nunca se leen ni descifran), solo para jurídicas; natural o desconocido van `null`. El filtro `con_contacto=true` (jurídica con teléfono o correo) se agrega con `AND` al filtro de alcance en `RepositorioLeadsPostgres._pagina`.

@@ -6,7 +6,12 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import text
 
-from app.modulos.descubrimiento.dominio.modelos import Actividad, CriteriosICP, EmpresaCruda
+from app.modulos.descubrimiento.dominio.modelos import (
+    Actividad,
+    CriteriosICP,
+    EmpresaCruda,
+    ResultadoEnriquecimiento,
+)
 from app.modulos.descubrimiento.infraestructura.persistencia.repositorio_leads import RepositorioLeadsPostgres
 
 CS, OSM, RUES = "croma_supersociedades_co", "osm_overpass", "datos_gov_co_rues"
@@ -99,12 +104,91 @@ def test_busqueda_ajena_o_inexistente_es_none(mundo):
     assert r.listar_leads(mundo["b2"], 1, 25).total == 0  # existe pero vacía: no es None
 
 
-def test_tiene_web_y_contacto_sin_dato(mundo):
+def test_tiene_web(mundo):
     p = _por_id(mundo["repo"].listar_leads(mundo["b1"], 1, 25))
 
     assert (p[mundo["j"]].tiene_web, p[mundo["j2"]].tiene_web, p[mundo["n"]].tiene_web) == (True, False, False)
-    for i in p.values():  # no hay columna de contacto todavía: sin dato, nunca false inventado
-        assert (i.tiene_telefono, i.tiene_email) == (None, None)
+
+
+TELEFONO = "+57 601 555 0100"
+CORREO = "ventas@acme.invalid"
+
+
+def _guardar(repo, lead, titular, telefono=None, email=None):
+    repo.guardar_enriquecimiento(lead, ResultadoEnriquecimiento(
+        titular, (telefono, "sitio_web") if telefono else None, (email, "sitio_web") if email else None,
+        titular == "juridica", None if titular == "juridica" else "persona_natural", None))
+
+
+def _con_contacto(mundo):
+    """Acme: teléfono. Beta: nada. Gamma (nueva): solo correo. La natural: teléfono y correo cifrados."""
+    r = mundo["repo"]
+    e = _empresa("Gamma SAS", OSM, "900000007")
+    g, _ = r.obtener_o_crear_lead(e, "lic")
+    r.agregar_lead_fuente(g, mundo["b1"], e, "lic")
+    _guardar(r, mundo["j"], "juridica", telefono=TELEFONO)
+    _guardar(r, g, "juridica", email=CORREO)
+    _guardar(r, mundo["n"], "natural", telefono=TELEFONO, email=CORREO)
+    return g
+
+
+def test_contacto_booleano_solo_de_juridica(mundo):
+    g = _con_contacto(mundo)
+    p = _por_id(mundo["repo"].listar_leads(mundo["b1"], 1, 25))
+
+    assert (p[mundo["j"]].tiene_telefono, p[mundo["j"]].tiene_email) == (True, False)
+    assert (p[mundo["j2"]].tiene_telefono, p[mundo["j2"]].tiene_email) == (False, False)
+    assert (p[g].tiene_telefono, p[g].tiene_email) == (False, True)
+    # La natural tiene teléfono y correo cifrados, pero no se expone ni que existan.
+    assert (p[mundo["n"]].tiene_telefono, p[mundo["n"]].tiene_email) == (None, None)
+
+
+def test_contacto_nunca_aparece_en_el_resultado(mundo):
+    _con_contacto(mundo)
+
+    assert TELEFONO not in repr(mundo["repo"].listar_leads(mundo["b1"], 1, 25))
+    assert CORREO not in repr(mundo["repo"].listar_leads_de_fuente(None, 1, 25, con_contacto=True))
+
+
+def test_filtro_con_contacto_solo_juridicas_con_telefono_o_correo(mundo):
+    g = _con_contacto(mundo)
+    r = mundo["repo"]
+
+    p = r.listar_leads(mundo["b1"], 1, 25, con_contacto=True)
+
+    assert {i.id for i in p.items} == {mundo["j"], g}  # no Beta (sin contacto), no la natural (con contacto cifrado)
+    assert p.total == 2
+    assert r.listar_leads(mundo["b1"], 1, 25).total == 4  # sin filtro, todos
+    assert r.listar_leads(mundo["b1"], 1, 25, con_contacto=False).total == 4
+    assert {i.id for i in r.listar_leads_de_fuente(None, 1, 25, con_contacto=True).items} == {mundo["j"], g}
+    assert {i.id for i in r.listar_leads_de_fuente(OSM, 1, 25, con_contacto=True).items} == {mundo["j"], g}
+    assert r.listar_leads_de_fuente(CS, 1, 25, con_contacto=True).total == 0  # Beta no tiene contacto
+
+
+def test_filtro_con_contacto_pagina_sobre_lo_filtrado(mundo):
+    g = _con_contacto(mundo)
+
+    p1 = mundo["repo"].listar_leads(mundo["b1"], 1, 1, con_contacto=True)
+    p2 = mundo["repo"].listar_leads(mundo["b1"], 2, 1, con_contacto=True)
+
+    assert (p1.total, len(p1.items), len(p2.items)) == (2, 1, 1)
+    assert {p1.items[0].id, p2.items[0].id} == {mundo["j"], g}
+
+
+def test_contacto_de_otro_tenant_no_se_ve(mundo):
+    _con_contacto(mundo)
+    otro = mundo["otro"]
+    e = _empresa("Ajena 2 SAS", OSM, "900000008")
+    ajeno, _ = otro.obtener_o_crear_lead(e, "lic")
+    otro.agregar_lead_fuente(ajeno, mundo["ajena"], e, "lic")
+    _guardar(otro, ajeno, "juridica", telefono=TELEFONO)
+
+    mios = mundo["repo"].listar_leads_de_fuente(None, 1, 25, con_contacto=True)
+    suyos = otro.listar_leads_de_fuente(None, 1, 25, con_contacto=True)
+
+    assert ajeno not in {i.id for i in mios.items} and mios.total == 2
+    assert {i.id for i in suyos.items} == {ajeno}
+    assert mundo["repo"].listar_leads(mundo["ajena"], 1, 25, con_contacto=True) is None
 
 
 def test_atribuciones_solo_de_la_busqueda(mundo):

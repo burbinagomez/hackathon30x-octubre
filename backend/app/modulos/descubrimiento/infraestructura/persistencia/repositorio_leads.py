@@ -60,6 +60,8 @@ _SQL_BUSQUEDAS = text("""
 _FILTRO_BUSQUEDA = "lf.busqueda_id = :b"
 _FILTRO_FUENTE = "l.id IN (SELECT lead_id FROM lead_fuentes WHERE fuente = :f)"
 _FILTRO_TODOS = "TRUE"
+# Solo jurídicas, con teléfono o correo guardado. Constante del módulo; se agrega con AND al filtro de alcance.
+_CON_CONTACTO = "l.tipo_titular = 'juridica' AND (l.telefono_cifrado IS NOT NULL OR l.email_cifrado IS NOT NULL)"
 _DESDE = "FROM leads l JOIN lead_fuentes lf ON lf.lead_id = l.id WHERE "
 
 
@@ -70,7 +72,11 @@ def _sql_total(filtro: str):
 def _sql_leads(filtro: str):
     return text(f"""
     SELECT l.id, CASE WHEN l.tipo_titular = 'juridica' THEN l.nombre END AS nombre, l.tipo_titular, l.ciudad,
-           l.web IS NOT NULL AS tiene_web, array_agg(lf.fuente ORDER BY lf.fuente) AS fuentes,
+           l.web IS NOT NULL AS tiene_web,
+           -- Solo el IS NOT NULL: nunca se lee ni descifra el contacto. Natural o desconocido: NULL (no se expone nada).
+           CASE WHEN l.tipo_titular = 'juridica' THEN l.telefono_cifrado IS NOT NULL END AS tiene_telefono,
+           CASE WHEN l.tipo_titular = 'juridica' THEN l.email_cifrado IS NOT NULL END AS tiene_email,
+           array_agg(lf.fuente ORDER BY lf.fuente) AS fuentes,
            array_agg(lf.licencia ORDER BY lf.fuente) AS licencias
     {_DESDE}{filtro}
     GROUP BY l.id ORDER BY l.creado_en, l.id LIMIT :limite OFFSET :desde""")
@@ -275,29 +281,35 @@ class RepositorioLeadsPostgres:
         return [ResumenBusqueda(id=f.id, creada_en=f.creado_en, estado=f.estado, pais=f.pais, departamento=f.departamento,
                                 ciudad=f.ciudad, total_leads=f.total_leads) for f in filas]
 
-    def listar_leads(self, busqueda_id: UUID, pagina: int, tamano: int) -> PaginaLeads | None:
+    def listar_leads(self, busqueda_id: UUID, pagina: int, tamano: int, con_contacto: bool = False) -> PaginaLeads | None:
         """None si la búsqueda no existe para este tenant."""
         with self._uow() as c:
             if c.execute(text("SELECT 1 FROM busquedas WHERE id = :id"), {"id": busqueda_id}).first() is None:
                 return None
-            return self._pagina(c, _FILTRO_BUSQUEDA, {"b": busqueda_id}, pagina, tamano)
+            return self._pagina(c, _FILTRO_BUSQUEDA, {"b": busqueda_id}, pagina, tamano, con_contacto)
 
-    def listar_leads_de_fuente(self, fuente: str | None, pagina: int, tamano: int) -> PaginaLeads:
+    def listar_leads_de_fuente(self, fuente: str | None, pagina: int, tamano: int,
+                               con_contacto: bool = False) -> PaginaLeads:
         """Leads de una fuente en todas las búsquedas del tenant; sin fuente, todos. Que la fuente exista lo valida la API."""
         with self._uow() as c:
             if fuente is None:
-                return self._pagina(c, _FILTRO_TODOS, {}, pagina, tamano)
-            return self._pagina(c, _FILTRO_FUENTE, {"f": fuente}, pagina, tamano)
+                return self._pagina(c, _FILTRO_TODOS, {}, pagina, tamano, con_contacto)
+            return self._pagina(c, _FILTRO_FUENTE, {"f": fuente}, pagina, tamano, con_contacto)
 
     @staticmethod
-    def _pagina(c: Connection, filtro: str, params: dict, pagina: int, tamano: int) -> PaginaLeads:
+    def _pagina(c: Connection, filtro: str, params: dict, pagina: int, tamano: int,
+                con_contacto: bool = False) -> PaginaLeads:
         """Nunca lee las columnas cifradas ni descifra: el nombre sale solo de una jurídica (el CASE lo repite aunque el
-        CHECK ya lo garantice), y no hay dirección ni contacto. El tenant lo filtra la RLS."""
+        CHECK ya lo garantice), y no hay dirección ni contacto: del teléfono y el correo solo se sabe si existen
+        (IS NOT NULL, y solo de una jurídica). El tenant lo filtra la RLS."""
+        if con_contacto:
+            filtro = f"({filtro}) AND {_CON_CONTACTO}"
         total = c.execute(_sql_total(filtro), params).scalar_one()
         filas = c.execute(_sql_leads(filtro), {**params, "limite": tamano, "desde": (pagina - 1) * tamano}).all()
         atribuciones = c.execute(_sql_atribuciones(filtro), params).all()
         items = tuple(LeadListado(
             id=f.id, nombre=f.nombre, tipo_titular=f.tipo_titular, fuentes=tuple(f.fuentes), licencias=tuple(f.licencias),
-            ciudad=f.ciudad, tiene_web=f.tiene_web) for f in filas)
+            ciudad=f.ciudad, tiene_web=f.tiene_web,
+            tiene_telefono=f.tiene_telefono, tiene_email=f.tiene_email) for f in filas)
         return PaginaLeads(items=items, total=total, pagina=pagina, tamano=tamano, atribuciones=tuple(
             AtribucionFuente(a.fuente, a.texto, a.url) for a in atribuciones))
