@@ -8,6 +8,7 @@ Contrato que fija este archivo para el verde (T032):
 Sin red: los dos hosts (Overpass y datos.gov.co) los atiende un MockTransport. Datos sintéticos.
 """
 import json
+from decimal import Decimal
 import re
 from decimal import Decimal
 from types import SimpleNamespace
@@ -364,18 +365,65 @@ def test_tablero_devuelve_encontrados_y_unicos_del_tenant(api, admin, usuarios):
     assert minimo(como_b["total"]) == {"fuente": "TOTAL", "encontrados": 1, "unicos": 1}
 
 
-def test_tablero_completa_con_null_lo_que_el_minimo_no_calcula(api, admin, usuarios):
+def test_tablero_completa_con_null_lo_que_aun_no_se_calcula(api, admin, usuarios):
     _sembrar(admin, usuarios["tenant_a"], [(uuid4(), uuid4(), "osm_overpass")])
 
     t = _tablero(api, usuarios["a"])
 
-    for clave in ("costo_evals", "cobertura", "revisiones_pendientes"):
+    for clave in ("cobertura", "revisiones_pendientes"):
         assert t[clave] is None, clave  # null = "sin dato"; nunca [] ni 0
+    # Sin filas en `costos`: costo, CPL y evals son "sin dato" (null), no "0".
+    assert t["costo_evals"] is None
     for fila in [*t["fuentes"], t["total"]]:
-        for clave in ("icp", "costo_lista", "costo_real", "desperdicio_lista", "desperdicio_real", "cpl_lista", "cpl_real",
+        for clave in ("icp", "desperdicio_lista", "desperdicio_real", "costo_lista", "costo_real", "cpl_lista", "cpl_real",
                       "naturales_no_contactables"):
             assert fila[clave] is None, clave
         assert fila["cuenta_naturales"] is False
+
+
+def _costo(admin, tenant, fuente, unidades, unitario, gratis=False):
+    with admin.begin() as c:
+        c.execute(text("INSERT INTO costos (tenant_id, tipo, unidades, costo_unitario, moneda, proveedor, fuente, gratis) "
+                       "VALUES (:t, 'overpass_query', :u, :c, 'USD', 'p', :f, :g)"),
+                  {"t": tenant, "u": unidades, "c": unitario, "f": fuente, "g": gratis})
+
+
+def test_tablero_devuelve_costo_y_cpl_como_decimales_en_string(api, admin, usuarios):
+    a, osm = usuarios["tenant_a"], "osm_overpass"
+    _sembrar(admin, a, [(uuid4(), uuid4(), osm), (uuid4(), uuid4(), osm)])
+    _costo(admin, a, osm, 3, "0.10")
+    _costo(admin, a, osm, 1, "0.10", gratis=True)
+    _costo(admin, a, "evals", 1, "1.00")
+
+    t = _tablero(api, usuarios["a"])
+
+    (fila,) = t["fuentes"]
+    assert (Decimal(fila["costo_lista"]), Decimal(fila["costo_real"])) == (Decimal("0.40"), Decimal("0.30"))
+    assert (Decimal(fila["cpl_lista"]), Decimal(fila["cpl_real"])) == (Decimal("0.20"), Decimal("0.15"))
+    assert all(isinstance(fila[k], str) for k in ("costo_lista", "costo_real", "cpl_lista", "cpl_real"))
+    assert Decimal(t["total"]["cpl_lista"]) == Decimal("0.20") and Decimal(t["costo_evals"]) == Decimal("1.00")
+
+
+def test_tablero_devuelve_null_para_cpl_sin_divisor(api, admin, usuarios):
+    _costo(admin, usuarios["tenant_a"], "croma_supersociedades_co", 1, "0.50")  # costo y cero leads
+
+    t = _tablero(api, usuarios["a"])
+
+    (fila,) = t["fuentes"]
+    assert Decimal(fila["costo_lista"]) == Decimal("0.50")
+    for f in (fila, t["total"]):
+        assert f["cpl_lista"] is None and f["cpl_real"] is None  # null, no "0" ni "0.0"
+
+
+def test_tablero_no_mezcla_costos_de_otro_tenant(api, admin, usuarios):
+    _sembrar(admin, usuarios["tenant_a"], [(uuid4(), uuid4(), "osm_overpass")])
+    _costo(admin, usuarios["tenant_a"], "osm_overpass", 1, "0.10")
+    _costo(admin, usuarios["tenant_b"], "osm_overpass", 1, "50")
+    _costo(admin, usuarios["tenant_b"], "evals", 1, "50")
+
+    t = _tablero(api, usuarios["a"])
+
+    assert Decimal(t["total"]["costo_lista"]) == Decimal("0.10") and t["costo_evals"] is None
 
 
 # --- de punta a punta -----------------------------------------------------------------------------------------
