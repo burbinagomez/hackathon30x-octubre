@@ -45,7 +45,8 @@
     "requests_restantes": "Croma requests left in 24 h: {{n}}",
     "descartadas": "Discarded sources",
     "ignorados": "ignored: {{lista}}",
-    "error": "The operation could not be completed. Try again."
+    "error": "The operation could not be completed. Try again.",
+    "tope_nota": "Saved; not enforced yet."
   },
   "fuentes": {
     "croma_supersociedades_co": "Supersociedades (Croma)",

@@ -12,7 +12,7 @@ from sqlalchemy import text
 from app import db
 from app.api import actividades, busquedas, geografia, tablero, usuarios
 from app.api.sesion import tenant_actual
-from app.composicion import CONFIG, cargar_tarifas, registro_api
+from app.composicion import CONFIG, cargar_geografia, cargar_tarifas, registro_api
 from app.config import SettingsApi, verificar_entorno
 from app.modulos.acceso.infraestructura.verificador_jwks import VerificadorJwks, cliente_jwks
 from app.modulos.descubrimiento.infraestructura.adaptadores import catalogo
@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
     app.state.canales_contacto = (yaml.safe_load((CONFIG / "fuentes.yaml").read_text()) or {}).get("canales_contacto") or {}
     app.state.tarifas = cargar_tarifas()
     # Un archivo por país en config/geografia/: la estructura admite MX/PE/BR sin tocar código; sin archivo, no se ofrece.
-    app.state.geografia = {a["pais"]: a for a in (yaml.safe_load(f.read_text()) for f in sorted((CONFIG / "geografia").glob("*.yaml")))}
+    app.state.geografia = cargar_geografia(CONFIG / "geografia")
     app.state.camaras_yaml = CONFIG / "camaras_co.yaml"
     yield
 

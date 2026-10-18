@@ -6,168 +6,168 @@
 # ATENCIÓN: sin municipios (la corrida no tuvo red). Correr el script con red para completarlos.
 pais: CO
 divisiones:
-- iso_3166_2: CO-ANT
-  codigo_nativo: '05'
+- iso_3166_2: "CO-ANT"
+  codigo_nativo: "05"
   nombre_es: Antioquia
   nombre_en: Antioquia
   municipios: []
-- iso_3166_2: CO-ATL
-  codigo_nativo: 08
+- iso_3166_2: "CO-ATL"
+  codigo_nativo: "08"
   nombre_es: Atlántico
   nombre_en: Atlántico
   municipios: []
-- iso_3166_2: CO-DC
-  codigo_nativo: '11'
+- iso_3166_2: "CO-DC"
+  codigo_nativo: "11"
   nombre_es: Bogotá, D.C.
   nombre_en: Bogotá, D.C.
   municipios: []
-- iso_3166_2: CO-BOL
-  codigo_nativo: '13'
+- iso_3166_2: "CO-BOL"
+  codigo_nativo: "13"
   nombre_es: Bolívar
   nombre_en: Bolívar
   municipios: []
-- iso_3166_2: CO-BOY
-  codigo_nativo: '15'
+- iso_3166_2: "CO-BOY"
+  codigo_nativo: "15"
   nombre_es: Boyacá
   nombre_en: Boyacá
   municipios: []
-- iso_3166_2: CO-CAL
-  codigo_nativo: '17'
+- iso_3166_2: "CO-CAL"
+  codigo_nativo: "17"
   nombre_es: Caldas
   nombre_en: Caldas
   municipios: []
-- iso_3166_2: CO-CAQ
-  codigo_nativo: '18'
+- iso_3166_2: "CO-CAQ"
+  codigo_nativo: "18"
   nombre_es: Caquetá
   nombre_en: Caquetá
   municipios: []
-- iso_3166_2: CO-CAU
-  codigo_nativo: '19'
+- iso_3166_2: "CO-CAU"
+  codigo_nativo: "19"
   nombre_es: Cauca
   nombre_en: Cauca
   municipios: []
-- iso_3166_2: CO-CES
-  codigo_nativo: '20'
+- iso_3166_2: "CO-CES"
+  codigo_nativo: "20"
   nombre_es: Cesar
   nombre_en: Cesar
   municipios: []
-- iso_3166_2: CO-COR
-  codigo_nativo: '23'
+- iso_3166_2: "CO-COR"
+  codigo_nativo: "23"
   nombre_es: Córdoba
   nombre_en: Córdoba
   municipios: []
-- iso_3166_2: CO-CUN
-  codigo_nativo: '25'
+- iso_3166_2: "CO-CUN"
+  codigo_nativo: "25"
   nombre_es: Cundinamarca
   nombre_en: Cundinamarca
   municipios: []
-- iso_3166_2: CO-CHO
-  codigo_nativo: '27'
+- iso_3166_2: "CO-CHO"
+  codigo_nativo: "27"
   nombre_es: Chocó
   nombre_en: Chocó
   municipios: []
-- iso_3166_2: CO-HUI
-  codigo_nativo: '41'
+- iso_3166_2: "CO-HUI"
+  codigo_nativo: "41"
   nombre_es: Huila
   nombre_en: Huila
   municipios: []
-- iso_3166_2: CO-LAG
-  codigo_nativo: '44'
+- iso_3166_2: "CO-LAG"
+  codigo_nativo: "44"
   nombre_es: La Guajira
   nombre_en: La Guajira
   municipios: []
-- iso_3166_2: CO-MAG
-  codigo_nativo: '47'
+- iso_3166_2: "CO-MAG"
+  codigo_nativo: "47"
   nombre_es: Magdalena
   nombre_en: Magdalena
   municipios: []
-- iso_3166_2: CO-MET
-  codigo_nativo: '50'
+- iso_3166_2: "CO-MET"
+  codigo_nativo: "50"
   nombre_es: Meta
   nombre_en: Meta
   municipios: []
-- iso_3166_2: CO-NAR
-  codigo_nativo: '52'
+- iso_3166_2: "CO-NAR"
+  codigo_nativo: "52"
   nombre_es: Nariño
   nombre_en: Nariño
   municipios: []
-- iso_3166_2: CO-NSA
-  codigo_nativo: '54'
+- iso_3166_2: "CO-NSA"
+  codigo_nativo: "54"
   nombre_es: Norte de Santander
   nombre_en: Norte de Santander
   municipios: []
-- iso_3166_2: CO-QUI
-  codigo_nativo: '63'
+- iso_3166_2: "CO-QUI"
+  codigo_nativo: "63"
   nombre_es: Quindío
   nombre_en: Quindío
   municipios: []
-- iso_3166_2: CO-RIS
-  codigo_nativo: '66'
+- iso_3166_2: "CO-RIS"
+  codigo_nativo: "66"
   nombre_es: Risaralda
   nombre_en: Risaralda
   municipios: []
-- iso_3166_2: CO-SAN
-  codigo_nativo: '68'
+- iso_3166_2: "CO-SAN"
+  codigo_nativo: "68"
   nombre_es: Santander
   nombre_en: Santander
   municipios: []
-- iso_3166_2: CO-SUC
-  codigo_nativo: '70'
+- iso_3166_2: "CO-SUC"
+  codigo_nativo: "70"
   nombre_es: Sucre
   nombre_en: Sucre
   municipios: []
-- iso_3166_2: CO-TOL
-  codigo_nativo: '73'
+- iso_3166_2: "CO-TOL"
+  codigo_nativo: "73"
   nombre_es: Tolima
   nombre_en: Tolima
   municipios: []
-- iso_3166_2: CO-VAC
-  codigo_nativo: '76'
+- iso_3166_2: "CO-VAC"
+  codigo_nativo: "76"
   nombre_es: Valle del Cauca
   nombre_en: Valle del Cauca
   municipios: []
-- iso_3166_2: CO-ARA
-  codigo_nativo: '81'
+- iso_3166_2: "CO-ARA"
+  codigo_nativo: "81"
   nombre_es: Arauca
   nombre_en: Arauca
   municipios: []
-- iso_3166_2: CO-CAS
-  codigo_nativo: '85'
+- iso_3166_2: "CO-CAS"
+  codigo_nativo: "85"
   nombre_es: Casanare
   nombre_en: Casanare
   municipios: []
-- iso_3166_2: CO-PUT
-  codigo_nativo: '86'
+- iso_3166_2: "CO-PUT"
+  codigo_nativo: "86"
   nombre_es: Putumayo
   nombre_en: Putumayo
   municipios: []
-- iso_3166_2: CO-SAP
-  codigo_nativo: '88'
+- iso_3166_2: "CO-SAP"
+  codigo_nativo: "88"
   nombre_es: San Andrés y Providencia
   nombre_en: San Andrés and Providencia
   municipios: []
-- iso_3166_2: CO-AMA
-  codigo_nativo: '91'
+- iso_3166_2: "CO-AMA"
+  codigo_nativo: "91"
   nombre_es: Amazonas
   nombre_en: Amazonas
   municipios: []
-- iso_3166_2: CO-GUA
-  codigo_nativo: '94'
+- iso_3166_2: "CO-GUA"
+  codigo_nativo: "94"
   nombre_es: Guainía
   nombre_en: Guainía
   municipios: []
-- iso_3166_2: CO-GUV
-  codigo_nativo: '95'
+- iso_3166_2: "CO-GUV"
+  codigo_nativo: "95"
   nombre_es: Guaviare
   nombre_en: Guaviare
   municipios: []
-- iso_3166_2: CO-VAU
-  codigo_nativo: '97'
+- iso_3166_2: "CO-VAU"
+  codigo_nativo: "97"
   nombre_es: Vaupés
   nombre_en: Vaupés
   municipios: []
-- iso_3166_2: CO-VID
-  codigo_nativo: '99'
+- iso_3166_2: "CO-VID"
+  codigo_nativo: "99"
   nombre_es: Vichada
   nombre_en: Vichada
   municipios: []

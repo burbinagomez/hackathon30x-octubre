@@ -79,4 +79,14 @@ def fabrica_de_fuentes(registro: Registro, **comunes) -> FabricaFuentes:
 
 
 def cargar_geografia(carpeta: Path) -> dict[str, dict]:
-    return {}  # esqueleto
+    """pais -> contenido de su archivo en config/geografia/. Dos archivos del mismo país, o uno sin `pais`, impiden arrancar."""
+    archivos: dict[str, dict] = {}
+    for ruta in sorted(carpeta.glob("*.yaml")):
+        contenido = yaml.safe_load(ruta.read_text()) or {}
+        pais = contenido.get("pais")
+        if not pais:
+            raise ValueError(f"{ruta.name}: falta `pais`")
+        if pais in archivos:
+            raise ValueError(f"geografía duplicada para {pais}: {ruta.name}")
+        archivos[pais] = contenido
+    return archivos

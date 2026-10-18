@@ -131,7 +131,7 @@ export default function NuevaBusqueda() {
           type="text"
           list="ciudades"
           autoComplete="off"
-          disabled={!division}
+          disabled={!division || division.municipios.length === 0}
           value={form.ciudad}
           onChange={(e) => cambiar("ciudad", e.target.value)}
         />
@@ -148,6 +148,7 @@ export default function NuevaBusqueda() {
         </select>
       </Campo>
       {tope}
+      <p className="nota">{t("busqueda.tope_nota")}</p>
       <Campo id="mensaje" etiqueta={t("busqueda.mensaje")}>
         <textarea id="mensaje" value={form.mensaje} onChange={(e) => cambiar("mensaje", e.target.value)} />
       </Campo>

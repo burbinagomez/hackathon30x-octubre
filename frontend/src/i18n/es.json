@@ -45,7 +45,8 @@
     "requests_restantes": "Consultas de Croma restantes en 24 h: {{n}}",
     "descartadas": "Fuentes descartadas",
     "ignorados": "se ignora: {{lista}}",
-    "error": "No se pudo completar la operación. Probá de nuevo."
+    "error": "No se pudo completar la operación. Probá de nuevo.",
+    "tope_nota": "Se guarda; todavía no se aplica."
   },
   "fuentes": {
     "croma_supersociedades_co": "Supersociedades (Croma)",

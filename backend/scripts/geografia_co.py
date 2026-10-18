@@ -56,6 +56,17 @@ DEPARTAMENTOS: list[tuple[str, str, str, str]] = [
     ("97", "CO-VAU", "Vaupés", "Vaupés"),
     ("99", "CO-VID", "Vichada", "Vichada"),
 ]
+
+
+class _Codigo(str):
+    """Un código (DIVIPOLA, ISO): siempre entre comillas. PyYAML deja '08' sin ellas y un parser YAML 1.2 lo leería como número."""
+
+
+class _Dumper(yaml.SafeDumper):
+    pass
+
+
+_Dumper.add_representer(_Codigo, lambda d, v: d.represent_scalar("tag:yaml.org,2002:str", str(v), style='"'))
 _MINUSCULAS = {"de", "del", "la", "las", "los", "y", "e", "el"}
 
 
@@ -80,10 +91,10 @@ def construir(filas: list[dict], fecha: str, dataset: str | None) -> str:
         division = str(fila["cod_dpto"]).zfill(2)
         if division not in nativos:
             raise ValueError(f"departamento {division} no está en la tabla de DEPARTAMENTOS: no se inventa")
-        por_division[division].append({"codigo_nativo": str(fila["cod_mpio"]).zfill(5), "nombre": _titulo(fila["nom_mpio"])})
+        por_division[division].append({"codigo_nativo": _Codigo(str(fila["cod_mpio"]).zfill(5)), "nombre": _titulo(fila["nom_mpio"])})
 
     divisiones = [
-        {"iso_3166_2": iso, "codigo_nativo": cod, "nombre_es": es, "nombre_en": en,
+        {"iso_3166_2": _Codigo(iso), "codigo_nativo": _Codigo(cod), "nombre_es": es, "nombre_en": en,
          "municipios": sorted(por_division.get(cod, []), key=lambda m: m["codigo_nativo"])}
         for cod, iso, es, en in sorted(DEPARTAMENTOS)
     ]
@@ -96,7 +107,7 @@ def construir(filas: list[dict], fecha: str, dataset: str | None) -> str:
     ]
     if not filas:
         encabezado.append("# ATENCIÓN: sin municipios (la corrida no tuvo red). Correr el script con red para completarlos.")
-    cuerpo = yaml.safe_dump({"pais": "CO", "divisiones": divisiones}, allow_unicode=True, sort_keys=False)
+    cuerpo = yaml.dump({"pais": "CO", "divisiones": divisiones}, Dumper=_Dumper, allow_unicode=True, sort_keys=False)
     return "\n".join(encabezado) + "\n" + cuerpo
 
 
