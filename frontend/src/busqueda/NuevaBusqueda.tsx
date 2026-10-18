@@ -16,9 +16,12 @@ const CANALES = ["email"];
 
 type Pestana = "lookalike" | "frase" | "filtros";
 
-function Campo({ id, etiqueta, children }: { id: string; etiqueta: string; children: ReactNode }) {
+// El ancho es una clase del campo, nunca su posición: un aviso o un campo condicional no corre a los demás.
+function Campo({ id, etiqueta, ancho = false, children }: {
+  id: string; etiqueta: string; ancho?: boolean; children: ReactNode;
+}) {
   return (
-    <div className="campo">
+    <div className={ancho ? "campo campo-ancho" : "campo campo-mitad"}>
       <label htmlFor={id}>{etiqueta}</label>
       {children}
     </div>
@@ -128,6 +131,8 @@ export default function NuevaBusqueda() {
       {pestana === "filtros" && (
       <div className="formulario formulario-ancho">
       {sugerido && <p role="status" className="aviso aviso-ancho">{avisoSugerencia}</p>}
+      <fieldset className="grupo">
+      <legend>{t("busqueda.grupos.quien")}</legend>
       <Campo id="pais" etiqueta={t("busqueda.pais")}>
         <select id="pais" value={form.pais} onChange={(e) => cambiar("pais", e.target.value)}>
           {paises.map((p) => <option key={p} value={p}>{t(`paises.${p}`)}</option>)}
@@ -163,18 +168,25 @@ export default function NuevaBusqueda() {
           {(division?.municipios ?? []).map((m) => <option key={m.codigo_nativo} value={m.nombre} />)}
         </datalist>
       </Campo>
+      </fieldset>
+      <fieldset className="grupo">
+      <legend>{t("busqueda.grupos.afinar")}</legend>
       {ingresosMin}
-      {palabrasClave}
-      {exclusiones}
       <Campo id="canal" etiqueta={t("busqueda.canal")}>
         <select id="canal" value={form.canal} onChange={(e) => cambiar("canal", e.target.value)}>
           {CANALES.map((c) => <option key={c} value={c}>{t(`canales.${c}`)}</option>)}
         </select>
       </Campo>
+      {palabrasClave}
+      {exclusiones}
+      </fieldset>
+      <fieldset className="grupo">
+      <legend>{t("busqueda.grupos.mensaje")}</legend>
       {tope}
-      <Campo id="mensaje" etiqueta={t("busqueda.mensaje")}>
+      <Campo id="mensaje" etiqueta={t("busqueda.mensaje")} ancho>
         <textarea id="mensaje" value={form.mensaje} onChange={(e) => cambiar("mensaje", e.target.value)} />
       </Campo>
+      </fieldset>
 
       <BloqueBusqueda busqueda={filtros} pedido={aPedido(form)} tope={Number(form.tope)}
         puedeVista={Boolean(form.ciiu) && Number(form.tope) > 0} />

@@ -4,7 +4,24 @@
 # `filtros` cubren el ICP. Si ningún adaptador cubre un país/criterio, se reporta,
 # no se inventa.
 
-fuentes_descubrimiento:                 # puerto: FuenteDescubrimiento
+fuentes_descubrimiento:                 # puerto: FuenteDescubrimiento · orden = prioridad: gratuitas primero, Croma tercera (PRD §2)
+  osm_overpass:
+    habilitado: true
+    proveedor: osm
+    tipo: live
+    paises: [CO, MX, PE, BR, "*"]
+    filtros: [ciudad, tipo_negocio]
+    trae: [nombre, telefono, web, email, direccion, geo]
+    licencia: ODbL
+  datos_gov_co_rues:
+    habilitado: true                     # un flag la desconecta: false y la fuente no existe
+    proveedor: datos.gov.co
+    dataset: c82u-588k
+    tipo: dataset
+    paises: [CO]
+    filtros: [ciiu, departamento]
+    trae: [nit, nombre, ciiu, ciudad_camara]
+    licencia: CC-BY-SA-4.0
   croma_supersociedades_co:
     habilitado: true
     proveedor: croma
@@ -34,23 +51,6 @@ fuentes_descubrimiento:                 # puerto: FuenteDescubrimiento
     filtros: [estado, actividad_scian, nombre_obligatorio]
     trae: [nombre_comercial, estado, camara]   # detalle: tel, email, web, dirección
     nota: "requiere nombre (substring); descubrimiento parcial"
-  osm_overpass:
-    habilitado: true
-    proveedor: osm
-    tipo: live
-    paises: [CO, MX, PE, BR, "*"]
-    filtros: [ciudad, tipo_negocio]
-    trae: [nombre, telefono, web, email, direccion, geo]
-    licencia: ODbL
-  datos_gov_co_rues:
-    habilitado: true                     # un flag la desconecta: false y la fuente no existe
-    proveedor: datos.gov.co
-    dataset: c82u-588k
-    tipo: dataset
-    paises: [CO]
-    filtros: [ciiu, departamento]
-    trae: [nit, nombre, ciiu, ciudad_camara]
-    licencia: CC-BY-SA-4.0
 
 # OJO: de esta sección solo se lee `rues_datos_gov_co.habilitado` (composicion.verificador_titular). El resto es documental:
 # composicion.py arma los demás enriquecedores en código y cambiar su `habilitado` NO conecta ni desconecta nada.

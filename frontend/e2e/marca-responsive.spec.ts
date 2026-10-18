@@ -16,6 +16,8 @@ const RUTAS = [
 const VIEWPORTS = [
   { nombre: "360x640", viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true },
   { nombre: "375x812", viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true },
+  // El corte de 48rem: ahí el formulario pasa a dos columnas.
+  { nombre: "768x1024", viewport: { width: 768, height: 1024 }, isMobile: false, hasTouch: true },
   { nombre: "1280x800", viewport: { width: 1280, height: 800 }, isMobile: false, hasTouch: false },
 ];
 
@@ -107,10 +109,8 @@ for (const v of VIEWPORTS) {
   });
 }
 
-// Tema oscuro: sigue la preferencia del sistema (spec 014, enmienda 2026-10-18).
-const VIEWPORTS_OSCURO = VIEWPORTS.filter((v) => v.nombre !== "360x640");
-
-for (const v of VIEWPORTS_OSCURO) {
+// Tema oscuro: sigue la preferencia del sistema (spec 014, enmienda 2026-10-18). 360 incluido: el formulario de Nueva búsqueda se revisa ahí en ambos temas.
+for (const v of VIEWPORTS) {
   test.describe(`${v.nombre} oscuro`, () => {
     test.use({
       viewport: v.viewport,

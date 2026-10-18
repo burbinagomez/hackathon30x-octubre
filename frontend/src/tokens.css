@@ -7,6 +7,8 @@
   --color-blanco: #FFFFFF;
   --fuente-titulos: "Poppins", system-ui, sans-serif;
   --fuente-texto: "DM Sans", system-ui, sans-serif;
+  --espacio: 1rem; /* entre campos y entre bloques */
+  --espacio-chico: 0.5rem; /* entre botones y entre filas de una lista */
 
   /* Semánticos, tema claro. Las pantallas usan estos, no las variables de marca. */
   color-scheme: light dark;

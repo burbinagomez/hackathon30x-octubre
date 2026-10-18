@@ -4,11 +4,14 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
+import httpx
 import pytest
 
+from app import cli
 from app.cli import Persistencia, _adaptadores_enriquecer, main
 from app.composicion import cargar_tarifas
-from app.config import Settings
+from app.config import Settings, SettingsEmail
+from app.modulos.contacto.dominio.tokens import verificar
 from app.modulos.descubrimiento.dominio.modelos import Actividad, EmpresaCruda, LeadParaEnriquecer, PaginaEmpresas
 from app.modulos.enriquecimiento.dominio.puertos import ContactoPublicado
 from app.modulos.enriquecimiento.infraestructura.adaptadores.jev_clasificador import JevClasificador
@@ -164,6 +167,80 @@ def test_datos_gov_co_sin_variables_usa_los_defaults_del_adaptador(persistencia,
     (kwargs,) = _GrabaKwargs.armadas
     assert "url" not in kwargs
     assert kwargs.get("app_token") is None
+
+
+ENTORNO_EMAIL = {"DATABASE_URL": DB_URL, "SMTP_HOST": "smtp.invalido", "SMTP_USUARIO": "u",
+                 "SMTP_CLAVE": "clave-smtp-falsa-4e2b", "REMITENTE": "Ana", "BAJA_SECRET": "b" * 32,
+                 "API_BASE_URL": "https://api.invalido", "URL_PRIVACIDAD": "https://invalido/privacidad"}
+ENVIAR = ["enviar", "--tenant", str(uuid4()), "--busqueda", str(uuid4())]
+
+
+def _api_desplegada(clave, pedidos=None):
+    """La API de Railway: GET /baja/<token> da 200 solo si el token lo firmó su propia BAJA_SECRET."""
+    def responder(pedido):
+        if pedidos is not None:
+            pedidos.append(pedido.url)
+        token = pedido.url.path.removeprefix("/baja/")
+        return httpx.Response(200 if verificar(clave.encode(), "baja", token) else 404)
+    return httpx.MockTransport(responder)
+
+
+def _ajustes_email(monkeypatch, **extra):
+    for nombre, valor in (ENTORNO_EMAIL | extra).items():
+        monkeypatch.setenv(nombre, valor)
+    return SettingsEmail()
+
+
+def test_baja_responde_en_la_api_desplegada_con_la_misma_clave(monkeypatch):
+    pedidos = []
+    ajustes = _ajustes_email(monkeypatch)
+    assert cli._hay_ruta_de_baja(ajustes, uuid4(), _api_desplegada("b" * 32, pedidos)) is True
+    assert [u.host for u in pedidos] == ["api.invalido"]
+
+
+def test_baja_con_otra_clave_en_la_api_no_vale(monkeypatch):
+    ajustes = _ajustes_email(monkeypatch)
+    assert cli._hay_ruta_de_baja(ajustes, uuid4(), _api_desplegada("x" * 32)) is False
+
+
+def test_baja_con_la_api_caida_no_vale(monkeypatch):
+    def caida(pedido):
+        raise httpx.ConnectError("sin red", request=pedido)
+    ajustes = _ajustes_email(monkeypatch)
+    assert cli._hay_ruta_de_baja(ajustes, uuid4(), httpx.MockTransport(caida)) is False
+
+
+def test_enviar_en_modo_prueba_no_consulta_la_api(monkeypatch):
+    monkeypatch.setattr(cli, "_hay_ruta_de_baja", lambda *a: pytest.fail("en prueba no se consulta"))
+    for nombre, valor in ENTORNO_EMAIL.items():
+        monkeypatch.setenv(nombre, valor)
+    assert main(ENVIAR, armar_envio=lambda ajustes, tenant: _SinAprobados()) == 1
+
+
+class _SinAprobados:
+    def enviar(self, busqueda_id):
+        from app.modulos.contacto.dominio.errores import SinVistaPrevia
+        raise SinVistaPrevia()
+
+
+def test_enviar_en_modo_real_sin_ruta_de_baja_no_arma_nada(monkeypatch, capsys):
+    monkeypatch.setattr(cli, "_hay_ruta_de_baja", lambda *a: False)
+    for nombre, valor in (ENTORNO_EMAIL | {"EMAIL_MODO": "real"}).items():
+        monkeypatch.setenv(nombre, valor)
+    armados = []
+    codigo = main(ENVIAR, armar_envio=lambda ajustes, tenant: armados.append(tenant))
+    assert codigo == 2 and armados == []
+    assert "/baja" in capsys.readouterr().err
+
+
+def test_enviar_con_configuracion_invalida_imprime_solo_nombres(monkeypatch, capsys):
+    for nombre, valor in ENTORNO_EMAIL.items():
+        monkeypatch.setenv(nombre, valor)
+    monkeypatch.setenv("BAJA_SECRET", "corta-y-secreta")
+    codigo = main(ENVIAR, armar_envio=lambda ajustes, tenant: pytest.fail("no se arma con config inválida"))
+    err = capsys.readouterr().err
+    assert codigo == 2 and "BAJA_SECRET" in err
+    assert not any(v in err for v in ("corta-y-secreta", "clave-smtp-falsa-4e2b", "clave-db-falsa-7c1d"))
 
 
 # --- enriquecer (T030) ---

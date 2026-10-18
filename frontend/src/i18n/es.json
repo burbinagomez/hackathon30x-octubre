@@ -46,7 +46,7 @@
     "creditos_restantes": "Créditos de Croma restantes este mes: {{n}}",
     "requests_restantes": "Consultas de Croma restantes en 24 h: {{n}}",
     "descartadas": "Fuentes descartadas",
-    "ignorados": "se ignora: {{lista}}",
+    "ignorados": "no filtra por: {{lista}}",
     "error": "No se pudo completar la operación. Probá de nuevo.",
     "pestanas": {
       "lookalike": "Ya me compran",
@@ -83,7 +83,13 @@
       "detalle_ignora": "no filtra por: {{campos}}",
       "detalle_costo": "Costo máximo {{maximo}} · tope {{tope}}"
     },
-    "revisar_clientes": "Prellenamos los filtros con tus clientes. Revisalos y ajustalos antes de la vista previa."
+    "revisar_clientes": "Prellenamos los filtros con tus clientes. Revisalos y ajustalos antes de la vista previa.",
+    "sin_conteo_corto": "sin conteo previo",
+    "grupos": {
+      "quien": "¿A quién buscás?",
+      "afinar": "Afinar la búsqueda",
+      "mensaje": "Mensaje y gasto"
+    }
   },
   "fuentes": {
     "croma_supersociedades_co": "Supersociedades (Croma)",

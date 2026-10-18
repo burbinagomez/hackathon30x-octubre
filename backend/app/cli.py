@@ -4,14 +4,16 @@ import sys
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import cache
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import httpx
 import yaml
 from pydantic import ValidationError
 
 from app.composicion import CONFIG, adaptadores_enriquecer, armador_de_fuente, cargar_tarifas
-from app.config import Settings
+from app.config import Settings, SettingsEmail
+from app.modulos.contacto.dominio.errores import MensajeCambio, SinVistaPrevia
+from app.modulos.contacto.dominio.tokens import firmar
 from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.costos.dominio.puertos import RegistroCostos
 from app.modulos.descubrimiento.aplicacion.ejecutar_busqueda import EjecutarBusqueda
@@ -70,10 +72,121 @@ def _parser() -> argparse.ArgumentParser:
     b.add_argument("--ciiu")
     b.add_argument("--departamento")
     b.add_argument("--ciudad")
-    e = sub.add_parser("enriquecer", help="Enriquece los leads de una búsqueda que todavía no se enriquecieron.")
+    e = sub.add_parser("enviar", help="Manda el mensaje base a los contactos aprobados por el --dry-run de la búsqueda.")
     e.add_argument("--tenant", type=UUID, required=True)
     e.add_argument("--busqueda", type=UUID, required=True)
+    e.add_argument("--dry-run", action="store_true", help="Aprueba los contactos y muestra el resumen; no manda nada.")
+    e.add_argument("--rehacer", action="store_true", help="Con --dry-run: recompone los aprobados si cambió el mensaje.")
+    d = sub.add_parser("baja", help="Da de baja a mano (via humano) al lead de un contacto: cierra todos los canales.")
+    d.add_argument("--tenant", type=UUID, required=True)
+    d.add_argument("--contacto", type=UUID, required=True)
+    r = sub.add_parser("respondio", help="Marca a mano que el contacto respondió (solo si se le envió).")
+    r.add_argument("--tenant", type=UUID, required=True)
+    r.add_argument("--contacto", type=UUID, required=True)
+    t = sub.add_parser("tasa-respuesta", help="Contactados, respondieron y tasa por canal del tenant.")
+    t.add_argument("--tenant", type=UUID, required=True)
+    n = sub.add_parser("enriquecer", help="Enriquece los leads de una búsqueda que todavía no se enriquecieron.")
+    n.add_argument("--tenant", type=UUID, required=True)
+    n.add_argument("--busqueda", type=UUID, required=True)
     return p
+
+
+def _contactos(args) -> int:
+    """baja, respondio y tasa-respuesta: van directo al repo, sin caso de uso propio."""
+    from app import db
+    from app.modulos.contacto.infraestructura.repositorio_contactos import RepositorioContactosPostgres
+
+    try:
+        settings = Settings()
+    except ValidationError as error:
+        return _invalida(error)
+    repo = RepositorioContactosPostgres(db.crear_engine(settings.database_url), args.tenant)
+    if args.comando == "tasa-respuesta":
+        filas = repo.tasa_por_canal()
+        for canal, contactados, respondieron, tasa in filas:
+            print(f"{canal}: contactados={contactados} respondieron={respondieron} "
+                  f"tasa={'sin dato' if tasa is None else tasa.normalize()}")
+        if not filas:
+            print("sin contactos")
+        return 0
+    if args.comando == "respondio":
+        hecho, falta = repo.marcar_respondio(args.contacto), "no hay un envío de ese contacto en ese tenant"
+    else:
+        hecho, falta = repo.dar_de_baja(args.contacto, "humano"), "no existe ese contacto en ese tenant"
+    if not hecho:
+        print(falta, file=sys.stderr)
+        return 1
+    print(f"{args.comando}: 1")
+    return 0
+
+
+def _invalida(error: ValidationError) -> int:
+    """Solo los nombres de las variables, nunca sus valores."""
+    faltan = sorted({str(e["loc"][0]).upper() for e in error.errors() if e["loc"]} or {"SETTINGS"})
+    print(f"configuración inválida: {', '.join(faltan)}", file=sys.stderr)
+    return 2
+
+
+def _hay_ruta_de_baja(ajustes: SettingsEmail, tenant: UUID, transporte: httpx.BaseTransport | None = None) -> bool:
+    """La API desplegada en API_BASE_URL acepta un token firmado con esta BAJA_SECRET: los enlaces que mandamos andan."""
+    token = firmar(ajustes.baja_secret.get_secret_value().encode(), "baja", tenant, uuid4())
+    try:
+        with httpx.Client(transport=transporte, timeout=5) as cliente:
+            return cliente.get(f"{ajustes.api_base_url.rstrip('/')}/baja/{token}").status_code == 200
+    except httpx.HTTPError:
+        return False
+
+
+def _armar_envio_postgres(ajustes: SettingsEmail, tenant: UUID):
+    from app import db
+    from app.modulos.contacto.aplicacion.envio import EnviarABusqueda
+    from app.modulos.contacto.infraestructura.leads_contactables import LeadsContactablesPostgres
+    from app.modulos.contacto.infraestructura.repositorio_contactos import RepositorioContactosPostgres
+    from app.modulos.contacto.infraestructura.smtp_email import SmtpEmail
+    from app.modulos.costos.infraestructura.postgres_costos import PostgresCostos
+    from app.seguridad.cifrado import Cifrador
+
+    engine = db.crear_engine(ajustes.database_url)
+    tarifa = Decimal(str(yaml.safe_load((CONFIG / "tarifas.yaml").read_text())["email"]["usd_por_mensaje"]))
+    return EnviarABusqueda(
+        tenant, RepositorioContactosPostgres(engine, tenant),
+        LeadsContactablesPostgres(engine, tenant, Cifrador(ajustes.cifrado_key.get_secret_value())),
+        SmtpEmail(ajustes, PostgresCostos(engine, tenant), tarifa),
+        clave_baja=ajustes.baja_secret.get_secret_value().encode(), remitente=ajustes.remitente,
+        url_api=ajustes.api_base_url, url_privacidad=ajustes.url_privacidad, modo=ajustes.email_modo,
+        destinos_prueba=ajustes.email_prueba_destinos)
+
+
+def _enviar(args, armar_envio) -> int:
+    try:
+        ajustes = SettingsEmail()
+    except ValidationError as error:
+        return _invalida(error)
+    if ajustes.email_modo == "real" and not _hay_ruta_de_baja(ajustes, args.tenant):
+        print("EMAIL_MODO=real y /baja/{token} no responde en API_BASE_URL con esta BAJA_SECRET: no se manda", file=sys.stderr)
+        return 2
+    try:
+        caso = (armar_envio or _armar_envio_postgres)(ajustes, args.tenant)
+    except NotImplementedError as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    try:
+        if args.dry_run:
+            r = caso.vista_previa(args.busqueda, rehacer=args.rehacer)
+            print(f"modo: {r.modo}\naprobados: {r.aprobados}\na enviar: {r.a_enviar}")
+            if r.asunto is not None:
+                print(f"asunto: {r.asunto}\n\n{r.cuerpo}")
+            return 0
+        print(f"enviados: {caso.enviar(args.busqueda)}")
+        return 0
+    except SinVistaPrevia:
+        print("sin aprobados: corré antes `enviar --dry-run`", file=sys.stderr)
+        return 1
+    except MensajeCambio:
+        print("el mensaje cambió desde el dry-run: corré `enviar --dry-run --rehacer` y revisá", file=sys.stderr)
+        return 1
+
+
 
 
 def _enriquecer(args, ajustes, persistencia, adaptadores) -> int:
@@ -94,11 +207,15 @@ def _enriquecer(args, ajustes, persistencia, adaptadores) -> int:
     return 0
 
 
-def main(argv=None, *, catalogo=catalogo, persistencia=None, adaptadores=None) -> int:
+def main(argv=None, *, catalogo=catalogo, persistencia=None, adaptadores=None, armar_envio=None) -> int:
     try:
         args = _parser().parse_args(argv)
     except SystemExit as salida:
         return int(salida.code or 0)
+    if args.comando == "enviar":
+        return _enviar(args, armar_envio)
+    if args.comando in ("baja", "respondio", "tasa-respuesta"):
+        return _contactos(args)
 
     @cache
     def ajustes() -> Settings:
@@ -118,10 +235,8 @@ def main(argv=None, *, catalogo=catalogo, persistencia=None, adaptadores=None) -
                 return 2
         if persistencia is None:
             persistencia = _persistencia_postgres(ajustes(), args.tenant)
-    except ValidationError as error:  # solo los nombres de las variables, nunca sus valores
-        faltan = sorted({str(e["loc"][0]).upper() for e in error.errors()})
-        print(f"configuración inválida: {', '.join(faltan)}", file=sys.stderr)
-        return 2
+    except ValidationError as error:
+        return _invalida(error)
 
     costos = _ContadorDeCreditos(persistencia.costos)
     tarifas = cargar_tarifas()

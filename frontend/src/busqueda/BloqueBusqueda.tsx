@@ -50,6 +50,8 @@ export default function BloqueBusqueda({ busqueda, pedido, tope, puedeVista, ext
   const puedeBuscar = resultado === null && vista !== null && vista.dentro_del_tope !== false && vista.fuentes.length > 0;
   return (
     <>
+      {ocupado === "vista" && <Trabajando texto={t("busqueda.trabajando.vista_previa")} />}
+      {vista && <ResultadoVistaPrevia vista={vista} tope={tope} />}
       <div className="acciones acciones-fin">
         <button type="button" className="boton" disabled={!puedeVista || ocupado !== null} aria-busy={ocupado === "vista"}
           onClick={() => busqueda.previsualizar(pedido)}>
@@ -62,8 +64,6 @@ export default function BloqueBusqueda({ busqueda, pedido, tope, puedeVista, ext
           {ocupado === "buscar" ? t("busqueda.trabajando.buscando_boton") : t("busqueda.buscar")}
         </button>
       </div>
-      {ocupado === "vista" && <Trabajando texto={t("busqueda.trabajando.vista_previa")} />}
-      {vista && <ResultadoVistaPrevia vista={vista} tope={tope} />}
       {ocupado === "buscar" && vista && (
         // La API responde todo junto al final: mientras tanto se ve qué fuentes se están consultando.
         <Trabajando
