@@ -29,7 +29,7 @@ SELECT_FILAS = (
     "codigo_camara,organizacion_juridica,fecha_renovacion"
 )
 _CIIU = re.compile(r"\d{4}")
-_NIT = re.compile(r"\d{9}")
+_NIT = re.compile(r"[89]\d{8}")
 
 
 def _es_juridica_valida(fila: Mapping[str, Any]) -> bool:
@@ -81,8 +81,6 @@ class DatosGovCoRues:
         if not isinstance(ciiu, str) or _CIIU.fullmatch(ciiu) is None:
             raise CriterioNoSoportado(f"{self.meta.clave}: ciiu debe ser de 4 dígitos")
         departamento = criterios.filtros.get("departamento")
-        if not isinstance(departamento, str):
-            raise CriterioNoSoportado(f"{self.meta.clave}: falta departamento")
         codigos = sorted(camaras_de(dict(self._camaras), departamento))
         if not codigos:
             raise CriterioNoSoportado(f"{self.meta.clave}: departamento sin cámaras")

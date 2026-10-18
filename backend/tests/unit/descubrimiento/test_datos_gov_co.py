@@ -382,16 +382,9 @@ def test_segundo_fallo_lanza_fuente_no_disponible(fallo):
     )  # ninguna request de conteo (T021 suma el assert propio)
 
 
-ROJO_NIT = pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="rojo NIT [89]; fix en el commit siguiente",
-)
-
-
 @pytest.mark.parametrize(
     ("nit", "valido"),
-    [("999000001", True), pytest.param("712345678", False, marks=ROJO_NIT)],
+    [("999000001", True), ("712345678", False)],
 )
 def test_nit_exige_prefijo_8_o_9(nit, valido):
     fila = {**_cargar("filas.json")[0], "nit": nit}

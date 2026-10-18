@@ -109,7 +109,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`.
   - `::test_segundo_fallo_lanza_fuente_no_disponible`: dos 503 (y la variante con dos `httpx.TimeoutException`) dan `FuenteNoDisponible`, 2 filas y un `str(exc)` que no contiene el cuerpo de la respuesta (un marcador `"CUERPO-SECRETO"`). El assert de "0 requests de conteo" se suma en T021.
   - El advisor revisa antes del verde, hasta APRUEBA.
   - **Rojo escrito** con `xfail(strict, raises=AssertionError)` y el helper `_buscar_sin_propagar`, para que el rojo sea un assert y no un `HTTPStatusError`. El `xfail` se saca en T030.
-  - **Duda para el advisor:** sin `departamento` en los criterios, T018 lanza `CriterioNoSoportado`. La spec no lo dice (el flujo 4 solo valida el CIIU y traduce el departamento). ¿Debe `departamento` ser obligatorio, o su ausencia debe omitir la cláusula `codigo_camara`? Además, T018 valida el NIT con `^\d{9}$` y la spec (caso c) dice `^[89]\d{8}$`.
+  - **Decisión (advisor):** `departamento` es obligatorio: sin él, `CriterioNoSoportado` y 0 requests (lo cubre `if not codigos`, porque `camaras_de` no encuentra cámaras). El NIT se valida con `^[89]\d{8}$`, como dice la spec.
 - [ ] T030 [MIN] [Paso 6] **Verde:** el bucle de 2 intentos.
   - Registra la fila **antes** de decidir.
   - La espera pasa por `dormir`, que no se mide.
