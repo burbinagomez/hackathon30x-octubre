@@ -12,7 +12,7 @@
 
 ## Fase 1: Puerta y setup
 
-- [ ] T001 [MIN] [Paso 0] **Puerta.** `git fetch origin`. Confirmar que 002, 003, 011 y 004 están en `main`. Elegir el número de migración: el siguiente libre en `supabase/migrations/` (P5). Se frena en dos casos:
+- [ ] T001 [MIN] [Paso 0] **Puerta.** `git fetch origin`. Confirmar que 002, 003 y 011 están en `main` (la 004 no es requisito: decisión del dueño, plan.md, Preguntas abiertas). Elegir el número de migración: el siguiente libre en `supabase/migrations/` (P5). Se frena en dos casos:
   - P1 (estados, y qué deja la CLI) no tiene respuesta del dueño;
   - el default de P2 no está aprobado.
 

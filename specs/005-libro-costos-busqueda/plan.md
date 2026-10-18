@@ -210,6 +210,13 @@ docs/{arquitectura-backend.md, arquitectura-frontend.md, prd.md (§4)}
 ## Preguntas abiertas
 
 Ninguna se resuelve en este plan. Cada fila dice qué tareas bloquea.
+
+**Decisiones del dueño (2026-10-18):**
+- **P1 aprobada con el default:** el `CHECK` de `busquedas.estado` es la unión de los 8 valores; la CLI sigue igual; en la API una fuente caída con otra que respondió deja `completada` con el error por fuente, y `error` es solo cuando fallan todas.
+- **P2 aprobada con el default:** `crear_borrador`, `fijar_estimados`, `obtener_borrador` y `pasar_a_ejecutando`; los métodos del 002 no cambian.
+- **P4 aprobada con el default:** la fábrica de cada adaptador calcula `costo_maximo_llamada` con la tarifa resuelta; el YAML no lo declara.
+- **T001 sin la 004:** la 004 (evals) no es requisito para arrancar la 005; `v_costo_evals` lee una tabla vacía hasta que la 004 escriba.
+- **P5:** la migración de la 005 es la `0004`; la `0003` queda para el cifrado de `nombre`/`direccion` de la 003.
 - **Bloquea la puerta T001: P1.** La decide el dueño.
 - **P13 está decidida por el dueño:** `email_hmac`.
 - **P2 y P4** tienen default, pero falta que el dueño lo apruebe.
