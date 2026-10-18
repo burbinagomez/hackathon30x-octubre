@@ -43,13 +43,13 @@ fuentes_descubrimiento:                 # puerto: FuenteDescubrimiento
     trae: [nombre, telefono, web, email, direccion, geo]
     licencia: ODbL
   datos_gov_co_rues:
-    habilitado: false                    # DESCONECTADO esta vez; un flag lo vuelve a conectar
+    habilitado: true                     # un flag la desconecta: false y la fuente no existe
     proveedor: datos.gov.co
-    dataset: nb3d-v3n7
+    dataset: c82u-588k
     tipo: dataset
     paises: [CO]
-    filtros: [ciiu, camara, estado_matricula, tipo_propietario]
-    trae: [nit, nombre, ciiu, estado, tipo_titular]
+    filtros: [ciiu, departamento]
+    trae: [nit, nombre, ciiu, ciudad_camara]
     licencia: CC-BY-SA-4.0
 
 enriquecedores:                          # puerto: Enriquecedor

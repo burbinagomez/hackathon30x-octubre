@@ -7,8 +7,6 @@ from app.modulos.descubrimiento.aplicacion.registro import cargar_registro
 from app.modulos.descubrimiento.dominio.errores import RegistroInvalido
 from app.modulos.descubrimiento.infraestructura.adaptadores import catalogo
 
-ROJO_T040 = pytest.mark.xfail(strict=True, raises=AssertionError, reason="rojo T038/T043; verde en T040")
-
 FUENTES_YAML = Path(__file__).resolve().parents[3] / "config" / "fuentes.yaml"
 
 
@@ -103,7 +101,6 @@ def test_osm_overpass_carga_con_el_catalogo_real():
     assert "osm_overpass" not in registro.sin_implementacion
 
 
-@ROJO_T040
 def test_datos_gov_co_rues_del_yaml_real_se_carga():
     """Conectada por config (`habilitado: true`): cargada, con implementación y con el dataset de la spec."""
     registro = cargar_registro(FUENTES_YAML, catalogo)

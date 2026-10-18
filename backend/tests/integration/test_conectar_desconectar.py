@@ -23,8 +23,6 @@ from app.modulos.descubrimiento.infraestructura.persistencia.repositorio_leads i
     RepositorioLeadsPostgres,
 )
 
-ROJO_T040 = pytest.mark.xfail(strict=True, raises=AssertionError, reason="rojo T038/T043; verde en T040")
-
 BACKEND = Path(__file__).resolve().parents[2]
 CONFIG = BACKEND / "config"
 FILAS = json.loads((BACKEND / "tests" / "fixtures" / "datos_gov_co" / "filas.json").read_text())
@@ -100,14 +98,12 @@ def _ver(rt, tenant):
     return leads, licencias, lead_fuentes, costos
 
 
-@ROJO_T040
 def test_yaml_real_consulta_datos_gov_co(rt, tenant):
     _, a_datos_gov = _buscar(rt, tenant, CONFIG / "fuentes.yaml")
 
     assert len(a_datos_gov) >= 1
 
 
-@ROJO_T040
 def test_habilitada_por_yaml_temporal_da_leads_cc_by_sa(rt, tenant, tmp_path):
     _buscar(rt, tenant, _yaml(tmp_path, habilitado=True))
 

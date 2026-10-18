@@ -50,7 +50,7 @@ def test_buscar_imprime_resumen(persistencia, entorno, capsys):
     salida = capsys.readouterr().out
     assert codigo == 0
     assert "encontrados 2 · únicos 1 · nuevos 1 · créditos 1" in salida
-    assert "sin_implementacion: croma_dian_trade_co, osm_overpass" in salida
+    assert "sin_implementacion: croma_dian_trade_co, datos_gov_co_rues, osm_overpass" in salida
     assert "sin_fuente_para" not in salida
 
 
@@ -61,7 +61,7 @@ def test_buscar_sin_adaptadores_reporta_sin_fuente_y_sin_implementacion(persiste
     assert codigo == 0
     assert list(persistencia.repo.busquedas.values()) == ["terminada"]
     assert "sin_fuente_para: CO" in salida
-    assert "sin_implementacion: croma_dian_trade_co, croma_supersociedades_co, osm_overpass" in salida
+    assert "sin_implementacion: croma_dian_trade_co, croma_supersociedades_co, datos_gov_co_rues, osm_overpass" in salida
     assert persistencia.costos.filas == []
     assert persistencia.repo.leads == {}
 
