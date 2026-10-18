@@ -168,3 +168,12 @@ test("la_explicacion_muestra_nombres_si_la_pantalla_los_conoce", async () => {
   expect(screen.queryByText("Bogotá D.C.: 4")).toBeInTheDocument();
   expect(screen.queryByText("4752: 1")).toBeInTheDocument(); // sin nombre conocido, queda el código
 });
+
+test("una_sola_empresa_encontrada_va_en_singular", async () => {
+  iniciarSesion();
+  atender(200, { ...RESPUESTA, resueltos: 1 });
+  render(<IntakeLookalike alSugerir={() => undefined} />);
+  escribir(cinco.join("\n"));
+  fireEvent.click(boton(es.intake.lookalike.sugerir));
+  await waitFor(() => expect(screen.queryByText("1 empresa encontrada")).toBeInTheDocument());
+});
