@@ -18,7 +18,7 @@ import Tablero from "./Tablero";
 type Idioma = "es" | "en";
 const textos = { es, en };
 
-async function montar(respuesta: ReturnType<typeof respuestaTablero>, idioma: Idioma = "es") {
+async function montar(respuesta: Record<string, unknown>, idioma: Idioma = "es") {
   server.use(http.get("*/tablero/fuentes", () => HttpResponse.json(respuesta)));
   await i18n.changeLanguage(idioma);
   render(<Tablero />);
@@ -118,7 +118,7 @@ test.each<Idioma>(["es", "en"])("muestra_naturales_encontradas_no_contactables[%
 });
 
 test("el_minimo_pinta_encontrados_y_unicos_y_no_las_columnas_de_costo_ni_las_secciones_sin_dato", async () => {
-  await montar(respuestaTableroMinima({ atribuciones: [atribucionOsm] }) as ReturnType<typeof respuestaTablero>);
+  await montar(respuestaTableroMinima({ atribuciones: [atribucionOsm] }));
 
   const encabezados = screen.queryAllByRole("columnheader").map((h) => h.textContent);
   expect(encabezados).toEqual(["Fuente", "Encontrados", "Únicos"]);

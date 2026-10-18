@@ -3,11 +3,11 @@ export type FilaTablero = {
   fuente: string;
   encontrados: number;
   unicos: number;
-  icp: number;
-  costo_lista: string;
-  costo_real: string;
-  desperdicio_lista: string;
-  desperdicio_real: string;
+  icp: number | null;
+  costo_lista: string | null;
+  costo_real: string | null;
+  desperdicio_lista: string | null;
+  desperdicio_real: string | null;
   cpl_lista: string | null;
   cpl_real: string | null;
   cuenta_naturales: boolean;
@@ -17,8 +17,8 @@ export type FilaTablero = {
 export type Tablero = {
   fuentes: FilaTablero[];
   total: FilaTablero;
-  costo_evals: string;
-  cobertura: { pais: string; fuentes: string[] }[];
-  revisiones_pendientes: number;
+  costo_evals: string | null;
+  cobertura: { pais: string; fuentes: string[] }[] | null;
+  revisiones_pendientes: number | null;
   atribuciones: { fuente: string; texto: string; url: string }[];
 };

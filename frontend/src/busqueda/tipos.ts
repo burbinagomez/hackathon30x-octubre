@@ -20,15 +20,16 @@ export type FuenteVistaPrevia = {
   truncado: boolean;
 };
 
-/** Los montos son decimales como string, tal como los serializa la API. */
+/** Los montos son decimales como string, tal como los serializa la API. `null` = la API todavía no lo calcula (o no lo
+ *  aplica, como el tope): no se pinta y nunca se lee como 0. */
 export type VistaPrevia = {
   busqueda_id: string;
   fuentes: FuenteVistaPrevia[];
   descartadas: { fuente: string; motivo: string }[];
-  costo_vista_previa_usd: string;
-  costo_estimado_usd: string;
-  costo_maximo_usd: string;
-  creditos_restantes_mes: number;
-  requests_restantes_24h: number;
-  dentro_del_tope: boolean;
+  costo_vista_previa_usd: string | null;
+  costo_estimado_usd: string | null;
+  costo_maximo_usd: string | null;
+  creditos_restantes_mes: number | null;
+  requests_restantes_24h: number | null;
+  dentro_del_tope: boolean | null;
 };

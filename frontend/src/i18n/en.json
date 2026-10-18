@@ -10,7 +10,8 @@
   "motivos": {
     "sin_mapeo_actividad": "The activity has no equivalent in this source",
     "pais": "The source does not cover this country",
-    "sin_geografia": "The source needs a state or city"
+    "sin_geografia": "The source needs a state or city",
+    "sin_conteo": "No count yet: the number of companies is not queried"
   },
   "config": {
     "incompleta": "Incomplete configuration"
@@ -55,7 +56,10 @@
     "pais": "Country",
     "ciiu": "Activity",
     "departamento": "State",
-    "ingresos_min": "Minimum revenue"
+    "ingresos_min": "Minimum revenue",
+    "ciudad": "City",
+    "palabras_clave": "Keywords",
+    "exclusiones": "Exclusions"
   },
   "tablero": {
     "error": "The dashboard could not be loaded. Try again.",

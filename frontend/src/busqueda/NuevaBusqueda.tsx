@@ -80,7 +80,7 @@ export default function NuevaBusqueda() {
   const exclusiones = entrada("exclusiones", t("busqueda.exclusiones"));
   const tope = entrada("tope", t("busqueda.tope"), "number");
   const nombre = (a: Actividad) => (i18n.language === "en" ? a.nombre_en ?? a.nombre_es : a.nombre_es);
-  const puedeBuscar = vista !== null && vista.dentro_del_tope && vista.fuentes.length > 0;
+  const puedeBuscar = vista !== null && vista.dentro_del_tope !== false && vista.fuentes.length > 0;
 
   return (
     <main className="pantalla">

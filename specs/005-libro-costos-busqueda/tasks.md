@@ -203,7 +203,7 @@
 
 ## Fase 8: Endpoints (Paso 7)
 
-- [ ] T031 [MIN] [Paso 7] **Rojo:** `backend/tests/integration/test_api_busquedas.py`:
+- [x] T031 [MIN] [Paso 7] **Rojo:** `backend/tests/integration/test_api_busquedas.py`:
   - `::test_tenant_sale_del_token_no_del_body` (advisor, RLS). **Mutación:** modelo sin `extra='forbid'` → 201 en lugar de 422.
   - `::test_tenant_b_no_ejecuta_busqueda_de_a` (advisor, RLS). **Mutación:** abrir la unidad de trabajo con el tenant de la búsqueda en lugar del del token.
   - `::test_ejecutar_dos_veces_da_409`. **Mutación:** mapear `BusquedaYaEjecutada` a 500.
@@ -216,17 +216,18 @@
   - `::test_tablero_trae_naturales_por_fuente`. **viene de 011 (D7)** (T047 de la 011). Definición en la 011 spec (c64c5f8):135. Las dos búsquedas se siembran con `creado_en` **explícito y distinto**. Con `DEFAULT now()`, dentro de una misma transacción empatan: `DISTINCT ON` elegiría al azar, y la mutación ASC no daría rojo. **Mutación:** `COALESCE(naturales, 0)` → OSM trae `0` en lugar de `null`; o `ORDER BY fuente, creado_en ASC` → toma el conteo viejo.
   *Van a Pulido (el [MIN] no los pide): `::test_ejecutar_con_costo_maximo_sobre_tope_da_409`, `::test_tablero_devuelve_null_para_cpl_sin_divisor` y `::test_tablero_trae_naturales_por_fuente` (D7). El [MIN] sí fija que el tablero completa con `null` lo que no calcula (`test_tablero_completa_con_null_lo_que_el_minimo_no_calcula`).*
   *Rojo escrito 2026-10-18, pendiente de advisor (RLS y cumplimiento) (parte [MIN]): `test_api_busquedas.py`, 21 casos en rojo por assert (`501 == 201/200/422`; `['4711', '5611', '4752'] == []` para el YAML de actividades). Más lo que el [MIN] necesita y la tabla no listaba: 404 frente a 409 entre tenants (ajena indistinguible de inexistente, sin requests ni costos), `test_validacion_ciiu_devuelve_el_nombre_de_la_regla`, `test_actividades_yaml_real_tiene_nombre_es_en_todas_las_entradas`, y `test_flujo_completo_deja_leads_costos_y_cumplimiento_del_tenant` (vista previa -> ejecutar -> tablero con fuentes reales y transporte falso: costos con `lote_id` = búsqueda y `lead_id` null, un `cumplimiento` por lead, nada en B). Contrato del verde: `app.state.transporte_http` y `app.state.actividades_yaml`; vista previa 201, ejecutar 200; errores 422 como `{errores: [{campo, codigo}]}`.*
-
-- [ ] T032 [MIN] [Paso 7] **Verde:**
+  *Verde 2026-10-18 con T032 (parte [MIN]); 27 casos en `test_api_busquedas.py` + `tests/unit/api/`. Ajuste a lo pedido: `base_legal` NO se exige no nula en `cumplimiento` (la setea AprobarMensaje en el 007: 0002 migración:68, 003 spec:344); el test exige que sea NULL en todos, para que nadie la rellene con `persona_juridica_canal_publicado` a un lead de OSM (`desconocido` = natural).*
+- [x] T032 [MIN] [Paso 7] **Verde:**
   - routers `busquedas`, `tablero`, `actividades`;
   - `repositorio_tablero.py`;
   - `limites_app` en `tarifas.yaml` (P11);
   - `nombre_es`/`nombre_en` en `actividades.yaml`;
   - el verde del tablero de naturales: `DISTINCT ON (fuente) … ORDER BY fuente, creado_en DESC` (la columna ya existe en la 002) sobre las búsquedas `completada`, o `IN ('completada','terminada')` según lo que decida el dueño en P1; **viene de 011 (D7)** (T049 de la 011).
-- [ ] T033 [MIN] [Paso 7] `EXCLUIDOS` de los tests de arquitectura de la 002 suma `repositorio_tablero.py` y `repositorio_usuarios.py` (P10). `uv run lint-imports` verde. **LOW (security):** `usuarios` entra a `EXCLUIDAS` de `test_rls.py` con el motivo "`app_rt` no tiene privilegios; entra solo por `tenant_de_usuario`; su RLS la prueba `test_usuarios_tiene_rls`".
+  *Hecho 2026-10-18 (parte [MIN]): `app/composicion.py` (CLI y API comparten `armador_de_fuente`; `registro_api` sin Croma), routers `busquedas`, `tablero` (con `null` en lo no calculado) y `actividades`, `repositorio_tablero.py`, `nombre_es`/`nombre_en` en `actividades.yaml`, `canal:` en `canales_contacto`, 422 como `{errores: [{campo, codigo}]}`. Front en el mismo PR: tipos `| null`, `puedeBuscar` con `!== false`, líneas de costo/tope y columnas de costo ocultas si vienen `null`, `motivos.sin_conteo` y `criterios.{ciudad,palabras_clave,exclusiones}` en es/en. Sabotajes vistos en rojo: sin `extra=forbid`, 409 sin mapear, ajena responde 409, sin validar canal, palabras clave descartadas, error de fuente como frase, `unicos` desde `encontrados`, sin `nombre_en` cuando es null, 422 con `msg`, lifespan que hereda estado, `registro_api` sin filtro de Croma, datos.gov.co sin el transporte inyectado; front: `puedeBuscar` exige true, tope con costo máximo null, columnas de costo siempre, cobertura null sin guarda.*
+- [x] T033 [MIN] [Paso 7] `EXCLUIDOS` de los tests de arquitectura de la 002 suma `repositorio_tablero.py` y `repositorio_usuarios.py` (P10). `uv run lint-imports` verde. **LOW (security):** `usuarios` entra a `EXCLUIDAS` de `test_rls.py` con el motivo "`app_rt` no tiene privilegios; entra solo por `tenant_de_usuario`; su RLS la prueba `test_usuarios_tiene_rls`".
 
 ## Fase 9: Front (Paso 8)
-
+  *Hecho 2026-10-18: en esta rama no existe el `EXCLUIDOS` de arquitectura de la 002 (solo el de `test_required_checks.py`, que es de CI); `repositorio_tablero.py` y `repositorio_usuarios.py` no escriben ni llaman a fuentes, así que no hay nada que excluir. `usuarios` ya está en `EXCLUIDAS` de `test_rls.py` con su motivo. `lint-imports` verde (5 contratos).*
 - [x] T034 [MIN] [Paso 8] Mover `src/setupTests.ts` a `src/test/setup.ts` y sumar `src/test/servidor.ts` (MSW sin handlers). `vitest.config.ts` incluye `src/**` y `tests/**` y excluye `e2e/`.
 
   **Esqueletos del front,** para que los rojos de T035–T041 y T047 fallen por aserción y no por "module not found" ni ENOENT:

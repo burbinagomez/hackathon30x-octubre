@@ -10,7 +10,8 @@
   "motivos": {
     "sin_mapeo_actividad": "La actividad no tiene equivalente en esta fuente",
     "pais": "La fuente no cubre este país",
-    "sin_geografia": "La fuente necesita un departamento o ciudad"
+    "sin_geografia": "La fuente necesita un departamento o ciudad",
+    "sin_conteo": "Sin conteo: todavía no se consulta cuántas empresas hay"
   },
   "config": {
     "incompleta": "Configuración incompleta"
@@ -55,7 +56,10 @@
     "pais": "País",
     "ciiu": "Actividad",
     "departamento": "Departamento",
-    "ingresos_min": "Ingresos mínimos"
+    "ingresos_min": "Ingresos mínimos",
+    "ciudad": "Ciudad",
+    "palabras_clave": "Palabras clave",
+    "exclusiones": "Exclusiones"
   },
   "tablero": {
     "titulo": "Tablero por fuente",
