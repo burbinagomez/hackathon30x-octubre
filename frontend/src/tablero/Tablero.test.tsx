@@ -130,3 +130,37 @@ test("el_minimo_pinta_encontrados_y_unicos_y_no_las_columnas_de_costo_ni_las_sec
   expect(document.body).not.toHaveTextContent(/NaN|—|No aplica/);
   expect(screen.queryByRole("link", { name: atribucionOsm.texto })).toBeInTheDocument();  // la atribución sí
 });
+
+const sinDesperdicio = { desperdicio_lista: null, desperdicio_real: null };
+
+test("con_costos_y_sin_desperdicio_muestra_costo_y_cpl_y_no_columnas_vacias", async () => {
+  const base = respuestaTablero();
+  await montar({
+    ...base,
+    fuentes: base.fuentes.map((f) => ({ ...f, ...sinDesperdicio })),
+    total: { ...base.total, ...sinDesperdicio },
+  });
+
+  const encabezados = screen.queryAllByRole("columnheader").map((h) => h.textContent);
+  expect(encabezados).toEqual(["Fuente", "Encontrados", "Únicos", "Costo (lista)", "Costo (real)", "CPL (lista)", "CPL (real)"]);
+  expect(celda("Total", "CPL (lista)")).toBe(monto("es", "0.3375"));
+});
+
+test("fuente_sin_costo_registrado_muestra_sin_dato_y_nunca_cero", async () => {
+  const base = respuestaTablero();
+  const sinCosto = { ...base.fuentes[0], fuente: "osm_overpass", costo_lista: null, costo_real: null, cpl_lista: null, cpl_real: null };
+  await montar({ ...base, fuentes: [base.fuentes[0], sinCosto] });
+
+  for (const columna of ["Costo (lista)", "Costo (real)", "CPL (lista)", "CPL (real)"]) {
+    expect(celda("OpenStreetMap", columna)).toBe("—");
+  }
+  expect(celda("OpenStreetMap", "CPL (lista)")).not.toMatch(/0[.,]00/);
+});
+
+test("costo_y_cpl_en_ingles_con_moneda_del_idioma", async () => {
+  await montar(respuestaTablero(), "en");
+  const t = en.tablero;
+  expect(celda(en.fuentes.croma_supersociedades_co, t.costo_lista)).toBe(monto("en", "1.35"));
+  expect(celda(en.fuentes.croma_supersociedades_co, t.cpl_real)).toBe(monto("en", "0.2375"));
+  expect(celda(en.fuentes.sin_atribuir, t.cpl_lista)).toBe("—");
+});

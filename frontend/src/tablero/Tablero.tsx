@@ -4,31 +4,40 @@ import { entero, moneda } from "../compartido/formato";
 import { obtenerTablero } from "./api";
 import type { FilaTablero, Tablero as DatosTablero } from "./tipos";
 
-const BASICAS = ["fuente", "encontrados", "unicos"] as const;
-const DE_COSTO = [
-  "costo_lista", "costo_real", "desperdicio_lista", "desperdicio_real", "cpl_lista", "cpl_real", "naturales",
-] as const;
+type Columna = "costo_lista" | "costo_real" | "desperdicio_lista" | "desperdicio_real" | "cpl_lista" | "cpl_real" | "naturales";
 
-function Fila({ fila, total = false, conCostos }: { fila: FilaTablero; total?: boolean; conCostos: boolean }) {
+function Fila({ fila, total = false, columnas }: { fila: FilaTablero; total?: boolean; columnas: Columna[] }) {
   const { t } = useTranslation();
+  const celdas: Record<Columna, string> = {
+    costo_lista: moneda(fila.costo_lista),
+    costo_real: moneda(fila.costo_real),
+    desperdicio_lista: moneda(fila.desperdicio_lista),
+    desperdicio_real: moneda(fila.desperdicio_real),
+    cpl_lista: moneda(fila.cpl_lista),
+    cpl_real: moneda(fila.cpl_real),
+    naturales: total ? "" : fila.cuenta_naturales ? entero(fila.naturales_no_contactables) : t("tablero.no_aplica"),
+  };
   return (
     <tr className={total ? "total" : undefined}>
       <td>{total ? t("tablero.total") : t(`fuentes.${fila.fuente}`)}</td>
       <td>{entero(fila.encontrados)}</td>
       <td>{entero(fila.unicos)}</td>
-      {conCostos && (
-        <>
-      <td>{moneda(fila.costo_lista)}</td>
-      <td>{moneda(fila.costo_real)}</td>
-      <td>{moneda(fila.desperdicio_lista)}</td>
-      <td>{moneda(fila.desperdicio_real)}</td>
-      <td>{moneda(fila.cpl_lista)}</td>
-      <td>{moneda(fila.cpl_real)}</td>
-      <td>{total ? "" : fila.cuenta_naturales ? entero(fila.naturales_no_contactables) : t("tablero.no_aplica")}</td>
-        </>
-      )}
+      {columnas.map((c) => <td key={c}>{celdas[c]}</td>)}
     </tr>
   );
+}
+
+/** Solo las columnas que la API ya calcula: lo que viene null en toda la tabla no se pinta (no hay columna de "—"). */
+function columnasConDatos(d: DatosTablero): Columna[] {
+  const filas = [...d.fuentes, d.total];
+  const hay = (c: keyof FilaTablero) => filas.some((f) => f[c] !== null);
+  const columnas: Columna[] = [];
+  const conCostos = hay("costo_lista");
+  if (conCostos) columnas.push("costo_lista", "costo_real");
+  if (hay("desperdicio_lista")) columnas.push("desperdicio_lista", "desperdicio_real");
+  if (conCostos) columnas.push("cpl_lista", "cpl_real");  // con costos, el CPL sin divisor se ve como "—"
+  if (filas.some((f) => f.cuenta_naturales)) columnas.push("naturales");
+  return columnas;
 }
 
 export default function Tablero() {
@@ -48,9 +57,9 @@ export default function Tablero() {
       </main>
     );
   }
-  // La API del [MIN] manda null en todo lo que aún no calcula: esas columnas y secciones no se pintan.
-  const conCostos = datos.total.costo_lista !== null;
-  const columnas = conCostos ? [...BASICAS, ...DE_COSTO] : BASICAS;
+  // La API manda null en todo lo que aún no calcula: esas columnas y secciones no se pintan.
+  const extra = columnasConDatos(datos);
+  const columnas = ["fuente", "encontrados", "unicos", ...extra];
   return (
     <main className="pantalla pantalla-ancha">
       <h1>{t("tablero.titulo")}</h1>
@@ -62,8 +71,8 @@ export default function Tablero() {
           </tr>
         </thead>
         <tbody>
-          {datos.fuentes.map((f) => <Fila key={f.fuente} fila={f} conCostos={conCostos} />)}
-          <Fila fila={datos.total} total conCostos={conCostos} />
+          {datos.fuentes.map((f) => <Fila key={f.fuente} fila={f} columnas={extra} />)}
+          <Fila fila={datos.total} total columnas={extra} />
         </tbody>
       </table>
       </div>
