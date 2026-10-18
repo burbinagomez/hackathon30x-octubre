@@ -8,4 +8,6 @@ Contacto = tuple[str, CanalPublicado]  # (valor, canal)
 
 def elegir_canal(actual: Contacto | None, nuevo: Contacto | None) -> Contacto | None:
     """El nuevo reemplaza al actual solo si su canal tiene estrictamente más confianza."""
+    if nuevo is None or (actual is not None and CONFIANZA_CANAL[nuevo[1]] <= CONFIANZA_CANAL[actual[1]]):
+        return actual
     return nuevo
