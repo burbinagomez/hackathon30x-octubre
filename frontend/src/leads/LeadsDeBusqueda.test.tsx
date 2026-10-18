@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { http, HttpResponse } from "msw";
+import { delay, http, HttpResponse } from "msw";
 import { expect, test } from "vitest";
 import i18n from "../i18n";
 import en from "../i18n/en.json";
@@ -146,4 +146,26 @@ test("404 muestra no encontrada", async () => {
   server.use(http.get("*/busquedas/:id/leads", () => HttpResponse.json({ detail: "no_encontrada" }, { status: 404 })));
   render(<LeadsDeBusqueda id={ID} />);
   await waitFor(() => expect(screen.queryByRole("alert")).toHaveTextContent("No se encontró la búsqueda."));
+});
+
+test("enriquecer_muestra_que_trabaja_y_despues_el_resumen_con_lo_que_queda", async () => {
+  let llamadas = 0;
+  server.use(
+    http.post("*/busquedas/:id/enriquecer", async () => {
+      llamadas += 1;
+      await delay(50); // que se alcance a ver la píldora de trabajo
+      return HttpResponse.json(llamadas === 1
+        ? { procesados: 15, contactables: 6, clasificados: 0, sin_clasificar: 15, cortado: false, pendientes: 5 }
+        : { procesados: 5, contactables: 2, clasificados: 0, sin_clasificar: 5, cortado: false, pendientes: 0 });
+    }),
+  );
+  await montar(pagina([lead(1)]));
+
+  fireEvent.click(screen.getByRole("button", { name: es.enriquecer.boton }));
+  expect(await screen.findByRole("status", { name: es.enriquecer.trabajando })).toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByText(/15 procesados · 6 con contacto · quedan 5/)).toBeInTheDocument());
+
+  fireEvent.click(screen.getByRole("button", { name: es.enriquecer.seguir }));
+  await waitFor(() => expect(screen.queryByText(/5 procesados · 2 con contacto · quedan 0/)).toBeInTheDocument());
+  expect(screen.queryByRole("button", { name: es.enriquecer.seguir })).not.toBeInTheDocument();
 });

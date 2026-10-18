@@ -1,6 +1,5 @@
 """Raíz de composición: único módulo que une descubrimiento con la infraestructura de costos."""
 import argparse
-import socket
 import sys
 from dataclasses import dataclass
 from decimal import Decimal
@@ -11,7 +10,7 @@ import httpx
 import yaml
 from pydantic import ValidationError
 
-from app.composicion import CONFIG, armador_de_fuente, cargar_tarifas
+from app.composicion import CONFIG, adaptadores_enriquecer, armador_de_fuente, cargar_tarifas
 from app.config import Settings
 from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.costos.dominio.puertos import RegistroCostos
@@ -58,21 +57,8 @@ def _persistencia_postgres(settings: Settings, tenant: UUID) -> Persistencia:
     return Persistencia(RepositorioLeadsPostgres(engine, tenant, Cifrador(settings.cifrado_key.get_secret_value())), PostgresCostos(engine, tenant))
 
 
-def _resolver(host: str) -> list[str]:
-    return [info[4][0] for info in socket.getaddrinfo(host, None)]
-
-
 def _adaptadores_enriquecer(ajustes: Settings, costos: RegistroCostos, tarifas: dict[str, Decimal]):
-    """Croma RUES, sitio web y jev. Sin TYPESAFE_API_KEY o TYPESAFE_URL no hay clasificador: encaje queda NULL."""
-    from app.modulos.enriquecimiento.infraestructura.adaptadores.croma_rues import CromaRues
-    from app.modulos.enriquecimiento.infraestructura.adaptadores.jev_clasificador import JevClasificador
-    from app.modulos.enriquecimiento.infraestructura.adaptadores.sitio_web import SitioWeb
-
-    clasificador = None
-    if ajustes.typesafe_api_key and ajustes.typesafe_url:
-        clasificador = JevClasificador(costos, httpx.HTTPTransport(), ajustes.typesafe_url, ajustes.typesafe_api_key,
-                                       tarifas["jev_in_por_M"])
-    return CromaRues(), SitioWeb(costos, httpx.HTTPTransport(), _resolver, tarifas["web_fetch"]), clasificador
+    return adaptadores_enriquecer(ajustes, costos, tarifas, httpx.HTTPTransport())
 
 
 def _parser() -> argparse.ArgumentParser:

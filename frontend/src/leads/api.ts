@@ -17,3 +17,16 @@ export const listarLeadsDeFuente = (fuente: string | null, pagina: number, conCo
   if (conContacto) q.set("con_contacto", "true");
   return pedir<PaginaLeads>(`/leads?${q.toString()}`);
 };
+
+export type ResumenEnriquecimiento = {
+  procesados: number;
+  contactables: number;
+  clasificados: number;
+  sin_clasificar: number;
+  cortado: boolean;
+  pendientes: number;
+};
+
+/** Una tanda de enriquecimiento (sitio web, RUES, jev) para los leads de la búsqueda. Solo vuelven conteos. */
+export const enriquecer = (id: string) =>
+  pedir<ResumenEnriquecimiento>(`/busquedas/${encodeURIComponent(id)}/enriquecer`, { metodo: "POST" });
