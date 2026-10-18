@@ -64,7 +64,9 @@ El CSV del mínimo (`lead_id, calificado, fecha, minutos`) no distingue el resul
 - `calificados` = leads distintos de `lead_fuentes` con `fuente = f` y `calificado = true`;
 - `cpql_lista` = `costo_lista / NULLIF(calificados, 0)`, y `cpql_real` igual.
 
-La fila `TOTAL` suma **todos** los costos del tenant, incluidos los `dapta_llamada` sin fuente, y los divide por los calificados distintos. Un divisor 0 da NULL ("sin dato"), nunca 0.
+Un costo sin fuente (el `dapta_llamada`) va a la fila **`sin_atribuir`**, como en el tablero: tiene costo pero no CPQL (0 calificados → NULL). Σ costo de las filas (sin `TOTAL`) = Σ `costos` del tenant sin evals: ningún costo desaparece del CPQL.
+
+La fila `TOTAL` suma **todos** los costos del tenant y los divide por los calificados distintos. Un divisor 0 da NULL ("sin dato"), nunca 0.
 
 ## DDL 0007 — aprobado por Daniel (2026-10-18)
 
@@ -83,7 +85,7 @@ La tabla no tiene UPDATE ni DELETE porque un conflicto lo resuelve un humano. El
 ## Preguntas abiertas
 
 - **P1. Tarifa de Dapta para la demo.** Resuelta: Daniel dio el valor real, `0.333` USD/min contestado (docs.dapta.ai), ya cargado en `tarifas.yaml`. Buzón de voz y no contestada quedan pendientes (ver sección "Tarifa").
-- **P2. Costo de Dapta en el CPQL por fuente.** Pediste costo de la fuente / calificados: el `dapta_llamada` no tiene fuente, así que entra solo en `TOTAL`. El reparto en partes iguales entre las fuentes del lead (spec, Decisiones) queda fuera del mínimo. Revisión del advisor de costos.
+- **P2. Costo de Dapta en el CPQL por fuente.** Resuelta (Daniel, 2026-10-18): el CPQL por fuente no incluye Dapta; el `dapta_llamada` va a la fila `sin_atribuir`, a la vista, y entra en `TOTAL`. El reparto en partes iguales entre las fuentes del lead (spec, Decisiones) queda fuera del mínimo.
 - **P3. Moneda.** Todo `costos` está en USD hoy (`tarifas.yaml`). La vista no filtra por `moneda`. Revisión del advisor de costos.
 
 ## Fuera del mínimo (vuelve con la 006/007)

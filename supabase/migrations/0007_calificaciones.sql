@@ -21,17 +21,19 @@ CREATE POLICY tenant_aislado ON public.calificaciones
   WITH CHECK (tenant_id = current_setting('app.tenant_id')::uuid);
 
 -- CPQL por fuente = costo de la fuente / leads calificados de la fuente. Divisor 0 o sin costos: NULL ("sin dato").
--- Igual que el tablero: los costos de evals no entran. El dapta_llamada no tiene fuente: entra solo en TOTAL.
+-- Igual que el tablero: los costos de evals no entran y un costo sin fuente (el dapta_llamada) va a 'sin_atribuir',
+-- que tiene costo pero no CPQL (0 calificados → NULL). Así Σ filas (sin TOTAL) = Σ costos del tenant: nada se esconde.
+-- ponytail: asume todo en USD (tarifas.yaml); agrupar por moneda si entra una tarifa en otra.
 -- security_invoker: corre como app_rt y pasa por la RLS de costos, lead_fuentes y calificaciones.
 -- Un CREATE OR REPLACE VIEW sin WITH (security_invoker = true) BORRA la opción; repetirla siempre.
 CREATE VIEW public.v_cpql WITH (security_invoker = true) AS
   WITH costo AS (
-    SELECT fuente,
+    SELECT COALESCE(fuente, 'sin_atribuir') AS fuente,
            sum(unidades * costo_unitario) AS costo_lista,
            sum(CASE WHEN gratis THEN 0 ELSE unidades * costo_unitario END) AS costo_real
     FROM public.costos
-    WHERE fuente IS NOT NULL AND fuente <> 'evals'
-    GROUP BY fuente
+    WHERE fuente IS DISTINCT FROM 'evals'
+    GROUP BY 1
   ), calif AS (
     SELECT lf.fuente, count(DISTINCT lf.lead_id) AS calificados
     FROM public.lead_fuentes lf

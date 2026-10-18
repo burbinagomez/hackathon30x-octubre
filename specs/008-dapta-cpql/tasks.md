@@ -66,6 +66,8 @@ Los tests de integración necesitan `TEST_DATABASE_URL`: corren contra un Postgr
   - `::test_total_incluye_dapta_y_cuenta_leads_distintos`.
   - **Mutación `cpql_divide_por_todos_los_leads`**: el divisor cuenta los leads sin `calificado = true`.
   - **Mutación `total_sin_dapta`**: TOTAL filtra `fuente IS NOT NULL`.
+  - `::test_sin_atribuir_lleva_el_costo_de_dapta_sin_cpql_propio` y `::test_la_suma_de_las_filas_es_el_libro_de_costos` (con una fila de evals que no entra).
+  - **Mutación `sin_atribuir_escondido`**: el CTE `costo` filtra `fuente IS NOT NULL` y el `dapta_llamada` desaparece de las filas.
 - [ ] T014 [MIN] [Paso 3] Repo de lectura `infraestructura/persistencia/repositorio_cpql.py` sobre `v_cpql` (patrón de `repositorio_tablero.py`, **sin tocarlo**).
 - [ ] T015 [MIN] [Paso 3] (security) `tests/integration/test_api_calificaciones.py`:
   - `POST /calificaciones/importar` (cuerpo `text/csv`, ≤ 1 MB) y `GET /calificaciones/cpql`, ambos con `Depends(tenant_actual)`;
