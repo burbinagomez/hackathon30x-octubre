@@ -48,3 +48,13 @@ test("un_401_sin_sesion_no_redirige_y_falla", async () => {
   });
   expect(assign).not.toHaveBeenCalled();
 });
+
+test.each(["https://atacante.test/x", "//atacante.test/x", "/\\atacante.test", "actividades", "/ok\nHost: x"])(
+  "rechaza_una_ruta_que_no_es_relativa_a_la_api: %s",
+  async (ruta) => {
+    const llamadas = vi.fn();
+    server.use(http.all("*", () => { llamadas(); return HttpResponse.json({}); }));
+    await expect(pedir(ruta)).rejects.toThrow("ruta_invalida");
+    expect(llamadas).not.toHaveBeenCalled();
+  },
+);

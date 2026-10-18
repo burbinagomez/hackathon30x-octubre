@@ -722,3 +722,14 @@ def test_log_de_fuente_caida_no_trae_el_mensaje(api, usuarios, caplog):
     for x in caplog.records:
         assert x.exc_info is None and x.exc_text is None
         assert "ACME" not in x.getMessage() and "secreto" not in x.getMessage() and "900123456" not in x.getMessage()
+
+
+def test_actividades_devuelve_el_catalogo_real_ampliado(api, usuarios):
+    r = api.get("/actividades", headers=_bearer(usuarios["a"]))
+
+    assert r.status_code == 200
+    por_codigo = {a["codigo"]: a for a in r.json()}
+    assert len(por_codigo) >= 20
+    for codigo in ("4711", "5611", "4752", "4773", "4771", "9602", "4520", "6201", "4923"):
+        assert codigo in por_codigo, codigo
+    assert por_codigo["6201"]["nombre_es"] and por_codigo["6201"]["nombre_en"]
