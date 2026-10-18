@@ -141,6 +141,8 @@ def ejecutar(busqueda_id: UUID, request: Request, tenant_id: UUID = Depends(tena
         "estado": repo.estado(r.busqueda_id),
         "encontrados": r.encontrados, "unicos": r.unicos, "nuevos": r.nuevos,
         "omitidas_por_tope": list(r.omitidas_por_tope),
+        # 015: qué pasó con cada fuente seleccionada. Códigos; el texto lo pone el front según el idioma.
+        "por_fuente": {clave: {"estado": f.estado, "encontrados": f.encontrados} for clave, f in r.por_fuente.items()},
         "errores": [{"fuente": clave, "motivo": _MOTIVO_DE_ERROR.get(type(e), "error")} for clave, e in r.errores.items()],
         "sin_fuente_para": None if r.sin_fuente_para is None else {
             "pais": r.sin_fuente_para[0], "filtros": {k: list(v) if isinstance(v, tuple) else v

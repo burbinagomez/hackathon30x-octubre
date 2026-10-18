@@ -680,3 +680,45 @@ def test_tolima_no_da_500(api, admin, usuarios, causa):
     assert r.json()["estado"] == "error"  # las dos fallaron; la respuesta sigue siendo 200
     assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=busqueda_id) == "error"
 
+
+
+def test_ejecutar_devuelve_por_fuente(api, usuarios):
+    busqueda_id = _crear(api, usuarios["a"])
+
+    r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert r.status_code == 200
+    por_fuente = r.json()["por_fuente"]
+    assert set(por_fuente) == {"osm_overpass", "datos_gov_co_rues"}
+    assert all(set(v) == {"estado", "encontrados"} and v["estado"] == "con_resultados" and v["encontrados"] > 0
+               for v in por_fuente.values())
+    assert sum(v["encontrados"] for v in por_fuente.values()) == r.json()["encontrados"]
+    assert CODIGO.match(por_fuente["osm_overpass"]["estado"])  # un código, no una frase
+
+
+def test_overpass_sin_elementos_es_sin_resultados_y_la_busqueda_completa(api, usuarios):
+    _osm_con(api, httpx.Response(200, json={"osm3s": {"timestamp_osm_base": "2026-10-01T00:00:00Z"}, "elements": []}))
+    busqueda_id = _crear(api, usuarios["a"])
+
+    r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert r.status_code == 200 and r.json()["estado"] == "completada"
+    assert r.json()["por_fuente"]["osm_overpass"] == {"estado": "sin_resultados", "encontrados": 0}
+    assert r.json()["por_fuente"]["datos_gov_co_rues"]["estado"] == "con_resultados"
+
+
+def test_log_de_fuente_caida_no_trae_el_mensaje(api, usuarios, caplog):
+    import logging
+
+    _osm_con(api, httpx.ReadTimeout("ACME SAS 900123456 https://overpass.test/?data=secreto"))
+    busqueda_id = _crear(api, usuarios["a"])
+
+    with caplog.at_level(logging.DEBUG):
+        r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert r.status_code == 200
+    registros = [x for x in caplog.records if "osm_overpass" in x.getMessage()]
+    assert registros and "ReadTimeout" in registros[0].getMessage()
+    for x in caplog.records:
+        assert x.exc_info is None and x.exc_text is None
+        assert "ACME" not in x.getMessage() and "secreto" not in x.getMessage() and "900123456" not in x.getMessage()
