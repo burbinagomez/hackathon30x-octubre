@@ -47,7 +47,21 @@
     "requests_restantes": "Consultas de Croma restantes en 24 h: {{n}}",
     "descartadas": "Fuentes descartadas",
     "ignorados": "se ignora: {{lista}}",
-    "error": "No se pudo completar la operación. Probá de nuevo."
+    "error": "No se pudo completar la operación. Probá de nuevo.",
+    "pestanas": {
+      "lookalike": "Ya me compran",
+      "frase": "En una frase",
+      "filtros": "Filtros"
+    },
+    "frase": {
+      "etiqueta": "¿A quién le vendés y qué ofrecés?",
+      "ayuda": "Una o dos frases. Ejemplo: vendo software contable a ferreterías medianas en Antioquia.",
+      "sugerir": "Sugerir filtros",
+      "pensando": "Pensando…",
+      "revisar": "Prellenamos los filtros con tu frase. Revisalos y ajustalos antes de la vista previa.",
+      "error_no_disponible": "La sugerencia con IA no está disponible ahora. Usá los filtros directamente.",
+      "error_interpretacion": "No pudimos interpretar la frase. Probá con otra redacción o usá los filtros."
+    }
   },
   "fuentes": {
     "croma_supersociedades_co": "Supersociedades (Croma)",

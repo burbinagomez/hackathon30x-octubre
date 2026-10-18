@@ -13,3 +13,19 @@ export const vistaPrevia = (pedido: PedidoVistaPrevia) =>
 
 export const ejecutar = (id: string) =>
   pedir<unknown>(`/busquedas/${encodeURIComponent(id)}/ejecutar`, { metodo: "POST" });
+
+export type EstadoIntake = { frase: boolean; lookalike: boolean };
+export type Sugerencia = {
+  pais: string;
+  ciiu: string | null;
+  departamento: string | null;
+  ciudad: string | null;
+  ingresos_min: number | null;
+  palabras_clave: string[];
+  exclusiones: string[];
+};
+
+export const estadoIntake = () => pedir<EstadoIntake>("/intake/estado");
+
+export const sugerirDesdeFrase = (frase: string) =>
+  pedir<{ sugerencia: Sugerencia; costo_usd: string }>("/intake/frase", { metodo: "POST", cuerpo: { frase } });
