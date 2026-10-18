@@ -17,6 +17,7 @@ from app.modulos.descubrimiento.dominio.errores import (
 from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, MetaFuente
 from app.modulos.descubrimiento.infraestructura.adaptadores.datos_gov_co_rues import (
     DatosGovCoRues,
+    _es_juridica_valida,
 )
 
 BACKEND = Path(__file__).resolve().parents[3]
@@ -256,13 +257,18 @@ def test_departamento_25_se_traduce_a_cuatro_camaras():
         {"ciiu": "471"},
         {"ciiu": "47111"},
         {"ciiu": ("4711", "4712")},  # tupla: varios valores no se soportan
+        {"departamento": None},  # departamento obligatorio (se quita la clave abajo)
     ],
 )
 def test_criterio_invalido_lanza_sin_requests(filtros):
     adaptador, capturadas = _adaptador()
 
+    criterios = _criterios(**filtros)
+    if criterios.filtros["departamento"] is None:
+        criterios = CriteriosICP(pais="CO", filtros={"ciiu": "4711"})
+
     with pytest.raises(CriterioNoSoportado):
-        adaptador.buscar(_criterios(**filtros), 1)
+        adaptador.buscar(criterios, 1)
 
     assert capturadas == []
 
@@ -345,6 +351,9 @@ def test_registra_segundos_de_cada_intento():
 
     filas = adaptador._costos.filas
     assert [f.unidades for f in filas] == [Decimal(2), Decimal(3)]
+    assert all(
+        type(f.unidades) is Decimal and type(f.costo_unitario) is Decimal for f in filas
+    )
     assert error is None
     assert len(_requests_de_filas(capturadas)) == 2
     for fila in filas:
@@ -367,7 +376,24 @@ def test_segundo_fallo_lanza_fuente_no_disponible(fallo):
 
     assert isinstance(error, FuenteNoDisponible)
     assert CUERPO_SECRETO not in str(error)
-    assert len(adaptador._costos.filas) == 2
+    assert [f.unidades for f in adaptador._costos.filas] == [Decimal(2), Decimal(3)]
     assert (
         len(capturadas) == 2
     )  # ninguna request de conteo (T021 suma el assert propio)
+
+
+ROJO_NIT = pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="rojo NIT [89]; fix en el commit siguiente",
+)
+
+
+@pytest.mark.parametrize(
+    ("nit", "valido"),
+    [("999000001", True), pytest.param("712345678", False, marks=ROJO_NIT)],
+)
+def test_nit_exige_prefijo_8_o_9(nit, valido):
+    fila = {**_cargar("filas.json")[0], "nit": nit}
+
+    assert _es_juridica_valida(fila) is valido
