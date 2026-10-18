@@ -84,8 +84,8 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`.
 - [ ] T016 [MIN] [Paso 4] **Guarda (advisor):** `::test_descartados_no_se_loguean`.
   - `caplog.set_level(DEBUG)` sobre el root, que incluye `httpx`. Ningún `record.getMessage()` ni `record.args` contiene el `nit` ni la `razon_social` de (a), (a') a (d).
   - **Mutación:** un `logger.debug(fila)` en el descarte → rojo. Se revierte.
-- [ ] T017 [MIN] [Paso 4] **Advisor:** revisa T013–T016 antes del verde. Sus hallazgos se aplican y se vuelve a pedir revisión hasta APRUEBA.
-- [ ] T018 [MIN] [Paso 4] **Verde:**
+- [X] T017 [MIN] [Paso 4] **Advisor:** revisa T013–T016 antes del verde. Sus hallazgos se aplican y se vuelve a pedir revisión hasta APRUEBA.
+- [X] T018 [MIN] [Paso 4] **Verde:**
   - armado del SoQL desde criterios ya validados;
   - `_es_juridica_valida(fila)` pura, que en (a) compara con `strip().upper()`;
   - mapeo mínimo para que las válidas salgan.

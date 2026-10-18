@@ -4,15 +4,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
-import pytest
 
 from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.descubrimiento.aplicacion.camaras import cargar_camaras
 from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, MetaFuente
-from app.modulos.descubrimiento.infraestructura.adaptadores.datos_gov_co_rues import DatosGovCoRues
-
-# Rojo de T013–T016 hasta el verde de T018: strict, así un XPASS rompe la suite y obliga a sacar la marca.
-pytestmark = pytest.mark.xfail(strict=True, raises=AssertionError, reason="rojo T013-T016; verde en T018")
+from app.modulos.descubrimiento.infraestructura.adaptadores.datos_gov_co_rues import (
+    DatosGovCoRues,
+)
 
 BACKEND = Path(__file__).resolve().parents[3]
 FIXTURES = BACKEND / "tests" / "fixtures" / "datos_gov_co"
