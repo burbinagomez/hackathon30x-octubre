@@ -43,4 +43,9 @@ class PostgresCostos:
             ).scalar_one()
 
     def gasto_busqueda(self, busqueda_id: UUID) -> Decimal:
-        return Decimal("-1")  # esqueleto T004
+        # A valor de lista, gratis incluido (el tier gratis se acaba en medio de una búsqueda). COALESCE: sin filas, 0 y no NULL.
+        with unidad_de_trabajo(self._engine, self._tenant_id) as c:
+            return c.execute(
+                text("SELECT COALESCE(sum(unidades * costo_unitario), 0) FROM costos WHERE lote_id = :lote"),
+                {"lote": busqueda_id},
+            ).scalar_one()
