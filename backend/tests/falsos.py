@@ -1,4 +1,5 @@
 """Falsos en memoria de los puertos. Mismo contrato que Postgres: dedup por (pais, id_fiscal), ON CONFLICT en lead_fuentes."""
+from collections.abc import Mapping
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -12,10 +13,19 @@ class RepositorioLeadsFalso:
         self.leads: dict[tuple[str, str | None], UUID] = {}  # (pais, id_fiscal) -> id
         self.cumplimiento: dict[UUID, tuple] = {}  # lead_id -> (fuente, licencia, url_origen, as_of)
         self.lead_fuentes: set[tuple[UUID, str, UUID]] = set()  # (lead_id, fuente, busqueda_id)
+        self.borradores: dict[UUID, tuple] = {}  # id -> (criterios, canal_preferido, tope_gasto_usd, mensaje_base)
 
     def crear_busqueda(self, criterios: CriteriosICP) -> UUID:
         busqueda_id = uuid4()
         self.busquedas[busqueda_id] = "creada"
+        return busqueda_id
+
+    def crear_borrador(self, criterios: CriteriosICP, canal_preferido: str | None, tope_gasto_usd: Decimal,
+                       mensaje_base: str | None) -> UUID:
+        """P2: mismo contrato que Postgres. Estado `borrador`, criterios congelados."""
+        busqueda_id = uuid4()
+        self.busquedas[busqueda_id] = "borrador"
+        self.borradores[busqueda_id] = (criterios, canal_preferido, tope_gasto_usd, mensaje_base)
         return busqueda_id
 
     def obtener_o_crear_lead(self, e: EmpresaCruda, licencia: str) -> tuple[UUID, bool]:
@@ -73,3 +83,22 @@ class FuenteFalsa:
             raise self._error
         del_pais = tuple(e for e in self._empresas if e.pais == criterios.pais)
         return PaginaEmpresas(empresas=del_pais if pagina == 1 else (), total=len(del_pais))
+
+
+class FabricaFalsa:
+    """FabricaFuentes de prueba: arma una FuenteFalsa por entrada con el lote_id que le pasan y anota cada llamada.
+    `metas` fija las fuentes y su orden; `empresas` y `errores` van por clave."""
+
+    def __init__(self, costos: RegistroCostosFalso, metas: Mapping[str, MetaFuente],
+                 empresas: Mapping[str, tuple[EmpresaCruda, ...]] | None = None,
+                 errores: Mapping[str, Exception] | None = None):
+        self.llamadas: list[UUID | None] = []  # lote_id de cada llamada
+        self._costos = costos
+        self._metas = metas
+        self._empresas = empresas or {}
+        self._errores = errores or {}
+
+    def __call__(self, lote_id: UUID) -> Mapping[str, FuenteFalsa]:
+        self.llamadas.append(lote_id)
+        return {clave: FuenteFalsa(meta, self._costos, lote_id, self._empresas.get(clave, ()), self._errores.get(clave))
+                for clave, meta in self._metas.items()}
