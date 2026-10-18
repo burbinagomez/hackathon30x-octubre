@@ -109,3 +109,16 @@ def test_argumentos_ilegibles_es_salida_invalida_con_costo_registrado():
     with pytest.raises(SalidaIntakeInvalida):
         _adaptador(costos, malo).generar(FRASE, uuid4())
     assert len(costos.filas) == 2
+
+
+def test_el_schema_lleva_el_catalogo_de_ciiu_como_enum_mas_null():
+    capturados = []
+    http = httpx.Client(base_url="https://openrouter.test/api/v1", transport=httpx.MockTransport(
+        lambda r: capturados.append(json.loads(r.content)) or _respuesta()))
+    a = InterpretadorOpenRouter(registro_costos=RegistroCostosFalso(), tarifa=TARIFA, modelo=MODELO, api_key=CLAVE,
+                                http_client=http, codigos_ciiu=["8521", "4752"])
+
+    a.generar(FRASE, uuid4())
+
+    ciiu = capturados[0]["tools"][0]["function"]["parameters"]["properties"]["ciiu"]
+    assert ciiu["enum"] == ["4752", "8521", None]

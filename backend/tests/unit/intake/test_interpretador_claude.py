@@ -161,3 +161,23 @@ def test_ni_la_frase_ni_la_respuesta_salen_en_logs(caplog):
         adaptador(RegistroCostosFalso(), [], respuesta(None, content=[{"type": "text", "text": "RESPUESTA-SECRETA-888"}])).generar(frase, uuid4())
 
     assert "SECRETO-777" not in caplog.text and "SECRETA-888" not in caplog.text
+
+
+def test_el_schema_lleva_el_catalogo_de_ciiu_como_enum_mas_null():
+    capturados = []
+    a = InterpretadorClaude(registro_costos=RegistroCostosFalso(), tarifa=TARIFA, modelo=MODELO, api_key=CLAVE_FALSA,
+                            http_client=cliente(capturados), codigos_ciiu=["8521", "4752"])
+
+    a.generar(FRASE, uuid4())
+
+    ciiu = capturados[0]["tools"][0]["input_schema"]["properties"]["ciiu"]
+    assert ciiu["enum"] == ["4752", "8521", None]
+    assert "pattern" not in ciiu
+
+
+def test_el_prompt_explica_que_hacer_si_la_actividad_no_esta_en_la_lista():
+    from app.modulos.intake.infraestructura.llm.interpretador_claude import PROMPT
+    texto = PROMPT.read_text(encoding="utf-8")
+
+    assert "no está en el catálogo todavía" in texto
+    assert "Listo, tocá Buscar o Vista previa" in texto
