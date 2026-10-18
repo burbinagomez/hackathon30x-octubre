@@ -87,6 +87,14 @@ test("nueva búsqueda: pantalla, campos con clase y botones con clase", () => {
   for (const b of screen.getAllByRole("button")) expect(b).toHaveClass("boton");
 });
 
+test("nueva búsqueda: el ancho de cada campo es una clase explícita, nunca la posición", () => {
+  expect(css()).not.toMatch(/nth-child/);
+  expect(regla(".campo-ancho")).toMatch(/grid-column:\s*1\s*\/\s*-1/);
+  // Espaciado parejo: el mismo token entre campos y entre bloques.
+  for (const sel of [".formulario-ancho", ".grupo"]) expect(regla(sel), sel).toMatch(/gap:\s*var\(--espacio\)/);
+  expect(regla(".acciones-fin")).toMatch(/justify-content:\s*flex-end/);
+});
+
 test("tablero sin datos (API caída) igual muestra título y un estado", async () => {
   server.use(http.get("*/tablero/fuentes", () => HttpResponse.error()));
   render(<Tablero />);

@@ -208,3 +208,23 @@ test("ya_me_compran_prellena_los_filtros_y_muestra_la_explicacion", async () => 
   expect(campo("Actividad")).toHaveValue("4631");
   await waitFor(() => expect(campo("Departamento")).toHaveValue("05"));
 });
+
+const ANCHOS: Record<string, string> = {
+  "País": "campo-mitad", "Actividad": "campo-mitad", "Departamento": "campo-mitad", "Ciudad (opcional)": "campo-mitad",
+  "Ingresos mínimos (USD)": "campo-mitad", "Canal preferido": "campo-mitad",
+  "Palabras clave (separadas por coma)": "campo-mitad", "Exclusiones (separadas por coma)": "campo-mitad",
+  "Tope de gasto (USD)": "campo-mitad", "Mensaje base": "campo-ancho",
+};
+const clases = () =>
+  Object.fromEntries(Object.keys(ANCHOS).map((e) => [e, campo(e).closest(".campo")?.className]));
+
+test("el_aviso_de_la_sugerencia_no_cambia_el_ancho_de_ningun_campo", async () => {
+  await montar();
+  await waitFor(() => expect(screen.queryByLabelText("Departamento")).toBeInTheDocument());
+  const antes = clases();
+  for (const [e, ancho] of Object.entries(ANCHOS)) expect(antes[e], e).toBe(`campo ${ancho}`);
+
+  await escribirYSugerir();
+  await waitFor(() => expect(screen.queryByRole("status")).toHaveTextContent(es.busqueda.frase.revisar));
+  expect(clases()).toEqual(antes);
+});
