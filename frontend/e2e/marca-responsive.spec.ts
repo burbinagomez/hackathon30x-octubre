@@ -62,6 +62,16 @@ for (const v of VIEWPORTS) {
         const enLima = colores.filter((c) => c.color === LIMA).map((c) => c.tag);
         expect.soft(enLima, "texto en lima").toEqual([]);
 
+        // Regla 4: objetivos táctiles de al menos 44 x 44 px (controles y links visibles).
+        const chicos = await page.evaluate(() =>
+          Array.from(document.querySelectorAll("button, input, select, textarea, a[href]"))
+            .filter((el) => el.checkVisibility())
+            .map((el) => ({ el, r: el.getBoundingClientRect() }))
+            .filter(({ r }) => r.width < 44 || r.height < 44)
+            .map(({ el, r }) => `${el.tagName} ${Math.round(r.width)}x${Math.round(r.height)}`),
+        );
+        expect.soft(chicos, "objetivos táctiles menores a 44x44").toEqual([]);
+
         // Canario, última aserción: prueba que la medición detecta un desborde. Después no se mide nada.
         const desborde = await page.evaluate(() => {
           const div = document.createElement("div");
