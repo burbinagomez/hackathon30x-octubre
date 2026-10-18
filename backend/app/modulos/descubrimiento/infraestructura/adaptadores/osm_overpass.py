@@ -6,8 +6,9 @@ from uuid import UUID
 
 import httpx
 
+from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.costos.dominio.puertos import RegistroCostos
-from app.modulos.descubrimiento.dominio.errores import CriterioNoSoportado
+from app.modulos.descubrimiento.dominio.errores import CriterioNoSoportado, FuenteNoDisponible
 from app.modulos.descubrimiento.dominio.modelos import (
     Actividad,
     CriteriosICP,
@@ -74,15 +75,43 @@ class OsmOverpass:
         sobrantes = set(criterios.filtros) - self.meta.filtros
         if sobrantes:
             raise CriterioNoSoportado(f"{self.meta.clave} no filtra por {sorted(sobrantes)}")
-        respuesta = self._http.post(self._url, data={"data": armar_query(criterios)})
-        cuerpo = respuesta.json()
-        as_of = datetime.fromisoformat(cuerpo["osm3s"]["timestamp_osm_base"])
-        empresas = tuple(
-            e
-            for el in cuerpo.get("elements", ())
-            if (e := self._mapear(el, criterios, as_of)) is not None
-        )
+        t0 = self._reloj()
+        try:
+            respuesta = self._http.post(self._url, data={"data": armar_query(criterios)})
+        finally:
+            # Por intento y antes de devolver o lanzar: solo los segundos del request.
+            self._registrar_segundos(self._reloj() - t0)
+
+        if respuesta.status_code != 200:
+            # Solo el código: el cuerpo puede traer cualquier cosa del servidor.
+            raise FuenteNoDisponible(f"osm_overpass http {respuesta.status_code}") from None
+        try:
+            cuerpo = respuesta.json()
+            as_of = datetime.fromisoformat(cuerpo["osm3s"]["timestamp_osm_base"])
+            empresas = tuple(
+                e
+                for el in cuerpo.get("elements", ())
+                if (e := self._mapear(el, criterios, as_of)) is not None
+            )
+        except (ValueError, KeyError, TypeError, AttributeError):
+            raise FuenteNoDisponible("osm_overpass respuesta ilegible") from None
         return PaginaEmpresas(empresas, None)
+
+    def _registrar_segundos(self, segundos: float) -> None:
+        self._costos.registrar(
+            OperacionCosto(
+                tipo="overpass_query",
+                unidades=Decimal(str(round(segundos, 3))),
+                costo_unitario=self._costo_unitario,
+                moneda="USD",
+                proveedor="osm",
+                fuente=self.meta.clave,
+                canal=None,
+                lead_id=None,
+                lote_id=self._lote_id,
+                gratis=False,  # el cómputo es nuestro aunque Overpass no cobre
+            )
+        )
 
     def _mapear(self, el: dict, criterios: CriteriosICP, as_of: datetime) -> EmpresaCruda | None:
         # En el [MIN] no se mapea contacto (teléfono, email, web): llega con T040p, cifrado.
