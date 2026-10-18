@@ -2,14 +2,14 @@
 
 **Branch**: `feature/012-seguridad` | **Date**: 2026-10-18 | **Spec**: [spec.md](./spec.md)
 
-> La spec es anterior a la decisión de Supabase Auth (005 plan:335, constitución 2.0.0). Este plan no la reescribe: marca qué partes quedan superadas ("Qué cambió desde la spec") y planifica lo que sigue valiendo, más cinco entradas nuevas que pidió el dueño (E1–E5). Lo que la spec no decide va a **Preguntas abiertas**, con un default propuesto que no se aplica hasta que lo apruebe el dueño.
+> La spec es anterior a la decisión de Supabase Auth (005 plan:335, constitución 2.0.0). Este plan no la reescribe: marca qué partes quedan superadas ("Qué cambió desde la spec") y planifica lo que sigue valiendo, más cinco entradas nuevas que pidió el dueño (E1–E5). Lo que la spec no decide va a **Preguntas abiertas**, con una propuesta que no se aplica hasta que la apruebe Daniel.
 >
 > Artefactos: como en la 002, la 005 y la 011, este slice entrega solo `plan.md` y `tasks.md`.
 
 ## Summary
 
 La 012 entrega:
-- **E1.** CSP y cabeceras de seguridad en `frontend/Caddyfile`, con `check_cabeceras.sh` y su test de que el check puede fallar;
+- **E1.** CSP y cabeceras de seguridad en `frontend/vercel.json` (el front se publica en Vercel, #39), con `cabeceras.test.ts` sobre ese archivo; el `Caddyfile` queda solo como alternativa;
 - **E2.** las fuentes de Google fuera de `index.html` (o permitidas en la CSP, P1), con un test que lo fija;
 - **E3.** la sesión de supabase-js fuera de `localStorage` (o la decisión escrita de dejarla, P2);
 - **E4.** `PATCH /usuarios/me` con la función `fijar_idioma` (`SECURITY DEFINER`), DDL **pendiente de aprobación de Daniel**;
@@ -20,8 +20,8 @@ La 012 entrega:
 
 - **Back:** Python 3.12, FastAPI, SQLAlchemy Core, Postgres con RLS; rol de runtime `app_rt` sin `BYPASSRLS`. Migraciones con Supabase CLI en `supabase/migrations/`.
 - **Auth:** Supabase Auth. El front loguea con supabase-js; la api verifica el JWT por JWKS (ES256/RS256, `aud=authenticated`, `iss=AUTH_ISSUER`) y saca el tenant de `tenant_de_usuario(sub)`, nunca del token.
-- **Front:** React, Vite, Vitest, Playwright. Servido por Caddy (`frontend/Caddyfile`, `admin off`, `:{$PORT:8080}`).
-- **Tests:** `scripts/test-backend.sh [ruta]`, `scripts/test-frontend.sh`. Scripts de CI con su `test_*.sh` en `.github/scripts/`, como `check_imagen.sh`.
+- **Front:** React, Vite, Vitest, Playwright. Sitio estático en Vercel (`www.profitdata.tech`), con `frontend/vercel.json` (hoy solo el rewrite a `/index.html`) y las tres `VITE_*` cargadas en Vercel (`docs/decisiones.md:18`). `frontend/Dockerfile` y `Caddyfile` quedan como alternativa en Railway.
+- **Tests:** `scripts/test-backend.sh [ruta]`, `scripts/test-frontend.sh`. Tests de arquitectura del front en `frontend/tests/arquitectura/` (`i18n`, `limites`, `sin_secretos`).
 
 ## Constitution Check
 
@@ -34,13 +34,13 @@ La 012 entrega:
 
 | Id | Qué | ¿En `main`? | Para qué |
 |----|-----|-------------|----------|
-| D1 | 005 back: `usuarios`, `tenant_de_usuario`, `ALTER DEFAULT PRIVILEGES … REVOKE EXECUTE` (migración 0006), verificador JWKS | **Sí** (5edee68) | E4 copia el patrón de `tenant_de_usuario`; los tests usan sus fixtures (`test_usuarios_repo.py`). |
+| D1 | 005 back: `usuarios`, `tenant_de_usuario`, `ALTER DEFAULT PRIVILEGES … REVOKE EXECUTE` (migración 0006), verificador JWKS | **Sí** (550928d, #40) | E4 copia el patrón de `tenant_de_usuario`; los tests usan sus fixtures (`test_usuarios_repo.py`). |
 | D2 | 012 config del repo: CodeQL default setup, `required-checks.txt`, gitleaks, `revision_seguridad.sh`, `veredicto_security.sh`, `verificar_proteccion.sh`, `test_required_checks.py` | **Sí** (PR #23, 31b9ce2) | Paso 2 de la spec: hecho. Queda solo el pendiente humano de `ANTHROPIC_API_KEY`. |
-| D3 | 005 back: `GET /usuarios/me` (idiomas del usuario y del tenant) | **No** (`rg "usuarios/me" backend` vacío; los routers de `main` son `auth`, `busquedas`, `tablero`, `actividades`) | `test_fijar_idioma_persiste` lee con el GET. Sin D3, E4 trae su propio GET mínimo o espera (T001). |
+| D3 | 005 back: `GET /usuarios/me` (idiomas del usuario y del tenant), `sesion_actual` | **Sí** (#40, 373c829: `backend/app/api/usuarios.py`, tests en `test_auth.py`). No hay `PATCH`. | `test_fijar_idioma_persiste` lee con el GET; E4 suma el `PATCH` en el mismo router. |
 | D4 | 005 front: `SelectorIdioma.tsx` manda `PATCH /usuarios/me {idioma}`, `sesion.ts`, `supabase.ts` | **Sí** (el front ya llama una ruta que no existe y traga el error con `.catch`) | E3 y E4. |
-| D5 | 006 enriquecedor: su plan y su migración | **No** (sin plan ni migración en `main`) | Número de migración de E4: la 006 puede tomar 0007 primero (T001). |
+| D5 | 006 enriquecedor: su plan y su migración | **No** (en `main` solo `spec.md`; migraciones 0001–0003, 0005, 0006) | E4 queda fijada en **0007**; la 006 toma la siguiente libre (P4). |
 | D6 | 007 (`RUTAS_PUBLICAS`, `/baja/{token}`), 008 (`/calificaciones/importar`), 009 (`/webhooks/whatsapp`) | **No** (`rg` sin rutas en `backend/app`) | Límites por tenant y casos de PII de esas rutas: entran solo las que estén en `main` al arrancar la fase. |
-| D7 | 001: `check_imagen.sh` y su test, `frontend/Dockerfile` | **Sí** | Patrón de `check_cabeceras.sh`. |
+| D7 | Deploy del front en Vercel: `frontend/vercel.json` con el rewrite | **Sí** (#39, eba6e33) | E1 suma `headers` al mismo archivo, sin tocar el rewrite. |
 
 ## Qué cambió desde la spec (Supabase Auth)
 
@@ -52,55 +52,62 @@ La spec diseña una sesión propia. Con Supabase Auth esas partes no se construy
 | `test_refresco.py` entero y los tests de sesión de `test_auth.py` (cookie, `/auth/refrescar`, `/auth/salir`, `Origin`, `sesiones_refresco`, `SESSION_SECRET_ANTERIOR`) | **Superado** | No hay `/auth/sesion` propio: lo fija `test_sin_login_propio.py` (005). |
 | Rate limit de `/auth/sesion`, semáforo de scrypt, 429 igual exista o no el email | **Superado → E5** | No hay scrypt ni login en la api. Riesgo aceptado (005 plan:357). |
 | `cliente.test.ts`: access en memoria, single-flight del refresh, 409 en curso, restaurar al cargar | **Superado → E3** | El refresh lo hace supabase-js. Lo que queda es dónde guarda la sesión. |
-| Proxy same-origin (`/api/*` por la red privada de Railway) | **Sigue, sin urgencia** | Se justificaba por la cookie `SameSite=Strict`. Sin cookie, el proxy solo achica la CSP (`connect-src 'self'` para la api). Fuera del [MIN]: P5. |
-| `test_dockerfile_web_no_recibe_args` | **Choca** | `frontend/Dockerfile` necesita `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` (públicas por diseño, 005 plan:359). El test pasa a "solo estos tres ARG" o "solo los dos de Supabase" si entra el proxy. |
-| CSP de la spec con `connect-src 'self'` | **Cambia (E1)** | Bloquearía las llamadas de supabase-js a `VITE_SUPABASE_URL`. Suma ese origen, y el de la api mientras no haya proxy. |
-| Revisión `security` 002–008, PII transversal, límites por tenant, pantalla de cumplimiento, `check_cabeceras.sh` | **Sigue** | No dependen de cómo se loguea. |
+| Proxy same-origin (`/api/*` por la red privada de Railway) | **Sigue, sin urgencia** | Se justificaba por la cookie `SameSite=Strict`. Sin cookie, el proxy solo achica la CSP (`connect-src 'self'` para la api). Con el front en Vercel sería un rewrite de `vercel.json`, no Caddy. Fuera del [MIN]: P5. |
+| `test_dockerfile_web_no_recibe_args` (spec:128, :279) | **Superado** | Ya no existe. El vigente es `test_dockerfile_web_solo_recibe_variables_publicas` (`backend/tests/arquitectura/test_secrets.py:87`), que permite exactamente `VITE_API_URL`, `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` (públicas por diseño, 005 plan:359). La 012 no lo toca. Con el front en Vercel, el `Dockerfile` es solo la alternativa; si entra el proxy (P5), `VITE_API_URL` sigue igual y apunta al mismo origen. |
+| CSP de la spec con `connect-src 'self'` | **Cambia (E1)** | Bloquearía las llamadas de supabase-js a `VITE_SUPABASE_URL` y las de la api en Railway. `connect-src` suma el origen de Supabase y el de la api. |
+| `check_cabeceras.sh` sobre la imagen `web` | **Cambia (E1)** | El front productivo no es la imagen: el test pasa a `cabeceras.test.ts` sobre `vercel.json`. |
+| Revisión `security` 002–008, PII transversal, límites por tenant, pantalla de cumplimiento | **Sigue** | No dependen de cómo se loguea. |
 
-Si el dueño quiere la spec enmendada, va en un PR aparte (P6).
+La enmienda de la spec, si Daniel aprueba P6, va en un PR aparte y marca lo reemplazado sin borrarlo.
 
 ## Diseño por entrada
 
-### E1 — CSP y cabeceras en `frontend/Caddyfile`
+### E1 — CSP y cabeceras en `frontend/vercel.json`
 
-Hoy el Caddyfile no pone ninguna cabecera. Se suma, dentro del bloque del sitio:
+El front se publica en Vercel (#39, `docs/decisiones.md:18`). Hoy `frontend/vercel.json` solo tiene el rewrite y no pone ninguna cabecera. Se suma un bloque `headers`, sin tocar el rewrite:
 
-```
-header {
-	Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' {$SUPABASE_ORIGEN} {$API_ORIGEN}; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
-	Strict-Transport-Security "max-age=31536000; includeSubDomains"
-	X-Content-Type-Options "nosniff"
-	Referrer-Policy "no-referrer"
-	Permissions-Policy "camera=(), microphone=(), geolocation=()"
-	Cross-Origin-Opener-Policy "same-origin"
-	-Server
+```json
+{
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://<ref>.supabase.co https://<api-railway>; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" },
+        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "no-referrer" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" }
+      ]
+    }
+  ]
 }
-request_body {
-	max_size 1MB
-}
 ```
 
-- `SUPABASE_ORIGEN` y `API_ORIGEN` son variables de entorno de `web` en tiempo de arranque (Caddy las lee con `{$VAR}`), no del bundle. Son orígenes, sin path.
+- `vercel.json` es estático: no lee variables de entorno. Los dos orígenes de `connect-src` van **literales**: el de `VITE_SUPABASE_URL` (`https://<ref>.supabase.co`) y el de `VITE_API_URL` (la api en Railway). Son orígenes públicos, sin path; los dicta Daniel desde las variables de Vercel (T017). Si cambia uno, cambia `vercel.json` en el mismo PR.
 - `style-src` y `font-src` quedan en `'self'` solo si E2 se resuelve con self-host (P1).
-- `/health` también lleva las cabeceras: el bloque `header` va fuera de los `handle`.
+- Lo que Vercel no hace como Caddy: sacar `Server` (Vercel manda `Server: Vercel`) y cortar el body con 413. El front es estático y no recibe POST; el límite de body y el `Cache-Control: no-store` de las respuestas de la api son de la api en Railway, no de esta entrada.
+- **Caddyfile, solo alternativa:** si `web` vuelve a Railway, el mismo juego de cabeceras va en un bloque `header { … -Server }` con `request_body { max_size 1MB }` y los orígenes por `{$SUPABASE_ORIGEN} {$API_ORIGEN}`. No entra en el [MIN] ni lleva test mientras Vercel sea el deploy.
 
-**Test propuesto** (`.github/scripts/check_cabeceras.sh` + `.github/scripts/test_check_cabeceras.sh`, patrón de `check_imagen.sh`):
-- el script levanta la imagen `web` con `SUPABASE_ORIGEN=https://proyecto.supabase.co` y `API_ORIGEN=https://api.ejemplo.invalid`, y en `/` y en `/ruta-spa` verifica la CSP **exacta**, HSTS, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy`, COOP y que **no** venga `Server`;
-- un POST de 2 MB da 413;
-- `test_check_cabeceras.sh` corre el script contra un Caddyfile sin la línea de CSP y espera salida ≠ 0, y contra uno con `connect-src 'self'` sin el origen de Supabase y espera ≠ 0. Un check que no puede fallar no prueba nada.
-- **Rojo:** hoy el script falla en el primer assert (no hay CSP).
-- **E2E** (`frontend/e2e/seguridad.spec.ts::navegar_no_viola_la_csp`): login → tablero → Nueva búsqueda con 0 eventos `securitypolicyviolation`. Corre contra el deploy en `e2e.yml`, apenas la CSP está arriba.
+**Test propuesto** (`frontend/tests/arquitectura/cabeceras.test.ts`, junto a `sin_secretos.test.ts`):
+- parsea `frontend/vercel.json`; para `source: "/(.*)"` exige la CSP **exacta** (comparada directiva por directiva), HSTS, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy` y COOP;
+- `connect-src` trae `'self'`, un origen que matchea `^https://[a-z0-9]+\.supabase\.co$` y el origen de la api; si `VITE_SUPABASE_URL` o `VITE_API_URL` están seteadas en el entorno del test, sus orígenes tienen que estar (el E2E contra el deploy cubre el desfasaje con lo que carga Vercel);
+- el rewrite a `/index.html` sigue presente (no se pisa el arreglo de #39).
+- **Rojo:** hoy `vercel.json` no tiene `headers` → falla en el primer assert.
+- **Mutaciones:** sacar `frame-ancestors 'none'` → rojo; sacar el origen de Supabase de `connect-src` → rojo.
+- **E2E** (`frontend/e2e/seguridad.spec.ts::navegar_no_viola_la_csp`): login → tablero → Nueva búsqueda con 0 eventos `securitypolicyviolation`, y la respuesta de `/` trae la CSP. Corre contra el deploy de Vercel en `e2e.yml`, apenas la CSP está arriba.
 
 ### E2 — Google Fonts sin CSP en `index.html`
 
 `frontend/index.html` hace `preconnect` a `fonts.googleapis.com` y `fonts.gstatic.com` y carga el CSS de DM Sans y Poppins desde Google. Con la CSP de E1, `style-src 'self'` y `font-src 'self'` lo bloquean: la página carga con la fuente del sistema y el E2E de CSP da rojo.
 
 Dos caminos (fork real, P1):
-- **Self-host (default propuesto):** los `.woff2` en `frontend/public/fuentes/` con su `@font-face` en el CSS del proyecto. La CSP no cambia, no hay request a Google (sin IP del usuario a un tercero) y no hay dependencia de red externa en la demo. Costo: bajar los archivos una vez y revisar la licencia (OFL, permite redistribuir).
+- **Self-host (propuesta, pendiente de Daniel):** los `.woff2` en `frontend/public/fuentes/` con su `@font-face` en el CSS del proyecto. La CSP no cambia, no hay request a Google (sin IP del usuario a un tercero) y no hay dependencia de red externa en la demo. Costo: bajar los archivos una vez y revisar la licencia (OFL, permite redistribuir).
 - **Permitir Google:** `style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com`. Cero archivos nuevos, pero la CSP se abre a un tercero y cada visita le avisa a Google.
 
 **Test propuesto:**
-- `frontend/src/test/index_html.test.ts::no_carga_recursos_de_terceros`: lee `index.html` y falla si aparece cualquier `href` o `src` con `https://` (con self-host), o si aparece un origen que no está en la CSP del Caddyfile (si se permite Google). **Rojo:** hoy encuentra `fonts.googleapis.com`.
+- `frontend/src/test/index_html.test.ts::no_carga_recursos_de_terceros`: lee `index.html` y falla si aparece cualquier `href` o `src` con `https://` (con self-host), o si aparece un origen que no está en la CSP de `vercel.json` (si se permite Google). **Rojo:** hoy encuentra `fonts.googleapis.com`.
 - El E2E `navegar_no_viola_la_csp` de E1 lo cubre en el navegador real.
 - **Mutación:** volver a pegar el `<link>` de Google → rojo.
 
@@ -108,7 +115,7 @@ Dos caminos (fork real, P1):
 
 `frontend/src/api/supabase.ts` llama `createClient(url, key)` sin `auth.storage`: supabase-js guarda access y refresh en `localStorage` (`sb-<ref>-auth-token`). Persiste al cerrar el navegador y lo comparten todas las pestañas.
 
-- **`sessionStorage` (default propuesto):** `createClient(url, key, { auth: { storage: sessionStorage } })`. La sesión muere al cerrar la pestaña y no se comparte entre pestañas.
+- **`sessionStorage` (propuesta, pendiente de Daniel):** `createClient(url, key, { auth: { storage: sessionStorage } })`. La sesión muere al cerrar la pestaña y no se comparte entre pestañas.
 - **Lo que no cambia:** ante un XSS, `sessionStorage` está tan expuesto como `localStorage`. La mitigación real del robo de token es la CSP de E1; E3 achica la ventana (sesiones olvidadas en una máquina compartida), no el vector.
 - **Costo de UX (P2):** abrir un link en otra pestaña pide login de nuevo. Para la demo, una sola pestaña.
 
@@ -120,13 +127,13 @@ Dos caminos (fork real, P1):
 
 ### E4 — `PATCH /usuarios/me` con `fijar_idioma` (SECURITY DEFINER)
 
-El front ya manda `PATCH /usuarios/me {idioma}` (`SelectorIdioma.tsx:16`) y la api no tiene la ruta: hoy da 404 y el `.catch` lo traga. `app_rt` no tiene privilegios sobre `usuarios` (0006), así que el UPDATE va por función `SECURITY DEFINER`, con el mismo patrón que `tenant_de_usuario`.
+El front ya manda `PATCH /usuarios/me {idioma}` (`SelectorIdioma.tsx:16`) y la api solo tiene el `GET` (#40): hoy el `PATCH` da 405 y el `.catch` lo traga. `app_rt` no tiene privilegios sobre `usuarios` (0006), así que el UPDATE va por función `SECURITY DEFINER`, con el mismo patrón que `tenant_de_usuario`.
 
 **Ruta:** `PATCH /usuarios/me`, autenticada. Body `IdiomaUsuario(BaseModel, extra="forbid")` con `idioma: Literal["es", "en"]`. El `auth_user_id` sale del `sub` verificado, nunca del body. Llama `fijar_idioma(sub, idioma)` dentro de la transacción con `app.tenant_id` ya seteado. Responde **204**. Si la función cambió 0 filas, 404 (el usuario no es de este tenant).
 
 **DDL — PENDIENTE DE APROBACIÓN DE DANIEL**
 
-Archivo propuesto: `supabase/migrations/0007_fijar_idioma.sql`. El número se confirma en T001 contra la 006 (D5). **No se crea el archivo hasta la aprobación.**
+Archivo propuesto: `supabase/migrations/0007_fijar_idioma.sql`. Número **fijado en 0007** (en `main` la última es 0006; la 006 toma la siguiente, P4). **No se crea el archivo hasta la aprobación.**
 
 ```sql
 -- 0007 — fijar_idioma: el usuario cambia su idioma sin que app_rt toque usuarios.
@@ -157,7 +164,7 @@ GRANT EXECUTE ON FUNCTION public.fijar_idioma(uuid, text) TO app_rt;
 - No toca la RLS de `usuarios`: como `SECURITY DEFINER` corre como `postgres`, que es dueño y la tabla no tiene `FORCE`, la RLS no aplica y el filtro de tenant es el `AND` explícito. Por eso el test de no cruzar tenants lleva mutación.
 
 **Tests** (pedidos por `security`, revisados por él antes de aceptarlos):
-- `backend/tests/integration/test_api_usuarios.py::test_fijar_idioma_persiste`: usuario de tenant A con `idioma='es'`; `PATCH /usuarios/me {idioma:'en'}` da 204, y el `GET /usuarios/me` siguiente (o un SELECT como `postgres` si D3 no está) trae `'en'`. **Rojo:** hoy la ruta da 404.
+- `backend/tests/integration/test_api_usuarios.py::test_fijar_idioma_persiste`: usuario de tenant A con `idioma='es'`; `PATCH /usuarios/me {idioma:'en'}` da 204, y el `GET /usuarios/me` siguiente (D3, ya en `main`) trae `idioma_usuario: 'en'`. **Rojo:** hoy el `PATCH` da 405.
 - `::test_fijar_idioma_invalido_da_422[caso]`, con los casos:
   - `pt`, `''`, `EN` (no hay normalización);
   - **mass assignment:** `{idioma:'en', usuario_id:<otro>}`, `{idioma:'en', tenant_id:<B>}`, `{idioma:'en', auth_user_id:<otro>}`;
@@ -186,21 +193,21 @@ La decisión de si el riesgo sigue aceptado es del dueño (P3).
 ## Validación (quickstart)
 
 1. `scripts/test-backend.sh backend/tests/integration/test_api_usuarios.py backend/tests/integration/test_usuarios_repo.py`.
-2. `.github/scripts/test_check_cabeceras.sh` y `.github/scripts/check_cabeceras.sh`.
-3. `scripts/test-frontend.sh` (incluye `supabase.test.ts` e `index_html.test.ts`).
+2. `scripts/test-frontend.sh` (incluye `cabeceras.test.ts`, `supabase.test.ts` e `index_html.test.ts`).
+3. `curl -sI https://www.profitdata.tech/ | grep -i content-security-policy` después del deploy de Vercel.
 4. `e2e.yml` contra el deploy: `seguridad.spec.ts`.
 
 ## Project Structure
 
 ```
-frontend/Caddyfile                                   E1 (header, request_body)
+frontend/vercel.json                                 E1 (headers)
+frontend/tests/arquitectura/cabeceras.test.ts        E1
 frontend/index.html                                  E2 (sin Google)
 frontend/public/fuentes/*.woff2                      E2 (si P1 = self-host)
 frontend/src/estilos/fuentes.css                     E2 (si P1 = self-host)
 frontend/src/test/index_html.test.ts                 E2
 frontend/src/api/supabase.ts / supabase.test.ts      E3
 frontend/e2e/seguridad.spec.ts                       E1, E3
-.github/scripts/check_cabeceras.sh / test_…sh        E1
 supabase/migrations/0007_fijar_idioma.sql            E4 (tras la aprobación)
 backend/app/api/usuarios.py                          E4
 backend/tests/integration/test_api_usuarios.py       E4
@@ -212,15 +219,17 @@ docs/seguridad/revision-002-008.md                   revisión + E5
 
 ## Preguntas abiertas
 
-Sin decidir. El default propuesto no se aplica hasta que lo apruebe el dueño.
+Sin decidir. La columna "Propuesta" es **propuesta pendiente de Daniel**: no se aplica hasta que la apruebe.
 
-- **P1 — Fuentes (E2):** ¿self-host de DM Sans y Poppins o permitir `fonts.googleapis.com` y `fonts.gstatic.com` en la CSP? Default propuesto: self-host.
-- **P2 — Sesión (E3):** ¿`sessionStorage` (cerrar la pestaña cierra la sesión, no se comparte entre pestañas) o seguir con `localStorage`? Default propuesto: `sessionStorage`.
-- **P3 — Login (E5):** ¿el rate limit de Supabase Auth alcanza y el riesgo sigue aceptado? ¿Hace falta el check manual por Management API? Default propuesto: sigue aceptado, sin check.
-- **P4 — Número de migración (E4):** 0007 si la 006 no lo toma antes. ¿Quién numera primero? Default propuesto: el primero que mergea a `main`; el otro renumera.
-- **P5 — Proxy same-origin:** sin cookie de refresh, ¿sigue valiendo el trabajo de Railway (red privada, sacar el dominio público de la api)? Default propuesto: fuera del [MIN], `API_ORIGEN` en la CSP mientras tanto.
-- **P6 — Spec:** ¿se enmienda `spec.md` para Supabase Auth en un PR aparte, o alcanza con la tabla "Qué cambió desde la spec"? Default propuesto: la tabla.
-- **P7 — Orden de corte:** la spec corta cumplimiento → E2E de sesión → `SESSION_SECRET_ANTERIOR` → límites de intake/importar. Los dos del medio ya no existen. ¿Nuevo orden: cumplimiento → límites por tenant → proxy (P5)? Default propuesto: ese.
+| Id | Pregunta | Propuesta (pendiente de Daniel) |
+|----|----------|---------------------------------|
+| P1 | Fuentes (E2): ¿self-host de DM Sans y Poppins o permitir `fonts.googleapis.com` y `fonts.gstatic.com` en la CSP? | Servir las fuentes desde el propio sitio, sin Google. |
+| P2 | Sesión (E3): ¿`sessionStorage` (cerrar la pestaña cierra la sesión, no se comparte entre pestañas) o seguir con `localStorage`? | Sí, la sesión va a `sessionStorage`. |
+| P3 | Login (E5): ¿el rate limit de Supabase Auth alcanza y el riesgo sigue aceptado? ¿Hace falta el check manual por Management API? | Sigue aceptado; Daniel copia los límites del panel a `docs/seguridad/revision-002-008.md`, sin check por Management API. |
+| P4 | Número de migración (E4): ¿quién numera primero, la 012 o la 006? | 0007 queda reservada para `fijar_idioma`; la 006 toma la siguiente libre (0008) y renumera si choca. |
+| P5 | Proxy same-origin: sin cookie de refresh, ¿vale la pena? | Fuera del [MIN]. Si se hace, rewrite de `vercel.json` `/api/(.*)` → api en Railway, no Caddy. |
+| P6 | Spec: ¿se enmienda `spec.md` para Supabase Auth y Vercel, o alcanza con la tabla "Qué cambió desde la spec"? | Sí, enmendar la spec marcando lo reemplazado, sin borrarlo. |
+| P7 | Orden de corte: la spec corta cumplimiento → E2E de sesión → `SESSION_SECRET_ANTERIOR` → límites de intake/importar; los dos del medio ya no existen. | Cumplimiento → límites por tenant → proxy (P5). |
 
 ## Complexity Tracking
 
