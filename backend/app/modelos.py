@@ -51,6 +51,10 @@ busquedas = Table(
     Column("mensaje_base", Text),
     Column("descripcion_icp", Text),
     Column("creado_en", DateTime(timezone=True), nullable=False, server_default=_AHORA),
+    # La vista previa las escribe (0011); el borrador nace sin ellas.
+    Column("costo_estimado_usd", Numeric),
+    Column("costo_maximo_usd", Numeric),
+    Column("ejecutada_en", DateTime(timezone=True)),
     UniqueConstraint("tenant_id", "id", name="busquedas_tenant_id_id_key"),
 )
 
@@ -102,6 +106,8 @@ lead_fuentes = Table(
     UniqueConstraint("lead_id", "fuente", "busqueda_id", name="lead_fuentes_lead_fuente_busqueda_key"),
     ForeignKeyConstraint(["tenant_id", "lead_id"], ["leads.tenant_id", "leads.id"]),
     ForeignKeyConstraint(["tenant_id", "busqueda_id"], ["busquedas.tenant_id", "busquedas.id"]),
+    # Las fuentes de un lead y el ICP por búsqueda (0011).
+    Index("lead_fuentes_busqueda_fuente_idx", "busqueda_id", "fuente"),
 )
 
 contactos = Table(
@@ -152,6 +158,8 @@ costos = Table(
     Column("gratis", Boolean, nullable=False),
     Column("ts", DateTime(timezone=True), nullable=False, server_default=_AHORA),
     Index("costos_tenant_proveedor_ts_idx", "tenant_id", "proveedor", "ts"),
+    # El libro por lote (0011): el costo de una búsqueda.
+    Index("costos_tenant_lote_idx", "tenant_id", "lote_id"),
 )
 
 calificaciones = Table(
