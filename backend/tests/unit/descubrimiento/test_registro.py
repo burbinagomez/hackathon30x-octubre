@@ -111,3 +111,13 @@ def test_datos_gov_co_rues_del_yaml_real_se_carga():
     assert entrada["dataset"] == "c82u-588k"
     assert entrada["filtros"] == ["ciiu", "departamento"]
     assert entrada["licencia"] == "CC-BY-SA-4.0"
+
+
+def test_las_fuentes_gratuitas_van_antes_que_croma():
+    """PRD §2: OSM y datos.gov.co son las fuentes de la verdad; Croma es la tercera. La búsqueda llama en el orden
+    del registro y saltea por tope a las últimas: las gratuitas no pueden quedar detrás de Croma."""
+    orden = list(cargar_registro(FUENTES_YAML, catalogo).fuentes)
+    gratuitas = [orden.index(c) for c in ("osm_overpass", "datos_gov_co_rues")]
+    croma = [i for i, c in enumerate(orden) if c.startswith("croma_")]
+
+    assert max(gratuitas) < min(croma), orden
