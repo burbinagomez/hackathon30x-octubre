@@ -84,3 +84,20 @@ def test_los_codigos_que_el_dataset_trae_sin_cero_a_la_izquierda_se_completan():
     datos = _cargar(geografia_co.construir([{"cod_dpto": "5", "cod_mpio": "5001", "nom_mpio": "MEDELLÍN"}], "2026-10-18", "x"))
     antioquia = next(d for d in datos["divisiones"] if d["codigo_nativo"] == "05")
     assert antioquia["municipios"] == [{"codigo_nativo": "05001", "nombre": "Medellín"}]
+
+
+def _lineas_de_codigos(texto):
+    return [l.strip() for l in texto.splitlines() if re.match(r"\s*(- )?(codigo_nativo|iso_3166_2):", l)]
+
+
+def test_los_codigos_salen_siempre_entre_comillas_incluidos_08_y_09():
+    # PyYAML deja "08" sin comillas (no es octal) y un parser YAML 1.2 lo leería como número: se fuerzan siempre.
+    texto = geografia_co.construir([{"cod_dpto": "08", "cod_mpio": "08001", "nom_mpio": "BARRANQUILLA"}], "2026-10-18", "x")
+    lineas = _lineas_de_codigos(texto)
+    assert lineas and all(re.fullmatch(r"(- )?(codigo_nativo|iso_3166_2): ['\"][^'\"]+['\"]", l) for l in lineas), lineas
+
+
+def test_el_co_yaml_versionado_tiene_todos_los_codigos_entre_comillas():
+    lineas = _lineas_de_codigos((BACKEND / "config" / "geografia" / "co.yaml").read_text())
+    sin_comillas = [l for l in lineas if not re.fullmatch(r"(- )?(codigo_nativo|iso_3166_2): ['\"][^'\"]+['\"]", l)]
+    assert lineas and sin_comillas == []

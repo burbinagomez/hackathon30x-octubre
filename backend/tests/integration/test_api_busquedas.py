@@ -307,7 +307,6 @@ def test_flujo_completo_deja_leads_costos_y_cumplimiento_del_tenant(api, admin, 
     assert cuerpo["busqueda_id"] == busqueda_id
     assert cuerpo["estado"] == "completada"
     assert cuerpo["errores"] == [] and cuerpo["sin_fuente_para"] is None
-    assert cuerpo["errores"] == [] and cuerpo["sin_fuente_para"] is None
 
     # Cuentas exactas, derivadas del fixture: OSM trae N elementos con nombre y datos.gov.co, sus filas jurídicas.
     esperados_osm = sum(1 for e in OSM["elements"] if e.get("tags", {}).get("name"))
@@ -507,3 +506,7 @@ def test_tolima_con_el_yaml_real_de_camaras_no_tumba_la_busqueda_porque_no_hay_c
     assert cuerpo["estado"] == "completada"  # OSM sí corrió, con la ciudad
     assert cuerpo["errores"] == [{"fuente": "datos_gov_co_rues", "motivo": "criterio_no_soportado"}]
     assert not [q for q in api.pedidas if q.url.host == "www.datos.gov.co"]  # falló antes de cualquier request
+    # En el libro del lote: ni una fila de datos.gov.co (no hubo request) y exactamente una de OSM.
+    with admin.connect() as c:
+        filas = c.execute(text("SELECT proveedor FROM costos WHERE lote_id = :l"), {"l": busqueda_id}).all()
+    assert [f.proveedor for f in filas] == ["osm"]

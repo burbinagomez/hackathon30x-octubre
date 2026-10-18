@@ -354,3 +354,22 @@ test("los_nombres_de_division_salen_en_el_idioma_activo", async () => {
   expect(campo(en.busqueda.ciudad)).toBeInTheDocument();
   expect(campo("Department")).toBeInTheDocument();
 });
+
+test("la_ciudad_queda_deshabilitada_si_la_division_no_tiene_municipios", async () => {
+  await montarGeografia();
+
+  fireEvent.change(campo("Departamento"), { target: { value: "88" } });  // San Andrés: el archivo aún no trae municipios
+
+  expect(campo(es.busqueda.ciudad)).toBeDisabled();
+  fireEvent.change(campo("Departamento"), { target: { value: "73" } });
+  expect(campo(es.busqueda.ciudad)).toBeEnabled();  // y con municipios, sí
+});
+
+test.each([["es", "Se guarda; todavía no se aplica"], ["en", "Saved; not enforced yet"]])(
+  "el_tope_avisa_que_se_guarda_pero_todavia_no_se_aplica[%s]",
+  async (idioma, aviso) => {
+    await i18n.changeLanguage(idioma);
+    await montarGeografia();
+    expect(screen.queryByText(aviso, { exact: false })).toBeInTheDocument();
+  },
+);

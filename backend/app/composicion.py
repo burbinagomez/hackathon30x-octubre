@@ -76,3 +76,7 @@ def fabrica_de_fuentes(registro: Registro, **comunes) -> FabricaFuentes:
     """FabricaFuentes para la API: `lote_id` -> todas las fuentes del registro, atadas a ese lote."""
     armadores = {clave: armador_de_fuente(clase, meta, **comunes) for clave, (clase, meta) in registro.fuentes.items()}
     return lambda lote_id: {clave: armar(lote_id) for clave, armar in armadores.items()}
+
+
+def cargar_geografia(carpeta: Path) -> dict[str, dict]:
+    return {}  # esqueleto
