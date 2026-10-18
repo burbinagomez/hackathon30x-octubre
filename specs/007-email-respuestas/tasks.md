@@ -14,7 +14,7 @@
 - [x] T001 [Paso 0] Daniel aprobó el DDL con condiciones: número = siguiente libre en `main` al mergear; grants/revokes también en las vistas; P1 con `--dry-run` previo, tope 20, elegibilidad y `EMAIL_MODO=prueba`.
 - [x] T002 [P] [Paso 0] Esqueletos de `app/modulos/contacto/{dominio,aplicacion,infraestructura}` con firmas y `raise NotImplementedError`; `app.modulos.contacto` en `containers` de import-linter y contrato `contacto.dominio` ↛ `smtplib`, `cryptography`.
 - [x] T003 [P] [Paso 0] `Settings`: `smtp_host`, `smtp_port`, `smtp_usuario`, `smtp_clave: SecretStr`, `smtp_seguridad` (`ssl|starttls|ninguna`), `remitente`, `baja_secret: SecretStr`, `api_base_url`, `email_modo` (`prueba` por defecto | `real`), `email_prueba_destinos: list[str]`. `::test_email_modo_por_defecto_es_prueba`. Mutación `sabotaje_modo_real_por_defecto`. (security)
-- [ ] T004 [P] [Paso 0] `tests/smtp_falso.py`: `socketserver` con EHLO, AUTH PLAIN, MAIL, RCPT, DATA, QUIT; guarda los mensajes y puede rechazar un RCPT con 550 o cortar en DATA.
+- [x] T004 [P] [Paso 0] `tests/smtp_falso.py`: `socketserver` con EHLO, AUTH PLAIN, MAIL, RCPT, DATA, QUIT; guarda los mensajes y puede rechazar un RCPT con 550 o cortar en DATA.
 
 ## Fase 2: Dominio (Paso 1)
 
