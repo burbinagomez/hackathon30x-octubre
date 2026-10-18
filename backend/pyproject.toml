@@ -44,7 +44,7 @@ name = "Capas de los modulos"
 type = "layers"
 # "(aplicacion)": capa opcional; costos todavía no la tiene.
 layers = ["infraestructura", "(aplicacion)", "dominio"]
-containers = ["app.modulos.descubrimiento", "app.modulos.costos", "app.modulos.acceso"]
+containers = ["app.modulos.descubrimiento", "app.modulos.costos", "app.modulos.acceso", "app.modulos.intake"]
 
 [[tool.importlinter.contracts]]
 name = "Descubrimiento no usa la infraestructura de costos"
@@ -52,6 +52,13 @@ type = "forbidden"
 # Solo app.cli une los dos módulos: descubrimiento conoce el puerto, nunca el adaptador.
 source_modules = ["app.modulos.descubrimiento"]
 forbidden_modules = ["app.modulos.costos.infraestructura"]
+
+[[tool.importlinter.contracts]]
+name = "Intake no importa descubrimiento ni la infraestructura de costos"
+type = "forbidden"
+# Los puertos de intake son Protocol: los adaptadores los cumplen por estructura y solo la composición los une.
+source_modules = ["app.modulos.intake"]
+forbidden_modules = ["app.modulos.descubrimiento", "app.modulos.costos.infraestructura"]
 
 [[tool.importlinter.contracts]]
 name = "Cifrado fuera del dominio"
