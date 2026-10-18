@@ -30,14 +30,17 @@ def _fila(nit, razon, camara="04"):
             "codigo_camara": camara, "organizacion_juridica": SAS, "estado_matricula": "ACTIVA", "fecha_renovacion": "20260410"}
 
 
-def _rues(por_nombre: dict[str, list[dict] | int]):
+def _rues(por_nombre: dict[str, list[dict] | int], naturales: dict[str, int] | None = None):
     """Responde según el nombre buscado (en el $where). Un entero es un status de error."""
     pedidas = []
+    naturales = naturales or {}
 
     def responder(request: httpx.Request) -> httpx.Response:
         if request.url.host != "www.datos.gov.co":
             return httpx.Response(404)
         pedidas.append(request)
+        if "count(" in request.url.params["$select"]:
+            return httpx.Response(200, json=[{"count": str(naturales.get(request.url.params["$where"].split("'")[1].strip("%"), 0))}])
         donde = request.url.params["$where"]
         for clave, respuesta in por_nombre.items():
             if f"'%{clave}%'" in donde:
@@ -153,8 +156,8 @@ def test_cada_consulta_queda_en_costos_con_su_lead(admin, tenants, cifrador, mun
     with admin.connect() as c:
         filas = c.execute(text("SELECT tipo, proveedor, fuente, lead_id, lote_id, moneda, gratis, costo_unitario FROM costos "
                                "WHERE tenant_id = :t"), {"t": tenants["a"]}).all()
-    assert len(pedidas) == len(filas) == 2
-    assert {f.lead_id for f in filas} == {uno, dos}
+    assert len(pedidas) == len(filas) == 3  # uno: búsqueda + conteo de naturales; dos: solo la búsqueda (sin match)
+    assert sorted(str(f.lead_id) for f in filas) == sorted(map(str, [uno, uno, dos]))
     assert {(f.tipo, f.proveedor, f.fuente, f.lote_id, f.moneda) for f in filas} == {
         ("socrata_descarga", "datos.gov.co", None, None, "USD")}
     assert {f.costo_unitario for f in filas} == {Decimal(str(cargar_tarifas()["datos.gov.co"]))}
@@ -210,3 +213,15 @@ def test_lead_osm_con_telefono_que_matchea_queda_contactable_y_sale_en_el_export
     assert [(f["lead_id"], f["to_number"], f["first_name"]) for f in filas] == [(str(si), TELEFONO, "Transportes Andinos")]
     for texto in (r.text, caplog.text):
         assert "ANDINOS" not in texto.upper() and "CARGA RAPIDA" not in texto.upper()
+
+
+def test_una_natural_homonima_deja_el_lead_desconocido_y_la_constancia_lo_dice(admin, tenants, cifrador, mundo):
+    repo, costos, busqueda = mundo
+    lead = _sembrar(repo, admin, cifrador, tenants["a"], busqueda, "Juan Pérez")
+    transporte, _ = _rues({"JUAN PEREZ": [_fila("900111222", "JUAN PEREZ SAS")]}, naturales={"JUAN PEREZ": 1})
+
+    _enriquecer(repo, costos, busqueda, transporte)
+
+    assert _lead(admin, lead)[:3] == ("desconocido", False, "persona_natural")
+    (entrada,) = _solicitudes(admin, lead)
+    assert (entrada["motivo"], entrada["naturales_homonimas"]) == ("ambiguo", 1) and "nit" not in entrada

@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol, runtime_checkable
 from uuid import UUID
@@ -58,3 +58,7 @@ class BuscadorRazonSocialRues(Protocol):
     el costo de cada request con el `lead_id` del contexto, antes de devolver."""
 
     def buscar_coincidencias(self, nombre_normalizado: str, contexto_costo: ContextoCosto) -> Sequence[CoincidenciaRues]: ...
+
+    def contar_naturales(self, nombre_normalizado: str, camaras: Collection[str], contexto_costo: ContextoCosto) -> int:
+        """Personas naturales matriculadas con ese nombre en esas cámaras. Solo un conteo, nunca sus nombres."""
+        ...

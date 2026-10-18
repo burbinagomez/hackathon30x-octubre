@@ -38,8 +38,9 @@ class RuesDatosGov:
             return _desconocido("sin_ciudad")
         if not nombre:
             return _desconocido("sin_match")
+        contexto = ContextoCosto(None, None, lead_id)
         try:
-            candidatas = list(self._buscador.buscar_coincidencias(nombre, ContextoCosto(None, None, lead_id)))
+            candidatas = list(self._buscador.buscar_coincidencias(nombre, contexto))
         except FuenteNoDisponible:  # solo la clave y el status: el mensaje de la fuente no lleva el nombre
             return _desconocido("fuente_no_disponible")
         if len(candidatas) >= self._tope:
@@ -55,6 +56,16 @@ class RuesDatosGov:
             return _desconocido("sin_match")
         if len(exactas) > 1:
             return _desconocido("ambiguo", candidatos=len(exactas))
+        # Una persona natural con ese nombre en la cámara de la ciudad: no se puede afirmar que el lead sea la SAS. El
+        # servidor excluye a las naturales de la búsqueda, así que se cuentan aparte (solo el número).
+        camaras = [codigo for codigo, m in self._municipios.items() if normalizar_ciudad(m) == ciudad_lead]
+        try:
+            naturales = self._buscador.contar_naturales(nombre, camaras, contexto)
+        except FuenteNoDisponible:
+            return _desconocido("fuente_no_disponible")
+        if naturales > 0:
+            return VerificacionTitular("desconocido", "ambiguo", ConstanciaTitular(
+                "ambiguo", FUENTE, DATASET, naturales_homonimas=naturales))
         (nit, (razon_social, municipio)), = exactas.items()
         return VerificacionTitular("juridica", "match_unico", ConstanciaTitular(
             "match_unico", FUENTE, DATASET, nit=nit, razon_social=razon_social, municipio=municipio))

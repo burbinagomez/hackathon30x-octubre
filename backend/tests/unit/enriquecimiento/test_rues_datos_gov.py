@@ -29,14 +29,17 @@ def _fila(nit="900111222", razon="TRANSPORTES ANDINOS S.A.S.", camara="04", esta
             "fecha_renovacion": "20260410"}
 
 
-def _verificador(respuesta, intentos=2):
-    """`respuesta`: lista de filas (200), o una función request -> Response / que lanza."""
+def _verificador(respuesta, intentos=2, naturales=0):
+    """`respuesta`: lista de filas (200), o una función request -> Response / que lanza.
+    `naturales`: lo que responde el conteo de personas naturales homónimas (request aparte, solo `count(*)`)."""
     pedidas = []
 
     def responder(request):
         pedidas.append(request)
         if callable(respuesta):
             return respuesta(request)
+        if "count(" in request.url.params.get("$select", ""):
+            return httpx.Response(200, json=[{"count": str(naturales)}])
         return httpx.Response(200, json=respuesta)
 
     costos = RegistroCostosFalso()
@@ -175,7 +178,7 @@ def test_cada_request_escribe_su_costo_con_el_lead_antes_de_devolver():
 
     v.verificar(lead, NOMBRE, "Bogotá")
 
-    assert len(pedidas) == len(costos.filas) == 1
+    assert len(pedidas) == len(costos.filas) == 2  # la búsqueda por razón social y el conteo de naturales
     c = costos.filas[0]
     assert (c.tipo, c.proveedor, c.lead_id, c.lote_id, c.fuente) == ("socrata_descarga", "datos.gov.co", lead, None, None)
     assert c.costo_unitario == Decimal("0.000007") and c.unidades >= 0
@@ -221,3 +224,61 @@ def test_el_nombre_no_sale_en_el_mensaje_de_error_interno(caplog):
     v.verificar(uuid4(), "Zxqvk Ficticia", "Bogotá")
 
     assert "ZXQVK" not in caplog.text.upper()
+
+
+def test_una_persona_natural_homonima_en_la_camara_vuelve_ambiguo_el_match():
+    # "Juan Pérez" (OSM) y "JUAN PEREZ SAS": si existe la natural matriculada en la misma cámara, no hay certeza.
+    v, pedidas, _ = _verificador([_fila(razon="JUAN PEREZ SAS")], naturales=1)
+
+    r = v.verificar(uuid4(), "Juan Pérez", "Bogotá")
+
+    assert (r.tipo_titular, r.motivo) == ("desconocido", "ambiguo")
+    assert r.constancia.naturales_homonimas == 1 and r.constancia.nit is None
+
+
+def test_sin_naturales_homonimas_el_match_unico_sigue_siendo_juridica():
+    v, _, _ = _verificador([_fila(razon="JUAN PEREZ SAS")], naturales=0)
+
+    assert v.verificar(uuid4(), "Juan Pérez", "Bogotá").tipo_titular == "juridica"
+
+
+def test_el_conteo_de_naturales_es_solo_un_count_filtrado_por_la_camara_de_la_ciudad():
+    v, pedidas, _ = _verificador([_fila(razon="JUAN PEREZ SAS")])
+
+    v.verificar(uuid4(), "Juan Pérez", "Bogotá")
+
+    conteo = [p for p in pedidas if "count(" in p.url.params["$select"]]
+    assert len(conteo) == 1
+    p = conteo[0].url.params
+    assert p["$select"] == "count(*)"  # ningún nombre de persona sale del servidor
+    assert "'%JUAN PEREZ%'" in p["$where"] and "organizacion_juridica = 'PERSONA NATURAL'" in p["$where"]
+    assert "codigo_camara in('04')" in p["$where"]
+
+
+def test_el_conteo_de_naturales_tambien_cobra_su_request_con_el_lead():
+    v, pedidas, costos = _verificador([_fila(razon="JUAN PEREZ SAS")])
+    lead = uuid4()
+
+    v.verificar(lead, "Juan Pérez", "Bogotá")
+
+    assert len(pedidas) == len(costos.filas) == 2
+    assert {c.lead_id for c in costos.filas} == {lead}
+
+
+def test_sin_match_no_se_gasta_el_conteo_de_naturales():
+    v, pedidas, _ = _verificador([_fila(camara="14")])
+
+    v.verificar(uuid4(), NOMBRE, "Bogotá")
+
+    assert len(pedidas) == 1
+
+
+def test_si_el_conteo_de_naturales_falla_es_desconocido():
+    def falla_el_conteo(request):
+        if "count(" in request.url.params.get("$select", ""):
+            return httpx.Response(503, json={})
+        return httpx.Response(200, json=[_fila()])
+
+    v, _, _ = _verificador(falla_el_conteo)
+
+    assert v.verificar(uuid4(), NOMBRE, "Bogotá").motivo == "fuente_no_disponible"

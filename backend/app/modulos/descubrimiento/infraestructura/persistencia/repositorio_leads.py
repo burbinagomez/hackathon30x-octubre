@@ -280,7 +280,7 @@ class RepositorioLeadsPostgres:
             return {"tipo": "paso_a_claro", "motivo": "match_unico", "fuente": "croma_rues_co"} if claro else None
         entrada = {"tipo": "paso_a_claro" if claro else "verificacion_titular", "motivo": k.motivo, "fuente": k.fuente,
                    "dataset": k.dataset, "nit": k.nit, "razon_social": k.razon_social, "municipio": k.municipio,
-                   "candidatos": k.candidatos}
+                   "candidatos": k.candidatos, "naturales_homonimas": k.naturales_homonimas}
         return {clave: valor for clave, valor in entrada.items() if valor is not None}
 
     def listar_busquedas(self) -> list[ResumenBusqueda]:

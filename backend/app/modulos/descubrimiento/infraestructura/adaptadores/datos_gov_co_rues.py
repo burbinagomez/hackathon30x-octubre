@@ -3,7 +3,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass, replace
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from datetime import UTC, datetime
 from decimal import Decimal
 from email.utils import parsedate_to_datetime
@@ -51,6 +51,7 @@ LIMITE_COINCIDENCIAS = 100
 # [0-9] y no \d: \d acepta dígitos de otros alfabetos y esos no entran al SoQL ni al NIT.
 _CIIU = re.compile(r"[0-9]{4}")
 _NIT = re.compile(r"[89][0-9]{8}")
+_CAMARA = re.compile(r"[0-9]{1,3}")
 
 
 def _es_juridica_valida(fila: Mapping[str, Any]) -> bool:
@@ -209,6 +210,33 @@ class DatosGovCoRues:
             ]
         except (ValueError, TypeError, AttributeError, KeyError):
             raise FuenteNoDisponible(f"{self.meta.clave}: respuesta ilegible") from None
+
+    def contar_naturales(self, nombre_normalizado: str, camaras: Collection[str], contexto_costo: ContextoCosto) -> int:
+        """Cuántas personas naturales matriculadas tienen una razón social que contiene el nombre, en esas cámaras.
+
+        Solo un `count(*)`: ningún nombre de persona sale del servidor (principio VII). Sirve para no ascender a jurídica
+        un lead que también podría ser la persona natural homónima. Escribe su costo como cualquier request.
+        """
+        nombre = _literal_like(nombre_normalizado)
+        # Códigos de cámara de 1 a 3 dígitos: lo que venga de fuera de ese formato no entra al SoQL.
+        codigos = sorted({str(c) for c in camaras if _CAMARA.fullmatch(str(c))})
+        if not nombre or not codigos:
+            return 0
+        enlista = ",".join(f"'{c}'" for c in codigos)
+        where = (
+            f"upper(razon_social) like '%{nombre}%'"
+            " AND organizacion_juridica = 'PERSONA NATURAL'"
+            f" AND codigo_camara in({enlista})"
+        )
+        respuesta = self._pedir({"$select": "count(*)", "$where": where}, contexto_costo)
+        try:
+            (fila,) = respuesta.json()
+            cuenta = int(fila["count"])
+            if cuenta < 0:
+                raise ValueError
+        except (ValueError, TypeError, AttributeError, KeyError):
+            raise FuenteNoDisponible(f"{self.meta.clave}: respuesta ilegible") from None
+        return cuenta
 
     def _pedir(self, params: Mapping[str, str], contexto: ContextoCosto | None = None) -> httpx.Response:
         """GET con hasta 2 intentos. Cada intento deja su fila en costos antes de decidir."""

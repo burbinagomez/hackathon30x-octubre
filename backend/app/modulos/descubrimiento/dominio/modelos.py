@@ -86,6 +86,7 @@ class ConstanciaTitular:
     razon_social: str | None = None
     municipio: str | None = None
     candidatos: int | None = None  # solo si fue ambiguo: cuántos NIT cumplían
+    naturales_homonimas: int | None = None  # solo si una persona natural con ese nombre vuelve ambiguo el match
 
 
 @dataclass(frozen=True)

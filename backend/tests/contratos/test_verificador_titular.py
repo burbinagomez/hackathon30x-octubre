@@ -30,6 +30,8 @@ def _registrados() -> dict[str, dict]:
 # Fuentes falsas con las que se prueba cada adaptador: lo que el proveedor puede hacer (datos, nada, caerse, colgarse).
 def _fuente(modo):
     def responder(request):
+        if "count(" in request.url.params.get("$select", "") and modo in {"match", "vacia"}:
+            return httpx.Response(200, json=[{"count": "0"}])  # sin personas naturales homónimas
         if modo == "timeout":
             raise httpx.ReadTimeout("lento", request=request)
         return {"match": httpx.Response(200, json=[FILA]), "vacia": httpx.Response(200, json=[]),
