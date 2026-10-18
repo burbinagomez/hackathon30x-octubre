@@ -10,7 +10,7 @@ ALTER TABLE public.leads
 ALTER TABLE public.leads ALTER COLUMN nombre DROP NOT NULL;
 
 -- octet_length > 28: nonce de 12 bytes + etiqueta GCM de 16; un bytea más corto no es un cifrado.
--- NOT VALID: las filas ya guardadas (leads OSM del [MIN], en claro) no se pueden cifrar desde SQL; no hay backfill (leads de prueba).
+-- NOT VALID: las filas ya guardadas (leads OSM del [MIN], en claro) no se pueden cifrar desde SQL.
 ALTER TABLE public.leads
   ADD CONSTRAINT leads_nombre_segun_titular_ck CHECK (
     (tipo_titular =  'juridica' AND nombre IS NOT NULL AND nombre_cifrado IS NULL)
