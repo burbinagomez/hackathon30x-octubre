@@ -65,12 +65,27 @@ El e2e de esta spec corre en `e2e.yml` contra Railway, después del deploy, junt
 - [x] `npm test` sigue verde; `playwright.config.ts`, `health.spec.ts` y `package.json` sin cambios.
 - [x] `docs/decisiones.md` tiene la fila de la regla responsive (2026-10-17).
 
+## Tema oscuro (enmienda 2026-10-18)
+Decisión de Daniel: el tema sigue la preferencia del sistema operativo (`prefers-color-scheme`), sin selector. Claro como hoy; oscuro con la marca Dapta. Reemplaza "Modo oscuro" de Fuera del alcance.
+
+- **Tokens semánticos** en `tokens.css`, definidos en `:root` para claro y redefinidos en `@media (prefers-color-scheme: dark)`: `--color-superficie`, `--color-texto`, `--color-borde`, `--color-acento-texto`, `--color-cabecera-fondo`, `--color-cabecera-texto`, `--color-foco`, `--color-sobre-acento` (texto sobre lima; `--color-oscuro` en ambos temas, para que `estilos.css` no use `--color-oscuro` como `color`). Las seis variables de marca no cambian; se suma `--color-blanco: #FFFFFF`.
+- **Claro:** superficie `--color-fondo`, texto `--color-oscuro`, borde `--color-gris`, acento-texto `--color-oscuro` (el lima nunca es texto sobre blanco).
+- **Oscuro:** superficie `#1A1A1C` (`--color-oscuro`), texto `#FFFFFF` (`--color-blanco`), borde `--color-gris`. El lima puede ser texto, acento y foco sobre el oscuro (`--color-acento-texto` y `--color-foco` = lima).
+- **Lima como fondo** (botón primario, fila total, borde de la card): el texto encima es siempre `--color-oscuro`, en ambos temas.
+- `color-scheme: light dark` en `:root` (inputs, selects y scrollbars nativos acompañan) y `<meta name="color-scheme" content="light dark">` en `index.html`.
+- `estilos.css` usa solo variables; ningún hex fuera de `tokens.css`. Sin dependencias nuevas.
+
+**Terminado cuando:**
+- `marca.test.ts`: `tokens.css` tiene el bloque `@media (prefers-color-scheme: dark)` que redefine `--color-superficie` y `--color-texto` (fondo `#1A1A1C`, texto `#FFFFFF`), declara `color-scheme: light dark`, e `index.html` tiene el meta `color-scheme`. El test de hex prohibidos sigue vigente.
+- `estilos.test.tsx`: `estilos.css` usa los tokens semánticos y ninguna variable de marca cruda para superficie o texto de página.
+- `e2e/marca-responsive.spec.ts`: describe en oscuro (`colorScheme: 'dark'`, 375x812 y 1280x800) sobre `RUTAS`: body `rgb(26, 26, 28)` y texto `rgb(255, 255, 255)`; ningún texto visible con color igual a su fondo efectivo. En claro, el lima no es color de texto sobre un fondo claro (se mira el fondo efectivo; en oscuro se permite).
+
 ## Fuera del alcance
 - Mecanismo de i18n (librería, archivos de mensajes, selector de idioma). Este slice no agrega texto; el mecanismo nace con el primer slice que lo necesite.
 - Título visible en la página de health.
 - `docs/arquitectura-frontend.md`: lo crea la 013 (T033).
 - Componentes de UI (botones, tablas, tarjetas, layout de tablero): los hace cada slice con su pantalla, siguiendo la regla.
-- Modo oscuro, logo de Dapta, favicon, animaciones.
+- Selector manual de tema, logo de Dapta, favicon, animaciones.
 - Self-hosting de las fuentes.
 - Test automático de objetivos táctiles de 44 px: la página de health no tiene controles. Entra con el primer slice que tenga un botón.
 - Chequeo de contraste con axe o similar: sería una dependencia nueva.

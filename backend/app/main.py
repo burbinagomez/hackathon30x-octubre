@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app import db
-from app.api import actividades, busquedas, calificaciones, geografia, tablero, usuarios
+from app.api import actividades, busquedas, calificaciones, geografia, leads, tablero, usuarios
 from app.api.sesion import tenant_actual
 from app.composicion import CONFIG, calificador_api, cargar_geografia, cargar_tarifas, registro_api
 from app.config import SettingsApi, verificar_entorno
@@ -32,8 +32,13 @@ async def lifespan(app: FastAPI):
     app.state.cifrador = Cifrador(app.state.settings.cifrado_key.get_secret_value())
     app.state.transporte_http = httpx.HTTPTransport()
     app.state.actividades_yaml = yaml.safe_load((CONFIG / "actividades.yaml").read_text()) or {}
-    app.state.registro = registro_api(CONFIG / "fuentes.yaml", catalogo)
-    app.state.canales_contacto = (yaml.safe_load((CONFIG / "fuentes.yaml").read_text()) or {}).get("canales_contacto") or {}
+    fuentes_yaml = yaml.safe_load((CONFIG / "fuentes.yaml").read_text()) or {}
+    # Sin CROMA_API_KEY la fuente de Croma queda fuera del catálogo (-> sin_implementacion): no rompe el arranque.
+    sin_key = app.state.settings.croma_api_key is None
+    app.state.registro = registro_api(
+        CONFIG / "fuentes.yaml", {c: k for c, k in catalogo.items() if not (sin_key and c.startswith("croma_"))})
+    app.state.limites = fuentes_yaml.get("limites") or {}
+    app.state.canales_contacto = fuentes_yaml.get("canales_contacto") or {}
     app.state.tarifas = cargar_tarifas()
     app.state.calificador = calificador_api(CONFIG / "fuentes.yaml")
     # Un archivo por país en config/geografia/: la estructura admite MX/PE/BR sin tocar código; sin archivo, no se ofrece.
@@ -77,6 +82,6 @@ def health(request: Request):
 
 
 # La dependencia va en el include: una ruta nueva no puede quedar sin auth por olvido.
-for _router in (busquedas.router, tablero.router, actividades.router, geografia.router, usuarios.router,
+for _router in (busquedas.router, leads.router, tablero.router, actividades.router, geografia.router, usuarios.router,
                 calificaciones.router):
     app.include_router(_router, dependencies=[Depends(tenant_actual)])

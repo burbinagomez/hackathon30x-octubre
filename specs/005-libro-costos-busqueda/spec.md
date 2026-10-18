@@ -271,6 +271,25 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
 
 **E2E** (`frontend/e2e/busqueda.spec.ts::login_vista_previa_buscar_tablero`): login con Supabase Auth contra un stub local (`/auth/v1/token` y un JWKS firmado con una clave de prueba, en `servidor_fuentes.py`; nunca el proyecto real) con el usuario sembrado → formulario CO + CIIU 1081 + Bogotá → la vista previa muestra los conteos del stub (cs 3, osm 2) → Buscar → el tablero muestra 5 únicos y un CPL de cs que no es "sin dato". Corre en CI **local**, con api y web levantados en el runner, Postgres de servicio y un stub HTTP (`backend/tests/stubs/servidor_fuentes.py`) apuntado por `CROMA_BASE_URL` y `OVERPASS_URL`. Nunca corre contra Railway: gastaría créditos reales. El E2E del 001 contra Railway (health) sigue como está.
 
+## Lista de leads (enmienda 2026-10-18)
+Decisión de Daniel: pantalla "Leads de la búsqueda", para ver qué trajo cada búsqueda. Solo lectura, sin DDL (usa `busquedas`, `leads`, `lead_fuentes` y `v_atribuciones`).
+
+**Contrato** (auth con `tenant_actual`; RLS como `app_rt`; el tenant nunca viene del request):
+- `GET /busquedas` → `{items: [{id, creada_en, estado, pais, departamento, ciudad, total_leads}]}`, la más reciente primero. `departamento` y `ciudad` salen de los `criterios` guardados (null si no se filtró); `total_leads` = leads distintos con fila en `lead_fuentes` de esa búsqueda.
+- `GET /busquedas/{id}/leads?pagina=1&tamano=25` → `{items, total, pagina, tamano, atribuciones}`. `pagina >= 1`, `1 <= tamano <= 100`; fuera de rango es 422. Orden estable (`creado_en`, `id`). Cada item: `id`, `nombre`, `tipo_titular`, `fuentes` (claves de `lead_fuentes`), `licencias` (una por fuente), `ciudad`, `tiene_telefono`, `tiene_email`, `tiene_web`.
+  - `nombre` solo si `tipo_titular == 'juridica'`; si no, `null` y el front pinta "Persona natural (datos protegidos)" (i18n). La regla se aplica también en el SQL: la consulta ni lee las columnas cifradas.
+  - `tiene_web` = `web IS NOT NULL`. **`tiene_telefono` y `tiene_email` van `null` ("sin dato")**: hoy no hay columna de contacto en `leads` (llegan con el enriquecimiento y el canal publicado, 006/007). Cuando existan serán booleanos; nunca el valor del contacto. Sin DDL en esta enmienda.
+  - `atribuciones`: las de `v_atribuciones` solo para las fuentes de esa búsqueda (mismo formato que el tablero).
+- `GET /leads?fuente=<clave>&pagina=&tamano=` → mismo cuerpo, con los leads de esa fuente en **todas** las búsquedas del tenant (cada lead conserva todas sus fuentes); sin `fuente`, todos los del tenant. Misma consulta del repo que la lista por búsqueda, con otro filtro. `fuente` fuera del registro: 422 `{"errores": [{"campo": "fuente", "codigo": "desconocida"}]}` (mismo formato que la vista previa). Mismos límites de `pagina`/`tamano`.
+- Búsqueda inexistente o de otro tenant: 404 `no_encontrada`, indistinguible. Este endpoint nunca descifra ni devuelve datos de naturales (dirección tampoco), y no loguea datos de leads.
+- Front: `/busquedas` (lista, cada una enlaza) y `/busquedas/:id/leads` (tabla paginada; tarjetas en móvil; tokens de marca; objetivos de 44 px; es/en; atribuciones al pie). El tablero trae un enlace "Ver búsquedas"; cada fila de fuente enlaza (interno, sin recargar) a `/leads?fuente=<clave>` y la fila Total a `/leads` ("sin atribuir" no enlaza: son costos sin lead). `/leads` reusa la lista, con título "Leads de <fuente>" / "Todos los leads". Las atribuciones del pie siguen externas (pestaña nueva, lo exige la licencia) y se rotulan "Licencia ↗". Las rutas nuevas entran en `RUTAS` de `e2e/marca-responsive.spec.ts`.
+
+**Terminado cuando (tests que hoy fallan):**
+- `backend/tests/integration/test_leads_lista_repo.py`: `::lista_busquedas_del_tenant_con_total`, `::natural_sin_nombre_ni_direccion`, `::juridica_con_nombre`, `::lead_de_dos_fuentes_una_fila_con_dos_fuentes`, `::paginacion_y_total`, `::busqueda_ajena_o_inexistente_es_none`, `::tiene_web_y_contacto_sin_dato`, `::atribuciones_solo_de_la_busqueda`.
+- `backend/tests/integration/test_api_leads_lista.py`: `::sin_token_401` (lo cubre `test_auth`), `::404_tenant_ajeno_igual_a_inexistente`, `::nunca_nombre_de_natural_ni_contacto` (el cuerpo entero no contiene el nombre, la dirección ni el teléfono sembrados), `::paginacion`, `::tamano_mayor_a_100_es_422`, `::pagina_cero_es_422`, `::lista_de_busquedas_no_mezcla_tenants`, `::leads_de_una_fuente`, `::leads_sin_fuente_son_todos_los_del_tenant...`, `::fuente_desconocida_es_422`.
+- `frontend/src/leads/*.test.tsx`: lista de búsquedas con enlaces; tabla con jurídica por nombre y natural como "Persona natural (datos protegidos)" en es y en; paginación pide la página; atribuciones al pie; sin dato de contacto no se pinta nada; enlace "Ver búsquedas" en el tablero.
+- Sabotajes con nombre (cada uno debe poner un test en rojo): devolver el nombre de la natural, devolver el teléfono/email, quitar el filtro de tenant, quitar el tope de `tamano`, `/leads` sin filtro de tenant, aceptar una fuente desconocida.
+
 ## Fuera del alcance
 - **006:**
   - `v_leads_icp` filtrando por `encaje <> 'no_encaja'`;

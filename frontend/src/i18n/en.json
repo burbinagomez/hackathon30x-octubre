@@ -40,13 +40,14 @@
     "ninguna_fuente_cubre": "No source covers this search.",
     "costo_estimado": "Estimated cost: {{monto}}",
     "costo_maximo": "Maximum cost: {{monto}}",
+    "dentro_del_tope": "Within the cap: the search can run.",
+    "fuera_del_tope": "Over the cap: raise the cap or narrow the search.",
     "tope_linea": "Cap: {{monto}}",
     "creditos_restantes": "Croma credits left this month: {{n}}",
     "requests_restantes": "Croma requests left in 24 h: {{n}}",
     "descartadas": "Discarded sources",
     "ignorados": "ignored: {{lista}}",
-    "error": "The operation could not be completed. Try again.",
-    "tope_nota": "Saved; not enforced yet."
+    "error": "The operation could not be completed. Try again."
   },
   "fuentes": {
     "croma_supersociedades_co": "Supersociedades (Croma)",
@@ -82,7 +83,9 @@
     "cobertura": "Coverage by country",
     "revisiones_pendientes": "Pending reviews: {{n}}",
     "atribucion": "Data attribution",
-    "desperdicio_real": "Waste (actual)"
+    "desperdicio_real": "Waste (actual)",
+    "ver_busquedas": "View searches",
+    "licencia": "License"
   },
   "idioma": {
     "etiqueta": "Language",
@@ -105,5 +108,47 @@
       "BR": "State",
       "PE": "Region"
     }
+  },
+  "leads": {
+    "titulo_busquedas": "Searches",
+    "titulo_leads": "Leads of the search",
+    "sin_busquedas": "There are no searches yet.",
+    "sin_leads": "This search brought no leads.",
+    "error_busquedas": "The searches could not be loaded.",
+    "error_leads": "The leads could not be loaded. Try again.",
+    "no_encontrada": "The search was not found.",
+    "resumen_busqueda": "{{pais}} · {{lugar}} · {{fecha}} · {{estado}} · {{total}} leads",
+    "departamento": "Dept. {{codigo}}",
+    "todo_el_pais": "Whole country",
+    "volver": "Back to searches",
+    "natural_protegida": "Individual (protected data)",
+    "nombre": "Name",
+    "tipo": "Type",
+    "fuentes": "Sources",
+    "ciudad": "City",
+    "web": "Website",
+    "telefono": "Phone",
+    "email": "Email",
+    "licencia": "License",
+    "si": "Yes",
+    "no": "No",
+    "anterior": "Previous",
+    "siguiente": "Next",
+    "pagina_de": "Page {{pagina}} of {{paginas}}",
+    "total": "{{total}} leads",
+    "tipo_titular": {
+      "juridica": "Legal entity",
+      "natural": "Individual",
+      "desconocido": "Undetermined"
+    },
+    "estado": {
+      "creada": "Created",
+      "borrador": "Draft",
+      "ejecutando": "Running",
+      "terminada": "Completed",
+      "con_errores": "With errors"
+    },
+    "titulo_de_fuente": "Leads from {{fuente}}",
+    "titulo_todos": "All leads"
   }
 }

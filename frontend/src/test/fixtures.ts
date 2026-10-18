@@ -90,7 +90,7 @@ export function respuestaVistaPrevia(cambios: Record<string, unknown> = {}) {
   };
 }
 
-/** Lo que devuelve la API del [MIN]: sin `contar` ni costos, y el tope todavía no se aplica (null, nunca 0). */
+/** Lo que devuelve la API del [MIN]: sin `contar` ni costos, y sin estimado (null, nunca 0); el tope sí se aplica en la API real. */
 export function respuestaVistaPreviaMinima(cambios: Record<string, unknown> = {}) {
   return respuestaVistaPrevia({
     fuentes: [

@@ -464,3 +464,14 @@ Ninguna se resuelve en este plan. Cada fila dice qué tareas bloquea.
 | Un campo de `MetaFuente` que no sale del YAML (P4) | Depende de la tarifa y del timeout del adaptador, y duplicarlo en el YAML los desincroniza | Declararlo en `fuentes.yaml`: un cambio de tarifa no lo movería |
 | Módulo `tablero` sin dominio | La lógica vive en SQL (PRD §7, spec:300) | Calcular el CPL en Python: tendría dos fuentes de verdad |
 | Funciones `SECURITY DEFINER` | El login ocurre antes de conocer el tenant, y `app_rt` no puede leer `usuarios` | Darle `SELECT` a `app_rt`: podría volcar los hashes de todos los tenants |
+
+
+## Divergencia con la 002: cupo mensual de Croma ESTRICTO (2026-10-18, decisión de coordinación)
+
+La 002 decía: con `creditos_mes >= 1500` el adaptador sigue llamando y registra `gratis=false`. Acá el adaptador
+`croma_supersociedades_co` se niega (`LimiteFuenteAgotado`, 0 requests, 0 filas) cuando `creditos_mes + 1 > croma_creditos_gratis_mes`:
+protege el tier gratis en el evento, y el tope de gasto sigue siendo el freno del resto. Una búsqueda cortada por un
+límite de Croma termina en `tope_alcanzado`. Tests: `test_croma_supersociedades.py::test_no_llama_si_el_cupo_mensual_no_alcanza_para_otro_credito`
+y `::test_el_ultimo_credito_del_cupo_mensual_si_se_llama_y_sale_gratis`. Los límites salen de `fuentes.yaml` (`limites`), no de constantes.
+Supuestos sintéticos a contrastar en T048: forma `{data, total}`, campos `nit`/`name`/`city`/`address`/`ciiu_code`, header
+`Authorization: Bearer`, y que `department` acepte el código DIVIPOLA que manda la API.

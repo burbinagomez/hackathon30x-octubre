@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { entero, moneda } from "../compartido/formato";
+import { entero, moneda, monedaFina } from "../compartido/formato";
 import type { VistaPrevia } from "./tipos";
 
 type Props = { vista: VistaPrevia; tope: number };
@@ -37,8 +37,11 @@ export default function ResultadoVistaPrevia({ vista, tope }: Props) {
       )}
       {vista.costo_maximo_usd !== null && (
         <>
-          <p>{t("busqueda.costo_maximo", { monto: moneda(vista.costo_maximo_usd) })}</p>
-          <p>{t("busqueda.tope_linea", { monto: moneda(tope) })}</p>
+          <p>{t("busqueda.costo_maximo", { monto: monedaFina(vista.costo_maximo_usd) })}</p>
+          <p>{t("busqueda.tope_linea", { monto: monedaFina(tope) })}</p>
+          {vista.dentro_del_tope !== null && (
+            <p role="status">{t(vista.dentro_del_tope ? "busqueda.dentro_del_tope" : "busqueda.fuera_del_tope")}</p>
+          )}
           <p className="nota">{t("busqueda.se_compara_el_maximo")}</p>
         </>
       )}
