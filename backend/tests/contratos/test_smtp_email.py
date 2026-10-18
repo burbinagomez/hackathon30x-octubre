@@ -165,3 +165,14 @@ def test_falla_en_quit_despues_de_aceptado_cuenta_como_enviado():
         _, costos, resultado = _enviar(falso)
     assert resultado.enviado is True
     assert len(falso.mensajes) == 1 and len(costos.filas) == 1
+
+
+def test_sobre_sale_de_la_direccion_y_no_del_encabezado_to(monkeypatch):
+    """Segunda defensa: aunque la validación dejara pasar una coma, el sobre lleva un solo RCPT."""
+    from app.modulos.contacto.infraestructura import smtp_email
+    monkeypatch.setattr(smtp_email, "getaddresses", lambda d: [("", d[0])])
+    monkeypatch.setattr(smtp_email, "_CASILLA", type("Todo", (), {"fullmatch": staticmethod(lambda d: True)}))
+    with SmtpFalso() as falso:
+        _enviar(falso, _mensaje(f"{DESTINO}, otro@atacante.test"))
+    [recibido] = falso.mensajes
+    assert len(recibido.destinos) == 1 and "otro@atacante.test" not in recibido.destinos
