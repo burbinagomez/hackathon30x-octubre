@@ -101,3 +101,14 @@ export const atribucionDatosGov = {
   texto: "Datos: Confecámaras vía datos.gov.co (CC BY-SA 4.0)",
   url: "https://creativecommons.org/licenses/by-sa/4.0/",
 };
+
+/** Monto como lo formatea la UI (USD, idioma activo); los espacios duros pasan a normales, como en el DOM. */
+export function monto(idioma: "es" | "en", valor: number | string): string {
+  return new Intl.NumberFormat(idioma, { style: "currency", currency: "USD" })
+    .format(Number(valor))
+    .replace(/\s/g, " ");
+}
+
+export function numero(idioma: "es" | "en", valor: number): string {
+  return new Intl.NumberFormat(idioma).format(valor).replace(/\s/g, " ");
+}

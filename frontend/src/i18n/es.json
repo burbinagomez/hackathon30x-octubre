@@ -3,9 +3,35 @@
     "ingresar": "Ingresar"
   },
   "motivos": {
-    "sin_mapeo_actividad": "La actividad no tiene equivalente en esta fuente"
+    "sin_mapeo_actividad": "La actividad no tiene equivalente en esta fuente",
+    "pais": "La fuente no cubre este país",
+    "sin_geografia": "La fuente necesita un departamento o ciudad"
   },
   "salud": {
     "estado": "API: {{api}} · DB: {{db}}"
+  },
+  "busqueda": {
+    "titulo": "Nueva búsqueda",
+    "pais": "País",
+    "actividad": "Actividad",
+    "actividad_vacia": "Elegí una actividad",
+    "departamento": "Departamento",
+    "ingresos_min": "Ingresos mínimos (USD)",
+    "palabras_clave": "Palabras clave (separadas por coma)",
+    "exclusiones": "Exclusiones (separadas por coma)",
+    "canal": "Canal preferido",
+    "tope": "Tope de gasto (USD)",
+    "mensaje": "Mensaje base",
+    "vista_previa": "Vista previa",
+    "buscar": "Buscar",
+    "conteo_antes_de_filtros": "Los conteos son antes de aplicar palabras clave y exclusiones.",
+    "se_compara_el_maximo": "Buscar se habilita según el costo máximo, no según el estimado.",
+    "ninguna_fuente_cubre": "Ninguna fuente cubre esta búsqueda.",
+    "costo_estimado": "Costo estimado: {{monto}}",
+    "costo_maximo": "Costo máximo: {{monto}}",
+    "tope_linea": "Tope: {{monto}}",
+    "creditos_restantes": "Créditos de Croma restantes este mes: {{n}}",
+    "requests_restantes": "Consultas de Croma restantes en 24 h: {{n}}",
+    "descartadas": "Fuentes descartadas"
   }
 }
