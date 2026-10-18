@@ -83,3 +83,22 @@ def test_rechazo_no_expone_el_valor_crudo():
     resultados = DaptaCSV().leer_resultados(archivo)
 
     assert "+573001112233" not in repr(resultados)
+
+
+@pytest.mark.parametrize("nombre", sorted(ADAPTADORES))
+@pytest.mark.parametrize("minutos", ["NaN", "sNaN"])
+def test_minutos_nan_es_fila_rechazada_no_excepcion(nombre, minutos):
+    # security (LOW): Decimal("NaN") se construye bien pero compararlo con 0..60 lanza InvalidOperation -> 500.
+    clase, construir = ADAPTADORES[nombre]
+    archivo = construir([{"lead_id": str(LEAD), "calificado": "si", "fecha": FECHA.isoformat(), "minutos": minutos}])
+
+    assert clase().leer_resultados(archivo) == [FilaRechazada(1, "valor_invalido")]
+
+
+def test_campo_enorme_es_archivo_invalido_no_excepcion():
+    # security (LOW): un campo de más de csv.field_size_limit() (131072) lanza csv.Error -> 500.
+    archivo = _csv([{"lead_id": str(LEAD), "calificado": "si", "fecha": FECHA.isoformat(), "minutos": "1",
+                     "extra": "x" * 200_000}])
+
+    with pytest.raises(ArchivoInvalido):
+        DaptaCSV().leer_resultados(archivo)

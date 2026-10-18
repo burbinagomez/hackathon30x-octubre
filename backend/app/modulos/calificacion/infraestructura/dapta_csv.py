@@ -18,7 +18,10 @@ class DaptaCSV:
             texto = archivo.decode("utf-8-sig")  # con o sin BOM
         except UnicodeDecodeError:
             raise ArchivoInvalido("no es UTF-8") from None
-        filas = list(csv.DictReader(io.StringIO(texto)))
+        try:
+            filas = list(csv.DictReader(io.StringIO(texto)))
+        except csv.Error:  # p. ej. un campo de más de csv.field_size_limit()
+            raise ArchivoInvalido("CSV ilegible") from None
         if len(filas) > LIMITE_FILAS:
             raise ArchivoInvalido(f"más de {LIMITE_FILAS} filas")
         ahora = datetime.now(UTC)

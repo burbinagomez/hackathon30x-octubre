@@ -23,6 +23,8 @@ def mapear_fila(numero: int, fila: Mapping[str, str], ahora: datetime) -> Result
         if fecha.tzinfo is None:
             fecha = fecha.replace(tzinfo=UTC)
         minutos = Decimal(str(fila["minutos"]))
+        if not minutos.is_finite():  # NaN no se compara con 0..60: InvalidOperation
+            return FilaRechazada(numero, "valor_invalido")
     except (ValueError, InvalidOperation, KeyError, TypeError):
         return FilaRechazada(numero, "valor_invalido")
     if fecha > ahora:
