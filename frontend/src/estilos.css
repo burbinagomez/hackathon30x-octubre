@@ -129,16 +129,46 @@ h2 {
 /* Formularios */
 .formulario {
   display: grid;
-  gap: 16px;
+  gap: var(--espacio);
 }
 
 .campo {
   min-width: 0;
 }
 
+/* Nueva búsqueda: el mismo espacio entre campos que entre bloques. */
+.formulario-ancho,
+.grupo {
+  gap: var(--espacio);
+}
+
+.grupo {
+  display: grid;
+  min-width: 0; /* un fieldset no se achica por debajo de su contenido sin esto */
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.grupo legend {
+  padding: 0;
+  margin-bottom: var(--espacio-chico);
+  font-family: var(--fuente-titulos);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
 .acciones {
   display: grid;
-  gap: 8px;
+  gap: var(--espacio-chico);
+}
+
+/* Botones al pie, a la derecha; en pantallas angostas bajan de a uno. */
+.acciones-fin {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--espacio-chico);
 }
 
 .boton {
@@ -174,6 +204,42 @@ h2 {
 .resultado ul,
 .lista {
   padding-left: 20px;
+}
+
+/* Vista previa: una fila por fuente (nombre | conteo, y debajo lo que no filtra). */
+.resultado .fuentes-vista {
+  display: grid;
+  gap: var(--espacio-chico);
+  padding: 0;
+  list-style: none;
+}
+
+.fila-fuente {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0 var(--espacio);
+  padding-bottom: var(--espacio-chico);
+  border-bottom: 1px solid var(--color-borde);
+}
+
+.fila-fuente-nombre {
+  font-weight: 500;
+}
+
+.fila-fuente-ignora {
+  grid-column: 1 / -1;
+  font-size: 0.8125rem;
+  opacity: 0.75;
+}
+
+.metricas-vista {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--espacio-chico);
+}
+
+.metricas-vista > .metrica {
+  margin: 0;
 }
 
 /* Tablero */
@@ -358,16 +424,20 @@ table.tabla-leads {
     font-size: 2rem;
   }
 
-  .formulario-ancho {
+  .grupo {
     grid-template-columns: 1fr 1fr;
   }
 
-  .formulario-ancho > .campo:nth-child(n + 5):nth-child(-n + 6),
-  .formulario-ancho > .campo:nth-child(9),
-  .formulario-ancho > .resultado,
-  .formulario-ancho > .acciones,
-  .formulario-ancho > .error {
+  .campo-ancho {
     grid-column: 1 / -1;
+  }
+
+  .fila-fuente {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 2fr);
+  }
+
+  .fila-fuente-ignora {
+    grid-column: auto;
   }
 
   .acciones {

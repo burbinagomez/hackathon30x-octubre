@@ -46,7 +46,7 @@
     "creditos_restantes": "Croma credits left this month: {{n}}",
     "requests_restantes": "Croma requests left in 24 h: {{n}}",
     "descartadas": "Discarded sources",
-    "ignorados": "ignored: {{lista}}",
+    "ignorados": "does not filter by: {{lista}}",
     "error": "The operation could not be completed. Try again.",
     "pestanas": {
       "lookalike": "Already buying from me",
@@ -73,6 +73,12 @@
       "detalle_fuente_sin_conteo": "{{fuente}}: no prior count",
       "detalle_ignora": "does not filter by: {{campos}}",
       "detalle_costo": "Maximum cost {{maximo}} · cap {{tope}}"
+    },
+    "sin_conteo_corto": "no prior count",
+    "grupos": {
+      "quien": "Who are you looking for?",
+      "afinar": "Refine the search",
+      "mensaje": "Message and spend"
     }
   },
   "fuentes": {
