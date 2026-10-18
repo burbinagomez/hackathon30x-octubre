@@ -108,8 +108,14 @@ h2 {
   padding: 16px;
 }
 
+/* Tarjeta de las puertas, como las de Dapti: borde sutil, esquinas redondeadas, acciones agrupadas a la derecha. */
 .tarjeta {
-  border-top: 6px solid var(--color-acento);
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 0.75rem;
+  background: var(--color-superficie);
 }
 
 .selector-idioma {
@@ -592,16 +598,8 @@ table.tabla-leads {
   .embudo-pista {
     grid-column: auto;
   }
-
-/* Tarjeta de las puertas, como las de Dapti: borde sutil, esquinas redondeadas, acciones agrupadas a la derecha. */
-.tarjeta {
-  display: grid;
-  gap: 1rem;
-  padding: 1.25rem 1.5rem;
-  border: 1px solid var(--color-borde);
-  border-radius: 0.75rem;
-  background: var(--color-superficie);
 }
+
 .tarjeta h2 { margin: 0; }
 .tarjeta .ayuda { margin: 0; }
 .campo-cabecera {
@@ -635,3 +633,5 @@ table.tabla-leads {
   border-radius: 0.4rem;
   background: var(--color-superficie);
 }
+
+.panel-enriquecer { margin-bottom: 1.5rem; }

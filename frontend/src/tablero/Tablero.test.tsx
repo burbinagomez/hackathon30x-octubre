@@ -360,6 +360,7 @@ test("embudo_cada_paso_tiene_texto_visible_ademas_de_la_barra", async () => {
     expect(li.textContent).toMatch(/\d/);
     expect(li.querySelector(".embudo-pista")).toHaveAttribute("aria-hidden", "true");
   }
+});
 
 test("exportar_para_dapta_baja_el_csv", async () => {
   let pedido = false;
