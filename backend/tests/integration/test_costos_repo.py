@@ -165,13 +165,13 @@ def _fila_de_lote(admin, tenant, lote, unidades, costo_unitario, gratis):
 def test_gasto_busqueda_suma_lista_del_lote(rt, admin, tenant):
     lote, otro = uuid4(), uuid4()
     _fila_de_lote(admin, tenant, lote, "1", "0.40", True)  # gratis: el tope cuenta el valor de lista
-    _fila_de_lote(admin, tenant, lote, "1", "0.07", False)
+    _fila_de_lote(admin, tenant, lote, "3", "0.0235", False)
     _fila_de_lote(admin, tenant, otro, "1", "9.99", False)  # otro lote: no entra
 
     gasto = PostgresCostos(rt, tenant).gasto_busqueda(lote)
 
     assert type(gasto) is Decimal
-    assert gasto == Decimal("0.47")
+    assert gasto == Decimal("0.4705")
 
 
 def test_gasto_busqueda_sin_filas_es_cero(rt, tenant):
