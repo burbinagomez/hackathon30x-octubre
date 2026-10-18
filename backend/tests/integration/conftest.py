@@ -42,3 +42,10 @@ def tenants(admin):
         for t in TABLAS_DE_TENANT:
             c.execute(text(f"DELETE FROM {t} WHERE tenant_id IN (:a, :b)"), ids)
         c.execute(text("DELETE FROM tenants WHERE id IN (:a, :b)"), ids)
+
+
+@pytest.fixture(autouse=True)
+def _sin_hilos_de_enriquecimiento(monkeypatch):
+    """`ejecutar` arranca el enriquecimiento en segundo plano: en los tests ningún hilo real sale a la red."""
+    from app.api import enriquecimiento
+    monkeypatch.setattr(enriquecimiento, "_lanzar_en_hilo", lambda trabajo: None)
