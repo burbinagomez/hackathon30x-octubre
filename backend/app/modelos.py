@@ -84,7 +84,7 @@ leads = Table(
     UniqueConstraint("tenant_id", "pais", "id_fiscal", name="leads_tenant_pais_id_fiscal_key"),
     UniqueConstraint("tenant_id", "id", name="leads_tenant_id_id_key"),
     # Los CHECK de titular (leads_nombre_segun_titular_ck, leads_direccion_segun_titular_ck) viven solo en el SQL de la 0003:
-    # alembic no los compara y declararlos acá solo agrega ruido. Igual los de la 0007 (leads_*_enum, *_cifrado_ck, ...).
+    # alembic no los compara y declararlos acá solo agrega ruido. Igual los de la 0008 (leads_*_enum, *_cifrado_ck, ...).
     Index("leads_sin_enriquecer", "tenant_id", postgresql_where=text("enriquecido_en IS NULL")),
 )
 

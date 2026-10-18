@@ -1,4 +1,4 @@
--- 0007_enriquecimiento.sql — aprobada por Daniel (2026-10-18)
+-- 0008_enriquecimiento.sql — aprobada por Daniel (2026-10-18)
 
 -- encaje y contactable viven en leads: son uno por lead, igual que tipo_titular.
 ALTER TABLE public.leads

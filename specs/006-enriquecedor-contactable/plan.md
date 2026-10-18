@@ -176,7 +176,7 @@ Son dos puertos y no un `Enriquecedor` genérico porque los dos adaptadores reci
 
 ## Migración 0007 — APROBADA POR DANIEL (2026-10-18)
 
-> **Aprobada** con dos cambios: `email_canal` admite solo `sitio_web` y `osm_contacto`, y el número es el siguiente libre en `main` al momento del merge (hoy **0007**; si entra otra antes, se renombra al que siga). El archivo `supabase/migrations/0007_enriquecimiento.sql` es este bloque byte a byte (`test_migracion_0007.py`).
+> **Aprobada** con dos cambios: `email_canal` admite solo `sitio_web` y `osm_contacto`, y el número es el siguiente libre en `main` al momento del merge (era la 0007; la tomó la 008, así que queda **0008**). El archivo `supabase/migrations/0008_enriquecimiento.sql` es este bloque byte a byte (`test_migracion_enriquecimiento.py`, que lo busca por patrón).
 
 - `costos.tipo` **no cambia**: su CHECK ya admite las tres operaciones (D2). P9 no suma columnas a `costos`.
 - Las columnas de contacto y `v_leads_icp` entran acá porque Daniel aprobó P3 y P2.
@@ -184,7 +184,7 @@ Son dos puertos y no un `Enriquecedor` genérico porque los dos adaptadores reci
 - Igual que la 0006, sin `BEGIN`/`COMMIT` propios.
 
 ```sql
--- 0007_enriquecimiento.sql — aprobada por Daniel (2026-10-18)
+-- 0008_enriquecimiento.sql — aprobada por Daniel (2026-10-18)
 
 -- encaje y contactable viven en leads: son uno por lead, igual que tipo_titular.
 ALTER TABLE public.leads
