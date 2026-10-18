@@ -112,12 +112,16 @@ def test_registrar_sobrevive_al_rollback_de_otra_transaccion(rt, admin, tenant):
 def test_overpass_query_escribe_fila_en_costos(rt, admin, tenant):
     """OSM real contra el libro real: 1 request deja 1 fila `overpass_query` del tenant, con la tarifa como numeric."""
     meta = cargar_registro(BACKEND / "config" / "fuentes.yaml", {"osm_overpass": object}).fuentes["osm_overpass"][1]
-    transporte = httpx.MockTransport(lambda request: httpx.Response(200, json=json.loads(FIXTURE_OSM.read_text())))
-    relojes = iter([100.0, 102.0])  # el request "duró" 2 s
+    ahora = [100.0]
+
+    def responder(request):
+        ahora[0] += 2.0  # el request "dura" 2 s
+        return httpx.Response(200, json=json.loads(FIXTURE_OSM.read_text()))
+
     lote = uuid4()
-    adaptador = OsmOverpass(meta=meta, registro_costos=PostgresCostos(rt, tenant), transporte=transporte,
-                            costo_unitario=Decimal("0.0005"), lote_id=lote, repo_url="https://example.invalid/repo",
-                            reloj=lambda: next(relojes))
+    adaptador = OsmOverpass(meta=meta, registro_costos=PostgresCostos(rt, tenant), transporte=httpx.MockTransport(responder),
+                            costo_unitario=Decimal("0.0000070"), lote_id=lote, repo_url="https://example.invalid/repo",
+                            reloj=lambda: ahora[0])
 
     adaptador.buscar(CriteriosICP("CO", {"ciudad": "Bogotá", "tipo_negocio": ("shop=supermarket",)}), 1)
 
@@ -125,6 +129,6 @@ def test_overpass_query_escribe_fila_en_costos(rt, admin, tenant):
         filas = c.execute(text("SELECT tenant_id, tipo, unidades, costo_unitario, moneda, proveedor, fuente, lead_id, "
                                "lote_id, gratis FROM costos WHERE tenant_id = :t"), {"t": tenant}).all()
         tipo_costo = c.execute(text("SELECT data_type FROM information_schema.columns "
-                                    "WHERE table_name = 'costos' AND column_name = 'costo_unitario'")).scalar()
-    assert filas == [(tenant, "overpass_query", Decimal(2), Decimal("0.0005"), "USD", "osm", "osm_overpass", None, lote, False)]
+                                    "WHERE table_schema = 'public' AND table_name = 'costos' AND column_name = 'costo_unitario'")).scalar()
+    assert filas == [(tenant, "overpass_query", Decimal(2), Decimal("0.0000070"), "USD", "osm", "osm_overpass", None, lote, False)]
     assert tipo_costo == "numeric"
