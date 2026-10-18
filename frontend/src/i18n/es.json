@@ -1,6 +1,11 @@
 {
   "acceso": {
-    "ingresar": "Ingresar"
+    "ingresar": "Ingresar",
+    "titulo": "Ingresar",
+    "email": "Correo",
+    "clave": "Clave",
+    "error_credenciales": "Correo o clave incorrectos",
+    "error_generico": "No se pudo ingresar. Probá de nuevo."
   },
   "motivos": {
     "sin_mapeo_actividad": "La actividad no tiene equivalente en esta fuente",
@@ -32,7 +37,9 @@
     "tope_linea": "Tope: {{monto}}",
     "creditos_restantes": "Créditos de Croma restantes este mes: {{n}}",
     "requests_restantes": "Consultas de Croma restantes en 24 h: {{n}}",
-    "descartadas": "Fuentes descartadas"
+    "descartadas": "Fuentes descartadas",
+    "ignorados": "se ignora: {{lista}}",
+    "error": "No se pudo completar la operación. Probá de nuevo."
   },
   "fuentes": {
     "croma_supersociedades_co": "Supersociedades (Croma)",
@@ -63,6 +70,21 @@
     "costo_evals": "Costo de evals (aparte): {{monto}}",
     "cobertura": "Cobertura por país",
     "revisiones_pendientes": "Revisiones pendientes: {{n}}",
-    "atribucion": "Atribución de datos"
+    "atribucion": "Atribución de datos",
+    "desperdicio_real": "Desperdicio (real)"
+  },
+  "idioma": {
+    "etiqueta": "Idioma",
+    "es": "Español",
+    "en": "English"
+  },
+  "paises": {
+    "CO": "Colombia",
+    "MX": "México",
+    "BR": "Brasil",
+    "PE": "Perú"
+  },
+  "canales": {
+    "email": "Correo electrónico"
   }
 }

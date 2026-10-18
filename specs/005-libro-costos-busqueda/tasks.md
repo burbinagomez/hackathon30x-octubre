@@ -222,15 +222,15 @@
   Un test que nazca verde contra estos esqueletos (por ejemplo, un positivo de `limites.test.ts` con la config vacía) se acepta solo si su mutación lo pone en rojo.
 - [ ] T035 [MIN] [Paso 8] **Rojo:** `frontend/tests/arquitectura/limites.test.ts`, los 6 tests de spec:221-235. **Mutación:** cada negativo, con su dirección en `allow`; para `import_sin_resolver_es_error`, `import/no-unresolved` en `off`.
 - [ ] T036 [Pulido] [Paso 8] **Verde:** `frontend/eslint.config.js` (boundaries, en el orden de tipos de spec:445-452, más el resolver de TS).
-- [ ] T037 [MIN] [Paso 8] **Rojo:**
+- [x] T037 [MIN] [Paso 8] **Rojo:**
   - `frontend/tests/arquitectura/i18n.test.ts`, los 4 tests. **Mutación:** borrar una clave de `en.json`; `mode` que no atrapa atributos.
   - `frontend/src/i18n/elegirIdioma.test.ts::precedencia[caso]`. **Mutación:** el tenant antes que el navegador.
-- [ ] T038 [MIN] [Paso 8] **Verde:** `src/i18n/` y la regla `i18next/no-literal-string`.
-- [ ] T039 [MIN] [P] [Paso 8] **Rojo:**
+- [x] T038 [MIN] [Paso 8] **Verde:** `src/i18n/` y la regla `i18next/no-literal-string`.
+- [x] T039 [MIN] [P] [Paso 8] **Rojo:**
   - `frontend/src/acceso/Login.test.tsx::selector_sin_sesion_no_guarda`. **Mutación:** `PATCH` sin mirar la sesión.
   - `frontend/src/api/cliente.test.ts::un_401_lleva_al_login_y_borra_el_token`. **Mutación:** no borrar el token.
-- [ ] T040 [MIN] [P] [Paso 8] **Rojo:** `frontend/src/busqueda/NuevaBusqueda.test.tsx`, los 6 tests de spec:251-257. **Mutación:** habilitar Buscar comparando el estimado en lugar del máximo; no invalidar la vista previa al cambiar un filtro.
-- [ ] T041 [MIN] [P] [Paso 8] **Rojo:** `frontend/src/tablero/Tablero.test.tsx`:
+- [x] T040 [MIN] [P] [Paso 8] **Rojo:** `frontend/src/busqueda/NuevaBusqueda.test.tsx`, los 6 tests de spec:251-257. **Mutación:** habilitar Buscar comparando el estimado en lugar del máximo; no invalidar la vista previa al cambiar un filtro.
+- [x] T041 [MIN] [P] [Paso 8] **Rojo:** `frontend/src/tablero/Tablero.test.tsx`:
   - los 6 de spec:259-268. **Mutación:** formatear `null` como `0`; un texto de atribución hardcodeado.
   - `::muestra_naturales_encontradas_no_contactables`. **viene de 011 (D7)** (T048 de la 011). Tres casos, en es y en:
     - `26304` se muestra "26.304" en es y "26,304" en en, con el esperado calculado con `Intl.NumberFormat`;
@@ -238,7 +238,7 @@
     - `cuenta_naturales: false` se muestra el texto i18n de "no aplica".
 
     **Mutación:** `valor ?? 0` → "0".
-- [ ] T042 [MIN] [Paso 8] **Verde:**
+- [x] T042 [MIN] [Paso 8] **Verde:**
   - `acceso/`, `busqueda/`, `tablero/` (con la columna "Naturales (no contactables)" y sus claves en es y en, que **viene de 011 (D7)**, T049);
   - `api/cliente.ts`, `compartido/{SelectorIdioma,formato}`;
   - `App.tsx` con el router.

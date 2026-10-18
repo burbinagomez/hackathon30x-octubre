@@ -1,6 +1,11 @@
 {
   "acceso": {
-    "ingresar": "Sign in"
+    "ingresar": "Sign in",
+    "titulo": "Sign in",
+    "email": "Email",
+    "clave": "Password",
+    "error_credenciales": "Wrong email or password",
+    "error_generico": "Could not sign in. Try again."
   },
   "motivos": {
     "sin_mapeo_actividad": "The activity has no equivalent in this source",
@@ -32,7 +37,9 @@
     "tope_linea": "Cap: {{monto}}",
     "creditos_restantes": "Croma credits left this month: {{n}}",
     "requests_restantes": "Croma requests left in 24 h: {{n}}",
-    "descartadas": "Discarded sources"
+    "descartadas": "Discarded sources",
+    "ignorados": "ignored: {{lista}}",
+    "error": "The operation could not be completed. Try again."
   },
   "fuentes": {
     "croma_supersociedades_co": "Supersociedades (Croma)",
@@ -63,6 +70,21 @@
     "costo_evals": "Evals cost (separate): {{monto}}",
     "cobertura": "Coverage by country",
     "revisiones_pendientes": "Pending reviews: {{n}}",
-    "atribucion": "Data attribution"
+    "atribucion": "Data attribution",
+    "desperdicio_real": "Waste (actual)"
+  },
+  "idioma": {
+    "etiqueta": "Language",
+    "es": "Español",
+    "en": "English"
+  },
+  "paises": {
+    "CO": "Colombia",
+    "MX": "Mexico",
+    "BR": "Brazil",
+    "PE": "Peru"
+  },
+  "canales": {
+    "email": "Email"
   }
 }

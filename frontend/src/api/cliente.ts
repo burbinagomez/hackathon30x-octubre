@@ -1,10 +1,30 @@
-// Esqueleto (T034): hace la llamada sin tocar el token.
+import { borrarSesion, leerSesion } from "./sesion";
+
 export type Opciones = { metodo?: string; cuerpo?: unknown };
 
-export async function pedir<T>(ruta: string, opciones: Opciones = {}): Promise<T> {
+export class ErrorApi extends Error {
+  constructor(readonly estado: number) {
+    super(`HTTP ${estado}`);
+  }
+}
+
+/** Cliente HTTP único. Un 401 con sesión la borra y lleva al login; sin sesión (login fallido) solo falla. */
+export async function pedir<T>(ruta: string, { metodo, cuerpo }: Opciones = {}): Promise<T> {
+  const { token } = leerSesion();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (cuerpo !== undefined) headers["Content-Type"] = "application/json";
+
   const respuesta = await fetch(`${import.meta.env.VITE_API_URL ?? ""}${ruta}`, {
-    method: opciones.metodo,
-    body: opciones.cuerpo === undefined ? undefined : JSON.stringify(opciones.cuerpo),
+    method: metodo,
+    headers,
+    body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
   });
-  return (await respuesta.json()) as T;
+
+  if (respuesta.status === 401 && token) {
+    borrarSesion();
+    window.location.assign("/login");
+  }
+  if (!respuesta.ok) throw new ErrorApi(respuesta.status);
+  return respuesta.status === 204 ? (undefined as T) : ((await respuesta.json()) as T);
 }

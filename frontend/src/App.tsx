@@ -1,9 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
+import Login from "./acceso/Login";
+import NuevaBusqueda from "./busqueda/NuevaBusqueda";
+import { aplicarIdioma } from "./compartido/idioma";
+import SelectorIdioma from "./compartido/SelectorIdioma";
+import Tablero from "./tablero/Tablero";
 
 type Estado = { api: "…" | "ok" | "error"; db: "…" | "ok" | "error" };
 
-export default function App() {
+const RUTAS: Record<string, ComponentType> = {
+  "/login": Login,
+  "/busqueda/nueva": NuevaBusqueda,
+  "/tablero": Tablero,
+};
+
+function Salud() {
   const { t } = useTranslation();
   // Arranca sin "ok": si no, el e2e pasa antes de que /health conteste.
   const [estado, setEstado] = useState<Estado>({ api: "…", db: "…" });
@@ -16,7 +27,28 @@ export default function App() {
       .catch(() => setEstado({ api: "error", db: "error" }));
   }, []);
 
+  return <div>{t("salud.estado", { api: estado.api, db: estado.db })}</div>;
+}
+
+/** Raíz de composición: el router mínimo (por pathname y popstate) y el idioma de arranque. */
+export default function App() {
+  const [ruta, setRuta] = useState(location.pathname);
+  // Antes del primer render: la elección guardada tiene que ganar sin un parpadeo en otro idioma.
+  useState(aplicarIdioma);
+
+  useEffect(() => {
+    const alNavegar = () => setRuta(location.pathname);
+    window.addEventListener("popstate", alNavegar);
+    return () => window.removeEventListener("popstate", alNavegar);
+  }, []);
+
+  const Pantalla = RUTAS[ruta];
+  if (!Pantalla) return <Salud />;
   return (
-    <div>{t("salud.estado", { api: estado.api, db: estado.db })}</div>
+    <>
+      {/* Login lleva su propio selector. */}
+      {ruta !== "/login" && <SelectorIdioma />}
+      <Pantalla />
+    </>
   );
 }

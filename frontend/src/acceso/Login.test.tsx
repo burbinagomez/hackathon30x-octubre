@@ -59,3 +59,14 @@ test("credenciales_invalidas_muestran_error_y_no_guardan", async () => {
   expect(sessionStorage.getItem("token")).toBeNull();
   expect(location.pathname).toBe("/");
 });
+
+test("un_fallo_del_servidor_no_se_presenta_como_clave_mala", async () => {
+  server.use(http.post("*/auth/sesion", () => new HttpResponse(null, { status: 500 })));
+  render(<Login />);
+
+  enviar("ana@ejemplo.test", "clave-de-prueba");
+
+  await waitFor(() =>
+    expect(screen.queryByRole("alert")).toHaveTextContent("No se pudo ingresar. Probá de nuevo."),
+  );
+});

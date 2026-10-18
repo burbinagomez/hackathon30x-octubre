@@ -179,3 +179,41 @@ test("cambia_idioma", async () => {
   await waitFor(() => expect(boton(en.busqueda.buscar)).toBeInTheDocument());
   expect(patches).toHaveLength(1);
 });
+
+test("vista_previa_exige_actividad_y_tope", async () => {
+  server.use(http.get("*/actividades", () => HttpResponse.json(actividades)));
+  render(<NuevaBusqueda />);
+  await waitFor(() => expect(screen.queryByRole("option", { name: actividades[0].nombre_es })).toBeInTheDocument());
+  expect(boton("Vista previa")).toBeDisabled();
+
+  fireEvent.change(campo("Actividad"), { target: { value: "1081" } });
+  expect(boton("Vista previa")).toBeDisabled();
+  fireEvent.change(campo("Tope de gasto (USD)"), { target: { value: "5" } });
+  expect(boton("Vista previa")).toBeEnabled();
+});
+
+test("un_error_de_la_api_se_avisa_y_no_deja_la_busqueda_a_medias", async () => {
+  server.use(http.post("*/busquedas/:id/ejecutar", () => new HttpResponse(null, { status: 409 })));
+  await previsualizar();
+  await waitFor(() => expect(boton("Buscar")).toBeEnabled());
+
+  fireEvent.click(boton("Buscar"));
+
+  await waitFor(() => expect(screen.queryByRole("alert")).toHaveTextContent("No se pudo completar la operación. Probá de nuevo."));
+  expect(location.pathname).toBe("/");
+});
+
+test("un_error_en_la_vista_previa_se_avisa", async () => {
+  server.use(
+    http.get("*/actividades", () => HttpResponse.json(actividades)),
+    http.post("*/busquedas/vista-previa", () => new HttpResponse(null, { status: 422 })),
+  );
+  render(<NuevaBusqueda />);
+  await waitFor(() => expect(screen.queryByRole("option", { name: actividades[0].nombre_es })).toBeInTheDocument());
+  fireEvent.change(campo("Actividad"), { target: { value: "1081" } });
+  fireEvent.change(campo("Tope de gasto (USD)"), { target: { value: "5" } });
+
+  fireEvent.click(boton("Vista previa"));
+
+  await waitFor(() => expect(screen.queryByRole("alert")).toHaveTextContent("No se pudo completar la operación. Probá de nuevo."));
+});

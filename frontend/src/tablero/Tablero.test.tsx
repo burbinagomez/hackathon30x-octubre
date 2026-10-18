@@ -31,7 +31,8 @@ function celda(fila: string, columna: string): string {
   expect(columnaIdx, `no hay columna "${columna}" en ${encabezados.join("|")}`).toBeGreaterThanOrEqual(0);
   const fila_ = screen.queryAllByRole("row").find((r) => within(r).queryAllByRole("cell")[0]?.textContent === fila);
   expect(fila_, `no hay fila "${fila}"`).toBeDefined();
-  return within(fila_!).queryAllByRole("cell")[columnaIdx]?.textContent ?? "";
+  // textContent trae los espacios duros de Intl; los helpers de monto los normalizan igual.
+  return (within(fila_!).queryAllByRole("cell")[columnaIdx]?.textContent ?? "").replace(/\s/g, " ");
 }
 
 test("cpl_null_se_muestra_sin_dato", async () => {
