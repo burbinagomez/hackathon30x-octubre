@@ -228,6 +228,8 @@
     "email": "Correo",
     "licencia": "Licencia",
     "solo_con_contacto": "Solo con contacto",
+    "solo_icp": "Solo los que encajan con el ICP",
+    "encaje": "Encaje ICP",
     "si": "Sí",
     "no": "No",
     "anterior": "Anterior",

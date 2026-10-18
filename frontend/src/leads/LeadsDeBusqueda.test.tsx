@@ -107,6 +107,49 @@ test("el checkbox Solo con contacto agrega con_contacto=true, vuelve a la pagina
   expect(pedidas[3]).toBe("?pagina=1&tamano=25");
 });
 
+test("el checkbox Solo los que encajan agrega solo_icp=true, vuelve a la pagina 1 y se combina con contacto", async () => {
+  const pedidas: string[] = [];
+  server.use(http.get("*/busquedas/:id/leads", ({ request }) => {
+    pedidas.push(new URL(request.url).search);
+    return HttpResponse.json(pagina([lead(1)], { total: 30 }));
+  }));
+  await i18n.changeLanguage("es");
+  render(<LeadsDeBusqueda id={ID} />);
+  await waitFor(() => expect(screen.queryByRole("table")).toBeInTheDocument());
+  fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+  await waitFor(() => expect(pedidas).toHaveLength(2));
+
+  fireEvent.click(screen.getByRole("checkbox", { name: "Solo los que encajan con el ICP" }));
+  await waitFor(() => expect(pedidas).toHaveLength(3));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Solo con contacto" }));
+  await waitFor(() => expect(pedidas).toHaveLength(4));
+
+  expect(pedidas).toEqual(["?pagina=1&tamano=25", "?pagina=2&tamano=25", "?pagina=1&tamano=25&solo_icp=true",
+    "?pagina=1&tamano=25&con_contacto=true&solo_icp=true"]);
+});
+
+test("la columna Encaje ICP pinta Si, No y guion, y solo aparece si algun item trae encaje", async () => {
+  await montar(pagina([lead(1, { encaje: "encaja" }), lead(2, { encaje: "no_encaja" }), lead(3, { encaje: "ninguna" }),
+    lead(4, { encaje: null })]));
+  expect(screen.getByRole("columnheader", { name: "Encaje ICP" })).toBeInTheDocument();
+  const celda = (n: number) => within(screen.getByText(`Empresa ${n} SAS`).closest("tr")!).getAllByRole("cell").at(-2)!;
+  expect([1, 2, 3, 4].map((n) => celda(n).textContent)).toEqual(["Sí", "No", "—", "—"]);
+});
+
+test("sin ningun encaje la columna no se pinta", async () => {
+  await montar(pagina([lead(1), lead(2, { encaje: null })]));
+  expect(screen.queryByRole("columnheader", { name: "Encaje ICP" })).not.toBeInTheDocument();
+});
+
+test("Encaje ICP en ingles", async () => {
+  await montar(pagina([lead(1, { encaje: "encaja" })]), "en");
+  expect(screen.getByRole("columnheader", { name: en.leads.encaje })).toBeInTheDocument();
+  expect(screen.getByRole("checkbox", { name: en.leads.solo_icp })).toBeInTheDocument();
+  expect(en.leads.solo_icp).not.toBe(es.leads.solo_icp);
+  expect(en.leads.encaje).not.toBe(es.leads.encaje);
+  await i18n.changeLanguage("es");
+});
+
 test("con el filtro y sin resultados el checkbox sigue para quitarlo, y en ingles", async () => {
   server.use(http.get("*/busquedas/:id/leads", ({ request }) =>
     HttpResponse.json(pagina([], { total: 0 }), { headers: { "x-q": new URL(request.url).search } })));
@@ -231,7 +274,7 @@ test("la fila de herramientas tiene el conteo y el checkbox", async () => {
   expect(fila).not.toBeNull();
   expect(within(fila).getByText(/12 leads/)).toBeInTheDocument();
   expect(within(fila).getByRole("checkbox", { name: "Solo con contacto" })).toBeInTheDocument();
-  expect(screen.getByRole("checkbox").closest("label")).toHaveClass("filtro-contacto"); // el label envuelve al input
+  expect(screen.getByRole("checkbox", { name: "Solo con contacto" }).closest("label")).toHaveClass("filtro-contacto"); // el label envuelve al input
 });
 
 test("el progreso sale en ingles", async () => {

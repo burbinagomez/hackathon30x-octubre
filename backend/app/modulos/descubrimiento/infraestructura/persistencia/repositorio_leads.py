@@ -68,6 +68,8 @@ _FILTRO_FUENTE = "l.id IN (SELECT lead_id FROM lead_fuentes WHERE fuente = :f)"
 _FILTRO_TODOS = "TRUE"
 # Solo jurídicas, con teléfono o correo guardado. Constante del módulo; se agrega con AND al filtro de alcance.
 _CON_CONTACTO = "l.tipo_titular = 'juridica' AND (l.telefono_cifrado IS NOT NULL OR l.email_cifrado IS NOT NULL)"
+# Solo los que el clasificador marcó como encaje con el ICP.
+_SOLO_ICP = "l.encaje = 'encaja'"
 _DESDE = "FROM leads l JOIN lead_fuentes lf ON lf.lead_id = l.id WHERE "
 
 
@@ -86,6 +88,7 @@ def _sql_leads(filtro: str):
            CASE WHEN l.tipo_titular = 'juridica' THEN l.telefono_cifrado END AS telefono_cifrado,
            CASE WHEN l.tipo_titular = 'juridica' THEN l.email_cifrado END AS email_cifrado,
            CASE WHEN l.tipo_titular = 'juridica' THEN l.web END AS web,
+           CASE WHEN l.tipo_titular = 'juridica' THEN l.encaje END AS encaje,
            array_agg(lf.fuente ORDER BY lf.fuente) AS fuentes,
            array_agg(lf.licencia ORDER BY lf.fuente) AS licencias
     {_DESDE}{filtro}
@@ -327,28 +330,31 @@ class RepositorioLeadsPostgres:
         return [ResumenBusqueda(id=f.id, creada_en=f.creado_en, estado=f.estado, pais=f.pais, departamento=f.departamento,
                                 ciudad=f.ciudad, total_leads=f.total_leads) for f in filas]
 
-    def listar_leads(self, busqueda_id: UUID, pagina: int, tamano: int, con_contacto: bool = False) -> PaginaLeads | None:
+    def listar_leads(self, busqueda_id: UUID, pagina: int, tamano: int, con_contacto: bool = False,
+                     solo_icp: bool = False) -> PaginaLeads | None:
         """None si la búsqueda no existe para este tenant."""
         with self._uow() as c:
             if c.execute(text("SELECT 1 FROM busquedas WHERE id = :id"), {"id": busqueda_id}).first() is None:
                 return None
-            return self._pagina(c, _FILTRO_BUSQUEDA, {"b": busqueda_id}, pagina, tamano, con_contacto)
+            return self._pagina(c, _FILTRO_BUSQUEDA, {"b": busqueda_id}, pagina, tamano, con_contacto, solo_icp)
 
     def listar_leads_de_fuente(self, fuente: str | None, pagina: int, tamano: int,
-                               con_contacto: bool = False) -> PaginaLeads:
+                               con_contacto: bool = False, solo_icp: bool = False) -> PaginaLeads:
         """Leads de una fuente en todas las búsquedas del tenant; sin fuente, todos. Que la fuente exista lo valida la API."""
         with self._uow() as c:
             if fuente is None:
-                return self._pagina(c, _FILTRO_TODOS, {}, pagina, tamano, con_contacto)
-            return self._pagina(c, _FILTRO_FUENTE, {"f": fuente}, pagina, tamano, con_contacto)
+                return self._pagina(c, _FILTRO_TODOS, {}, pagina, tamano, con_contacto, solo_icp)
+            return self._pagina(c, _FILTRO_FUENTE, {"f": fuente}, pagina, tamano, con_contacto, solo_icp)
 
     def _pagina(self, c: Connection, filtro: str, params: dict, pagina: int, tamano: int,
-                con_contacto: bool = False) -> PaginaLeads:
+                con_contacto: bool = False, solo_icp: bool = False) -> PaginaLeads:
         """El nombre sale solo de una jurídica (el CASE lo repite aunque el CHECK ya lo garantice) y nunca la dirección.
         Teléfono, correo y web: solo de una jurídica (el SQL ni los devuelve de una natural), descifrados para que el
         tenant vea el canal que la empresa publica (Daniel, 2026-10-18). El tenant lo filtra la RLS."""
         if con_contacto:
             filtro = f"({filtro}) AND {_CON_CONTACTO}"
+        if solo_icp:
+            filtro = f"({filtro}) AND {_SOLO_ICP}"
         total = c.execute(_sql_total(filtro), params).scalar_one()
         filas = c.execute(_sql_leads(filtro), {**params, "limite": tamano, "desde": (pagina - 1) * tamano}).all()
         atribuciones = c.execute(_sql_atribuciones(filtro), params).all()
@@ -358,6 +364,6 @@ class RepositorioLeadsPostgres:
             ciudad=f.ciudad, tiene_web=f.tiene_web,
             tiene_telefono=f.tiene_telefono, tiene_email=f.tiene_email,
             telefono=self._descifrar_contacto("telefono_cifrado", f.telefono_cifrado, f.id),
-            email=self._descifrar_contacto("email_cifrado", f.email_cifrado, f.id), web=f.web) for f in filas)
+            email=self._descifrar_contacto("email_cifrado", f.email_cifrado, f.id), web=f.web, encaje=f.encaje) for f in filas)
         return PaginaLeads(items=items, total=total, pagina=pagina, tamano=tamano, atribuciones=tuple(
             AtribucionFuente(a.fuente, a.texto, a.url) for a in atribuciones))

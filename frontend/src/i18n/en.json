@@ -228,6 +228,8 @@
     "email": "Email",
     "licencia": "License",
     "solo_con_contacto": "Only with contact",
+    "solo_icp": "Only those that fit the ICP",
+    "encaje": "ICP fit",
     "si": "Yes",
     "no": "No",
     "anterior": "Previous",

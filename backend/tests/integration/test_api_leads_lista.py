@@ -18,7 +18,7 @@ from tests.integration.test_auth import _bearer, cliente, entorno, usuarios, ver
 NOMBRE_NATURAL = "Juan Pérez Natural"
 DIRECCION_NATURAL = "Calle Secreta 123"
 CLAVES_DEL_ITEM = {"id", "nombre", "tipo_titular", "fuentes", "licencias", "ciudad", "tiene_telefono", "tiene_email",
-                   "tiene_web", "telefono", "email", "web"}
+                   "tiene_web", "telefono", "email", "web", "encaje"}
 
 
 def _empresa(nombre, fuente, id_fiscal, titular="juridica", direccion=None, web=None):
@@ -178,6 +178,46 @@ def _dar_contacto(datos, nombre, titular="juridica", telefono=None, email=None):
     repo.guardar_enriquecimiento(UUID(ids[nombre]), ResultadoEnriquecimiento(
         titular, (telefono, "sitio_web") if telefono else None, (email, "sitio_web") if email else None,
         titular == "juridica", None if titular == "juridica" else "persona_natural", None))
+
+
+def _clasificar(datos, nombre, encaje, titular="juridica", telefono=None):
+    repo = RepositorioLeadsPostgres(datos["api"].app.state.engine, datos["u"]["tenant_a"],
+                                    datos["api"].app.state.cifrador)
+    ids = {i["nombre"]: i["id"] for i in _leads(datos, "a", datos["ba"], tamano=100).json()["items"] if i["nombre"]}
+    repo.guardar_enriquecimiento(UUID(ids[nombre]), ResultadoEnriquecimiento(
+        titular, (telefono, "sitio_web") if telefono else None, None, True, None, encaje))
+
+
+def test_item_trae_encaje_y_la_natural_null(datos):
+    _clasificar(datos, "Acme SAS", "encaja")
+    items = _leads(datos, "a", datos["ba"], tamano=100).json()["items"]
+
+    assert next(i for i in items if i["nombre"] == "Acme SAS")["encaje"] == "encaja"
+    assert next(i for i in items if i["nombre"] == "Empresa 1 SAS")["encaje"] is None
+    assert next(i for i in items if i["tipo_titular"] == "natural")["encaje"] is None
+
+
+def test_solo_icp_filtra_en_las_dos_rutas_y_se_combina_con_contacto(datos):
+    _clasificar(datos, "Acme SAS", "encaja", telefono=TELEFONO)
+    _clasificar(datos, "Empresa 0 SAS", "encaja")
+    _clasificar(datos, "Empresa 1 SAS", "no_encaja", telefono=TELEFONO)
+    _clasificar(datos, "Empresa 2 SAS", "ninguna")
+
+    por_busqueda = _leads(datos, "a", datos["ba"], solo_icp="true").json()
+    todos = datos["api"].get("/leads", params={"solo_icp": "true"}, headers=_bearer(datos["u"]["a"])).json()
+    for r in (por_busqueda, todos):
+        assert {i["nombre"] for i in r["items"]} == {"Acme SAS", "Empresa 0 SAS"} and r["total"] == 2
+    combinado = _leads(datos, "a", datos["ba"], solo_icp="true", con_contacto="true").json()
+    assert {i["nombre"] for i in combinado["items"]} == {"Acme SAS"} and combinado["total"] == 1
+    assert _leads(datos, "a", datos["ba"], solo_icp="false").json()["total"] == 5
+
+
+def test_solo_icp_no_cruza_tenants(datos):
+    _clasificar(datos, "Acme SAS", "encaja")
+
+    como_b = datos["api"].get("/leads", params={"solo_icp": "true"}, headers=_bearer(datos["u"]["b"])).json()
+
+    assert (como_b["total"], como_b["items"]) == (0, [])
 
 
 def test_la_juridica_trae_su_contacto_sin_cache_y_otro_tenant_no_lo_ve(datos):

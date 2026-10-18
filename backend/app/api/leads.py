@@ -32,7 +32,7 @@ def _item(l: LeadListado) -> dict:
         "id": str(l.id), "nombre": l.nombre, "tipo_titular": l.tipo_titular, "fuentes": list(l.fuentes),
         "licencias": list(l.licencias), "ciudad": l.ciudad, "tiene_web": l.tiene_web,
         "tiene_telefono": l.tiene_telefono, "tiene_email": l.tiene_email,  # bool solo de jurídicas; None = no se expone
-        "telefono": l.telefono, "email": l.email, "web": l.web,  # solo de jurídicas: el canal que la empresa publica
+        "telefono": l.telefono, "email": l.email, "web": l.web, "encaje": l.encaje,  # solo de jurídicas: el canal que la empresa publica
     }
 
 
@@ -62,9 +62,10 @@ def listar_leads(
     pagina: Annotated[int, Query(ge=1, le=100_000)] = 1,
     tamano: Annotated[int, Query(ge=1, le=TAMANO_MAXIMO)] = 25,
     con_contacto: bool = False,
+    solo_icp: bool = False,
     tenant_id: UUID = Depends(tenant_actual),
 ):
-    r = _repo(request, tenant_id).listar_leads(busqueda_id, pagina, tamano, con_contacto)
+    r = _repo(request, tenant_id).listar_leads(busqueda_id, pagina, tamano, con_contacto, solo_icp)
     if r is None:  # inexistente o de otro tenant: la misma respuesta
         raise HTTPException(status_code=404, detail="no_encontrada")
     return JSONResponse(_cuerpo(r), headers=SIN_CACHE)
@@ -77,10 +78,11 @@ def listar_leads_de_fuente(
     pagina: Annotated[int, Query(ge=1, le=100_000)] = 1,
     tamano: Annotated[int, Query(ge=1, le=TAMANO_MAXIMO)] = 25,
     con_contacto: bool = False,
+    solo_icp: bool = False,
     tenant_id: UUID = Depends(tenant_actual),
 ):
     """Los leads de una fuente en todas las búsquedas del tenant (el tablero enlaza acá); sin `fuente`, todos."""
     if fuente is not None and fuente not in _fuentes_conocidas(request):
         return JSONResponse(status_code=422, content={"errores": [{"campo": "fuente", "codigo": "desconocida"}]})
-    return JSONResponse(_cuerpo(_repo(request, tenant_id).listar_leads_de_fuente(fuente, pagina, tamano, con_contacto)),
+    return JSONResponse(_cuerpo(_repo(request, tenant_id).listar_leads_de_fuente(fuente, pagina, tamano, con_contacto, solo_icp)),
                         headers=SIN_CACHE)
