@@ -146,8 +146,8 @@ Va después de que la 003 registre OSM en el catálogo. Con el catálogo vacío,
 ### Contrato de Croma y tarifa
 
 - [ ] T035 [US1] Verde (se adelanta al paso 6; el rojo de su contrato lo da T034): `backend/tests/contratos/fabricas.py` con la fábrica de `croma_supersociedades_co` (transporte falso + fixture de T028).
-- [ ] T046 [US1] Rojo: `backend/tests/unit/test_cli.py::test_tarifa_croma_es_decimal_exacto`, sacado de T040. Con `catalogo={"croma_supersociedades_co": FuenteFalsa}`, que captura el `costo_unitario` que le pasa el CLI, `costo_unitario == Decimal("0.00099")` y `isinstance(costo_unitario, Decimal)`. El rojo es real: la primera versión lee `tarifas.yaml` con `yaml.safe_load` y pasa el valor tal cual, un `float`, así que `isinstance` falla y `0.00099 != Decimal("0.00099")`.
-- [ ] T047 [US1] Verde: `app/cli.py` carga `tarifas.yaml` una vez, con cada valor como `Decimal(str(v))`, y le pasa al adaptador el `costo_unitario` ya resuelto.
+- [X] T046 [US1] Rojo: `backend/tests/unit/test_cli.py::test_tarifa_croma_es_decimal_exacto`, sacado de T040. Con `catalogo={"croma_supersociedades_co": FuenteFalsa}`, que captura el `costo_unitario` que le pasa el CLI, `costo_unitario == Decimal("0.00099")` y `isinstance(costo_unitario, Decimal)`. El rojo es real: la primera versión lee `tarifas.yaml` con `yaml.safe_load` y pasa el valor tal cual, un `float`, así que `isinstance` falla y `0.00099 != Decimal("0.00099")`.
+- [X] T047 [US1] Verde: `app/cli.py` carga `tarifas.yaml` una vez, con cada valor como `Decimal(str(v))`, y le pasa al adaptador el `costo_unitario` ya resuelto.
 
 ### Corrida real
 

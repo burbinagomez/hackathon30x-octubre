@@ -23,6 +23,12 @@ from app.modulos.descubrimiento.infraestructura.adaptadores import catalogo
 CONFIG = Path(__file__).resolve().parents[1] / "config"
 
 
+def _cargar_tarifas() -> dict[str, Decimal]:
+    """Tarifa unitaria por proveedor desde tarifas.yaml; cada valor pasa por str para no arrastrar el error del float."""
+    t = yaml.safe_load((CONFIG / "tarifas.yaml").read_text())
+    return {"croma": Decimal(str(t["croma"]["usd_por_credito"])), "osm": Decimal(str(t["computo_seg_usd"]))}
+
+
 @dataclass(frozen=True)
 class Persistencia:
     repo: RepositorioLeads
@@ -95,11 +101,14 @@ def main(argv=None, *, catalogo=catalogo, persistencia=None) -> int:
         return 2
 
     costos = _ContadorDeCreditos(persistencia.costos)
+    tarifas = _cargar_tarifas()
     filtros = {k: v for k, v in (("ciiu", args.ciiu), ("departamento", args.departamento)) if v}
 
     def fabrica(clase, meta):
         def armar(lote_id: UUID):
             kwargs = {"meta": meta, "registro_costos": costos, "transporte": httpx.HTTPTransport(), "lote_id": lote_id}
+            if meta.proveedor in tarifas:
+                kwargs["costo_unitario"] = tarifas[meta.proveedor]
             if meta.proveedor == "osm":
                 kwargs["repo_url"] = ajustes().repo_url
                 if ajustes().overpass_url:
