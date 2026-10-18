@@ -154,3 +154,14 @@ def test_calificados_sin_costo_de_la_fuente_cpql_es_null(rt, fixture_cpql):
 
     assert web.calificados == 1
     assert web.costo_lista is None and web.cpql_lista is None and web.cpql_real is None  # sin dato, no 0
+
+
+def test_el_costo_por_fuente_del_tablero_es_el_de_v_cpql(rt, fixture_cpql):
+    """El front une las dos respuestas por fuente: el costo de cada fila (sin_atribuir incluida) tiene que coincidir."""
+    from app.modulos.tablero.infraestructura.persistencia.repositorio_tablero import leer_tablero
+
+    cpql = _cpql(rt, fixture_cpql)
+    tablero = leer_tablero(rt, fixture_cpql)
+    assert {f.fuente: f.costo_lista for f in tablero.fuentes if f.costo_lista is not None} == {
+        f: r.costo_lista for f, r in cpql.items() if f != "TOTAL" and r.costo_lista is not None}
+    assert tablero.total.costo_lista == cpql["TOTAL"].costo_lista
