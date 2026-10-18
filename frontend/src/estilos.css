@@ -31,6 +31,27 @@ textarea {
   resize: vertical;
 }
 
+/* Un checkbox no es un campo de texto: tamaño propio, color de acento, y el objetivo táctil lo da su label. */
+input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--color-acento);
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.filtro-contacto {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  cursor: pointer;
+  margin: 8px 0;
+}
+
 button {
   cursor: pointer;
 }
