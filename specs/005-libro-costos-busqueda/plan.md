@@ -35,7 +35,7 @@ Además absorbe de la 011, por la D7, seis tests y el verde del tablero de natur
 
 - **Language/Version:** Python 3.12; TypeScript 5.7 con React 18.3.
 - **Primary Dependencies, back:** FastAPI, SQLAlchemy Core + psycopg 3, httpx y pyyaml, todos de la 002. Nueva: **`pyjwt[crypto]`** (verificar el token con JWKS; `cryptography` para ES256/RS256).
-- **Primary Dependencies, front:** react-i18next e i18next como dependencias nuevas. Como devDependencies nuevas: `eslint`, `typescript-eslint`, `eslint-plugin-boundaries`, `eslint-plugin-import`, `eslint-import-resolver-typescript` y `eslint-plugin-i18next`. MSW 2.6.6 ya está en `package.json`.
+- **Primary Dependencies, front:** react-i18next e i18next como dependencias nuevas. Como devDependencies nuevas: `eslint`, `typescript-eslint`, `eslint-plugin-boundaries`, `eslint-plugin-import`, `eslint-import-resolver-typescript` y `eslint-plugin-i18next`. `eslint-plugin-boundaries` no entra: ninguna versión publicada pasa `npm audit --audit-level=high` (arrastra `braces` o `handlebars` con CVE sin arreglo); los límites por feature van con `import/no-restricted-paths` de `eslint-plugin-import` (T036). MSW 2.6.6 ya está en `package.json`.
 - **Storage:** Postgres (`postgres:16` en CI) y una migración a mano. El número se discute en la pregunta P5.
 - **Testing:** pytest, con integración contra Postgres real como `app_rt`. Vitest + Testing Library + MSW en el front y Playwright para el E2E local. Se usan `httpx.MockTransport` y un reloj inyectable, como en la 002 y la 003.
 - **Constraints:**
