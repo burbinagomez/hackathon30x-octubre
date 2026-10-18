@@ -1,9 +1,13 @@
 import json
+from collections.abc import Iterator
+from contextlib import contextmanager
 from uuid import UUID, uuid4
 
-from sqlalchemy import Engine, text
+from sqlalchemy import Connection, Engine, text
+from sqlalchemy.exc import DBAPIError
 
 from app.db import unidad_de_trabajo
+from app.modulos.descubrimiento.dominio.errores import ErrorPersistencia
 from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, EmpresaCruda, Lead
 from app.seguridad.cifrado import Cifrador
 
@@ -29,12 +33,21 @@ class RepositorioLeadsPostgres:
         self._cifrador = cifrador
 
     def crear_busqueda(self, criterios: CriteriosICP) -> UUID:
-        with unidad_de_trabajo(self._engine, self._tenant_id) as c:
+        with self._uow() as c:
             return c.execute(
                 text("INSERT INTO busquedas (tenant_id, pais, criterios) VALUES (:t, :pais, CAST(:criterios AS jsonb)) "
                      "RETURNING id"),
                 {"t": self._tenant_id, "pais": criterios.pais, "criterios": json.dumps(dict(criterios.filtros))},
             ).scalar_one()
+
+    @contextmanager
+    def _uow(self) -> Iterator[Connection]:
+        # El mensaje de Postgres trae la fila entera en el DETAIL (nombre, dirección): no sale de acá, ni como causa.
+        try:
+            with unidad_de_trabajo(self._engine, self._tenant_id) as c:
+                yield c
+        except DBAPIError:
+            raise ErrorPersistencia("la base rechazó la operación") from None
 
     def _identidad(self, e: EmpresaCruda, lead_id: UUID) -> dict:
         """Nombre y dirección: en claro solo para una jurídica; para cualquier otro titular, cifrados (el CHECK lo exige)."""
@@ -47,7 +60,7 @@ class RepositorioLeadsPostgres:
 
     def obtener_o_crear_lead(self, e: EmpresaCruda, licencia: str) -> tuple[UUID, bool]:
         # ponytail: id_fiscal NULL (OSM) no choca con el UNIQUE, así que siempre crea lead nuevo; dedup difuso en Pulido.
-        with unidad_de_trabajo(self._engine, self._tenant_id) as c:
+        with self._uow() as c:
             # El id lo genera la app: entra al AAD del cifrado, y la base no puede ponerlo después.
             # Si el INSERT choca con ON CONFLICT, este id se descarta.
             lead_id = uuid4()
@@ -70,7 +83,7 @@ class RepositorioLeadsPostgres:
             return nuevo, True
 
     def agregar_lead_fuente(self, lead_id: UUID, busqueda_id: UUID, e: EmpresaCruda, licencia: str) -> None:
-        with unidad_de_trabajo(self._engine, self._tenant_id) as c:
+        with self._uow() as c:
             c.execute(
                 text("INSERT INTO lead_fuentes (tenant_id, lead_id, busqueda_id, fuente, url_origen, licencia) "
                      "VALUES (:t, :lead_id, :busqueda_id, :fuente, :url_origen, :licencia) "
@@ -80,7 +93,7 @@ class RepositorioLeadsPostgres:
             )
 
     def obtener_lead(self, lead_id: UUID) -> Lead | None:
-        with unidad_de_trabajo(self._engine, self._tenant_id) as c:
+        with self._uow() as c:
             f = c.execute(
                 text("SELECT pais, tipo_titular, id_fiscal, ciudad, web, nombre, direccion, nombre_cifrado, direccion_cifrada "
                      "FROM leads WHERE id = :id"), {"id": lead_id}).one_or_none()
@@ -93,5 +106,5 @@ class RepositorioLeadsPostgres:
                     direccion=f.direccion if f.direccion is not None else descifrar("direccion_cifrada", f.direccion_cifrada))
 
     def cerrar_busqueda(self, busqueda_id: UUID, estado: str) -> None:
-        with unidad_de_trabajo(self._engine, self._tenant_id) as c:
+        with self._uow() as c:
             c.execute(text("UPDATE busquedas SET estado = :estado WHERE id = :id"), {"estado": estado, "id": busqueda_id})
