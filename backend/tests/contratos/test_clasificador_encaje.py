@@ -9,7 +9,7 @@ from pydantic import SecretStr
 
 from app.modulos.enriquecimiento.dominio.errores import SalidaJevInvalida, UsoJevInvalido
 from app.modulos.enriquecimiento.dominio.puertos import Encaje
-from app.modulos.enriquecimiento.infraestructura.adaptadores.jev_clasificador import JevClasificador
+from app.modulos.enriquecimiento.infraestructura.adaptadores.jev_clasificador import JevClasificador, cuerpo_jev
 from tests.falsos import JevFalso, RegistroCostosFalso
 
 ETIQUETAS = get_args(Encaje.__annotations__["etiqueta"])
@@ -30,8 +30,12 @@ def _jev(salida: dict, costos: RegistroCostosFalso, tokens_in=500) -> JevClasifi
 CLASIFICADORES = pytest.mark.parametrize("fabrica", [_falso, _jev], ids=["falso", "jev"])
 
 
+ARGS = ("agentes de carga", "Transportes Andinos SAS", "Cali", None)
+TECHO = len(cuerpo_jev(*ARGS))  # bytes del body que JevClasificador manda
+
+
 def _clasificar(clasificador) -> Encaje:
-    return clasificador.clasificar(uuid4(), "agentes de carga", "Transportes Andinos SAS", "Cali", None)
+    return clasificador.clasificar(uuid4(), *ARGS)
 
 
 def _filas(costos: RegistroCostosFalso) -> list[tuple]:
@@ -67,10 +71,10 @@ def test_registra_costo(fabrica):
 
 
 @CLASIFICADORES
-def test_uso_invalido_lanza_sin_fila(fabrica):
+def test_uso_invalido_cobra_el_techo_y_lanza(fabrica):
     costos = RegistroCostosFalso()
 
     with pytest.raises(UsoJevInvalido):
         _clasificar(fabrica({"etiqueta": "encaja", "probabilidad": 0.9, "razon": "x"}, costos, tokens_in=-1))
 
-    assert costos.filas == []
+    assert _filas(costos) == [("jev_tokens", "jev", Decimal(TECHO), Decimal("0.042") * TECHO / 1_000_000)]

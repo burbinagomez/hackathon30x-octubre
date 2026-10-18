@@ -120,12 +120,12 @@
 **Checkpoint 4:** ✅ los 6 tests verdes, y `lint-imports` confirma que `app ↛ evals`.
 
 Notas de cierre (2026-10-18):
-- Desvío: el contrato son 4 funciones parametrizadas (8 casos), no 2, y la unidad son 22 casos, no 4: se sumaron uso inválido sin fila, HTTP 500 sin fila y `tokens_in=0`.
+- Desvío: el contrato son 4 funciones parametrizadas (8 casos), no 2, y la unidad son 22 casos, no 4: se sumaron uso inválido (hoy cobra el techo), HTTP 500 sin fila y `tokens_in=0`.
 - Formato de cable provisional (`ponytail:` en el adaptador): P8/D10 sin documentar.
 - No verificado (P8): si jev cobra las llamadas que fallan. Hoy un 5xx o un timeout no escribe fila, porque jev no informa tokens.
 
 **Pendientes de la Fase 5:**
-- [x] Un 200 con cuerpo que no es JSON registra `jev_tokens` al techo (bytes del body enviado) y lanza `SalidaJevInvalida`, mismo criterio que JuezClaude. Diferencia que queda: un JSON sin `uso` válido lanza `UsoJevInvalido` sin fila (JuezClaude ahí cobra el techo).
+- [x] Un 200 con cuerpo que no es JSON registra `jev_tokens` al techo (bytes del body enviado) y lanza `SalidaJevInvalida`, mismo criterio que JuezClaude. Un JSON sin `uso` válido también cobra el techo y lanza `UsoJevInvalido` (alineado con JuezClaude, pedido por Daniel al aprobar el DDL).
 - [x] Fase 6: una falla HTTP de jev cuenta solo contra ese lead (se marca y se sigue con el resto), salvo que se agote el límite o falle la red completa. Decidido por Daniel.
 
 ## Fase 6: Migración 0008 (columnas), repo y casos de uso (Paso 5) — advisor + security

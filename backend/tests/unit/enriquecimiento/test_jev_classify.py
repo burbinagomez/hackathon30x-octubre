@@ -146,13 +146,15 @@ def test_tokens_in_cero_es_una_medicion():
 @pytest.mark.parametrize("uso", [SIN_USO, {}, {"tokens_in": None}, {"tokens_in": True}, {"tokens_in": 1.5},
                                  {"tokens_in": "1234"}, {"tokens_in": -1}],
                          ids=["sin_uso", "sin_tokens_in", "none", "bool", "float", "string", "negativo"])
-def test_uso_invalido_lanza_sin_fila(uso):
-    clasificador, _, costos = _clasificador(VALIDA, uso=uso)
+def test_uso_invalido_cobra_el_techo_y_lanza(uso):
+    # Mismo criterio que JuezClaude: salió y se pagó; sin uso legible se cobra el techo (un token >= un byte del body).
+    clasificador, jev, costos = _clasificador(VALIDA, uso=uso)
+    lead_id = uuid4()
 
     with pytest.raises(UsoJevInvalido):
-        _clasificar(clasificador)
+        clasificador.clasificar(lead_id, "icp", "Transportes Andinos SAS", "Cali", None)
 
-    assert costos.filas == []  # nada se estima
+    _fila_jev(costos, lead_id, len(jev.requests[0].content))
 
 
 def test_http_500_lanza_sin_fila():

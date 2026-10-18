@@ -6,7 +6,8 @@ from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, EmpresaCruda, MetaFuente, PaginaEmpresas
 from app.modulos.enriquecimiento.dominio.puertos import Encaje
 from app.modulos.enriquecimiento.infraestructura.adaptadores.jev_clasificador import (
-    operacion_jev, validar_salida, validar_tokens)
+    cuerpo_jev, operacion_jev, tokens_validos, validar_salida)
+from app.modulos.enriquecimiento.dominio.errores import UsoJevInvalido
 
 
 class RepositorioLeadsFalso:
@@ -90,5 +91,9 @@ class JevFalso:
 
     def clasificar(self, lead_id: UUID, descripcion_icp: str, nombre: str, ciudad: str | None,
                    actividad: str | None) -> Encaje:
-        self.costos.registrar(operacion_jev(lead_id, validar_tokens(self.tokens_in), self.usd_in_por_M))
+        tokens = tokens_validos(self.tokens_in)
+        techo = len(cuerpo_jev(descripcion_icp, nombre, ciudad, actividad))
+        self.costos.registrar(operacion_jev(lead_id, techo if tokens is None else tokens, self.usd_in_por_M))
+        if tokens is None:
+            raise UsoJevInvalido
         return validar_salida(self.salida)
