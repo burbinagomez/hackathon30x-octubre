@@ -143,10 +143,10 @@ Arma el ciclo de PRD §6b: casos → agente → scorers → baseline → verde/r
 - `tipo_titular` se guarda en el caso solo para esa regla.
 
 **Juez:**
-- `JuezClaude` usa el SDK `anthropic` con `http_client` de `httpx` (inyectable para `MockTransport`), el modelo `claude-sonnet-5-5` pineado en `evals.yaml` y salida forzada por herramienta (`tool_choice` con `input_schema`). Temperatura 0; el ruido que queda lo absorbe PASS^3.
+- `JuezClaude(registro_costos, tarifa, modelo, prompt, lote_id, api_key, http_client)` habla `httpx` directo contra `POST /v1/messages`, sin SDK (decisión del dueño en T017). El `httpx.Client` es inyectable para `MockTransport`, y el juez pone `x-api-key` y `anthropic-version` en cada request. Usa el modelo `claude-sonnet-5-5` pineado en `evals.yaml` y salida forzada por herramienta (`tool_choice` con `input_schema`). Temperatura 0; el ruido que queda lo absorbe PASS^3.
 - Los prompts son archivos `.md` versionados (`encaje_v1.md`, `mensaje_v1.md`). Cambiar un prompt es crear `_v2` o editar el archivo; cualquiera de las dos cambia el fingerprint.
 - Los datos del caso van en el mensaje de usuario dentro de `<caso>…</caso>`, con `<` y `>` escapados. El system prompt dice que lo de adentro es dato. Los nombres de OSM son entrada no confiable.
-- `ANTHROPIC_API_KEY` sale del entorno; nunca se loguea.
+- `ANTHROPIC_API_KEY` la lee la composición (T019) del mapeo `entorno` de `main()` (default `os.environ`) y la pasa por constructor; el juez nunca lee el entorno. La key no aparece en logs, stdout/stderr, `repr` del juez ni en las excepciones (incluidas `__cause__`/`__context__`).
 
 **Mensaje para calibración y para la 007:** forma `{asunto, cuerpo, adjuntos: []}`. La 007 produce esa misma forma. Los scorers de forma del mensaje se mueven al dominio en la 007 (`plantilla`), porque la regla 7 es de producto; el scorer queda como un envoltorio. Una regla, un lugar.
 
@@ -159,7 +159,7 @@ Arma el ciclo de PRD §6b: casos → agente → scorers → baseline → verde/r
 
 **`baseline.json`** (por eval): `agregado`, `determinacion`, `k` (siempre 3), `n`, `fingerprint`, `fecha`, `motivo` (null salvo que se haya bajado el baseline).
 
-**Dependencias nuevas:** `anthropic` en el grupo `dev` (`evals/` no entra en la imagen de `api`); `pyyaml` en `dependencies` (la misma línea que declaran la 002 y la 012; el choque en `pyproject.toml`/`uv.lock` se resuelve en el merge).
+**Dependencias nuevas:** ninguna para el juez (`httpx` ya está; el SDK `anthropic` se sacó en T017); `pyyaml` en `dependencies` (la misma línea que declaran la 002 y la 012; el choque en `pyproject.toml`/`uv.lock` se resuelve en el merge).
 
 ## Plan de tareas (TDD, en orden)
 1. **Contrato `app` ↛ `evals`:** canario en rojo → contrato `forbidden` en `pyproject.toml` → verde.

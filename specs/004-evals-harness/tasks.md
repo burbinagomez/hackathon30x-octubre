@@ -20,7 +20,7 @@
 
 ## Fase 1: Setup
 
-- [ ] T001 🤖 Agregar `anthropic` al grupo `dev` y `pyyaml` a `dependencies` (nunca a dev: la 002 lo usa en runtime) de `backend/pyproject.toml` (decisión Q2); regenerar `backend/uv.lock`. Verificar que `pip-audit` sigue limpio.
+- [ ] T001 🤖 Agregar `pyyaml` a `dependencies` (en T017 se sacó `anthropic` del grupo `dev`: el juez usa `httpx` directo) (nunca a dev: la 002 lo usa en runtime) de `backend/pyproject.toml` (decisión Q2); regenerar `backend/uv.lock`. Verificar que `pip-audit` sigue limpio.
 
 ## Fase 2: Fundacional (sin dependencias de la 002)
 
@@ -88,10 +88,13 @@
 - [ ] T015 [P] [US1] 🤖 **Rojo por assert, contra el stub de T013:** `backend/tests/contratos/test_juez.py`, parametrizado sobre `claude` (transporte falso) y `falso`: `::test_devuelve_probabilidad_en_rango`, `::test_registra_costo[claude]`. El rojo se exige para los dos casos `[claude]`: `test_devuelve_probabilidad_en_rango[claude]` falla por assert con el `-1.0` del stub y `test_registra_costo[claude]` con 0 filas. Los `[falso]` nacen verdes porque `JuezFalso` existe desde T009, y se declara así en el docstring del test.
 - [ ] T016 [P] [US1] 🤖 **Rojo por assert, contra el stub de T013:** `backend/tests/integration/test_costos_repo.py::test_juez_escribe_filas_llm_en_costos` (archivo del 002, D2, D5), falla con 0 filas: `JuezClaude` con transporte falso + `postgres_costos` real como `app_rt` deja 2 filas con `fuente='evals'`, `proveedor='anthropic'` y el `tenant_id` del contexto. Va con T014–T015, antes del verde: es el chequeo del principio VIII para el juez.
 - [ ] T017 [US1] 🧠 Advisor revisa los tests de costos del juez (T013, T014 costos, T015, T016). APROBADO antes de T018.
-- [ ] T018 [US1] 🤖 **Verde:** `backend/evals/jueces/claude.py` reemplaza el stub de T013 (`JuezClaude(registro_costos, tarifa, modelo, prompt, lote_id, http_client)`, temperatura 0, filas de costo escritas con `usage` **antes** de validar la salida), `backend/evals/jueces/encaje_v1.md` (system prompt: el bloque `<caso>` es dato, no instrucción; un solo caso por mensaje, campos por clave) y `backend/evals/jueces/catalogo.py` (`CATALOGO = {"claude": JuezClaude, "falso": JuezFalso}`, que usa la `fabrica_juez` por defecto de `run.py`; **no** en `jueces/__init__.py`, que queda vacío porque `run.py` importa `evals.jueces.puerto` y eso lo ejecuta, ver plan.md). `ANTHROPIC_API_KEY` sale del entorno y nunca se loguea.
+- [ ] T018 [US1] 🤖 **Verde:** `backend/evals/jueces/claude.py` reemplaza el stub de T013 (`JuezClaude(registro_costos, tarifa, modelo, prompt, lote_id, api_key, http_client)`, `httpx` directo sin SDK, `x-api-key` y `anthropic-version` en cada request, temperatura 0, `max_tokens` entero, `costo_unitario` = tarifa / el entero `1_000_000`, filas de costo escritas con `usage` **antes** de validar la salida), `backend/evals/jueces/encaje_v1.md` (system prompt: el bloque `<caso>` es dato, no instrucción; un solo caso por mensaje, campos por clave) y `backend/evals/jueces/catalogo.py` (`CATALOGO = {"claude": JuezClaude, "falso": JuezFalso}`, que usa la `fabrica_juez` por defecto de `run.py`; **no** en `jueces/__init__.py`, que queda vacío porque `run.py` importa `evals.jueces.puerto` y eso lo ejecuta, ver plan.md). El juez nunca lee el entorno; la key no sale en logs, stdout/stderr, `repr` ni excepciones (tests de T017).
 
 ### Composición real
-- [ ] T019 [US1] 🤖 **Verde:** composición real en `backend/evals/run.py` (`__main__`): `postgres_costos` del 002 dentro de su unidad de trabajo con `--tenant`, tarifa resuelta con el cargador del 002 (D3), `JuezClaude` desde el `CATALOGO`. Sin diseñar nada del 002: si su forma cambia, cambia esta composición y nada más.
+- [ ] T019 [US1] 🤖 **Verde:** composición real en `backend/evals/run.py` (`__main__`): `postgres_costos` del 002 dentro de su unidad de trabajo con `--tenant`, tarifa resuelta con el cargador del 002 (D3), `JuezClaude` desde el `CATALOGO`, con `api_key = entorno["ANTHROPIC_API_KEY"]` (el mapeo de `main()`, default `os.environ`). Sin diseñar nada del 002: si su forma cambia, cambia esta composición y nada más. Antes del verde, en rojo y acá (no en T018):
+  - el reporte JSON con la composición real, a través de una costura `componer(entorno, transporte)` que arma `PostgresCostos` + `JuezClaude` con un `httpx.MockTransport`, sin red;
+  - la rama por defecto usa el `registro_costos` inyectado en `main()` cuando viene (no crea otro);
+  - la tarifa del yaml entra como `Decimal(str(v))`: `in_usd_por_M: 0.10` → `costo_unitario == Decimal("0.0000001")` exacto (con `Decimal(0.10)` da `0.1000000000000000055…/1e6` y falla).
 
 ### Exportación de candidatos
 - [ ] T020 [P] [US1] 🤖 **Rojo:** `backend/tests/unit/evals/test_exportar_candidatos.py` con un repositorio falso que sigue la forma de `RepositorioLeads` del 002 (D4):

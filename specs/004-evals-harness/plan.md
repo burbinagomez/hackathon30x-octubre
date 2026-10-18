@@ -11,7 +11,7 @@ Paquete `backend/evals/`, hermano de `app`, que arma el ciclo de PRD §6b: datas
 ## Technical Context
 
 **Language/Version**: Python 3.12 (el del back)
-**Primary Dependencies**: `anthropic` (nueva, con `http_client` de `httpx` inyectable), `httpx` (ya está en dev), `pyyaml` en `dependencies` (la 002 la usa en runtime para `fuentes.yaml`; la 002 y la 012 declaran la misma línea), stdlib (`hashlib`, `json`, `re`, `secrets`, `argparse`)
+**Primary Dependencies**: `httpx` (ya está en `dependencies`; el juez la usa directo, sin SDK `anthropic`, decisión T017), `pyyaml` en `dependencies` (la 002 la usa en runtime para `fuentes.yaml`; la 002 y la 012 declaran la misma línea), stdlib (`hashlib`, `json`, `re`, `secrets`, `argparse`)
 **Storage**: archivos JSON/YAML versionados en `backend/evals/`; filas en `costos` (Postgres, RLS) vía `postgres_costos` del 002
 **Testing**: `pytest` (unit, contratos, arquitectura, integración con rol `app_rt`); `httpx.MockTransport` para el juez; `import-linter` para `app` ↛ `evals`
 **Target Platform**: local del desarrollador (la corrida real); CI corre solo `pytest` con juez y transporte falsos
@@ -30,7 +30,7 @@ Paquete `backend/evals/`, hermano de `app`, que arma el ciclo de PRD §6b: datas
 | II Test primero | Cada tarea de `tasks.md` arranca con su test en rojo; el advisor revisa los de cumplimiento (whitelist, nombre) y las fórmulas del eval (PASS^3, determinación, k=1, baseline). | ✅ |
 | III Tenant/RLS | El juez escribe en `costos` con el `tenant_id` del contexto (`--tenant` obligatorio). Las tablas y la unidad de trabajo con `SET LOCAL` son del 002. | ✅ (dep. 002) |
 | IV Migraciones | Sin migración. Usa `costos` tal como la deja la `0002` del 002. | — |
-| V Seguridad | `ANTHROPIC_API_KEY` del entorno, nunca logueada; los datos del caso van delimitados en `<caso>…</caso>` y escapados (texto externo hostil); `anthropic` pasa por `pip-audit`. | ✅ |
+| V Seguridad | `ANTHROPIC_API_KEY` del entorno (la lee la composición y entra por constructor), nunca logueada; los datos del caso van delimitados en `<caso>…</caso>` y escapados (texto externo hostil); sin SDK nuevo, `pip-audit` limpio. | ✅ |
 | VI Contacto cifrado | No persiste contacto: la whitelist + regex de `esquema.py` impiden que entre a cualquier JSON de `evals/`. | ✅ |
 | VII Cumplimiento | Nombre solo para `juridica` de OSM; Croma sin nombre ni NIT, id aleatorio (`c-` + 12 hex). Atribución ODbL en `evals/LICENCIA.md`. | ✅ |
 | VIII Costos | Cada `juzgar` escribe `llm_tokens_in` + `llm_tokens_out` antes de devolver, también cuando la salida es inválida. Test de arquitectura `test_todo_juez_recibe_registro_costos` + integración contra `postgres_costos`. | ✅ (dep. 002) |
@@ -61,12 +61,12 @@ Corrección (T011): cuando se escribió este plan la 002 no estaba en `main`; ho
 
 ### Puerto y jueces
 - `jueces/puerto.py`: `Juez` (Protocol) con `juzgar(tarea, caso) -> Veredicto`; `Veredicto(probabilidad: float, razon: str)` frozen; excepción `SalidaJuezInvalida`.
-- `jueces/catalogo.py`: `CATALOGO = {"claude": JuezClaude, "falso": JuezFalso}`. Es el único lugar que conoce clases concretas, igual que el catálogo de adaptadores del 002. `jev` se suma en la 006. **No va en `jueces/__init__.py`** (regla del coordinador, Fase 3): `run.py` importa `evals.jueces.puerto` y eso ejecuta el `__init__`, así que cualquier import de `JuezClaude`/`anthropic` ahí se cargaría en cada corrida, también en los tests del runner. `__init__.py` queda vacío; `catalogo.py` se importa solo en la rama por defecto de `run.py` (T019).
-- Tarifa del juez (T014, decisión para el advisor en T017): el mapeo de `tarifas.yaml` `llm.<modelo>` tal cual, `{"in_usd_por_M": Decimal, "out_usd_por_M": Decimal}`; el juez divide por 1 000 000 al escribir `costo_unitario`. La resuelve la composición (T019).
-- Key de Anthropic (decisión para el advisor en T017): los tests inyectan un `httpx.Client` con `base_url` y `x-api-key` falsa en los headers, y no tocan el entorno. Si T018 usa el SDK, tiene que poder tomar ese cliente sin leer `ANTHROPIC_API_KEY`; si no, `JuezClaude` habla httpx directo contra `POST /v1/messages`. La key real la pone la composición (T019) desde el entorno.
-- Fixture compartida de la Messages API falsa: `backend/tests/anthropic_falso.py` (T014–T016): `httpx.MockTransport` que captura cuerpos de `POST /v1/messages` y responde `tool_use` con `usage` 120/30.
+- `jueces/catalogo.py`: `CATALOGO = {"claude": JuezClaude, "falso": JuezFalso}`. Es el único lugar que conoce clases concretas, igual que el catálogo de adaptadores del 002. `jev` se suma en la 006. **No va en `jueces/__init__.py`** (regla del coordinador, Fase 3): `run.py` importa `evals.jueces.puerto` y eso ejecuta el `__init__`, así que cualquier import de `JuezClaude` ahí se cargaría en cada corrida, también en los tests del runner. `__init__.py` queda vacío; `catalogo.py` se importa solo en la rama por defecto de `run.py` (T019).
+- Tarifa del juez (T017): el mapeo de `tarifas.yaml` `llm.<modelo>`, `{"in_usd_por_M": Decimal, "out_usd_por_M": Decimal}`. El juez divide por el **entero** `1_000_000` al escribir `costo_unitario` (nunca por `1e6`, que es float); su rojo es `test_registra_costos_antes_de_devolver[sonnet|haiku]` (T018; haiku: `0.10` → `Decimal("0.0000001")`). La conversión del yaml es `Decimal(str(v))`, nunca `Decimal(v)` sobre el float, y la hace la composición: su rojo va en T019.
+- Key de Anthropic (decisión del dueño, T017): parámetro `api_key` explícito y `httpx` directo, sin SDK. `JuezClaude` nunca lee el entorno: recibe la key por constructor, usa el `httpx.Client` inyectado y pone `x-api-key` (y `anthropic-version`) en cada request. En T019 la key sale del mapeo `entorno` de `main()` (default `os.environ`); si falta, sale 2 (ya cubierto por `test_sin_entorno_sale_2_sin_llamar`).
+- Fixture compartida de la Messages API falsa: `backend/tests/anthropic_falso.py` (T014–T017): `httpx.MockTransport` sin headers propios (solo `base_url` y transporte) que captura el cuerpo JSON y `dict(request.headers)` de `POST /v1/messages`, y responde `tool_use` con `usage` 120/30, un `content` propio (p. ej. `SIN_TOOL_USE`) o una respuesta HTTP entera (p. ej. un 401). Key falsa: `CLAVE_FALSA = "sk-ant-test-XXXX"`.
 - `JuezFalso`: devuelve una secuencia programada por caso y cuenta llamadas por `id`. Sin red, sin `RegistroCostos` (exclusión cerrada del test de arquitectura).
-- `JuezClaude(registro_costos, tarifa, modelo, prompt, lote_id, http_client)`: SDK `anthropic`, `tool_choice` forzado con `input_schema {probabilidad: number, razon: string}`, temperatura 0. Escribe las 2 filas de costo con `usage` **antes** de validar la salida; después valida y, si no cumple, lanza `SalidaJuezInvalida`.
+- `JuezClaude(registro_costos, tarifa, modelo, prompt, lote_id, api_key, http_client)`: `httpx` directo contra `POST /v1/messages`, `max_tokens` entero, `tool_choice` forzado con `input_schema {probabilidad: number, razon: string}`, temperatura 0. Escribe las 2 filas de costo con `usage` **antes** de validar la salida; después valida y, si no cumple, lanza `SalidaJuezInvalida`.
 - `determinista_si_se_demuestra` vive en **un solo lugar**: es atributo de clase del juez (`False` en `JuezClaude` y en `JuezFalso`). El runner lo lee del juez que devuelve `fabrica_juez(nombre_eval, lote_id)`, nunca del `CATALOGO`: el catálogo existe recién en T018 y los tests del runner son de la Fase 2. El test de k=1 usa una subclase de `JuezFalso` con el atributo en `True`.
 
 ### Lo que ya costó con Jev (CLAUDE.md), aplicado desde hoy
@@ -102,7 +102,7 @@ Una whitelist de claves por archivo (`dataset.json`, `casos/calibracion_mensajes
 
 ```text
 backend/
-├── pyproject.toml                  # + anthropic (dev), pyyaml (dependencies); contrato forbidden app ↛ evals (root_packages lo decide el canario de T002)
+├── pyproject.toml                  # + pyyaml (dependencies), sin anthropic (T017); contrato forbidden app ↛ evals (root_packages lo decide el canario de T002)
 ├── evals/
 │   ├── run.py                      # reemplaza el placeholder
 │   ├── config.py · fingerprint.py · esquema.py · exportar_candidatos.py
@@ -142,7 +142,7 @@ El de la spec, partido por dependencias (detalle en `tasks.md`):
 ## Decisiones del dueño (Q1–Q5, a recomendación del advisor)
 
 1. **Job `evals` de CI:** sigue como required check y corre los tests del harness con el juez falso, sin API key. Opcional: chequeo offline de que el fingerprint de `baseline.json` coincide con los archivos actuales. La desviación del principio IX está en Complexity Tracking.
-2. **`anthropic`** va en el grupo `dev`: `evals/` no entra en la imagen de `api`. La 007 lo mueve a `dependencies` cuando el redactor lo use desde `app`. `pyyaml` va en `dependencies`, no en dev.
+2. **Sin SDK `anthropic`** (T017, decisión del dueño): el juez usa `httpx` directo con `api_key` por constructor; el SDK se sacó del grupo `dev` y del `uv.lock`. Si la 007 lo quiere para el redactor, lo agrega ahí. `pyyaml` va en `dependencies`, no en dev.
 3. **Archivo de casos por eval:** clave `casos: <ruta>` en `evals.yaml` (enmendado en la spec).
 4. **`docs/arquitectura-backend.md`:** la 004 lo crea solo con la sección de evals; la 013 lo consolida.
 5. **Orden de merge con la 002** (D7): primero se mergea la 002. Después la 004 hace `git merge main` (no rebase), resuelve `[tool.importlinter]` a mano y corre `uv run lint-imports` antes de commitear el merge. El choque de `pyyaml` en `pyproject.toml`/`uv.lock` se resuelve en ese mismo merge.
