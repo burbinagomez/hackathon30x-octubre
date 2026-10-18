@@ -45,6 +45,12 @@ function ResumenSugerencia({ s, actividades, divisiones }: { s: Sugerencia; acti
             <dt>{t("criterios.ciiu")}</dt>
             <dd className="resumen-aviso">{t("busqueda.frase.actividad_falta")}</dd>
           </div>
+        ) : clave === "departamento" && !s.ciudad ? (
+          // Sin ubicación ninguna fuente corre: se dice acá, antes de que Buscar quede gris sin explicación.
+          <div key={clave}>
+            <dt>{t("criterios.departamento")}</dt>
+            <dd className="resumen-aviso">{t("busqueda.frase.ubicacion_falta")}</dd>
+          </div>
         ) : null,
       )}
     </dl>

@@ -22,7 +22,9 @@ Reglas:
 - `ciiu`: SOLO un código del catálogo (la lista del esquema de la herramienta) para la actividad del CLIENTE objetivo.
   Si la actividad del cliente no está en la lista, elegí la más cercana únicamente si de verdad corresponde; si no,
   `ciiu` va en null y la `explicacion` dice que "esa actividad no está en el catálogo todavía". No inventes códigos.
-- `departamento` y `ciudad`: el nombre en español, solo si se mencionan; si no, null. No los deduzcas.
+- `departamento` y `ciudad`: el nombre en español, solo si se mencionan; si no, null. No los deduzcas. Sin departamento
+  ni ciudad ninguna fuente puede buscar: si ya sabés a quién le vende pero falta la ubicación, completá el ICP igual y
+  poné en `pregunta` "¿En qué ciudad o departamento buscamos?" (una sola pregunta por turno: primero a quién le vende).
 - `ingresos_min`: ingresos anuales mínimos en pesos colombianos (entero), solo si se da una cifra; si no, null.
 - `palabras_clave`: hasta 10 palabras o frases cortas (máximo 40 caracteres) que describan al CLIENTE objetivo.
 - `exclusiones`: hasta 10 palabras o frases cortas que se pida dejar fuera. Vacío si no hay.

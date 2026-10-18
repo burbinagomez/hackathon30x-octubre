@@ -451,7 +451,9 @@ test("la_tarjeta_siempre_muestra_pais_y_actividad_y_solo_lo_demas_si_viene", asy
   expect(tarjeta.getByText(es.criterios.ciiu)).toBeInTheDocument();
   const falta = tarjeta.getByText(es.busqueda.frase.actividad_falta);
   expect(falta).toHaveClass("resumen-aviso");
-  for (const clave of ["departamento", "ciudad", "ingresos_min", "exclusiones"] as const) {
+  // Sin ubicación la fila de departamento aparece, pero como aviso (sin ella ninguna fuente corre).
+  expect(tarjeta.getByText(es.busqueda.frase.ubicacion_falta)).toHaveClass("resumen-aviso");
+  for (const clave of ["ciudad", "ingresos_min", "exclusiones"] as const) {
     expect(tarjeta.queryByText(es.criterios[clave])).not.toBeInTheDocument();
   }
   expect(tarjeta.getByText(es.criterios.palabras_clave)).toBeInTheDocument();
@@ -549,4 +551,16 @@ test("despues_de_la_primera_respuesta_no_vuelve_a_preguntar_a_quien_le_vendes", 
   expect(screen.getByLabelText(es.busqueda.frase.etiqueta)).toHaveAttribute("placeholder", es.busqueda.frase.ajustar);
   expect(screen.getByLabelText(es.busqueda.frase.etiqueta)).toHaveAttribute("rows", "1");
   expect(en.busqueda.frase.ajustar).toBeTruthy();
+});
+
+test("sin_departamento_ni_ciudad_la_tarjeta_avisa_que_falta_la_ubicacion", async () => {
+  // QA 2026-10-18: sin ubicación ninguna fuente corre y Buscar quedaba gris sin decir por qué.
+  await montar({ frase: true, lookalike: false }, () => HttpResponse.json({
+    sugerencia: { ...SUGERENCIA, departamento: null, ciudad: null }, pregunta: null, explicacion: EXPLICACION, costo_usd: "0" }));
+  escribirYSugerir();
+
+  const tarjeta = within(await verTarjeta());
+
+  expect(tarjeta.getByText(es.busqueda.frase.ubicacion_falta)).toHaveClass("resumen-aviso");
+  expect(en.busqueda.frase.ubicacion_falta).toBeTruthy();
 });
