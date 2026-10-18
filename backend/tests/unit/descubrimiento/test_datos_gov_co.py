@@ -72,12 +72,18 @@ AHORA = datetime(2026, 10, 17, 12, 0, tzinfo=UTC)
 class RelojFalso:
     def __init__(self) -> None:
         self.t = AHORA
+        self.dormidas: list[float] = []
 
     def __call__(self) -> datetime:
         return self.t
 
     def avanzar(self, segundos: float) -> None:
         self.t += timedelta(seconds=segundos)
+
+    def dormir(self, segundos: float) -> None:
+        # Registra y avanza el reloj: una espera medida como cómputo se vería en `unidades`.
+        self.dormidas.append(segundos)
+        self.avanzar(segundos)
 
 
 def _transporte_fijo(
@@ -131,7 +137,7 @@ def _adaptador(
     adaptador = DatosGovCoRues(
         transporte=transporte,
         reloj=reloj,
-        dormir=lambda _s: None,
+        dormir=reloj.dormir,
         costos=CostosEnMemoria(),
         cache=None,
         camaras=CAMARAS,
@@ -347,6 +353,7 @@ def test_registra_segundos_de_cada_intento():
         type(f.unidades) is Decimal and type(f.costo_unitario) is Decimal for f in filas
     )
     assert error is None
+    assert adaptador._reloj.dormidas == [1.0]
     assert len(_requests_de_filas(capturadas)) == 2
     for fila in filas:
         assert fila.tipo == "socrata_descarga"
@@ -359,7 +366,7 @@ def test_registra_segundos_de_cada_intento():
     # La tercera fila (conteo de naturales, 1 s) se suma en T021 (Pulido).
 
 
-@pytest.mark.parametrize("fallo", [503, "timeout"])
+@pytest.mark.parametrize("fallo", [502, 503, 504, "timeout"])
 def test_segundo_fallo_lanza_fuente_no_disponible(fallo):
     adaptador, capturadas = _adaptador(pasos=[(fallo, 2), (fallo, 3)])
 
@@ -371,6 +378,18 @@ def test_segundo_fallo_lanza_fuente_no_disponible(fallo):
     assert (
         len(capturadas) == 2
     )  # ninguna request de conteo (T021 suma el assert propio)
+
+
+def test_status_no_reintentable_corta_en_el_primer_intento():
+    adaptador, capturadas = _adaptador(pasos=[(400, 2), (200, 3)])
+
+    error = _buscar_sin_propagar(adaptador)
+
+    assert isinstance(error, FuenteNoDisponible)
+    assert CUERPO_SECRETO not in str(error)
+    assert [f.unidades for f in adaptador._costos.filas] == [Decimal(2)]
+    assert len(capturadas) == 1
+    assert adaptador._reloj.dormidas == []
 
 
 @pytest.mark.parametrize(
