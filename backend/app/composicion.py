@@ -13,6 +13,7 @@ import httpx
 import yaml
 
 from app.config import Settings
+from app.modulos.calificacion.infraestructura.dapta_csv import DaptaCSV
 from app.modulos.costos.dominio.puertos import RegistroCostos
 from app.modulos.descubrimiento.aplicacion.camaras import cargar_camaras
 from app.modulos.descubrimiento.aplicacion.registro import Registro, cargar_registro
@@ -94,3 +95,9 @@ def cargar_geografia(carpeta: Path) -> dict[str, dict]:
             raise ValueError(f"geografía duplicada para {pais}: {ruta.name}")
         archivos[pais] = contenido
     return archivos
+
+
+def calificador_api(ruta_yaml: Path):
+    """`DaptaCSV` si `calificadores.dapta_csv.habilitado` en fuentes.yaml; si no, None (el import responde 503)."""
+    calificadores = (yaml.safe_load(ruta_yaml.read_text()) or {}).get("calificadores") or {}
+    return DaptaCSV() if (calificadores.get("dapta_csv") or {}).get("habilitado") else None
