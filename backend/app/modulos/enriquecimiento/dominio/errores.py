@@ -11,4 +11,8 @@ class SalidaJevInvalida(ValueError):
 
 
 class UsoJevInvalido(RuntimeError):
-    """jev no informó tokens_in medibles (falta, no es entero o es negativo). Sin fila de costo; corta la corrida."""
+    """jev no informó tokens_in medibles (falta, no es entero o es negativo). El techo ya quedó cobrado."""
+
+
+class JevNoDisponible(RuntimeError):
+    """jev respondió 5xx o no respondió a tiempo. El costo ya quedó registrado; la falla cuenta solo contra ese lead."""

@@ -4,6 +4,7 @@ Defensas: los datos del lead van como JSON dentro de un bloque delimitado, con <
 abre ni cierra el bloque); las instrucciones salen de encaje_jev_v1.json, nunca del lead. El costo se registra
 con los tokens que informa jev, antes de validar la salida: una salida rota también se paga. Un 200 sin uso
 legible (no es JSON, o falta tokens_in válido) se cobra al techo, los bytes del body enviado, como JuezClaude.
+Una falla HTTP también deja fila: 500/502/503 en 0, 504 o timeout propio al techo, y lanza JevNoDisponible.
 """
 import json
 from decimal import Decimal
@@ -15,13 +16,14 @@ from pydantic import SecretStr
 
 from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.costos.dominio.puertos import RegistroCostos
-from app.modulos.enriquecimiento.dominio.errores import SalidaJevInvalida, UsoJevInvalido
+from app.modulos.enriquecimiento.dominio.errores import JevNoDisponible, SalidaJevInvalida, UsoJevInvalido
 from app.modulos.enriquecimiento.dominio.puertos import Encaje
 
 PROMPT = json.loads((Path(__file__).parent / "encaje_jev_v1.json").read_text(encoding="utf-8"))
 TIMEOUT_S = 30.0
 ETIQUETAS = {"encaja", "no_encaja", "ninguna"}
 SIN_JSON = object()
+NO_PROCESO = {500, 502, 503}
 
 
 def bloque_de_datos(descripcion_icp: str, nombre: str, ciudad: str | None, actividad: str | None) -> str:
@@ -74,9 +76,19 @@ class JevClasificador:
         # ponytail: formato de cable provisional (P8/D10 sin documentar); se ajusta acá cuando haya acceso a jev.
         with httpx.Client(transport=self._transporte, trust_env=False, timeout=TIMEOUT_S) as cliente:
             contenido = cuerpo_jev(descripcion_icp, nombre, ciudad, actividad)
-            respuesta = cliente.post(self._url, headers={"Authorization": f"Bearer {self._credencial.get_secret_value()}",
-                                                         "Content-Type": "application/json"}, content=contenido)
-            respuesta.raise_for_status()  # 5xx o timeout: jev no midió tokens, no hay fila
+            try:
+                respuesta = cliente.post(self._url, headers={"Authorization": f"Bearer {self._credencial.get_secret_value()}",
+                                                             "Content-Type": "application/json"}, content=contenido)
+            except httpx.TimeoutException:
+                respuesta = None  # timeout propio: no sabemos si jev procesó
+        if respuesta is None or respuesta.status_code >= 500:
+            # 500/502/503: jev no procesó, fila en 0. 504 y timeout: pudo haber procesado, techo. Siempre hay fila.
+            no_proceso = respuesta is not None and respuesta.status_code in NO_PROCESO
+            self._costos.registrar(operacion_jev(lead_id, 0 if no_proceso else len(contenido), self._usd_in_por_M))
+            raise JevNoDisponible  # sin cuerpo ni datos del lead: solo la clase
+        if respuesta.is_error:  # 4xx: jev rechazó sin procesar; credencial o pedido mal armados, corta la corrida
+            self._costos.registrar(operacion_jev(lead_id, 0, self._usd_in_por_M))
+            respuesta.raise_for_status()
         try:
             cuerpo = respuesta.json()
         except ValueError:

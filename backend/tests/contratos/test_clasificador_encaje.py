@@ -7,7 +7,7 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from app.modulos.enriquecimiento.dominio.errores import SalidaJevInvalida, UsoJevInvalido
+from app.modulos.enriquecimiento.dominio.errores import JevNoDisponible, SalidaJevInvalida, UsoJevInvalido
 from app.modulos.enriquecimiento.dominio.puertos import Encaje
 from app.modulos.enriquecimiento.infraestructura.adaptadores.jev_clasificador import JevClasificador, cuerpo_jev
 from tests.falsos import JevFalso, RegistroCostosFalso
@@ -78,3 +78,26 @@ def test_uso_invalido_cobra_el_techo_y_lanza(fabrica):
         _clasificar(fabrica({"etiqueta": "encaja", "probabilidad": 0.9, "razon": "x"}, costos, tokens_in=-1))
 
     assert _filas(costos) == [("jev_tokens", "jev", Decimal(TECHO), Decimal("0.042") * TECHO / 1_000_000)]
+
+
+def _jev_que_responde(responder, costos: RegistroCostosFalso) -> JevClasificador:
+    return JevClasificador(costos, httpx.MockTransport(responder), "https://jev.invalid/v1/clasificar",
+                           SecretStr("credencial-sintetica"), Decimal("0.042"))
+
+
+def _timeout(request):
+    raise httpx.ReadTimeout("sintetico", request=request)
+
+
+@pytest.mark.parametrize("responder, unidades", [
+    (lambda r: httpx.Response(503, text="caido"), 0),   # jev no procesó: fila en 0
+    (lambda r: httpx.Response(504, text="tarde"), TECHO),  # el gateway cortó, jev pudo haber procesado: techo
+    (_timeout, TECHO),                                  # timeout propio: no sabemos, techo
+], ids=["503", "504", "timeout"])
+def test_falla_http_registra_costo_y_lanza_jev_no_disponible(responder, unidades):
+    costos = RegistroCostosFalso()
+
+    with pytest.raises(JevNoDisponible):
+        _clasificar(_jev_que_responde(responder, costos))
+
+    assert _filas(costos) == [("jev_tokens", "jev", Decimal(unidades), Decimal("0.042") * unidades / 1_000_000)]

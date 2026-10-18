@@ -157,25 +157,14 @@ def test_uso_invalido_cobra_el_techo_y_lanza(uso):
     _fila_jev(costos, lead_id, len(jev.requests[0].content))
 
 
-def test_http_500_lanza_sin_fila():
-    clasificador, _, costos = _clasificador(VALIDA, estado=500)
+def test_4xx_deja_fila_en_cero_y_corta_la_corrida():
+    # 401/429: jev rechazó sin procesar; la credencial o el pedido están mal para todos los leads, no solo este.
+    clasificador, _, costos = _clasificador(VALIDA, estado=401)
 
-    with pytest.raises(httpx.HTTPError):
+    with pytest.raises(httpx.HTTPStatusError):
         _clasificar(clasificador)
 
-    assert costos.filas == []
-
-
-def test_timeout_lanza_sin_fila():
-    def colgado(request):
-        raise httpx.ReadTimeout("sintetico", request=request)
-    costos = RegistroCostosFalso()
-    clasificador = JevClasificador(costos, httpx.MockTransport(colgado), URL, SecretStr(CREDENCIAL), TARIFA_POR_M)
-
-    with pytest.raises(httpx.HTTPError):
-        _clasificar(clasificador)
-
-    assert costos.filas == []
+    assert [(op.tipo, op.unidades) for op in costos.filas] == [("jev_tokens", Decimal(0))]
 
 
 def test_200_que_no_es_json_cobra_el_techo_y_lanza_salida_invalida():
