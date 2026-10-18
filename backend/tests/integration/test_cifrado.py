@@ -22,13 +22,14 @@ REPOSITORIO = APP / "modulos" / "descubrimiento" / "infraestructura" / "persiste
 # PostgresCalificaciones (008) lee leads para el chequeo juridica+cumplimiento antes de importar: solo
 # tipo_titular e id, nunca nombre/direccion/nombre_cifrado/direccion_cifrada.
 CALIFICACIONES = APP / "modulos" / "calificacion" / "infraestructura" / "persistencia" / "postgres_calificaciones.py"
-# El tablero cuenta leads (embudo) en SQL inline: solo IS NOT NULL / count, nunca selecciona contacto.
-TABLERO = APP / "modulos" / "tablero" / "infraestructura" / "persistencia" / "repositorio_tablero.py"
+# El embudo del tablero cuenta leads en su propio módulo: solo count, nunca selecciona contacto
+# (lo ata test_el_sql_del_embudo_solo_cuenta y las columnas devueltas, test_tablero_embudo.py).
+EMBUDO = APP / "modulos" / "tablero" / "infraestructura" / "persistencia" / "embudo_sql.py"
 # El export para Dapta (008) lee leads de jurídicas y descifra solo telefono_cifrado: nunca nombre_cifrado,
 # direccion_cifrada ni email_cifrado (lo ata test_export_dapta_solo_descifra_el_telefono).
 ELEGIBLES_DAPTA = APP / "modulos" / "calificacion" / "infraestructura" / "persistencia" / "elegibles_dapta.py"
 # modelos.py y el catálogo nombran columnas, no ejecutan SQL sobre ellas.
-PERMITIDOS = (REPOSITORIO, CALIFICACIONES, TABLERO, ELEGIBLES_DAPTA, APP / "modelos.py", APP / "seguridad" / "catalogo_sensibles.py")
+PERMITIDOS = (REPOSITORIO, CALIFICACIONES, EMBUDO, ELEGIBLES_DAPTA, APP / "modelos.py", APP / "seguridad" / "catalogo_sensibles.py")
 NOMBRE = "Tienda Doña Rosa"  # sintéticos
 DIRECCION = "Calle 10 # 5-20"
 TELEFONO = "+57 601 555 0199"
@@ -239,12 +240,16 @@ def test_el_repo_de_calificaciones_no_lee_nombre_ni_direccion():
     assert "nombre" not in sql and "direccion" not in sql
 
 
-def test_el_repo_del_tablero_solo_cuenta_y_no_selecciona_contacto():
-    """Está en PERMITIDOS porque el embudo cuenta sobre `leads`: telefono_cifrado solo aparece como IS NOT NULL."""
-    sql = TABLERO.read_text()
-    for columna in ("nombre", "direccion", "nombre_cifrado", "direccion_cifrada", "email_cifrado"):
-        assert columna not in sql, columna
-    assert sql.count("telefono_cifrado") == sql.count("telefono_cifrado IS NOT NULL")
+def test_el_sql_del_embudo_solo_cuenta():
+    """Única excepción del tablero sobre `leads`. La lista prohibida sale del catálogo de sensibles; telefono_cifrado
+    solo puede ir como IS NOT NULL."""
+    sql = " ".join(EMBUDO.read_text().split())
+    prohibidas = {c for _, c in CIFRADAS | CONDICIONALES} - {"telefono_cifrado"}
+    for columna in prohibidas:
+        assert not re.search(rf"\b{columna}\b", sql), columna
+    assert sql.count("telefono_cifrado") == len(re.findall(r"telefono_cifrado IS NOT NULL", sql)) > 0
+    for forma in ("*", "to_jsonb", "row_to_json", "::text"):
+        assert forma not in sql, forma
 
 
 def test_export_dapta_solo_descifra_el_telefono():
