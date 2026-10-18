@@ -280,7 +280,7 @@ requires-dist = [
     { name = "cryptography", specifier = ">=50.0.2" },
     { name = "fastapi", specifier = ">=0.143.3" },
     { name = "httpx", specifier = ">=0.28.1" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.6" },
     { name = "pydantic-settings", specifier = ">=2.16.0" },
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.15.1" },
     { name = "pyyaml", specifier = ">=6.0.3" },

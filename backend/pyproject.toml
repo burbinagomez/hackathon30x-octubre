@@ -7,7 +7,7 @@ dependencies = [
     "fastapi>=0.143.3",
     # Runtime: lo usa el adaptador Croma en producción.
     "httpx>=0.28.1",
-    "psycopg[binary]>=3",
+    "psycopg[binary]>=3.3.6",
     "pydantic-settings>=2.16.0",
     "pyjwt[crypto]>=2.15.1",
     "pyyaml>=6.0.3",
