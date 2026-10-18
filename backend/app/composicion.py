@@ -22,11 +22,15 @@ from app.modulos.descubrimiento.dominio.puertos import FabricaFuentes, FuenteDes
 CONFIG = Path(__file__).resolve().parents[1] / "config"
 
 
-def cargar_tarifas() -> dict[str, Decimal]:
-    """Tarifa unitaria por proveedor desde tarifas.yaml; cada valor pasa por str para no arrastrar el error del float."""
-    t = yaml.safe_load((CONFIG / "tarifas.yaml").read_text())
+def cargar_tarifas(ruta: Path = CONFIG / "tarifas.yaml") -> dict[str, Decimal]:
+    """Tarifa unitaria por proveedor desde tarifas.yaml; cada valor pasa por str para no arrastrar el error del float.
+
+    `dapta` puede faltar (`null`): se lee como `None`, nunca como `Decimal(0)` (TarifaPendiente lo distingue)."""
+    t = yaml.safe_load(ruta.read_text())
+    usd_por_minuto = t["dapta"]["usd_por_minuto"]
     return {"croma": Decimal(str(t["croma"]["usd_por_credito"])), "osm": Decimal(str(t["computo_seg_usd"])),
-            "datos.gov.co": Decimal(str(t["computo_seg_usd"]))}
+            "datos.gov.co": Decimal(str(t["computo_seg_usd"])),
+            "dapta": Decimal(str(usd_por_minuto)) if usd_por_minuto is not None else None}
 
 
 def registro_api(ruta_yaml: Path, catalogo: dict[str, type]) -> Registro:

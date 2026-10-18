@@ -19,8 +19,11 @@ from tests.integration.ayudas_osm import FIXTURE, buscar_osm
 BACKEND = Path(__file__).resolve().parents[2]
 APP = BACKEND / "app"
 REPOSITORIO = APP / "modulos" / "descubrimiento" / "infraestructura" / "persistencia" / "repositorio_leads.py"
+# PostgresCalificaciones (008) lee leads para el chequeo juridica+cumplimiento antes de importar: solo
+# tipo_titular e id, nunca nombre/direccion/nombre_cifrado/direccion_cifrada.
+CALIFICACIONES = APP / "modulos" / "calificacion" / "infraestructura" / "persistencia" / "postgres_calificaciones.py"
 # modelos.py y el catálogo nombran columnas, no ejecutan SQL sobre ellas.
-PERMITIDOS = (REPOSITORIO, APP / "modelos.py", APP / "seguridad" / "catalogo_sensibles.py")
+PERMITIDOS = (REPOSITORIO, CALIFICACIONES, APP / "modelos.py", APP / "seguridad" / "catalogo_sensibles.py")
 NOMBRE = "Tienda Doña Rosa"  # sintéticos
 DIRECCION = "Calle 10 # 5-20"
 CLARO = {"nombre_cifrado": NOMBRE, "direccion_cifrada": DIRECCION}  # lo que guarda cada columna cifrada

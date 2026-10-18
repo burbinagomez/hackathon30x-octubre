@@ -32,10 +32,11 @@ def _arbol_modulos(raiz: Path, archivo: str, contenido: str) -> None:
     # Réplica mínima de app.modulos, con la config real copiada al lado.
     shutil.copy(BACKEND / "pyproject.toml", raiz)
     paquetes = ["app", "app/modulos",
-                "app/modulos/descubrimiento", "app/modulos/costos", "app/modulos/acceso",
+                "app/modulos/descubrimiento", "app/modulos/costos", "app/modulos/acceso", "app/modulos/calificacion",
                 *(f"app/modulos/descubrimiento/{c}" for c in ("dominio", "aplicacion", "infraestructura")),
                 *(f"app/modulos/costos/{c}" for c in ("dominio", "infraestructura")),
-                *(f"app/modulos/acceso/{c}" for c in ("dominio", "infraestructura"))]
+                *(f"app/modulos/acceso/{c}" for c in ("dominio", "infraestructura")),
+                *(f"app/modulos/calificacion/{c}" for c in ("dominio", "infraestructura"))]
     for p in paquetes:
         (raiz / p).mkdir(parents=True, exist_ok=True)
         (raiz / p / "__init__.py").touch()
