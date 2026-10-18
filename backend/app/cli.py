@@ -15,7 +15,7 @@ from app.config import Settings
 from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.costos.dominio.puertos import RegistroCostos
 from app.modulos.descubrimiento.aplicacion.ejecutar_busqueda import EjecutarBusqueda
-from app.modulos.descubrimiento.aplicacion.registro import cargar_registro
+from app.modulos.descubrimiento.aplicacion.registro import cargar_actividades, cargar_registro
 from app.modulos.descubrimiento.dominio.modelos import CriteriosICP
 from app.modulos.descubrimiento.dominio.puertos import RepositorioLeads
 from app.modulos.descubrimiento.infraestructura.adaptadores import catalogo
@@ -120,7 +120,7 @@ def main(argv=None, *, catalogo=catalogo, persistencia=None) -> int:
         return armar
 
     fuentes = {clave: (meta, fabrica(clase, meta)) for clave, (clase, meta) in registro.fuentes.items()}
-    caso = EjecutarBusqueda(persistencia.repo, fuentes)
+    caso = EjecutarBusqueda(persistencia.repo, fuentes, cargar_actividades(CONFIG / "actividades.yaml"))
     resultado = caso.ejecutar(CriteriosICP(args.pais, filtros))
 
     print(f"encontrados {resultado.encontrados} · únicos {resultado.unicos} · nuevos {resultado.nuevos}"
