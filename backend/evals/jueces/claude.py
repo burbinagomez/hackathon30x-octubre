@@ -11,7 +11,7 @@ import httpx
 
 from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.costos.dominio.puertos import RegistroCostos
-from evals.jueces.puerto import SalidaJuezInvalida, Veredicto
+from evals.jueces.puerto import ErrorJuez, SalidaJuezInvalida, Veredicto
 from evals.scorers import forma
 
 VERSION_API = "2023-06-01"
@@ -44,13 +44,29 @@ class JuezClaude:
         self._lote_id, self._api_key, self._http = lote_id, api_key, http_client
 
     def juzgar(self, tarea: str, caso: dict) -> Veredicto:
-        r = self._http.post("/v1/messages", headers={"x-api-key": self._api_key, "anthropic-version": VERSION_API},
-                            json={"model": self._modelo, "max_tokens": MAX_TOKENS, "temperature": 0,
-                                  "system": self._prompt, "tools": [HERRAMIENTA],
-                                  "tool_choice": {"type": "tool", "name": HERRAMIENTA["name"]},
-                                  "messages": [{"role": "user", "content": f"Tarea: {tarea}\n{_bloque_caso(caso)}"}]})
-        r.raise_for_status()  # 4xx/5xx: httpx.HTTPStatusError, sin usage y sin filas de costo
-        cuerpo = r.json()
+        # Los raise van FUERA del except: `from None` suprime la cadena al mostrarla pero igual setea __context__,
+        # y la excepción de httpx lleva request.headers (la key) y response.text.
+        codigo = None
+        try:
+            r = self._http.post("/v1/messages", headers={"x-api-key": self._api_key, "anthropic-version": VERSION_API},
+                                json={"model": self._modelo, "max_tokens": MAX_TOKENS, "temperature": 0,
+                                      "system": self._prompt, "tools": [HERRAMIENTA],
+                                      "tool_choice": {"type": "tool", "name": HERRAMIENTA["name"]},
+                                      "messages": [{"role": "user",
+                                                    "content": f"Tarea: {tarea}\n{_bloque_caso(caso)}"}]})
+            r.raise_for_status()  # 4xx/5xx: sin usage y sin filas de costo
+        except httpx.HTTPStatusError as e:
+            codigo = f"http_{e.response.status_code}"
+        except httpx.HTTPError:
+            codigo = "red"
+        if codigo:
+            raise ErrorJuez(codigo)
+        try:
+            cuerpo = r.json()
+        except ValueError:
+            cuerpo = None
+        if not isinstance(cuerpo, dict):
+            raise SalidaJuezInvalida("cuerpo_no_objeto")  # sin usage legible: sin fila de costo
         self._registrar(cuerpo.get("usage") or {})  # antes de validar: los tokens se gastaron igual
         return self._veredicto(cuerpo)
 

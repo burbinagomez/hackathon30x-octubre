@@ -7,6 +7,7 @@ from decimal import Decimal
 from pathlib import Path
 from uuid import UUID, uuid4
 
+import httpx
 import pytest
 
 from evals import run
@@ -60,6 +61,26 @@ def test_composicion_invalida_sale_2_sin_llamar(tmp_path, capsys, tenant, modelo
                                             registro_costos=costos)
 
     assert (codigo, reporte, capturados, costos.filas) == (2, None, [], [])
+
+
+@pytest.mark.parametrize("http", [
+    httpx.Response(401, json={"error": {"type": "authentication_error", "message": f"invalid x-api-key {CLAVE_FALSA}"}}),
+    httpx.Response(503, text=f"overloaded {CLAVE_FALSA}"),
+    httpx.ConnectTimeout("timeout"),
+], ids=["401", "503", "connect_timeout"])
+def test_falla_del_juez_sale_2_sin_key_ni_costos(tmp_path, capsys, http):
+    # Falla de la API, no del modelo: exit 2 (no se pudo evaluar), nunca 1 (regresión) ni un traceback.
+    costos, capturados = RegistroCostosFalso(), []
+    try:
+        codigo = run.main(["--config", str(config(tmp_path)), "--tenant", str(uuid4())], entorno=ENTORNO,
+                          registro_costos=costos, transporte=transporte(capturados, http=http))
+    except Exception as e:  # noqa: BLE001  el rojo tiene que ser por assert, no por la excepción que escapa
+        codigo = repr(e)
+    out, err = capsys.readouterr()
+
+    assert codigo == 2
+    assert CLAVE_FALSA not in out + err + str(codigo)
+    assert costos.filas == [] and len(capturados) == 1  # corta en la primera falla: no sigue gastando
 
 
 def test_evals_yaml_real_declara_encaje_icp():

@@ -13,7 +13,7 @@ import httpx
 import pytest
 
 from app.modulos.costos.dominio.modelos import OperacionCosto
-from evals.jueces.puerto import SalidaJuezInvalida, Veredicto
+from evals.jueces.puerto import ErrorJuez, SalidaJuezInvalida, Veredicto
 from tests.anthropic_falso import CASO, CLAVE_FALSA, MODELO, SIN_TOOL_USE, USO, juez
 from tests.falsos import RegistroCostosFalso
 
@@ -147,17 +147,38 @@ def _cadena(e: BaseException) -> str:
     return "\n".join(partes)
 
 
-def test_error_http_no_filtra_la_key():
-    costos, capturados = RegistroCostosFalso(), []
-    http = httpx.Response(401, json={"type": "error", "error": {"type": "authentication_error",
-                                                                "message": f"invalid x-api-key {CLAVE_FALSA}"}})
-    # Tipo concreto: httpx.HTTPStatusError (raise_for_status). Si T018 elige otro, se cambia acá y en plan.md.
-    error = _lanza(juez(costos, capturados, http=http), httpx.HTTPStatusError)
+FALLAS_HTTP = {
+    "401": (httpx.Response(401, json={"type": "error", "error": {"type": "authentication_error",
+                                                                 "message": f"invalid x-api-key {CLAVE_FALSA}"}}),
+            "http_401"),
+    "503": (httpx.Response(503, text=f"overloaded {CLAVE_FALSA}"), "http_503"),
+    "timeout": (httpx.ConnectTimeout("timeout"), "red"),
+}
 
-    assert error is not None, "un 401 tiene que lanzar httpx.HTTPStatusError"
+
+@pytest.mark.parametrize("http, codigo", FALLAS_HTTP.values(), ids=FALLAS_HTTP.keys())
+def test_error_http_no_filtra_la_key(http, codigo):
+    # La excepción de httpx lleva request.headers (la key) y response.text: el juez la corta, sin cadena.
+    costos, capturados = RegistroCostosFalso(), []
+    error = _lanza(juez(costos, capturados, http=http), Exception)
+
+    assert isinstance(error, ErrorJuez), f"tiene que lanzar ErrorJuez, lanzó {type(error).__name__}"
+    assert str(error) == codigo
+    assert error.__cause__ is None and error.__context__ is None
     assert len(capturados) == 1
-    assert costos.filas == []  # un 401 no trae usage: no hay tokens que registrar
+    assert costos.filas == []  # sin respuesta 200 no hay usage: no hay tokens que registrar
     assert CLAVE_FALSA not in _cadena(error)
+
+
+@pytest.mark.parametrize("http", [httpx.Response(200, text="<html>no es json</html>"),
+                                  httpx.Response(200, json=["no", "es", "objeto"])], ids=["no_json", "no_objeto"])
+def test_200_ilegible_es_salida_invalida_sin_costos(http):
+    # Sin un objeto JSON no hay usage que leer: no se inventa una fila con 0 tokens (sin usage, sin costo).
+    costos = RegistroCostosFalso()
+    error = _lanza(juez(costos, [], http=http), Exception)
+
+    assert isinstance(error, SalidaJuezInvalida), f"lanzó {type(error).__name__}"
+    assert costos.filas == []
 
 
 def test_salida_no_filtra_la_key(capsys, caplog):

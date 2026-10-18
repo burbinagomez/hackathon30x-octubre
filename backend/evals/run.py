@@ -17,7 +17,7 @@ import yaml
 
 from evals.config import ConfigInvalida, cargar
 from evals.fingerprint import fingerprint
-from evals.jueces.puerto import SalidaJuezInvalida
+from evals.jueces.puerto import ErrorJuez, SalidaJuezInvalida
 from evals.scorers import forma
 
 CONFIG_DEFAULT = Path(__file__).parent / "evals.yaml"
@@ -222,7 +222,10 @@ def main(argv, entorno=os.environ, fabrica_juez=None, registro_costos=None, tran
         if not _k_valido(ev, jueces[nombre], baseline.get(nombre)):
             return _error(f"config_invalida: {nombre}: k={ev['k']} sin determinación demostrada a k=3")
 
-    resultados = {nombre: _correr(nombre, ev, jueces[nombre]) for nombre, ev in evals.items()}
+    try:
+        resultados = {nombre: _correr(nombre, ev, jueces[nombre]) for nombre, ev in evals.items()}
+    except ErrorJuez as e:
+        return _error(f"juez_error: {e}")  # la API no respondió: no se pudo evaluar (2), no es regresión (1)
     for nombre, r in resultados.items():
         r["estado"] = _estado(r, evals[nombre], baseline.get(nombre))
         r["baseline"] = (baseline.get(nombre) or {}).get("agregado")

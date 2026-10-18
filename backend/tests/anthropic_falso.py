@@ -28,10 +28,10 @@ def respuesta(entrada: dict | None = None, uso: dict = USO, content: list | None
 
 
 def transporte(capturados: list, entrada: dict | None = None, cabeceras: list | None = None,
-               http: httpx.Response | None = None, **cuerpo) -> httpx.MockTransport:
+               http: httpx.Response | Exception | None = None, **cuerpo) -> httpx.MockTransport:
     """Messages API falsa. Cada request a POST /v1/messages deja su cuerpo JSON en `capturados` y
-    `dict(request.headers)` en `cabeceras`. `http` reemplaza la respuesta entera (p. ej. un 401);
-    `cuerpo` va a `respuesta()` (content, stop_reason).
+    `dict(request.headers)` en `cabeceras`. `http` reemplaza la respuesta entera (p. ej. un 401) o, si es una
+    excepción (p. ej. httpx.ConnectTimeout), se lanza después de capturar; `cuerpo` va a `respuesta()`.
     """
     entrada = {"probabilidad": 0.8, "razon": "encaja"} if entrada is None else entrada
 
@@ -41,6 +41,8 @@ def transporte(capturados: list, entrada: dict | None = None, cabeceras: list | 
         capturados.append(json.loads(request.content))
         if cabeceras is not None:
             cabeceras.append(dict(request.headers))
+        if isinstance(http, Exception):
+            raise http
         return http if http is not None else httpx.Response(200, json=respuesta(entrada, **cuerpo))
 
     return httpx.MockTransport(responder)
