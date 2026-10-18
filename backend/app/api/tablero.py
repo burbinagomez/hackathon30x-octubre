@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, Request
 
 from app.api.sesion import tenant_actual
@@ -6,12 +8,18 @@ from app.modulos.tablero.infraestructura.persistencia.repositorio_tablero import
 router = APIRouter()
 
 
+def _monto(valor: Decimal | None) -> str | None:
+    # Decimal como string (sin pasar por float); null = "sin dato", nunca "0".
+    return None if valor is None else str(valor)
+
+
 def _fila(f: FilaFuente) -> dict:
-    # [MIN]: solo encontrados y únicos. Lo que todavía no se calcula va null ("sin dato"), nunca 0.
+    # Costo y CPL salen de `costos`; lo que todavía no se calcula va null ("sin dato"), nunca 0.
     return {
         "fuente": f.fuente, "encontrados": f.encontrados, "unicos": f.unicos, "icp": None,
-        "costo_lista": None, "costo_real": None, "desperdicio_lista": None, "desperdicio_real": None,
-        "cpl_lista": None, "cpl_real": None, "cuenta_naturales": False, "naturales_no_contactables": None,
+        "costo_lista": _monto(f.costo_lista), "costo_real": _monto(f.costo_real),
+        "desperdicio_lista": None, "desperdicio_real": None,
+        "cpl_lista": _monto(f.cpl_lista), "cpl_real": _monto(f.cpl_real), "cuenta_naturales": False, "naturales_no_contactables": None,
     }
 
 
@@ -21,7 +29,7 @@ def tablero_fuentes(request: Request, tenant_id=Depends(tenant_actual)):
     return {
         "fuentes": [_fila(f) for f in datos.fuentes],
         "total": _fila(datos.total),
-        "costo_evals": None,
+        "costo_evals": _monto(datos.costo_evals),
         "cobertura": None,
         "revisiones_pendientes": None,
         "atribuciones": [{"fuente": a.fuente, "texto": a.texto, "url": a.url} for a in datos.atribuciones],
