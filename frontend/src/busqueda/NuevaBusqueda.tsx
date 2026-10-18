@@ -206,7 +206,7 @@ export default function NuevaBusqueda() {
         </div>
       )}
       {pestana === "frase" && (
-        <div className="formulario formulario-ancho" role="tabpanel">
+        <div className="formulario panel-intake" role="tabpanel">
           <Campo id="frase" etiqueta={t("busqueda.frase.etiqueta")}>
             <textarea id="frase" maxLength={MAX_FRASE} value={frase} onChange={(e) => setFrase(e.target.value)} />
           </Campo>
@@ -222,7 +222,7 @@ export default function NuevaBusqueda() {
         </div>
       )}
       {pestana === "lookalike" && (
-        <div className="formulario formulario-ancho" role="tabpanel">
+        <div className="panel-intake" role="tabpanel">
           {sugerido && <p role="status" className="aviso">{t("busqueda.frase.revisar")}</p>}
           <IntakeLookalike alSugerir={aplicarLookalike} />
         </div>
@@ -311,6 +311,7 @@ export default function NuevaBusqueda() {
       {ocupado === "buscar" && vista && (
         // La API responde todo junto al final: mientras tanto se ve qué fuentes se están consultando.
         <Trabajando
+          flotante
           texto={t("busqueda.trabajando.buscando")}
           pasos={vista.fuentes.map((f) => t("busqueda.trabajando.consultando", { fuente: nombreFuente(f.fuente) }))}
           detalle={<DetalleBusqueda vista={vista} tope={Number(form.tope)} />}

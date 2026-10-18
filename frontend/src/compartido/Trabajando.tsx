@@ -7,6 +7,8 @@ type Props = {
   pasos?: string[];
   /** Qué está haciendo, en detalle: se ve al desplegar la píldora (como el "Thinking…" de Dapti). */
   detalle?: ReactNode;
+  /** Queda pegada abajo de la pantalla mientras dura (las esperas largas: Buscar), como la píldora de Dapti. */
+  flotante?: boolean;
 };
 
 const FLECHA_ABAJO = "▾"; // glifos, no texto: aria-hidden
@@ -14,7 +16,7 @@ const FLECHA_ARRIBA = "▴";
 const reloj = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
 /** Píldora de "estoy trabajando": anillo lima, texto y cronómetro. Las esperas largas (Overpass, la IA) se ven vivas. */
-export default function Trabajando({ texto, pasos, detalle }: Props) {
+export default function Trabajando({ texto, pasos, detalle, flotante = false }: Props) {
   const [segundos, setSegundos] = useState(0);
   const [abierto, setAbierto] = useState(false);
   const id = useId();
@@ -34,7 +36,7 @@ export default function Trabajando({ texto, pasos, detalle }: Props) {
   );
 
   return (
-    <div role="status" aria-live="polite" aria-labelledby={id} className="trabajando">
+    <div role="status" aria-live="polite" aria-labelledby={id} className={flotante ? "trabajando trabajando-flotante" : "trabajando"}>
       {detalle ? (
         <button type="button" className="trabajando-cabecera trabajando-alternar" aria-expanded={abierto}
           aria-labelledby={id} onClick={() => setAbierto((a) => !a)}>

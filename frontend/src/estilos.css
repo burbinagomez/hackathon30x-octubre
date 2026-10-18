@@ -515,3 +515,23 @@ table.tabla-leads {
   overflow-y: auto;
 }
 .trabajando-detalle ul { margin: 0; padding-left: 1.1rem; }
+
+/* Paneles de las puertas: una columna, el texto y la caja al ancho completo. */
+.panel-intake {
+  max-width: 44rem;
+}
+.panel-intake textarea {
+  width: 100%;
+  min-height: 10rem;
+}
+/* La píldora ocupa todo el ancho del formulario y, en las esperas largas, queda visible abajo de la pantalla. */
+.formulario-ancho > .trabajando {
+  grid-column: 1 / -1;
+}
+.trabajando-flotante {
+  position: sticky;
+  bottom: 1rem;
+  z-index: 5;
+  border-color: var(--color-acento);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}

@@ -46,3 +46,8 @@ test("sin_detalle_no_hay_boton_para_desplegar", () => {
   render(<Trabajando texto="Buscando" />);
   expect(screen.queryByRole("button")).not.toBeInTheDocument();
 });
+
+test("flotante_queda_pegada_abajo_de_la_pantalla", () => {
+  render(<Trabajando texto="Buscando" flotante />);
+  expect(screen.getByRole("status")).toHaveClass("trabajando-flotante");
+});

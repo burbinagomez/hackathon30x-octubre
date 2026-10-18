@@ -43,7 +43,7 @@ export default function IntakeLookalike({ alSugerir }: Props) {
   }
 
   return (
-    <section className="formulario formulario-ancho">
+    <section className="formulario panel-intake">
       <h2>{t("intake.lookalike.titulo")}</h2>
       <p>{t("intake.lookalike.ayuda")}</p>
       <div className="campo">
