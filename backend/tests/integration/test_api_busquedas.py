@@ -641,3 +641,14 @@ def test_tolima_con_el_yaml_real_de_camaras_no_tumba_la_busqueda_porque_no_hay_c
     with admin.connect() as c:
         filas = c.execute(text("SELECT proveedor FROM costos WHERE lote_id = :l"), {"l": busqueda_id}).all()
     assert [f.proveedor for f in filas] == ["osm"]
+
+
+def test_actividades_devuelve_el_catalogo_real_ampliado(api, usuarios):
+    r = api.get("/actividades", headers=_bearer(usuarios["a"]))
+
+    assert r.status_code == 200
+    por_codigo = {a["codigo"]: a for a in r.json()}
+    assert len(por_codigo) >= 20
+    for codigo in ("4711", "5611", "4752", "4773", "4771", "9602", "4520", "6201", "4923"):
+        assert codigo in por_codigo, codigo
+    assert por_codigo["6201"]["nombre_es"] and por_codigo["6201"]["nombre_en"]
