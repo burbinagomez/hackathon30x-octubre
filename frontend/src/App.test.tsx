@@ -1,14 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { delay, http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, expect, test } from "vitest";
+import { expect, test } from "vitest";
 import App from "./App";
-
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
+import { server } from "./test/servidor";
 
 test("muestra estado de la API", async () => {
   server.use(

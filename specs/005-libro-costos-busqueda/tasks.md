@@ -210,7 +210,7 @@
 
 ## Fase 9: Front (Paso 8)
 
-- [ ] T034 [MIN] [Paso 8] Mover `src/setupTests.ts` a `src/test/setup.ts` y sumar `src/test/servidor.ts` (MSW sin handlers). `vitest.config.ts` incluye `src/**` y `tests/**` y excluye `e2e/`.
+- [x] T034 [MIN] [Paso 8] Mover `src/setupTests.ts` a `src/test/setup.ts` y sumar `src/test/servidor.ts` (MSW sin handlers). `vitest.config.ts` incluye `src/**` y `tests/**` y excluye `e2e/`.
 
   **Esqueletos del front,** para que los rojos de T035–T041 y T047 fallen por aserción y no por "module not found" ni ENOENT:
   - `Login`, `NuevaBusqueda`, `Tablero` y `ColaRevision` devuelven `null`;
