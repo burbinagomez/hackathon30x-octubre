@@ -56,26 +56,26 @@
 
 `tests/unit/enriquecimiento/test_sitio_web.py`, 7 tests (`spec.md:64-73`). `httpx.MockTransport` y DNS falso inyectable. Sin red.
 
-- [ ] T009 [MIN] [P] [Paso 2] 🤖 **Rojo** (security), SSRF:
+- [x] T009 [MIN] [P] [Paso 2] 🤖 **Rojo** (security), SSRF:
   - dominio que resuelve a `127.0.0.1`, `10.x`, `169.254.169.254` o `::1` → `estado="fallo"` y **cero** requests en el transport;
   - dominio público que responde `302 → http://localhost/` → se corta antes del segundo request.
 
   **Mutaciones:** validar solo la URL inicial; `any` por `all` en las IPs resueltas; `follow_redirects=True`.
-- [ ] T010 [MIN] [P] [Paso 2] 🤖 **Rojo** (security), límites:
+- [x] T010 [MIN] [P] [Paso 2] 🤖 **Rojo** (security), límites:
   - 4 redirecciones → `DemasiadasRedirecciones` y 4 requests, no 5;
   - cuerpo de 3 MB → `estado="truncado"`, y se leyeron ≤ 2 MB + un chunk;
   - `robots.txt` con `Disallow: /` para `*` → `fetch_bloqueado_por_robots`, sin GET de la raíz.
 
   **Mutaciones:** `> 3` por `> 4`; leer con `.text` en vez de por stream; ignorar robots.
-- [ ] T011 [MIN] [P] [Paso 2] 🤖 **Rojo**, extracción y costo:
+- [x] T011 [MIN] [P] [Paso 2] 🤖 **Rojo**, extracción y costo:
   - HTML con `mailto:`, `wa.me/57…` y un teléfono plano → email + `whatsapp_comercial` gana al plano;
   - un `web_fetch` registrado por request real con `lead_id` set, `fuente=None`, `lote_id=None` y `type(monto) is Decimal`;
   - un fetch cortado por SSRF no hace request y deja 0 filas en `costos` (P9);
   - `caplog` no contiene ni el email ni el teléfono extraídos.
 
   **Mutaciones:** registrar con `fuente="sitio_web"`; `logger.info(contacto)`; sacar `wa.me` de la regex.
-- [ ] T012 [MIN] [Paso 2] 🛡 Security revisa T009–T011. **APROBADO antes de T013.** Foco: rebinding DNS (se resuelve una vez y se conecta a esa IP), IPv6 mapeado (`::ffff:127.0.0.1`), timeout corto, UA fijo, nada de contacto en logs.
-- [ ] T013 [MIN] [Paso 2] 🤖 **Verde:** `infraestructura/adaptadores/sitio_web.py`.
+- [x] T012 [MIN] [Paso 2] 🛡 Security revisa T009–T011. **APROBADO antes de T013.** Foco: rebinding DNS (se resuelve una vez y se conecta a esa IP), IPv6 mapeado (`::ffff:127.0.0.1`), timeout corto, UA fijo, nada de contacto en logs.
+- [x] T013 [MIN] [Paso 2] 🤖 **Verde:** `infraestructura/adaptadores/sitio_web.py`.
 - [x] T014 [Paso 2] 🧑 Daniel decidió P9 (2026-10-17): solo se registra `web_fetch` cuando hay request real, robots.txt incluido; el corte por SSRF no registra nada; sin columna nueva en `costos`. T011 lo asierta: un SSRF cortado deja 0 filas en `costos`.
 
 **Checkpoint 2:** los 7 tests verdes sin red.
