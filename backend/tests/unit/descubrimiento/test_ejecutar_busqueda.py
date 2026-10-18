@@ -4,7 +4,7 @@ import pytest
 
 from app.modulos.descubrimiento.aplicacion.ejecutar_busqueda import EjecutarBusqueda
 from app.modulos.descubrimiento.dominio.errores import FuenteNoDisponible, LimiteFuenteAgotado
-from app.modulos.descubrimiento.dominio.modelos import Actividad, CriteriosICP, EmpresaCruda, MetaFuente
+from app.modulos.descubrimiento.dominio.modelos import Actividad, CriteriosICP, EmpresaCruda, MetaFuente, PaginaEmpresas
 from tests.falsos import FuenteFalsa, RegistroCostosFalso, RepositorioLeadsFalso
 
 AS_OF = datetime(2026, 10, 1, tzinfo=UTC)
@@ -36,7 +36,7 @@ def _caso(repo, costos, por_fuente, errores=None, paises=None):
         return armar
 
     fuentes = {clave: (metas[clave], fabrica(clave)) for clave in por_fuente}
-    return EjecutarBusqueda(repo, fuentes), armadas
+    return EjecutarBusqueda(repo, fuentes, actividades={}), armadas
 
 
 def test_mismo_nit_de_dos_fuentes_queda_en_un_lead():
@@ -93,7 +93,7 @@ def test_cada_lead_nuevo_tiene_fila_en_cumplimiento():
 def test_sin_fuente_para_el_pais_se_reporta():
     repo = RepositorioLeadsFalso()
     caso, armadas = _caso(repo, RegistroCostosFalso(), {"f1": [_empresa("f1")]})
-    icp_br = CriteriosICP(pais="BR", filtros={"ciiu": "4711"})
+    icp_br = CriteriosICP(pais="BR", filtros={"ciiu": "4711", "ciudad": "São Paulo"})
     resultado = caso.ejecutar(icp_br)
     assert resultado.sin_fuente_para == ("BR", icp_br.filtros)
     assert repo.leads == {}
@@ -129,3 +129,22 @@ def test_error_de_fuente_se_reporta_y_busqueda_queda_con_errores(error):
     assert resultado.errores == {"rota": error}
     assert list(repo.leads) == [("CO", "900123456")]  # la fuente sana sigue
     assert repo.busquedas == {resultado.busqueda_id: "con_errores"}
+
+
+def test_el_adaptador_recibe_los_criterios_reducidos_a_lo_que_declara():
+    meta = MetaFuente(clave="osm", proveedor="osm", paises=frozenset({"CO"}), filtros=frozenset({"ciudad", "tipo_negocio"}),
+                      trae=frozenset(), tipo="live", licencia="ODbL")
+    recibidos = []
+
+    class FuenteQueGuarda:
+        def __init__(self, lote_id):
+            self.meta = meta
+
+        def buscar(self, criterios, pagina):
+            recibidos.append(criterios)
+            return PaginaEmpresas((), None)
+
+    caso = EjecutarBusqueda(RepositorioLeadsFalso(), {"osm": (meta, FuenteQueGuarda)},
+                            actividades={"4711": ("shop=supermarket", "shop=convenience")})
+    caso.ejecutar(CriteriosICP("CO", {"ciiu": "4711", "ciudad": "Bogotá"}))
+    assert recibidos == [CriteriosICP("CO", {"ciudad": "Bogotá", "tipo_negocio": ("shop=supermarket", "shop=convenience")})]

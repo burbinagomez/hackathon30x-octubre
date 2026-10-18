@@ -26,11 +26,11 @@ class EjecutarBusqueda:
         self,
         repo: RepositorioLeads,
         fuentes: Mapping[str, tuple[MetaFuente, FabricaFuente]],
-        actividades: Mapping[str, tuple[str, ...]] | None = None,
+        actividades: Mapping[str, tuple[str, ...]],
     ):
         self._repo = repo
         self._fuentes = fuentes
-        self._actividades = actividades or {}
+        self._actividades = actividades
 
     def ejecutar(self, criterios: CriteriosICP) -> ResultadoBusqueda:
         busqueda_id = self._repo.crear_busqueda(criterios)
