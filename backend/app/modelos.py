@@ -92,6 +92,24 @@ lead_fuentes = Table(
     ForeignKeyConstraint(["tenant_id", "busqueda_id"], ["busquedas.tenant_id", "busquedas.id"]),
 )
 
+contactos = Table(
+    "contactos", metadata,
+    _id(), _tenant(),
+    Column("lead_id", UUID(as_uuid=True), nullable=False),
+    Column("busqueda_id", UUID(as_uuid=True), nullable=False),
+    Column("canal", Text, nullable=False),
+    Column("asunto", Text, nullable=False),
+    Column("cuerpo", Text, nullable=False),
+    Column("estado", Text, nullable=False, server_default=text("'aprobado'::text")),
+    Column("enviado_en", DateTime(timezone=True)),
+    Column("respondio_en", DateTime(timezone=True)),
+    Column("bloqueo", Boolean, nullable=False, server_default=text("false")),
+    Column("creado_en", DateTime(timezone=True), nullable=False, server_default=_AHORA),
+    UniqueConstraint("tenant_id", "lead_id", "canal", name="contactos_tenant_id_lead_id_canal_key"),
+    ForeignKeyConstraint(["tenant_id", "lead_id"], ["leads.tenant_id", "leads.id"]),
+    ForeignKeyConstraint(["tenant_id", "busqueda_id"], ["busquedas.tenant_id", "busquedas.id"]),
+)
+
 cumplimiento = Table(
     "cumplimiento", metadata,
     _id(), _tenant(),

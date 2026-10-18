@@ -33,7 +33,7 @@
 
 ## Fase 4: Migración (Paso 3) — después de T001
 
-- [ ] T030 [Paso 3] `supabase/migrations/<siguiente libre>_contactos.sql` con el DDL aprobado; `app/modelos.py` suma `contactos`. El número se recalcula contra `main` antes del merge.
+- [x] T030 [Paso 3] `supabase/migrations/<siguiente libre>_contactos.sql` con el DDL aprobado; `app/modelos.py` suma `contactos`. El número se recalcula contra `main` antes del merge.
 - [ ] T031 [Paso 3] `test_rls[contactos]` y `test_privilegios_supabase` en verde sin tocarlos; `test_migraciones` (drift vacío). `::test_un_solo_email_por_lead`: `INSERT` duplicado → `23505`. `::test_privilegios_vistas`: `app_rt` tiene `SELECT` en las dos vistas y `anon`/`authenticated` no tienen nada. Mutación `sabotaje_vista_sin_revoke`: sacar el revoke de una vista. (security)
 
 ## Fase 5: Envío (Paso 4) — advisor
