@@ -366,10 +366,30 @@ test("la_ciudad_queda_deshabilitada_si_la_division_no_tiene_municipios", async (
 });
 
 test.each([["es", "Se guarda; todavía no se aplica"], ["en", "Saved; not enforced yet"]])(
-  "el_tope_avisa_que_se_guarda_pero_todavia_no_se_aplica[%s]",
+  "el_tope_ya_no_avisa_que_no_se_aplica[%s]",
   async (idioma, aviso) => {
     await i18n.changeLanguage(idioma);
     await montarGeografia();
-    expect(screen.queryByText(aviso, { exact: false })).toBeInTheDocument();
+    expect(screen.queryByText(aviso, { exact: false })).not.toBeInTheDocument();
   },
 );
+
+const fino = (idioma: string, valor: string) =>
+  new Intl.NumberFormat(idioma, { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 6 })
+    .format(Number(valor)).replace(/\s/g, " ");
+
+test("la_vista_previa_muestra_costo_maximo_con_fracciones_de_centavo_y_dentro_del_tope", async () => {
+  await previsualizar(respuestaVistaPreviaMinima({ costo_maximo_usd: "0.00126", dentro_del_tope: true }));
+
+  await waitFor(() => expect(screen.queryByText(`Costo máximo: ${fino("es", "0.00126")}`)).toBeInTheDocument());
+  expect(screen.queryByText(es.busqueda.dentro_del_tope)).toBeInTheDocument();  // y no "$0.00"
+  expect(boton("Buscar")).toBeEnabled();
+});
+
+test("la_vista_previa_fuera_del_tope_lo_dice_y_deshabilita_buscar", async () => {
+  await previsualizar(respuestaVistaPreviaMinima({ costo_maximo_usd: "0.00126", dentro_del_tope: false }), "0.0001");
+
+  await waitFor(() => expect(screen.queryByText(es.busqueda.fuera_del_tope)).toBeInTheDocument());
+  expect(screen.queryByText(es.busqueda.dentro_del_tope)).not.toBeInTheDocument();
+  expect(boton("Buscar")).toBeDisabled();
+});

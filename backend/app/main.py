@@ -32,8 +32,13 @@ async def lifespan(app: FastAPI):
     app.state.cifrador = Cifrador(app.state.settings.cifrado_key.get_secret_value())
     app.state.transporte_http = httpx.HTTPTransport()
     app.state.actividades_yaml = yaml.safe_load((CONFIG / "actividades.yaml").read_text()) or {}
-    app.state.registro = registro_api(CONFIG / "fuentes.yaml", catalogo)
-    app.state.canales_contacto = (yaml.safe_load((CONFIG / "fuentes.yaml").read_text()) or {}).get("canales_contacto") or {}
+    fuentes_yaml = yaml.safe_load((CONFIG / "fuentes.yaml").read_text()) or {}
+    # Sin CROMA_API_KEY la fuente de Croma queda fuera del catálogo (-> sin_implementacion): no rompe el arranque.
+    sin_key = app.state.settings.croma_api_key is None
+    app.state.registro = registro_api(
+        CONFIG / "fuentes.yaml", {c: k for c, k in catalogo.items() if not (sin_key and c.startswith("croma_"))})
+    app.state.limites = fuentes_yaml.get("limites") or {}
+    app.state.canales_contacto = fuentes_yaml.get("canales_contacto") or {}
     app.state.tarifas = cargar_tarifas()
     # Un archivo por país en config/geografia/: la estructura admite MX/PE/BR sin tocar código; sin archivo, no se ofrece.
     app.state.geografia = cargar_geografia(CONFIG / "geografia")

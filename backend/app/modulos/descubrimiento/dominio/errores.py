@@ -24,3 +24,7 @@ class BusquedaYaEjecutada(RuntimeError):
 
 class BusquedaNoEncontrada(LookupError):
     """No existe, o es de otro tenant (RLS no deja distinguirlo, a propósito)."""
+
+
+class TopeExcedido(RuntimeError):
+    """Lo ya gastado más el costo máximo de las fuentes a llamar supera el tope de la búsqueda. No se llamó a nadie."""
