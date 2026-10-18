@@ -568,6 +568,8 @@ def test_lote_id_es_un_uuid_por_corrida(tmp_path, correr):
     assert r1.reporte["lote_id"] != r2.reporte["lote_id"]
     # fabrica_juez(nombre_eval, lote_id): recibe el mismo lote del reporte, una vez por eval.
     assert [(n, str(lote)) for n, lote in r1.fabrica_llamadas] == [(ENCAJE, r1.reporte["lote_id"])]
+    # UUID y no str: JuezClaude lo pasa tal cual a OperacionCosto.lote_id (UUID | None).
+    assert all(isinstance(lote, uuid.UUID) for _, lote in r1.fabrica_llamadas)
 
 
 # --- Entorno --------------------------------------------------------------------------------------------------

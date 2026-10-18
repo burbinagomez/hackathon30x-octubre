@@ -163,7 +163,7 @@ def main(argv, entorno=os.environ, fabrica_juez=None, registro_costos=None) -> i
     if fabrica_juez is None:
         raise NotImplementedError("composición real (JuezClaude + postgres_costos): T019")
 
-    lote_id = str(uuid.uuid4())
+    lote_id = uuid.uuid4()
     jueces = {}
     for nombre, ev in evals.items():
         jueces[nombre] = fabrica_juez(nombre, lote_id)
@@ -195,7 +195,7 @@ def main(argv, entorno=os.environ, fabrica_juez=None, registro_costos=None) -> i
         mejora_sin_fijar = [n for n, r in resultados.items()
                             if r["estado"] == "ok" and _compara(r, baseline.get(n), lambda x, y: x > y)]
 
-    print(json.dumps({"lote_id": lote_id, "evals": resultados, "mejora_sin_fijar": mejora_sin_fijar}, ensure_ascii=False))
+    print(json.dumps({"lote_id": str(lote_id), "evals": resultados, "mejora_sin_fijar": mejora_sin_fijar}, ensure_ascii=False))
     return 0 if all(r["estado"] == "ok" for r in resultados.values()) else 1
 
 
