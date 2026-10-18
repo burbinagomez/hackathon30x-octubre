@@ -232,7 +232,115 @@ footer p {
   margin: 0;
 }
 
+.etiqueta-licencia {
+  font-weight: 500;
+}
+
+/* El enlace de la tabla ocupa la celda para que el objetivo táctil sea de 44 px. */
+table a {
+  min-height: 44px;
+}
+
+/* Lista de leads: tarjetas en móvil, tabla desde 48rem. */
+.lista-busquedas {
+  list-style: none;
+  margin: 16px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.lista-busquedas a {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-gris);
+  border-radius: 12px;
+}
+
+.paginacion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+table.tabla-leads {
+  min-width: 0;
+}
+
+.tabla-leads thead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.tabla-leads,
+.tabla-leads tbody,
+.tabla-leads tr,
+.tabla-leads td {
+  display: block;
+}
+
+.tabla-leads tr {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-gris);
+}
+
+.tabla-leads td {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 0;
+  padding: 4px 12px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.tabla-leads td::before {
+  content: attr(data-etiqueta);
+  font-weight: 500;
+  text-align: left;
+}
+
 @media (min-width: 48rem) {
+  table.tabla-leads {
+    min-width: 40rem;
+  }
+
+  .tabla-leads thead {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+  }
+
+  .tabla-leads {
+    display: table;
+  }
+
+  .tabla-leads tbody {
+    display: table-row-group;
+  }
+
+  .tabla-leads tr {
+    display: table-row;
+    padding: 0;
+  }
+
+  .tabla-leads td {
+    display: table-cell;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--color-gris);
+  }
+
+  .tabla-leads td::before {
+    content: none;
+  }
+
   .pantalla {
     padding: 32px;
   }

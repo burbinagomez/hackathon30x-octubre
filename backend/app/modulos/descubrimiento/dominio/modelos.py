@@ -59,6 +59,48 @@ class Lead:
 
 
 @dataclass(frozen=True)
+class ResumenBusqueda:
+    id: UUID
+    creada_en: datetime
+    estado: str
+    pais: str
+    departamento: str | None
+    ciudad: str | None
+    total_leads: int
+
+
+@dataclass(frozen=True)
+class LeadListado:
+    """Fila de la pantalla "Leads de la búsqueda". Sin dirección y sin valores de contacto: solo si existen.
+    `nombre` es None salvo para una jurídica. `tiene_telefono`/`tiene_email` None = sin dato (aún no hay columna)."""
+    id: UUID
+    nombre: str | None
+    tipo_titular: TipoTitular
+    fuentes: tuple[str, ...]
+    licencias: tuple[str, ...]
+    ciudad: str | None
+    tiene_web: bool
+    tiene_telefono: bool | None = None
+    tiene_email: bool | None = None
+
+
+@dataclass(frozen=True)
+class AtribucionFuente:
+    fuente: str
+    texto: str
+    url: str
+
+
+@dataclass(frozen=True)
+class PaginaLeads:
+    items: tuple[LeadListado, ...]
+    total: int
+    pagina: int
+    tamano: int
+    atribuciones: tuple[AtribucionFuente, ...]
+
+
+@dataclass(frozen=True)
 class PaginaEmpresas:
     empresas: tuple[EmpresaCruda, ...]
     total: int | None  # lo que reporte la fuente
