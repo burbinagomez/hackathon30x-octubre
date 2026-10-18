@@ -71,6 +71,12 @@ class SettingsApi(Settings):
     # La misma clave que firma el enlace de baja en SettingsEmail. Sin ella, /baja/{token} responde 404.
     baja_secret: SecretStr | None = Field(None, min_length=32)
 
+    @field_validator("baja_secret", mode="before")
+    @classmethod
+    def _baja_secret_vacia_es_none(cls, valor: object) -> object:
+        # El compose local la pasa vacía si no está en el .env: sin baja, no sin api.
+        return None if valor == "" else valor
+
     # Puerta B de intake (frase -> ICP): proveedor Anthropic. Opcionales: sin key, sin modelo o con un modelo sin tarifa
     # en config/tarifas.yaml la API arranca igual y la ruta responde 503 ia_no_disponible (sin tarifa no hay costo que
     # registrar, principio VIII). Solo backend, nunca VITE_.
