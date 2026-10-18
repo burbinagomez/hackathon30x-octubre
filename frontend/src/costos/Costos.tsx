@@ -2,11 +2,15 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import Enlace from "../compartido/Enlace";
 import Esqueleto from "../compartido/Esqueleto";
-import { entero, moneda, monedaFina } from "../compartido/formato";
+import { entero, monedaFina } from "../compartido/formato";
 import { RUTA_COSTOS } from "../compartido/rutas";
 import { listarCostos } from "./api";
 import type { PaginaCostos } from "./tipos";
 
+const UNIDADES: Record<string, string> = {
+  socrata_descarga: "segundos", overpass_query: "segundos", web_fetch: "segundos", croma_consulta: "creditos",
+  llm_tokens_in: "tokens", llm_tokens_out: "tokens", jev_tokens: "tokens",
+};
 const COLUMNAS = ["ts", "tipo", "fuente", "proveedor", "cantidad", "costo", "gratis", "lead"] as const;
 
 type Props = { busquedaId: string | null };
@@ -34,6 +38,13 @@ export default function Costos({ busquedaId }: Props) {
   }
 
   const paginas = Math.max(1, Math.ceil(datos.total / datos.tamano));
+  // Cada tipo cobra en su unidad: segundos de cómputo, créditos de Croma o tokens.
+  const cantidad = (tipo: string, valor: string) => {
+    const n = Number(valor);
+    const numero = new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 3 }).format(n);
+    const unidad = UNIDADES[tipo];
+    return unidad ? `${numero} ${t(`costos.unidad.${unidad}`, { count: n })}` : numero;
+  };
   const fecha = (iso: string) => new Intl.DateTimeFormat(i18n.language, { dateStyle: "short", timeStyle: "medium" }).format(new Date(iso));
   const sino = (v: boolean) => (v ? t("costos.si") : t("costos.no"));
   const tipo = (k: string) => t(`costos.tipos.${k}`, { defaultValue: k });
@@ -50,23 +61,23 @@ export default function Costos({ busquedaId }: Props) {
       )}
       <div className="metricas">
         <p className="metrica">
-          {t("costos.total")}: <strong data-testid="total-usd">{moneda(datos.total_usd)}</strong>
+          {t("costos.total")}: <strong data-testid="total-usd">{monedaFina(datos.total_usd)}</strong>
         </p>
         <p className="metrica">
-          {t("costos.total_real")}: <strong data-testid="total-real-usd">{moneda(datos.total_real_usd)}</strong>
+          {t("costos.total_real")}: <strong data-testid="total-real-usd">{monedaFina(datos.total_real_usd)}</strong>
         </p>
       </div>
       <div className="subtotales">
         <section aria-labelledby="costos-por-tipo">
           <h2 id="costos-por-tipo">{t("costos.por_tipo")}</h2>
           <ul className="lista">
-            {datos.por_tipo.map((s) => <li key={s.tipo}><span>{tipo(s.tipo)}</span> <span>{moneda(s.costo_usd)}</span></li>)}
+            {datos.por_tipo.map((s) => <li key={s.tipo}><span>{tipo(s.tipo)}</span> <span>{monedaFina(s.costo_usd)}</span></li>)}
           </ul>
         </section>
         <section aria-labelledby="costos-por-fuente">
           <h2 id="costos-por-fuente">{t("costos.por_fuente")}</h2>
           <ul className="lista">
-            {datos.por_fuente.map((s) => <li key={s.fuente}><span>{fuente(s.fuente)}</span> <span>{moneda(s.costo_usd)}</span></li>)}
+            {datos.por_fuente.map((s) => <li key={s.fuente}><span>{fuente(s.fuente)}</span> <span>{monedaFina(s.costo_usd)}</span></li>)}
           </ul>
         </section>
       </div>
@@ -90,7 +101,7 @@ export default function Costos({ busquedaId }: Props) {
                     <td>{tipo(f.tipo)}</td>
                     <td>{fuente(f.fuente)}</td>
                     <td>{f.proveedor}</td>
-                    <td>{entero(Number(f.cantidad))}</td>
+                    <td>{cantidad(f.tipo, f.cantidad)}</td>
                     <td>{monedaFina(f.costo_usd)}</td>
                     <td>{sino(f.gratis)}</td>
                     <td>{sino(f.lead)}</td>

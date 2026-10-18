@@ -125,6 +125,7 @@
     "siguiente": "Siguiente",
     "pagina_de": "Página {{pagina}} de {{paginas}}",
     "ver_costos": "Ver costos",
+    "unidad": {"segundos_one": "s", "segundos_other": "s", "creditos_one": "crédito", "creditos_other": "créditos", "tokens_one": "token", "tokens_other": "tokens"},
     "col": {"ts": "Fecha", "tipo": "Tipo", "fuente": "Fuente", "proveedor": "Proveedor", "cantidad": "Cantidad", "costo": "Costo (USD)", "gratis": "Gratis", "lead": "De un lead"},
     "tipos": {
       "socrata_descarga": "Descarga Socrata", "overpass_query": "Consulta Overpass", "web_fetch": "Consulta de web",

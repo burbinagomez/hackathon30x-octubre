@@ -105,3 +105,21 @@ test("si la API falla muestra el error", async () => {
   render(<Costos busquedaId={null} />);
   await waitFor(() => expect(screen.queryByRole("alert")).toHaveTextContent("No se pudo cargar el libro de costos."));
 });
+
+test("los montos de fracciones de centavo no se redondean a 0,00", async () => {
+  // QA 2026-10-18: el libro real mostraba "Total: 0,00 US$" con operaciones de 0,00003 US$.
+  await montar(respuesta({ total_usd: "0.000032", total_real_usd: "0.000032",
+    por_tipo: [{ tipo: "socrata_descarga", costo_usd: "0.00003" }], por_fuente: [{ fuente: "datos_gov_co_rues", costo_usd: "0.00003" }] }));
+  await waitFor(() => expect(screen.getByTestId("total-usd")).toBeInTheDocument());
+  expect(screen.getByTestId("total-usd").textContent).not.toMatch(/^0,00\s?US\$$/);
+  expect(screen.getByTestId("total-usd")).toHaveTextContent("0,000032");
+  expect(within(screen.getByRole("region", { name: "Por tipo" })).getByText(/0,00003/)).toBeInTheDocument();
+});
+
+test("la cantidad lleva su unidad: segundos de cómputo o créditos", async () => {
+  await montar(respuesta({ items: [fila(1, { tipo: "socrata_descarga", cantidad: "4.298" }),
+                                   fila(2, { tipo: "croma_consulta", cantidad: "1" })] }));
+  const tabla = within(await screen.findByRole("table", { name: "Operaciones" }));
+  expect(tabla.getByText("4,298 s")).toBeInTheDocument();
+  expect(tabla.getByText("1 crédito")).toBeInTheDocument();
+});
