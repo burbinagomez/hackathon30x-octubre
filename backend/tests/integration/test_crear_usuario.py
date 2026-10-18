@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 _RUTA = Path(__file__).resolve().parents[2] / "scripts" / "crear_usuario.py"
 _spec = importlib.util.spec_from_file_location("crear_usuario", _RUTA)
@@ -31,7 +32,7 @@ def test_crear_dos_veces_el_mismo_usuario_falla_y_no_lo_mueve_de_tenant(admin, t
     uid = uuid4()
     with admin.begin() as c:
         crear_usuario.crear(c, uid, tenants["a"], "es")
-    with pytest.raises(Exception):
+    with pytest.raises(IntegrityError):
         with admin.begin() as c:
             crear_usuario.crear(c, uid, tenants["b"], "es")
     assert _fila(admin, uid) == [(tenants["a"], "es")]

@@ -104,6 +104,7 @@ CASOS_INVALIDOS = {
     "aud_distinto": lambda: _emitir(_claims(aud="anon")),
     "iss_distinto": lambda: _emitir(_claims(iss="https://otro.example/auth/v1")),
     "otra_clave": lambda: _emitir(_claims(), clave=OTRA_PRIVADA),
+    "nbf_futuro": lambda: _emitir(_claims(nbf=int(time.time()) + 3600)),
     "alg_none": lambda: _alg_none(_claims()),
     "alg_rs256_con_kid_ec": lambda: _rs256_con_el_kid_ec(_claims()),
     "hs256_con_la_clave_publica": lambda: _hs256_con_la_publica(_claims()),
@@ -143,3 +144,25 @@ def test_el_cliente_de_produccion_no_espera_mas_de_5_segundos_al_jwks():
 
     assert isinstance(cliente, jwt.PyJWKClient)
     assert cliente.timeout == 5
+
+
+SECRETO = b"secreto-simetrico-de-prueba-de-32-bytes!"
+
+
+class JwksSimetrico:
+    """Un JWKS envenenado: la clave del kid es simétrica (oct, HS256). La api no debe aceptar tokens HS256 nunca."""
+
+    def __init__(self):
+        k = base64.urlsafe_b64encode(SECRETO).rstrip(b"=").decode()
+        self._clave = jwt.PyJWK.from_dict({"kty": "oct", "k": k, "alg": "HS256", "kid": KID})
+
+    def get_signing_key_from_jwt(self, token):
+        return self._clave
+
+
+def test_clave_simetrica_en_el_jwks_no_valida_tokens_hs256():
+    # Mata las mutaciones "HS256 en algorithms", "algorithms tomado del header" y "sin algorithms": con cualquiera,
+    # PyJWT acepta el token porque su alg coincide con el de la clave del JWKS.
+    token = jwt.encode(_claims(), SECRETO, algorithm="HS256", headers={"kid": KID})
+
+    assert _resultado(VerificadorJwks(JwksSimetrico(), issuer=ISSUER), token) == "TokenInvalido"
