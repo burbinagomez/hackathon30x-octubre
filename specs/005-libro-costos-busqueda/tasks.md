@@ -33,7 +33,7 @@
 
 ## Fase 2: Migración y vistas (Paso 1)
 
-- [x] T005 [MIN] [Paso 1] **Esqueleto de la migración** `supabase/migrations/NNNN_libro_costos_busqueda.sql`: *(hecho: esqueleto de las dos vistas y el `CHECK`; falta `usuarios` y `tenant_de_usuario`, pausado)*
+- [x] T005 [MIN] [Paso 1] **Esqueleto de la migración** `supabase/migrations/NNNN_libro_costos_busqueda.sql`:
   - las columnas e índices de plan §Migración. `leads.fusionado_en` va con FK **simple** `REFERENCES leads(id)`; la compuesta entra en T011, después del rojo;
   - `usuarios` con sus columnas (`auth_user_id uuid PRIMARY KEY`, `tenant_id`, `idioma`, `creado_en`; sin email), **sin** `CHECK` y **sin** RLS;
   - `tenant_de_usuario` (y `fijar_idioma`, Pulido) como stubs `… WHERE false`, **sin** `SECURITY DEFINER` ni `REVOKE`;
@@ -55,8 +55,9 @@
   - `::test_costo_por_canal`: email 0.05 y whatsapp 0.30. **Mutación:** sin `WHERE canal IS NOT NULL` → aparece una fila `None`.
   - `::test_fila_con_lote_y_lead_va_al_lead`: B = 0.25/0.15 y Σ parte (L1, cs) = 0.80/0.40. **Mutación:** el prorrateo filtra `lote_id IS NOT NULL` en lugar de `lead_id IS NULL` → Σ parte 0.85.
   - `::test_lead_fusionado_no_cuenta`: únicos 6, encontrados 7, prorrateo L2 `Decimal("0.20")`. **Mutación:** `v_leads_icp` sin `fusionado_en IS NULL` → 7 y 0.16.
+  *Verificado 2026-10-18 (parte [MIN]): `test_vistas_costos.py:46` (`test_encontrados_y_unicos_por_fuente`) y `:50` (`test_lead_de_dos_fuentes_cuenta_una_vez_en_total`) verdes. Sabotaje `unicos = count(*)` en `v_tablero_fuentes` -> rojo en los dos (`AssertionError` sobre la tabla por fuente y sobre el TOTAL); revertido (base reconstruida, 2 passed).*
 - [x] T008 [MIN] [Paso 1] **Verde:** los cuerpos de las 9 vistas de spec:313-335, el `GRANT SELECT` a `app_rt` y el `CHECK` de `estado` (P1). **Sin `security_invoker`:** esa opción entra solo en T011, para que T009 nazca rojo.
-- [x] T009 [MIN] [Paso 1] **Rojo (advisor, RLS):** `backend/tests/integration/test_rls.py`: *(hecho: `[vista]` sobre las dos vistas [MIN] y `test_toda_vista_es_security_invoker`; falta `test_usuarios_tiene_rls`, pausado por Supabase Auth)*
+- [x] T009 [MIN] [Paso 1] **Rojo (advisor, RLS):** `backend/tests/integration/test_rls.py`:
   - `::test_tenant_b_no_accede_a_datos_de_a[vista]`, sobre cada `v_*`: control positivo de A ≥ 1 fila, B ve 0 filas y 0 filas `TOTAL`. La siembra de A trae una `lead_fuentes` de `osm_overpass`. Rojo hoy: las vistas sin `security_invoker` corren como `postgres`. **Mutación tras el verde:** quitar `security_invoker` de una vista, o quitar `HAVING count(*) > 0` → B ve una fila `TOTAL`.
   - `::test_toda_vista_es_security_invoker`, desde `pg_class`. **Mutación:** una vista sin la opción.
   - `::test_usuarios_tiene_rls`. **Mutación:** sin `ENABLE ROW LEVEL SECURITY`, o sin la política.
@@ -64,7 +65,7 @@
   *Verificado (parte [MIN]): `test_usuarios_tiene_rls` existe; sabotaje `DISABLE ROW LEVEL SECURITY` -> rojo; sabotaje `security_invoker=false` en `v_atribuciones` -> rojo en `[v_atribuciones]` y en `test_toda_vista_es_security_invoker`.*
 - [x] T010 [MIN] [P] [Paso 1] **Rojo (advisor):** `backend/tests/integration/test_privilegios_supabase.py::test_anon_y_authenticated_sin_privilegios` (de la 002) suma `pg_views`, con el assert previo de que esté `v_tablero_fuentes`. **Mutación:** sacar `pg_views` de la unión (falla el assert previo), o `GRANT SELECT ON v_tablero_fuentes TO anon`.
   - **LOW (security):** `::test_anon_y_authenticated_sin_execute_en_funciones_de_public`: recorre `pg_proc` de `public` y falla si `anon` o `authenticated` pueden ejecutar **cualquier** función (hoy `tenant_de_usuario` y las que vengan). **Mutación:** sacar el `REVOKE` de una función.
-- [x] T011 [MIN] [Paso 1] **Verde:** *(hecho: `security_invoker`; falta la RLS de `usuarios`, pausado por Supabase Auth)*
+- [x] T011 [MIN] [Paso 1] **Verde:**
   - `security_invoker = true` en las 9 vistas;
   - la RLS de `usuarios`;
   - `FOREIGN KEY (tenant_id, fusionado_en) REFERENCES leads (tenant_id, id)`, que se apoya en `leads_tenant_id_id_key` (002 migración:41).
@@ -73,7 +74,7 @@
   - `::test_app_rt_no_lee_usuarios_directo`. **Nace verde:** `app_rt` nunca tuvo `SELECT` sobre `usuarios`. Es una guarda. **Sabotaje:** `GRANT SELECT ON usuarios TO app_rt` → rojo, y se revierte. **LOW (security):** el test fija `app.tenant_id` del tenant dueño de la fila y exige sqlstate `42501` (privilegio insuficiente), para que no pase por un error de `current_setting`.
   - `::test_tenant_de_usuario_devuelve_solo_ese_usuario`. Con usuarios de 2 tenants, `tenant_de_usuario(<auth_user_id de A>)` devuelve 1 fila (tenant de A, `idioma_usuario`, `idioma_tenant`) y un uuid inexistente devuelve 0. Rojo hoy: el stub `WHERE false` devuelve 0 filas. **Mutación:** sin el `WHERE u.auth_user_id = p_auth_user_id` → 2 filas.
   - `::test_fijar_idioma_no_cruza_tenants` **(Pulido)**. Control positivo con el tenant de A: `fijar_idioma(<uid de A>, 'en')` modifica 1 fila. Rojo hoy: el stub modifica 0. Después, con el tenant de B sobre el usuario de A, modifica 0. **Mutación:** sin `AND tenant_id = current_setting(...)` → B modifica 1 fila.
-  - `::test_funcion_es_security_definer_con_search_path[tenant_de_usuario|fijar_idioma]`, con el `ALTER DEFAULT PRIVILEGES` en `supabase_simulado.sql` (ya está). **Mutación:** sin el `REVOKE` → `anon` tiene `EXECUTE`.
+  - `::test_tenant_de_usuario_es_security_definer_con_search_path` (y la de `fijar_idioma`, Pulido), con el `ALTER DEFAULT PRIVILEGES` en `supabase_simulado.sql` (ya está). **Mutación:** sin el `REVOKE` → `anon` tiene `EXECUTE`.
   *Verificado (parte [MIN]): sabotaje `GRANT SELECT ON usuarios TO app_rt` -> rojo; `tenant_de_usuario` sin `WHERE` -> rojo en `test_tenant_de_usuario_devuelve_solo_ese_usuario`. `fijar_idioma` es Pulido.*
 - [x] T012b [MIN] [P] [Paso 1] **Rojo (security):** `backend/tests/unit/acceso/test_verificar_token.py`, sin red: el test genera un par EC P-256 y le pasa al verificador un JWKS local.
   - `::test_token_valido_devuelve_sub`: devuelve el `sub` (uuid). Rojo hoy: el esqueleto devuelve un `sub` fijo distinto.
@@ -146,6 +147,7 @@
 - [ ] T024 [MIN] [Paso 5] **Rojo (advisor, costos):** `backend/tests/unit/descubrimiento/test_vista_previa.py`, con una `FabricaFuentes` falsa (que devuelve fuentes falsas y registra el `lote_id` con el que se la llamó), un repo falso y un libro falso:
   - `::test_conteo_por_fuente_y_motivo_de_las_descartadas` (`pais=PE`). **Mutación:** no copiar `ignoradas` a la respuesta.
   - `::test_crea_busqueda_en_borrador_con_criterios`: queda en estado `borrador`, y la fábrica se llamó una vez con `lote_id == borrador.id`. **Mutación:** usar `crear_busqueda` del 002 → estado `creada`; o pedir las fuentes antes de crear el borrador → `lote_id=None`.
+  - `::test_ignorados_son_los_criterios_que_la_fuente_no_aplica_y_el_ciiu_traducido_no_cuenta` **(P7, advisor T024)**: `ignorados` por fuente, ordenado; el `ciiu` que se aplica traducido a `tipo_negocio` no es ignorado. **Mutación:** derivar `set(criterios.filtros) - set(sel[k].filtros)` sin sacar el `ciiu` → OSM trae `ciiu`; o sin `sorted`.
   - `::test_fuente_no_disponible_da_conteo_null_y_sigue`. **Mutación:** dejar que la excepción se propague → cs no tiene conteo.
   - `::test_limite_agotado_da_conteo_null`. **Mutación:** mapear todo error a `no_disponible`.
   - `::test_costo_estimado_suma_lo_gastado_y_lo_que_falta`: el gastado sale del libro falso (`Decimal("0.00113")`) + 0 de cs + segundos de OSM × 0.0000070. **Mutación:** sumar 1 crédito de cs aunque haya caché.
@@ -159,7 +161,7 @@
 - [ ] T025 [MIN] [Paso 5] **Verde:**
   - `descubrimiento/aplicacion/vista_previa.py`, que recibe `FabricaFuentes`;
   - los métodos de borrador de `RepositorioLeads` (P2);
-  - `ignorados` derivado (P7).
+  - `ignorados` derivado (P7, corregido): `sorted(…)` como en plan.md P7.
 
   La implementación real de `FabricaFuentes` va en `app/api` (raíz de composición). `aplicacion/` no importa el catálogo concreto, y lo vigila import-linter.
 - [ ] T026 [MIN] [Paso 5] **Rojo (advisor, costos y cumplimiento):** `backend/tests/unit/descubrimiento/test_ejecutar_con_tope.py`, con la misma `FabricaFuentes` falsa de T024:
@@ -362,10 +364,10 @@ Lo que no figura acá va a Pulido.
 | T008 | Los cuerpos de `v_tablero_fuentes` reducida y de `v_atribuciones`, el `GRANT` y el `CHECK` de estado (P1) | |
 | T009 | `[vista]` sobre las dos vistas [MIN], `::test_toda_vista_es_security_invoker` y `::test_usuarios_tiene_rls` | `::test_tenant_b_no_fusiona_con_lead_de_a` va con `fusionado_en` |
 | T011 | `security_invoker` y la RLS de `usuarios` | La FK compuesta va con `fusionado_en` |
-| T012 | `::test_app_rt_no_lee_usuarios_directo`, `::test_tenant_de_usuario_devuelve_solo_ese_usuario` y `::test_funcion_es_security_definer_con_search_path[tenant_de_usuario]` | `fijar_idioma` y su test van a Pulido |
+| T012 | `::test_app_rt_no_lee_usuarios_directo`, `::test_tenant_de_usuario_devuelve_solo_ese_usuario` y `::test_tenant_de_usuario_es_security_definer_con_search_path` | `fijar_idioma` y su test van a Pulido |
 | T013 | Todo, menos `fijar_idioma` | |
-| T024 | Dos cosas: `::test_crea_busqueda_en_borrador_con_criterios`, sin la parte de la fábrica, y la parte de motivos de `::test_conteo_por_fuente_y_motivo_de_las_descartadas` | Sin `contar`, la vista previa no arma fuentes. **Mutación:** usar `crear_busqueda` de la 002 → estado `creada`; o no copiar `ignoradas` |
-| T025 | `crear_borrador`, `obtener_borrador` y `pasar_a_ejecutando` (P2) | `fijar_estimados` y `ignorados` (P7) son de los conteos |
+| T024 | Tres tests: `::test_crea_busqueda_en_borrador_con_criterios`, la parte de motivos de `::test_conteo_por_fuente_y_motivo_de_las_descartadas` y `::test_ignorados_son_los_criterios_que_la_fuente_no_aplica_y_el_ciiu_traducido_no_cuenta` (P7) | La fábrica entra al [MIN] solo para leer `.meta` (sin `contar`): la vista previa necesita las fuentes para seleccionar, y las pide con el `lote_id` del borrador. **Mutación:** usar `crear_busqueda` de la 002 → estado `creada`; pedir las fuentes antes del borrador → `lote_id=None`; no copiar `ignoradas`; derivar `ignorados` sin sacar el `ciiu` traducido → OSM trae `ciiu` |
+| T025 | `crear_borrador`, `obtener_borrador` y `pasar_a_ejecutando` (P2) | `fijar_estimados` es de los conteos; `ignorados` (P7) entra en T024/T025 |
 | T026 | `::test_solo_ejecuta_borrador` y `::test_usa_los_criterios_guardados` | Tope y palabras clave, a Pulido |
 | T027 | `EjecutarBusqueda` sobre el borrador, con `lote_id = busqueda.id` y el estado final (P1) | Tope y `naturales_por_fuente`, a Pulido |
 | T029 | Todo, menos `::test_fijar_idioma_persiste` y `::test_fijar_idioma_invalido_da_422` | `::test_usuarios_me_devuelve_idioma` queda: `elegirIdioma` (T037) lo usa |
