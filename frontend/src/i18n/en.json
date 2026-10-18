@@ -191,7 +191,7 @@
       "resueltos": "{{n}} companies found",
       "explicacion": "Why these filters",
       "ciiu": "Activity (CIIU)",
-      "departamento": "Department (code)",
+      "departamento": "Department",
       "no_resueltos": "We could not identify these companies (they are left out of the suggestion)",
       "rango": "Paste between 5 and 50 companies, one per line.",
       "no_disponible": "Company lookup is not available right now. Try again or use the filters.",

@@ -11,11 +11,16 @@ const MAXIMO = 50;
 type Props = {
   /** Recibe la sugerencia para prellenar el formulario; la pantalla que lo monta decide qué pestaña muestra. */
   alSugerir: (sugerencia: SugerenciaIntake) => void;
+  /** Nombre legible de un CIIU o de una división; si no lo conoce (undefined), se muestra el código. */
+  nombreActividad?: (codigo: string) => string | undefined;
+  nombreDivision?: (codigo: string) => string | undefined;
 };
+
+const sinNombre = () => undefined;
 
 const MENSAJE_DE_ERROR: Record<number, "no_disponible" | "rango"> = { 503: "no_disponible", 422: "rango" };
 
-export default function IntakeLookalike({ alSugerir }: Props) {
+export default function IntakeLookalike({ alSugerir, nombreActividad = sinNombre, nombreDivision = sinNombre }: Props) {
   const { t } = useTranslation();
   const [texto, setTexto] = useState("");
   const [respuesta, setRespuesta] = useState<RespuestaLookalike | null>(null);
@@ -67,11 +72,11 @@ export default function IntakeLookalike({ alSugerir }: Props) {
           <h3>{t("intake.lookalike.explicacion")}</h3>
           <h4>{t("intake.lookalike.ciiu")}</h4>
           <ul>
-            {respuesta.explicacion.ciiu.map(([codigo, n]) => <li key={codigo}>{`${codigo}: ${n}`}</li>)}
+            {respuesta.explicacion.ciiu.map(([codigo, n]) => <li key={codigo}>{`${nombreActividad(codigo) ?? codigo}: ${n}`}</li>)}
           </ul>
           <h4>{t("intake.lookalike.departamento")}</h4>
           <ul>
-            {respuesta.explicacion.departamento.map(([codigo, n]) => <li key={codigo}>{`${codigo}: ${n}`}</li>)}
+            {respuesta.explicacion.departamento.map(([codigo, n]) => <li key={codigo}>{`${nombreDivision(codigo) ?? codigo}: ${n}`}</li>)}
           </ul>
           {respuesta.no_resueltos.length > 0 && (
             <>

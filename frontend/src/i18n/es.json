@@ -191,7 +191,7 @@
       "resueltos": "{{n}} empresas encontradas",
       "explicacion": "Por qué estos filtros",
       "ciiu": "Actividad (CIIU)",
-      "departamento": "Departamento (código)",
+      "departamento": "Departamento",
       "no_resueltos": "No pudimos identificar estas empresas (no cuentan en la sugerencia)",
       "rango": "Pegá entre 5 y 50 empresas, una por línea.",
       "no_disponible": "La búsqueda de empresas no está disponible ahora. Probá de nuevo o usá los filtros.",
