@@ -54,6 +54,7 @@
       "filtros": "Filtros"
     },
     "frase": {
+      "ubicacion_falta": "Falta: decime la ciudad o el departamento",
       "ajustar": "¿Querés ajustar algo?",
       "etiqueta": "¿A quién le vendés y qué ofrecés?",
       "ayuda": "Contame a quién le vendés y qué ofrecés, en una o dos frases. Por ejemplo: vendo software contable a ferreterías medianas en Antioquia.",
@@ -279,7 +280,8 @@
       "omitida_por_tope": "no se consultó, pasaría el tope de gasto"
     },
     "ninguna_respondio": "Ninguna fuente respondió. Probá de nuevo más tarde.",
-    "ver_tablero": "Ver el tablero"
+    "ver_tablero": "Ver el tablero",
+    "ver_leads": "Ver los leads de esta búsqueda"
   },
   "comun": {
     "cargando": "Cargando…"

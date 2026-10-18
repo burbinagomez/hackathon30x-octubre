@@ -15,3 +15,8 @@ def test_hospitales_clinicas_y_apoyo_diagnostico_estan_en_el_catalogo():
 def test_el_prompt_no_repregunta_si_el_comprador_ya_esta_dicho():
     assert '"software para hospitales"' in PROMPT
     assert "no está en la lista, NO preguntes" in PROMPT
+
+
+def test_el_prompt_pregunta_la_ubicacion_si_falta():
+    # Sin departamento ni ciudad ninguna fuente corre: mejor preguntar que dejar Buscar gris (QA 2026-10-18).
+    assert "¿En qué ciudad o departamento buscamos?" in PROMPT

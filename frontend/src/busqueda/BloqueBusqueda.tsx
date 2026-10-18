@@ -77,10 +77,16 @@ export default function BloqueBusqueda({ busqueda, pedido, tope, puedeVista, ext
         <>
           <ResultadoPorFuente porFuente={resultado.por_fuente} />
           {resultado.estado === "error" && <p role="status">{t("ejecucion.ninguna_respondio")}</p>}
-          <div className="acciones">
+          <div className="acciones acciones-fin">
             <button type="button" className="boton" onClick={() => navegar("/tablero")}>
               {t("ejecucion.ver_tablero")}
             </button>
+            {vista && (
+              <button type="button" className="boton boton-primario"
+                onClick={() => navegar(`/busquedas/${encodeURIComponent(vista.busqueda_id)}/leads`)}>
+                {t("ejecucion.ver_leads")}
+              </button>
+            )}
           </div>
         </>
       )}
