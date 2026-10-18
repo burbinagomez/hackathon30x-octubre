@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { expect, test } from "vitest";
 import i18n from "../i18n";
@@ -168,4 +168,30 @@ test("costo_y_cpl_en_ingles_con_moneda_del_idioma", async () => {
 test("enlaza_a_ver_busquedas", async () => {
   await montar(respuestaTablero());
   expect(screen.getByRole("link", { name: "Ver búsquedas" })).toHaveAttribute("href", "/busquedas");
+});
+
+test("cada_fila_de_fuente_lleva_a_sus_leads_y_el_total_a_todos", async () => {
+  await montar(respuestaTablero());
+  expect(screen.getByRole("link", { name: "Supersociedades (Croma)" })).toHaveAttribute("href", "/leads?fuente=croma_supersociedades_co");
+  expect(screen.getByRole("link", { name: "Total" })).toHaveAttribute("href", "/leads");
+  // sin_atribuir son costos sin lead: no hay lista a la que llevar.
+  expect(screen.queryByRole("link", { name: "Sin atribuir" })).not.toBeInTheDocument();
+});
+
+test("el_clic_en_una_fila_navega_sin_recargar", async () => {
+  await montar(respuestaTablero());
+  const antes = window.location.href;
+  fireEvent.click(screen.getByRole("link", { name: "Supersociedades (Croma)" }));
+  expect(window.location.pathname + window.location.search).toBe("/leads?fuente=croma_supersociedades_co");
+  expect(antes).not.toBe(window.location.href);
+});
+
+test("la_atribucion_es_externa_y_dice_licencia", async () => {
+  await montar(respuestaTablero({ atribuciones: [atribucionOsm] }));
+  const pie = screen.getByLabelText("Atribución de datos");
+  expect(pie).toHaveTextContent("Licencia");
+  const enlace = within(pie).getByRole("link", { name: atribucionOsm.texto });
+  expect(enlace).toHaveAttribute("target", "_blank");
+  expect(enlace).toHaveAttribute("rel", expect.stringContaining("noreferrer"));
+  expect(enlace).toHaveTextContent("↗");
 });

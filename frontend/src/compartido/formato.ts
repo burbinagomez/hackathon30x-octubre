@@ -13,3 +13,6 @@ export function moneda(valor: string | number | null): string {
 export function entero(valor: number | null): string {
   return valor === null ? SIN_DATO : formatear({}, valor);
 }
+
+/** Marca de enlace que sale de la app (las atribuciones de licencia abren en pestaña nueva). */
+export const FLECHA_EXTERNA = "↗";

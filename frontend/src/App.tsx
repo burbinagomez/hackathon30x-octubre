@@ -4,6 +4,7 @@ import Login from "./acceso/Login";
 import { configuracionValida } from "./api/supabase";
 import NuevaBusqueda from "./busqueda/NuevaBusqueda";
 import LeadsDeBusqueda from "./leads/LeadsDeBusqueda";
+import LeadsDeFuente from "./leads/LeadsDeFuente";
 import ListaBusquedas from "./leads/ListaBusquedas";
 import { aplicarIdioma } from "./compartido/idioma";
 import SelectorIdioma from "./compartido/SelectorIdioma";
@@ -21,7 +22,12 @@ const RUTAS: Record<string, ComponentType> = {
 // Solo un uuid: lo que no lo es no es una ruta (el id acaba en la URL de la API).
 const LEADS_DE_BUSQUEDA = /^\/busquedas\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/leads$/;
 
-function resolver(ruta: string): ReactElement | null {
+function resolver(url: string): ReactElement | null {
+  const [ruta, consulta = ""] = url.split("?");
+  if (ruta === "/leads") {
+    const fuente = new URLSearchParams(consulta).get("fuente");
+    return <LeadsDeFuente key={fuente ?? ""} fuente={fuente} />;
+  }
   const Pantalla = RUTAS[ruta];
   if (Pantalla) return <Pantalla />;
   const id = LEADS_DE_BUSQUEDA.exec(ruta)?.[1];
@@ -47,12 +53,12 @@ function Salud() {
 /** Raíz de composición: el router mínimo (por pathname y popstate) y el idioma de arranque. */
 export default function App() {
   const { t } = useTranslation();
-  const [ruta, setRuta] = useState(location.pathname);
+  const [ruta, setRuta] = useState(location.pathname + location.search);
   // Antes del primer render: la elección guardada tiene que ganar sin un parpadeo en otro idioma.
   useState(aplicarIdioma);
 
   useEffect(() => {
-    const alNavegar = () => setRuta(location.pathname);
+    const alNavegar = () => setRuta(location.pathname + location.search);
     window.addEventListener("popstate", alNavegar);
     return () => window.removeEventListener("popstate", alNavegar);
   }, []);
@@ -63,7 +69,7 @@ export default function App() {
   return (
     <>
       {/* Login lleva su propio selector. */}
-      {ruta !== "/login" && (
+      {!ruta.startsWith("/login") && (
         <div className="barra">
           <SelectorIdioma />
         </div>

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import Atribuciones from "../compartido/Atribuciones";
 import Enlace from "../compartido/Enlace";
-import { RUTA_BUSQUEDAS } from "../compartido/rutas";
+import { RUTA_BUSQUEDAS, RUTA_LEADS } from "../compartido/rutas";
 import { entero, moneda } from "../compartido/formato";
 import { obtenerTablero } from "./api";
 import type { FilaTablero, Tablero as DatosTablero } from "./tipos";
@@ -19,9 +20,14 @@ function Fila({ fila, total = false, columnas }: { fila: FilaTablero; total?: bo
     cpl_real: moneda(fila.cpl_real),
     naturales: total ? "" : fila.cuenta_naturales ? entero(fila.naturales_no_contactables) : t("tablero.no_aplica"),
   };
+  const nombre = total ? t("tablero.total") : t(`fuentes.${fila.fuente}`);
+  // Cada fila lleva a sus leads; "sin atribuir" son costos sin lead, no hay lista.
+  const etiqueta = fila.fuente === "sin_atribuir" ? nombre : (
+    <Enlace a={total ? RUTA_LEADS : `${RUTA_LEADS}?fuente=${encodeURIComponent(fila.fuente)}`}>{nombre}</Enlace>
+  );
   return (
     <tr className={total ? "total" : undefined}>
-      <td>{total ? t("tablero.total") : t(`fuentes.${fila.fuente}`)}</td>
+      <td>{etiqueta}</td>
       <td>{entero(fila.encontrados)}</td>
       <td>{entero(fila.unicos)}</td>
       {columnas.map((c) => <td key={c}>{celdas[c]}</td>)}
@@ -99,15 +105,7 @@ export default function Tablero() {
           </ul>
         </>
       )}
-      {datos.atribuciones.length > 0 && (
-        <footer aria-label={t("tablero.atribucion")}>
-          {datos.atribuciones.map((a) => (
-            <p key={a.fuente}>
-              <a href={a.url} target="_blank" rel="noreferrer">{a.texto}</a>
-            </p>
-          ))}
-        </footer>
-      )}
+      <Atribuciones atribuciones={datos.atribuciones} />
     </main>
   );
 }

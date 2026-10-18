@@ -83,7 +83,8 @@
     "atribucion": "Atribución de datos",
     "desperdicio_real": "Desperdicio (real)",
     "error": "No se pudo cargar el tablero. Probá de nuevo.",
-    "ver_busquedas": "Ver búsquedas"
+    "ver_busquedas": "Ver búsquedas",
+    "licencia": "Licencia"
   },
   "idioma": {
     "etiqueta": "Idioma",
@@ -145,6 +146,8 @@
       "ejecutando": "Ejecutando",
       "terminada": "Terminada",
       "con_errores": "Con errores"
-    }
+    },
+    "titulo_de_fuente": "Leads de {{fuente}}",
+    "titulo_todos": "Todos los leads"
   }
 }

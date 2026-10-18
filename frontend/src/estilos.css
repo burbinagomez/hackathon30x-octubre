@@ -232,6 +232,15 @@ footer p {
   margin: 0;
 }
 
+.etiqueta-licencia {
+  font-weight: 500;
+}
+
+/* El enlace de la tabla ocupa la celda para que el objetivo táctil sea de 44 px. */
+table a {
+  min-height: 44px;
+}
+
 /* Lista de leads: tarjetas en móvil, tabla desde 48rem. */
 .lista-busquedas {
   list-style: none;
