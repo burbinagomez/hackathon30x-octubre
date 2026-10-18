@@ -24,12 +24,10 @@ def _desconocido(motivo: str, candidatos: int | None = None) -> VerificacionTitu
 
 
 class RuesDatosGov:
-    def __init__(self, buscador: BuscadorRazonSocialRues, municipio_de_camara: Mapping[str, str], tope: int) -> None:
-        """`municipio_de_camara`: codigo_camara -> municipio sede (el dataset no trae municipio, ver camaras_co.yaml).
-        `tope`: filas con las que el cliente corta; una respuesta que lo alcanza pudo dejar fuera un segundo candidato."""
+    def __init__(self, buscador: BuscadorRazonSocialRues, municipio_de_camara: Mapping[str, str]) -> None:
+        """`municipio_de_camara`: codigo_camara -> municipio sede (el dataset no trae municipio, ver camaras_co.yaml)."""
         self._buscador = buscador
         self._municipios = municipio_de_camara
-        self._tope = tope
 
     def verificar(self, lead_id: UUID, nombre_normalizado: str, ciudad: str | None, pais: str) -> VerificacionTitular:
         if pais != "CO":  # el RUES es colombiano: una ciudad que coincida en otro país no prueba nada
@@ -42,18 +40,29 @@ class RuesDatosGov:
             return _desconocido("sin_match")
         contexto = ContextoCosto(None, None, lead_id)
         try:
-            candidatas = list(self._buscador.buscar_coincidencias(nombre, contexto))
+            busqueda = self._buscador.buscar_homonimas(nombre, contexto)
         except FuenteNoDisponible:  # solo la clave y el status: el mensaje de la fuente no lleva el nombre
             return _desconocido("fuente_no_disponible")
-        if len(candidatas) >= self._tope:
+        candidatas = list(busqueda.coincidencias)
+        if busqueda.truncada:
             return _desconocido("ambiguo")
-        # NIT -> (razón social, municipio): varias matrículas del mismo NIT son una sola empresa.
+        # NIT -> (razón social, municipio): varias matrículas del mismo NIT son una sola empresa. El servidor ya filtra
+        # activas y jurídicas; acá se revisa igual, y una natural que llegue con el mismo nombre en la misma ciudad se cuenta.
         exactas: dict[str, tuple[str, str]] = {}
+        naturales_en_respuesta = 0
         for c in candidatas:
             municipio = self._municipios.get(c.camara or "")
-            if (c.razon_social and normalizar_nombre(c.razon_social) == nombre
+            if not (c.razon_social and normalizar_nombre(c.razon_social) == nombre
                     and municipio is not None and normalizar_ciudad(municipio) == ciudad_lead):
+                continue
+            organizacion = (c.organizacion_juridica or "").strip().upper()
+            if organizacion == "PERSONA NATURAL":
+                naturales_en_respuesta += 1
+            elif organizacion and (c.estado_matricula or "").strip().upper() == "ACTIVA":
                 exactas.setdefault(c.nit, (c.razon_social, municipio))
+        if naturales_en_respuesta:
+            return VerificacionTitular("desconocido", "ambiguo", ConstanciaTitular(
+                "ambiguo", FUENTE, DATASET, naturales_homonimas=naturales_en_respuesta))
         if not exactas:
             return _desconocido("sin_match")
         if len(exactas) > 1:

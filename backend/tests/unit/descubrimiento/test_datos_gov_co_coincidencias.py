@@ -179,3 +179,25 @@ def test_contar_naturales_no_deja_pasar_codigos_de_camara_raros():
     a.contar_naturales("juan perez", ["04", "x' OR 1=1 --"], ContextoCosto(None, None, uuid4()))
 
     assert "codigo_camara in('04')" in pedidas[0].url.params["$where"] and "OR" not in pedidas[0].url.params["$where"]
+
+
+def test_buscar_homonimas_marca_truncada_sobre_las_filas_crudas():
+    from app.modulos.descubrimiento.infraestructura.adaptadores.datos_gov_co_rues import LIMITE_COINCIDENCIAS
+
+    filas = [_fila(f"9001{i:05d}") for i in range(LIMITE_COINCIDENCIAS - 1)] + [_fila("12345")]  # una inválida
+    a, _, _ = _adaptador([(200, filas), (200, filas[:-1])])
+    ctx = ContextoCosto(None, None, uuid4())
+
+    lleno = a.buscar_homonimas("empresa ficticia", ctx)
+    justo_debajo = a.buscar_homonimas("empresa ficticia", ctx)
+
+    assert (len(lleno.coincidencias), lleno.truncada) == (LIMITE_COINCIDENCIAS - 1, True)
+    assert (len(justo_debajo.coincidencias), justo_debajo.truncada) == (LIMITE_COINCIDENCIAS - 1, False)
+
+
+def test_las_coincidencias_traen_la_organizacion_juridica():
+    a, _, _ = _adaptador([(200, [_fila("900000001")])])
+
+    (c,) = a.buscar_coincidencias("empresa ficticia", ContextoCosto("intake", uuid4()))
+
+    assert c.organizacion_juridica == "SOCIEDADES POR ACCIONES SIMPLIFICADAS SAS"

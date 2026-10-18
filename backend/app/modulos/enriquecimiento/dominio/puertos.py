@@ -50,6 +50,18 @@ class CoincidenciaRues(Protocol):
     def razon_social(self) -> str | None: ...
     @property
     def camara(self) -> str | None: ...
+    @property
+    def estado_matricula(self) -> str | None: ...
+    @property
+    def organizacion_juridica(self) -> str | None: ...
+
+
+@runtime_checkable
+class BusquedaRues(Protocol):
+    @property
+    def coincidencias(self) -> Sequence[CoincidenciaRues]: ...
+    @property
+    def truncada(self) -> bool: ...
 
 
 @runtime_checkable
@@ -58,7 +70,9 @@ class BuscadorRazonSocialRues(Protocol):
     datos.gov.co de la 011 lo cumple por estructura y solo la raíz de composición los une. Quien lo cumple escribe
     el costo de cada request con el `lead_id` del contexto, antes de devolver."""
 
-    def buscar_coincidencias(self, nombre_normalizado: str, contexto_costo: ContextoCosto) -> Sequence[CoincidenciaRues]: ...
+    def buscar_homonimas(self, nombre_normalizado: str, contexto_costo: ContextoCosto) -> BusquedaRues:
+        """Jurídicas cuya razón social contiene el nombre, y si el servidor cortó en su tope de filas."""
+        ...
 
     def contar_naturales(self, nombre_normalizado: str, camaras: Collection[str], contexto_costo: ContextoCosto) -> int:
         """Personas naturales matriculadas con ese nombre en esas cámaras. Solo un conteo, nunca sus nombres."""

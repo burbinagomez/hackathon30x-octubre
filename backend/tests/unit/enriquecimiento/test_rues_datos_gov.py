@@ -2,6 +2,7 @@
 Reusa el cliente de la 011 (`DatosGovCoRues`) con transporte falso: sin red. Datos sintéticos."""
 import logging
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
@@ -50,7 +51,7 @@ def _verificador(respuesta, intentos=2, naturales=0):
         meta=MetaFuente(clave="datos_gov_co_rues", proveedor="datos.gov.co", paises=frozenset({"CO"}),
                         filtros=frozenset({"ciiu", "departamento"}), trae=frozenset({"nit"}), tipo="dataset",
                         licencia="CC-BY-SA-4.0"))
-    return RuesDatosGov(cliente, MUNICIPIOS, tope=LIMITE_COINCIDENCIAS), pedidas, costos
+    return RuesDatosGov(cliente, MUNICIPIOS), pedidas, costos
 
 
 def test_match_exacto_unico_en_la_misma_ciudad_es_juridica():
@@ -293,3 +294,77 @@ def test_un_pais_que_no_es_co_es_desconocido_sin_request_ni_costo(pais):
     assert (r.tipo_titular, r.motivo) == ("desconocido", "pais_no_soportado")
     assert r.constancia.motivo == "pais_no_soportado"
     assert pedidas == [] and costos.filas == []
+
+
+def test_el_tope_se_cuenta_sobre_las_filas_crudas_aunque_una_sea_invalida():
+    # 100 filas del servidor, una con NIT malo que el cliente descarta: quedan 99 válidas, pero pudo haber más.
+    filas = [_fila("9001%05d" % i, razon=f"TRANSPORTES ANDINOS {i} SAS") for i in range(LIMITE_COINCIDENCIAS - 2)]
+    filas += [_fila(), _fila("12345", razon="NIT MALO SAS")]
+    assert len(filas) == LIMITE_COINCIDENCIAS
+    v, _, _ = _verificador(filas)
+
+    r = v.verificar(uuid4(), NOMBRE, "Bogotá", "CO")
+
+    assert (r.tipo_titular, r.motivo) == ("desconocido", "ambiguo")
+
+
+def test_99_filas_crudas_no_son_truncadas():
+    filas = [_fila("9001%05d" % i, razon=f"TRANSPORTES ANDINOS {i} SAS") for i in range(LIMITE_COINCIDENCIAS - 2)]
+    v, _, _ = _verificador(filas + [_fila()])
+
+    assert v.verificar(uuid4(), NOMBRE, "Bogotá", "CO").tipo_titular == "juridica"
+
+
+class _BuscadorFalso:
+    """Un cliente del RUES que devuelve lo que se le diga, aunque el servidor real no lo mandaría."""
+
+    def __init__(self, *filas, naturales=0):
+        self.filas, self.naturales = filas, naturales
+
+    def buscar_homonimas(self, nombre, contexto):
+        return SimpleNamespace(coincidencias=list(self.filas), truncada=False)
+
+    def contar_naturales(self, nombre, camaras, contexto):
+        return self.naturales
+
+
+def _coincidencia(nit="900111222", razon="TRANSPORTES ANDINOS SAS", camara="04", estado="ACTIVA", org=SAS):
+    return SimpleNamespace(nit=nit, razon_social=razon, camara=camara, estado_matricula=estado, organizacion_juridica=org)
+
+
+def _con(*filas):
+    return RuesDatosGov(_BuscadorFalso(*filas), MUNICIPIOS)
+
+
+def test_una_matricula_cancelada_no_cuenta_aunque_el_servidor_la_mande():
+    r = _con(_coincidencia(estado="CANCELADA")).verificar(uuid4(), NOMBRE, "Bogotá", "CO")
+
+    assert (r.tipo_titular, r.motivo) == ("desconocido", "sin_match")
+
+
+@pytest.mark.parametrize("estado", [None, "", "SUSPENDIDA", "activa-no"])
+def test_solo_la_matricula_activa_cuenta(estado):
+    assert _con(_coincidencia(estado=estado)).verificar(uuid4(), NOMBRE, "Bogotá", "CO").tipo_titular == "desconocido"
+
+
+def test_una_activa_con_estado_en_minusculas_o_con_espacios_cuenta():
+    assert _con(_coincidencia(estado=" activa ")).verificar(uuid4(), NOMBRE, "Bogotá", "CO").tipo_titular == "juridica"
+
+
+def test_una_fila_natural_colada_no_es_la_jurídica():
+    r = _con(_coincidencia(org="PERSONA NATURAL")).verificar(uuid4(), NOMBRE, "Bogotá", "CO")
+
+    assert r.tipo_titular == "desconocido"
+
+
+def test_una_natural_colada_junto_a_la_sas_deja_ambiguo_y_no_sube():
+    r = _con(_coincidencia(), _coincidencia(nit="1000000004", razon="TRANSPORTES ANDINOS", org="persona natural ")).verificar(
+        uuid4(), NOMBRE, "Bogotá", "CO")
+
+    assert (r.tipo_titular, r.motivo) == ("desconocido", "ambiguo")
+    assert r.constancia.naturales_homonimas == 1 and r.constancia.nit is None
+
+
+@pytest.mark.parametrize("org", [None, ""])
+def test_sin_organizacion_juridica_no_se_afirma_que_es_juridica(org):
+    assert _con(_coincidencia(org=org)).verificar(uuid4(), NOMBRE, "Bogotá", "CO").tipo_titular == "desconocido"

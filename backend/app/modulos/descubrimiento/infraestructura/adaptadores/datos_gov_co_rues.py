@@ -77,6 +77,13 @@ class CoincidenciaRazonSocial:
     camara: str | None
     estado_matricula: str | None
     razon_social: str | None = None
+    organizacion_juridica: str | None = None
+
+
+@dataclass(frozen=True)
+class BusquedaRazonSocial:
+    coincidencias: list[CoincidenciaRazonSocial]
+    truncada: bool  # el servidor devolvió el tope de filas: pudo haber más candidatos que los traídos
 
 
 def _literal_like(nombre: str) -> str:
@@ -176,6 +183,9 @@ class DatosGovCoRues:
     def buscar_coincidencias(
         self, nombre_normalizado: str, contexto_costo: ContextoCosto
     ) -> list[CoincidenciaRazonSocial]:
+        return self.buscar_homonimas(nombre_normalizado, contexto_costo).coincidencias
+
+    def buscar_homonimas(self, nombre_normalizado: str, contexto_costo: ContextoCosto) -> BusquedaRazonSocial:
         """Todas las jurídicas activas cuya razón social contiene el nombre (Puerta A de la 010 y verificación de titular
         de la 006).
 
@@ -184,7 +194,7 @@ class DatosGovCoRues:
         """
         nombre = _literal_like(nombre_normalizado)
         if not nombre:
-            return []
+            return BusquedaRazonSocial([], False)
         where = (
             f"upper(razon_social) like '%{nombre}%'"
             " AND organizacion_juridica != 'PERSONA NATURAL'"
@@ -197,17 +207,21 @@ class DatosGovCoRues:
             contexto_costo,
         )
         try:
-            return [
+            filas = respuesta.json()
+            coincidencias = [
                 CoincidenciaRazonSocial(
                     nit=fila["nit"].strip(),
                     ciiu=fila.get("cod_ciiu_act_econ_pri"),
                     camara=None if fila.get("codigo_camara") is None else str(fila["codigo_camara"]),
                     estado_matricula=fila.get("estado_matricula"),
                     razon_social=fila.get("razon_social"),
+                    organizacion_juridica=fila.get("organizacion_juridica"),
                 )
-                for fila in respuesta.json()
+                for fila in filas
                 if _es_juridica_valida(fila)
             ]
+            # Sobre las filas crudas: las que el cliente descarta por inválidas también cuentan contra el tope del servidor.
+            return BusquedaRazonSocial(coincidencias, len(filas) >= LIMITE_COINCIDENCIAS)
         except (ValueError, TypeError, AttributeError, KeyError):
             raise FuenteNoDisponible(f"{self.meta.clave}: respuesta ilegible") from None
 

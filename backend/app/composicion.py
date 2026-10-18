@@ -139,7 +139,7 @@ def verificador_titular(ajustes, costos: RegistroCostos, tarifas: Mapping, trans
                         ruta_yaml: Path = CONFIG / "fuentes.yaml"):
     """`rues_datos_gov_co` (nombre + ciudad contra el RUES de datos.gov.co) si `fuentes.yaml` lo habilita; si no, el stub
     `CromaRues`, que falla cerrado. Es un flag: ni el dominio ni el caso de uso saben cuál de los dos es."""
-    from app.modulos.descubrimiento.infraestructura.adaptadores.datos_gov_co_rues import LIMITE_COINCIDENCIAS, DatosGovCoRues
+    from app.modulos.descubrimiento.infraestructura.adaptadores.datos_gov_co_rues import DatosGovCoRues
     from app.modulos.enriquecimiento.infraestructura.adaptadores.croma_rues import CromaRues
     from app.modulos.enriquecimiento.infraestructura.adaptadores.rues_datos_gov import RuesDatosGov
 
@@ -157,7 +157,7 @@ def verificador_titular(ajustes, costos: RegistroCostos, tarifas: Mapping, trans
         costos=costos, cache=None, camaras=camaras, tarifas={"computo_seg_usd": tarifas["datos.gov.co"]}, lote_id=None,
         meta=meta, app_token=token.get_secret_value() if token else None, timeout_seg=TIMEOUT_VERIFICACION_SEG,
         intentos=1, **extra)
-    return RuesDatosGov(cliente, {c.codigo: c.municipio_sede for c in camaras.values()}, tope=LIMITE_COINCIDENCIAS)
+    return RuesDatosGov(cliente, {c.codigo: c.municipio_sede for c in camaras.values()})
 
 
 def adaptadores_enriquecer(ajustes, costos: RegistroCostos, tarifas: Mapping, transporte: httpx.BaseTransport,
