@@ -116,6 +116,7 @@ jobs:
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           version: "0.12.1"
+      # Valida la forma de la config; NO mide nada mientras no haya dataset etiquetado (T024).
       - run: uv run python -m evals.run --validar  # costo cero: sin key ni requests; el eval real con secret y presupuesto es decisión aparte
 
   imagenes:

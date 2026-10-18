@@ -13,10 +13,26 @@ Plataforma que encuentra clientes potenciales (pymes) en **fuentes públicas y g
 - Contexto para agentes: [`CLAUDE.md`](CLAUDE.md)
 
 ## Estado
+Verificado contra el código y los tests, no contra los checkboxes de `tasks.md` (que no siempre están al día).
+
 | Slice | Estado |
 |---|---|
-| 001 Walking skeleton | pendiente |
-| 002 Puertos + registro + croma_supersociedades_co | pendiente |
+| 001 Walking skeleton | construido: login (Supabase Auth), tenants con RLS, cifrado de contacto, API y front desplegables |
+| 002 Puertos + registro + Supersociedades | construido: puertos, registro por `fuentes.yaml`, `croma_supersociedades_co` (necesita `CROMA_API_KEY`), tope de gasto |
+| 003 OSM + dedup | construido: `osm_overpass` y dedup entre fuentes |
+| 005 Libro de costos y tablero | construido: costo por operación y tablero por fuente con embudo (solo cuenta jurídicas) |
+| 006 Enriquecedor | parcial: `sitio_web` (emails, teléfonos y WhatsApp publicados) y clasificador Jev de encaje operan, con botón "Enriquecer"; `croma_rues_co` es un stub que no verifica (devuelve "desconocido") |
+| 008 Dapta y CPQL | construido: exportación CSV de elegibles para Dapta, importación de calificaciones y CPQL por fuente. Sin API de Dapta: va por CSV |
+| 010 Intake | construido: Puerta A (formulario), Puerta B (en una frase) y "Ya me compran" (lookalike) |
+| 011 datos.gov.co | construido: `datos_gov_co_rues` (dataset `c82u-588k`), solo personas jurídicas activas |
+| 014 Marca y responsive | construido: marca, tema, estados de trabajo y e2e de responsive |
+| 015 Resultado por fuente | construido: estado por fuente en la respuesta de la búsqueda; una fuente que falla no tumba la búsqueda |
+| 007 Email y respuestas | solo spec: no hay código |
+
+## Qué no está
+- **No hay contacto por email** (007 es solo spec): ningún mensaje se envía desde esta plataforma. El flag `smtp_email` solo deja elegir "email" como canal preferido. El contacto lo hace la llamada de voz de Dapta, a partir del CSV que exportamos.
+- **Los evals no tienen dataset todavía.** El job de CI corre `evals.run --validar`, que valida la forma de la config sin medir nada.
+- `croma_dian_trade_co` (descubrimiento por partida arancelaria) está desconectada: no tiene adaptador. `croma_rues_co` no verifica hoy. WhatsApp (009) y Dapta por API no existen.
 
 ## Correr local
 Necesitás `uv`, Node 22, Docker (solo para Postgres) y `psql`.
@@ -63,7 +79,7 @@ Los tests de integración fallan, no se saltan, si falta alguna de las dos URLs.
 Los checks que `main` exige están en [`.github/required-checks.txt`](.github/required-checks.txt), y `tests/arquitectura/test_required_checks.py` falla si la lista y los workflows se desalinean. CodeQL corre por el default setup de code scanning (publica `Analyze (python)` y `Analyze (javascript-typescript)`), sin workflow propio: con el default setup prendido, GitHub rechaza el SARIF de un `codeql.yml`. `revision-seguridad` corre el agente `security` sobre el diff del PR con el secret `ANTHROPIC_API_KEY` (`.github/scripts/revision_seguridad.sh`; sin el secret, omite la revisión con un warning), y bloquea salvo `Veredicto: PASA` o `Veredicto: PASA CON OBSERVACIONES` (`.github/scripts/veredicto_security.sh`). El agente tiene negado leer `/proc` (`Read(//proc/**)`), y si igual el reporte trae el secret literal, el job lo borra y falla antes de escribir el summary o el artifact. La protección real la verifica el dueño del repo con `.github/scripts/verificar_proteccion.sh <owner/repo>` (necesita `gh` con admin y `jq`).
 
 ## Fuentes y licencias
-Datos de **OpenStreetMap** © colaboradores de OSM, licencia [ODbL](https://opendatacommons.org/licenses/odbl/). Registros de gobierno multi-país vía [Croma](https://usecroma.com/) (Supersociedades, DIAN, RUES, SIEM, SUNAT; datos públicos, no redistribuidos). Datos del **Registro Mercantil** vía Confecámaras / [datos.gov.co](https://www.datos.gov.co/) (dataset `nb3d-v3n7`), licencia [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Las bases derivadas publicadas por este proyecto se comparten bajo las mismas licencias.
+Datos de **OpenStreetMap** © colaboradores de OSM, licencia [ODbL](https://opendatacommons.org/licenses/odbl/). Registros de gobierno multi-país vía [Croma](https://usecroma.com/) (Supersociedades, DIAN, RUES, SIEM, SUNAT; datos públicos, no redistribuidos). Datos del **Registro Mercantil** vía Confecámaras / [datos.gov.co](https://www.datos.gov.co/) (dataset `c82u-588k`), licencia [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Las bases derivadas publicadas por este proyecto se comparten bajo las mismas licencias.
 
 ## Cumplimiento
 Solo se contacta a personas jurídicas por canales que la propia empresa publicó, con identificación, finalidad, origen del dato y opt-out en cada mensaje. Personas naturales se cuentan, no se contactan. Detalle en la skill [`cumplimiento-datos`](.claude/skills/cumplimiento-datos/SKILL.md).
