@@ -52,10 +52,12 @@ export default function ListaLeads({ clave, titulo, cargar, progreso }: {
   if (!datos) return <main className="pantalla pantalla-ancha">{cabecera}{!fallo && <Esqueleto filas={6} />}</main>;
 
   const paginas = Math.max(1, Math.ceil(datos.total / datos.tamano));
+  // La web se muestra por su dominio; solo http(s), nunca otro esquema en un href.
+  const dominio = (url: string) => url.replace(/^https?:\/\//, "").replace(/\/$/, "");
   const sino = (v: boolean | null) => (v === null ? "" : v ? t("leads.si") : t("leads.no"));
-  // Contacto: solo "Sí" o "—" (la API manda null para una natural: no se expone nada, ni siquiera un guion).
+  // Sin valor (o de una natural): "Sí"/"—", o vacío si la API manda null.
   const siOGuion = (v: boolean | null) => (v === null ? "" : v ? t("leads.si") : "—");
-  // Teléfono y correo: la API manda null mientras no haya dato; esa columna no se pinta (nunca un valor de contacto).
+  // Teléfono y correo: la API manda null mientras no haya dato; esa columna no se pinta.
   const hay = (c: "tiene_telefono" | "tiene_email") => datos.items.some((i) => i[c] !== null);
   const campos: Campo[] = ["nombre", "tipo", "fuentes", "ciudad", "web"];
   if (hay("tiene_telefono")) campos.push("telefono");
@@ -75,15 +77,16 @@ export default function ListaLeads({ clave, titulo, cargar, progreso }: {
               </thead>
               <tbody>
                 {datos.items.map((l) => {
-                  const celdas: Record<Campo, string> = {
+                  const celdas: Record<Campo, ReactNode> = {
                     // Persona natural: la API no manda nombre; el texto protegido es el único que se muestra.
                     nombre: l.tipo_titular === "juridica" && l.nombre ? l.nombre : t("leads.natural_protegida"),
                     tipo: t(`leads.tipo_titular.${l.tipo_titular}`),
                     fuentes: l.fuentes.map((f) => t(`fuentes.${f}`, { defaultValue: f })).join(", "),
                     ciudad: l.ciudad ?? "",
-                    web: sino(l.tiene_web),
-                    telefono: siOGuion(l.tiene_telefono),
-                    email: siOGuion(l.tiene_email),
+                    web: l.web && /^https?:\/\//i.test(l.web) ? <a href={l.web} target="_blank" rel="noopener noreferrer">{dominio(l.web)}</a> : sino(l.tiene_web),
+                    telefono: l.telefono
+                      ? <a href={`tel:${l.telefono.replace(/[^\d+]/g, "")}`}>{l.telefono}</a> : siOGuion(l.tiene_telefono),
+                    email: l.email ? <a href={`mailto:${l.email}`}>{l.email}</a> : siOGuion(l.tiene_email),
                     licencia: [...new Set(l.licencias)].join(", "),
                   };
                   return (

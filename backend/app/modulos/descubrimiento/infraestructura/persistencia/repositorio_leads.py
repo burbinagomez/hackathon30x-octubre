@@ -82,6 +82,10 @@ def _sql_leads(filtro: str):
            -- Solo el IS NOT NULL: nunca se lee ni descifra el contacto. Natural o desconocido: NULL (no se expone nada).
            CASE WHEN l.tipo_titular = 'juridica' THEN l.telefono_cifrado IS NOT NULL END AS tiene_telefono,
            CASE WHEN l.tipo_titular = 'juridica' THEN l.email_cifrado IS NOT NULL END AS tiene_email,
+           -- El valor solo de una jurídica: de una natural la base ni lo devuelve (nunca se descifra).
+           CASE WHEN l.tipo_titular = 'juridica' THEN l.telefono_cifrado END AS telefono_cifrado,
+           CASE WHEN l.tipo_titular = 'juridica' THEN l.email_cifrado END AS email_cifrado,
+           CASE WHEN l.tipo_titular = 'juridica' THEN l.web END AS web,
            array_agg(lf.fuente ORDER BY lf.fuente) AS fuentes,
            array_agg(lf.licencia ORDER BY lf.fuente) AS licencias
     {_DESDE}{filtro}
@@ -312,6 +316,10 @@ class RepositorioLeadsPostgres:
                    "candidatos": k.candidatos, "naturales_homonimas": k.naturales_homonimas}
         return {clave: valor for clave, valor in entrada.items() if valor is not None}
 
+    def _descifrar_contacto(self, columna: str, blob, lead_id: UUID) -> str | None:
+        """Solo para mostrarle al tenant el canal que la empresa publica. Nunca se loguea."""
+        return None if blob is None else self._cifrador.descifrar(columna, bytes(blob), self._tenant_id, lead_id)
+
     def listar_busquedas(self) -> list[ResumenBusqueda]:
         """Solo lectura; el tenant lo filtra la RLS (sin WHERE tenant_id a propósito: el test lo sabotea)."""
         with self._uow() as c:
@@ -334,12 +342,11 @@ class RepositorioLeadsPostgres:
                 return self._pagina(c, _FILTRO_TODOS, {}, pagina, tamano, con_contacto)
             return self._pagina(c, _FILTRO_FUENTE, {"f": fuente}, pagina, tamano, con_contacto)
 
-    @staticmethod
-    def _pagina(c: Connection, filtro: str, params: dict, pagina: int, tamano: int,
+    def _pagina(self, c: Connection, filtro: str, params: dict, pagina: int, tamano: int,
                 con_contacto: bool = False) -> PaginaLeads:
-        """Nunca lee las columnas cifradas ni descifra: el nombre sale solo de una jurídica (el CASE lo repite aunque el
-        CHECK ya lo garantice), y no hay dirección ni contacto: del teléfono y el correo solo se sabe si existen
-        (IS NOT NULL, y solo de una jurídica). El tenant lo filtra la RLS."""
+        """El nombre sale solo de una jurídica (el CASE lo repite aunque el CHECK ya lo garantice) y nunca la dirección.
+        Teléfono, correo y web: solo de una jurídica (el SQL ni los devuelve de una natural), descifrados para que el
+        tenant vea el canal que la empresa publica (Daniel, 2026-10-18). El tenant lo filtra la RLS."""
         if con_contacto:
             filtro = f"({filtro}) AND {_CON_CONTACTO}"
         total = c.execute(_sql_total(filtro), params).scalar_one()
@@ -349,6 +356,8 @@ class RepositorioLeadsPostgres:
             id=f.id, nombre=f.nombre, tipo_titular=f.tipo_titular, fuentes=tuple(_unicas(f.fuentes, f.licencias)),
             licencias=tuple(_unicas(f.fuentes, f.licencias).values()),
             ciudad=f.ciudad, tiene_web=f.tiene_web,
-            tiene_telefono=f.tiene_telefono, tiene_email=f.tiene_email) for f in filas)
+            tiene_telefono=f.tiene_telefono, tiene_email=f.tiene_email,
+            telefono=self._descifrar_contacto("telefono_cifrado", f.telefono_cifrado, f.id),
+            email=self._descifrar_contacto("email_cifrado", f.email_cifrado, f.id), web=f.web) for f in filas)
         return PaginaLeads(items=items, total=total, pagina=pagina, tamano=tamano, atribuciones=tuple(
             AtribucionFuente(a.fuente, a.texto, a.url) for a in atribuciones))
