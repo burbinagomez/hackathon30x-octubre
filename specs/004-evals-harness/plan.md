@@ -73,13 +73,13 @@ Corrección (T011): cuando se escribió este plan la 002 no estaba en `main`; ho
 
 ### Runner (`run.py`)
 - `main(argv, entorno, fabrica_juez=None, registro_costos=None) -> int`. Los tests inyectan juez y registro falsos. Solo en la rama por defecto (`fabrica_juez is None`) `run.py` importa `evals.jueces` y arma los reales (D2, D3). El entorno se lee del mapeo inyectado (default `os.environ`), nunca se imprime.
-- Orden, tal cual la spec (Flujo principal §3): validar entorno y `evals.yaml` (sale **2** sin construir el juez) → fingerprint por eval → por caso: forma primero, juez k veces solo si la forma pasa → PASS^k → `agregado`, `determinacion`, `fallidos` → comparar con baseline → reporte JSON por stdout → código 0/1/2.
+- Orden, tal cual la spec (Flujo principal §3): validar entorno, `evals.yaml` y datasets (si falla, sale **2** sin llamar a `fabrica_juez`) → fingerprint por eval → `fabrica_juez` por eval → regla de k (usa el baseline del mismo fingerprint; si falla, **2** sin ningún `juzgar`) → por caso: forma primero, juez k veces solo si la forma pasa → PASS^k → `agregado`, `determinacion`, `fallidos` → comparar con baseline → reporte JSON por stdout → código 0/1/2.
 - `--config <ruta a evals.yaml>` (default `backend/evals/evals.yaml`); `casos`, `prompt` y `baseline.json` se resuelven relativos a su carpeta. Lo agregó T010 para correr el runner en `tmp_path`; la spec no fijaba cómo se ubica `evals.yaml`.
 - `lote_id` = un `uuid4` por corrida, el mismo para todas las filas de costo, y va en el reporte.
 - `fabrica_juez(nombre_eval, lote_id) -> Juez` (decisión T011, la revisa el advisor): el argumento es el **nombre del eval**, no la clave `juez`, porque la fábrica por defecto necesita también `modelo` y `prompt` de ese eval. Se llama una vez por eval, después de validar entorno, `evals.yaml` y datasets, y antes de cualquier `juzgar`. El `lote_id` llega al juez por constructor: `JuezClaude(registro_costos, tarifa, modelo, prompt, lote_id, http_client)`.
 - La regla de k se valida **después** de `fabrica_juez` (necesita `determinista_si_se_demuestra` del juez devuelto) y **antes** de cualquier `juzgar`: k inválido sale 2 con 0 llamadas.
 - Qué recibe el juez: `tarea` = nombre del eval; `caso` = el caso **sin** `etiqueta`/`pertinente` (el juez no ve la respuesta), y en `encaje_icp` con el ICP del dataset bajo la clave `icp`. Una `etiqueta`/`pertinente` ausente o nula es `ConfigInvalida` → 2.
-- Comparaciones con baseline y tolerancia redondeadas (p. ej. `round(x, 9)`): en float `0.80 - 0.05` no da `0.75` exacto y el test de tolerancia lo pide como "ok".
+- Comparaciones con baseline y tolerancia redondeadas (p. ej. `round(x, 9)`), para que la suma de errores de float no cambie un "ok" por "regresion".
 - Fórmulas (las revisa el advisor):
   - `agregado = casos_que_pasan / todos_los_casos`;
   - `determinacion = juzgados_con_k_resultados_iguales / juzgados`, `null` si `juzgados == 0`;
