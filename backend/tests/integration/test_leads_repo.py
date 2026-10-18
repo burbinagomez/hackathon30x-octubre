@@ -46,7 +46,7 @@ def tenants(admin):
     with admin.begin() as c:
         c.execute(text("INSERT INTO tenants (id, nombre) VALUES (:a, 'A'), (:b, 'B')"), ids)
         c.execute(text("INSERT INTO busquedas (id, tenant_id, pais, criterios) VALUES (:busqueda, :a, 'CO', '{}')"), ids)
-        c.execute(text("INSERT INTO leads (id, tenant_id, pais, nombre) VALUES (:lead, :a, 'CO', 'sembrado')"), ids)
+        c.execute(text("INSERT INTO leads (id, tenant_id, pais, nombre, tipo_titular) VALUES (:lead, :a, 'CO', 'sembrado', 'juridica')"), ids)
     yield ids
     with admin.begin() as c:
         for t in ["lead_fuentes", "cumplimiento", "leads", "busquedas"]:
