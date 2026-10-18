@@ -1,16 +1,13 @@
-// La sesión vive en sessionStorage (spec 005, Auth): sin cookies no hay CSRF.
+import { supabase } from "./supabase";
+
+// El token lo guarda supabase-js; acá solo los idiomas (no son secretos) que trae GET /usuarios/me.
 export type IdiomaGuardado = "es" | "en";
 
-const CLAVES = { token: "token", usuario: "idioma_usuario", tenant: "idioma_tenant" } as const;
+const CLAVES = { usuario: "idioma_usuario", tenant: "idioma_tenant" } as const;
 
-export type Sesion = {
-  token: string | null;
-  idiomaUsuario: IdiomaGuardado | null;
-  idiomaTenant: IdiomaGuardado | null;
-};
+export type Idiomas = { idiomaUsuario: IdiomaGuardado | null; idiomaTenant: IdiomaGuardado | null };
 
-export type RespuestaSesion = {
-  token: string;
+export type RespuestaUsuario = {
   idioma_usuario: IdiomaGuardado | null;
   idioma_tenant: IdiomaGuardado;
 };
@@ -18,16 +15,14 @@ export type RespuestaSesion = {
 const comoIdioma = (valor: string | null): IdiomaGuardado | null =>
   valor === "es" || valor === "en" ? valor : null;
 
-export function leerSesion(): Sesion {
+export function leerIdiomas(): Idiomas {
   return {
-    token: sessionStorage.getItem(CLAVES.token),
     idiomaUsuario: comoIdioma(sessionStorage.getItem(CLAVES.usuario)),
     idiomaTenant: comoIdioma(sessionStorage.getItem(CLAVES.tenant)),
   };
 }
 
-export function guardarSesion(r: RespuestaSesion): void {
-  sessionStorage.setItem(CLAVES.token, r.token);
+export function guardarIdiomas(r: RespuestaUsuario): void {
   sessionStorage.setItem(CLAVES.tenant, r.idioma_tenant);
   if (r.idioma_usuario) sessionStorage.setItem(CLAVES.usuario, r.idioma_usuario);
   else sessionStorage.removeItem(CLAVES.usuario);
@@ -37,6 +32,12 @@ export function fijarIdiomaUsuario(idioma: IdiomaGuardado): void {
   sessionStorage.setItem(CLAVES.usuario, idioma);
 }
 
-export function borrarSesion(): void {
+export async function tokenActual(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ?? null;
+}
+
+export async function cerrarSesion(): Promise<void> {
+  await supabase.auth.signOut();
   for (const clave of Object.values(CLAVES)) sessionStorage.removeItem(clave);
 }

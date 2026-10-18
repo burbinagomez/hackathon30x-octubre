@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { ErrorApi, pedir } from "../api/cliente";
-import { guardarSesion, type RespuestaSesion } from "../api/sesion";
+import { pedir } from "../api/cliente";
+import { guardarIdiomas, type RespuestaUsuario } from "../api/sesion";
+import { supabase } from "../api/supabase";
 import { aplicarIdioma } from "../compartido/idioma";
 import { navegar } from "../compartido/navegar";
 import SelectorIdioma from "../compartido/SelectorIdioma";
@@ -15,9 +16,15 @@ export default function Login() {
   async function ingresar(e: FormEvent) {
     e.preventDefault();
     try {
-      guardarSesion(await pedir<RespuestaSesion>("/auth/sesion", { metodo: "POST", cuerpo: { email, clave } }));
-    } catch (e) {
-      setFallo(e instanceof ErrorApi && e.estado === 401 ? "error_credenciales" : "error_generico");
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password: clave });
+      if (error) {
+        setFallo(error.code === "invalid_credentials" ? "error_credenciales" : "error_generico");
+        return;
+      }
+      if (!data.session) throw new Error("sin sesión");
+      guardarIdiomas(await pedir<RespuestaUsuario>("/usuarios/me"));
+    } catch {
+      setFallo("error_generico");
       return;
     }
     aplicarIdioma();

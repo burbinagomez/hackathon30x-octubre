@@ -6,7 +6,9 @@ import { expect, test } from "vitest";
 import { raiz } from "./ayuda";
 
 // Armados por partes: este archivo no se delata a sí mismo si alguien lo escanea.
-const SECRETOS = [new RegExp("sb_" + "secret_"), new RegExp("service" + "_role")];
+// supabase-js trae el prefijo suelto (`startsWith("sb_secret_")`) para rechazar esas keys en el navegador,
+// así que en el build solo cuenta el prefijo seguido de un cuerpo de key.
+const SECRETOS = [new RegExp("sb_" + "secret_[A-Za-z0-9_-]+"), new RegExp("service" + "_role")];
 // La publishable key es pública por diseño (constitución 2.0.0) y solo vive en web.
 const VARIABLES_PERMITIDAS = ["VITE_API_URL", "VITE_SUPABASE_URL", "VITE_SUPABASE_PUBLISHABLE_KEY"];
 
@@ -33,6 +35,8 @@ test("el_detector_encuentra_un_secreto_plantado", () => {
     fs.writeFileSync(path.join(tmp, "limpio.ts"), "export const a = 1;\n");
     fs.writeFileSync(path.join(tmp, "malo.ts"), `export const k = "${"sb_" + "secret_x"}";\n`);
     fs.writeFileSync(path.join(tmp, "malo.js"), `const r = "${"service" + "_role"}";\n`);
+    // Control positivo: el prefijo suelto, como lo usa supabase-js, no es una key.
+    fs.writeFileSync(path.join(tmp, "lib.js"), `s.startsWith("${"sb_" + "secret_"}")\n`);
     expect(conSecretos(tmp).sort()).toEqual(["malo.js", "malo.ts"]);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });

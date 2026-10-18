@@ -1,4 +1,4 @@
-import { borrarSesion, leerSesion } from "./sesion";
+import { cerrarSesion, tokenActual } from "./sesion";
 
 export type Opciones = { metodo?: string; cuerpo?: unknown };
 
@@ -10,7 +10,7 @@ export class ErrorApi extends Error {
 
 /** Cliente HTTP único. Un 401 con sesión la borra y lleva al login; sin sesión (login fallido) solo falla. */
 export async function pedir<T>(ruta: string, { metodo, cuerpo }: Opciones = {}): Promise<T> {
-  const { token } = leerSesion();
+  const token = await tokenActual();
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   if (cuerpo !== undefined) headers["Content-Type"] = "application/json";
@@ -22,7 +22,7 @@ export async function pedir<T>(ruta: string, { metodo, cuerpo }: Opciones = {}):
   });
 
   if (respuesta.status === 401 && token) {
-    borrarSesion();
+    await cerrarSesion();
     window.location.assign("/login");
   }
   if (!respuesta.ok) throw new ErrorApi(respuesta.status);
