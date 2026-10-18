@@ -289,5 +289,50 @@
     "trabajando": "Looking for contact on websites",
     "resumen": "{{procesados}} processed · {{contactables}} with contact · {{pendientes}} left",
     "error": "Could not complete. Try again."
+  },
+  "landing": {
+    "etiqueta": "RETO DAPTA · 30X",
+    "titulo": "More leads, lower cost",
+    "bajada": "We find and measure company leads from free, public sources, with the cost per qualified lead in plain view.",
+    "empezar": "Get started",
+    "ver_tablero": "See the dashboard",
+    "problema": {
+      "titulo": "The problem",
+      "c1": {
+        "cifra": "$80–500",
+        "texto": "USD per lead when paying for ads"
+      },
+      "c2": {
+        "cifra": "CPL?",
+        "texto": "They don't know which channel works for them or what each lead costs"
+      },
+      "c3": {
+        "cifra": "3 of 5",
+        "texto": "clients ask Dapta to get them leads"
+      }
+    },
+    "solucion": {
+      "titulo": "The solution",
+      "p1": {
+        "titulo": "1. Find",
+        "texto": "From the ideal customer profile to free, public sources (RUES, Supersociedades, OpenStreetMap). No duplicates, companies only."
+      },
+      "p2": {
+        "titulo": "2. Contact",
+        "texto": "We look for the phone and email the company publishes on its own website, and Dapta calls it to qualify it."
+      },
+      "p3": {
+        "titulo": "3. Measure",
+        "texto": "CPL and CPQL per source, taken from a real cost ledger."
+      }
+    },
+    "diferencial": {
+      "titulo": "What nobody else shows you",
+      "d1": "Free sources",
+      "d2": "The cost before you search (preview with maximum cost and cap)",
+      "d3": "CPQL closed with Dapta"
+    },
+    "viabilidad": "Hexagonal architecture: each source is an adapter plugged in by configuration · RLS, encryption and compliance ledger.",
+    "cta": "More leads, lower cost. And measured."
   }
 }
