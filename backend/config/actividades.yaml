@@ -1,0 +1,11 @@
+# CIIU Rev. 4 A.C. (DANE) → equivalentes por sistema. Una fuente que filtra
+# por tipo_negocio sin mapeo para el CIIU del ICP se ignora y se reporta.
+"4711":
+  descripcion: "Comercio al por menor en establecimientos no especializados, surtido principalmente de alimentos"
+  osm: ["shop=supermarket", "shop=convenience"]
+"5611":
+  descripcion: "Expendio a la mesa de comidas preparadas"
+  osm: ["amenity=restaurant"]
+"4752":
+  descripcion: "Comercio al por menor de artículos de ferretería, pinturas y vidrios"
+  osm: ["shop=hardware"]

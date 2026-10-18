@@ -4,8 +4,11 @@ version = "0.1.0"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi>=0.143.3",
+    # Runtime: lo usa el adaptador Croma en producción.
+    "httpx>=0.28.1",
     "psycopg[binary]>=3",
     "pydantic-settings>=2.16.0",
+    "pyyaml>=6.0.3",
     "sqlalchemy>=2",
     "uvicorn>=0.54.0",
 ]
@@ -13,7 +16,6 @@ dependencies = [
 [dependency-groups]
 dev = [
     "alembic>=1.20.0",
-    "httpx>=0.28.1",
     "import-linter>=2.15",
     "pip-audit>=2.10.1",
     "pytest>=9.1.1",
@@ -34,6 +36,20 @@ forbidden_modules = [
     "instaloader",
     "facebook", "facebook_business", "facebook_scraper",
 ]
+
+[[tool.importlinter.contracts]]
+name = "Capas de los modulos"
+type = "layers"
+# "(aplicacion)": capa opcional; costos todavía no la tiene.
+layers = ["infraestructura", "(aplicacion)", "dominio"]
+containers = ["app.modulos.descubrimiento", "app.modulos.costos"]
+
+[[tool.importlinter.contracts]]
+name = "Descubrimiento no usa la infraestructura de costos"
+type = "forbidden"
+# Solo app.cli une los dos módulos: descubrimiento conoce el puerto, nunca el adaptador.
+source_modules = ["app.modulos.descubrimiento"]
+forbidden_modules = ["app.modulos.costos.infraestructura"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

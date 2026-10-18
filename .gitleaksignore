@@ -1,0 +1,2 @@
+# Key falsa del test del guard de revision-seguridad (spec 012), no es un secreto real.
+d788170309247ad1cbaa7a5a5ff22fc707c0a389:backend/tests/arquitectura/test_required_checks.py:generic-api-key:286

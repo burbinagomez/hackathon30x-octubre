@@ -1,0 +1,73 @@
+[
+  {
+    "nit": "999000001",
+    "digito_verificacion": "1",
+    "razon_social": "EJEMPLO FICTICIO ALFA S.A.S.",
+    "cod_ciiu_act_econ_pri": "4711",
+    "codigo_camara": "04",
+    "organizacion_juridica": "SOCIEDADES POR ACCIONES SIMPLIFICADAS SAS",
+    "fecha_renovacion": "20260410"
+  },
+  {
+    "nit": "999000002",
+    "digito_verificacion": "7",
+    "razon_social": "EJEMPLO FICTICIO BETA LTDA",
+    "cod_ciiu_act_econ_pri": "4711",
+    "codigo_camara": "04",
+    "organizacion_juridica": "SOCIEDAD LIMITADA",
+    "fecha_renovacion": "20250318"
+  },
+  {
+    "nit": "999000003",
+    "digito_verificacion": "3",
+    "razon_social": "EJEMPLO FICTICIO GAMA S.A.S.",
+    "cod_ciiu_act_econ_pri": "4711",
+    "codigo_camara": "14",
+    "organizacion_juridica": "SOCIEDADES POR ACCIONES SIMPLIFICADAS SAS",
+    "fecha_renovacion": "20260201"
+  },
+  {
+    "nit": "999000101",
+    "digito_verificacion": "5",
+    "razon_social": "DESCARTE FICTICIO A NATURAL",
+    "cod_ciiu_act_econ_pri": "4711",
+    "codigo_camara": "04",
+    "organizacion_juridica": "PERSONA NATURAL",
+    "fecha_renovacion": "20260115"
+  },
+  {
+    "nit": "999000102",
+    "digito_verificacion": "2",
+    "razon_social": "DESCARTE FICTICIO A PRIMA NATURAL",
+    "cod_ciiu_act_econ_pri": "4711",
+    "codigo_camara": "04",
+    "organizacion_juridica": "Persona Natural ",
+    "fecha_renovacion": "20260116"
+  },
+  {
+    "digito_verificacion": "0",
+    "razon_social": "DESCARTE FICTICIO B SIN NIT",
+    "cod_ciiu_act_econ_pri": "4711",
+    "codigo_camara": "04",
+    "organizacion_juridica": "SOCIEDAD LIMITADA",
+    "fecha_renovacion": "20120329"
+  },
+  {
+    "nit": "12345678",
+    "digito_verificacion": "9",
+    "razon_social": "DESCARTE FICTICIO C NIT MALO",
+    "cod_ciiu_act_econ_pri": "4711",
+    "codigo_camara": "04",
+    "organizacion_juridica": "SOCIEDADES POR ACCIONES SIMPLIFICADAS SAS",
+    "fecha_renovacion": "20260117"
+  },
+  {
+    "nit": "999000104",
+    "digito_verificacion": "4",
+    "razon_social": "",
+    "cod_ciiu_act_econ_pri": "4711",
+    "codigo_camara": "04",
+    "organizacion_juridica": "SOCIEDAD LIMITADA",
+    "fecha_renovacion": "20260118"
+  }
+]
