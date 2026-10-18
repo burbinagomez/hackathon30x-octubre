@@ -35,7 +35,7 @@ El registro mercantil no entra como fuente de este slice: Supersociedades (vía 
 | III Tenant/RLS | `revision_dedup` con `tenant_id` y RLS; se suma al parametrizado de `test_rls.py`. `test_privilegios_supabase` la toma sola. | ✅ |
 | IV Migraciones | Una migración a mano, `0003_osm_dedup.sql`. `test_pg_trgm_en_extensions_y_usable_por_app_rt` sobre `base_vacia`. `app/modelos.py` suma las columnas y la tabla para que el drift check siga vacío. | ✅ |
 | V Seguridad pipeline | `CIFRADO_KEY` y `OVERPASS_URL` por `Settings`; la app no arranca sin `CIFRADO_KEY` (`ConfigInvalida`). `CIFRADO_KEY` no choca con el guard de `config.py`. Dos dependencias nuevas pasan por `pip-audit`. | ✅ |
-| VI Contacto cifrado | `Cifrador` (AES-GCM, AAD `tabla.columna`) y HMAC del E.164 en `app/seguridad/`; catálogo `catalogo_sensibles.py` (con `nombre_cifrado` y `direccion_cifrada` para titulares no jurídicos, enmienda 2026-10-18; `CONDICIONALES` para `nombre`/`direccion`/`nombre_normalizado` en claro solo si `juridica`); tests de catálogo, de columnas fuera del catálogo (con la lista cerrada que incluye `leads.idioma_contacto` y `fuente_cache.respuesta`, 002 plan:211), de logs y de `wa.me` en columnas no catalogadas. Sin caché de Overpass. | ✅ |
+| VI Contacto cifrado | `Cifrador` (AES-GCM, AAD `leads.<columna>:<tenant_id>:<lead_id>`) y HMAC del E.164 en `app/seguridad/`; catálogo `catalogo_sensibles.py` (con `nombre_cifrado` y `direccion_cifrada` para titulares no jurídicos, enmienda 2026-10-18; `CONDICIONALES` para `nombre`/`direccion`/`nombre_normalizado` en claro solo si `juridica`); tests de catálogo, de columnas fuera del catálogo (con la lista cerrada que incluye `leads.idioma_contacto` y `fuente_cache.respuesta`, 002 plan:211), de logs y de `wa.me` en columnas no catalogadas. Sin caché de Overpass. | ✅ |
 | VII Cumplimiento | Lead OSM con `tipo_titular='desconocido'` (no contactable hasta el 006), fila en `cumplimiento` con `licencia` de `MetaFuente` (`ODbL`) y `url_origen` del elemento, en la misma transacción que el lead (002 plan:178). `telefono_canal`/`email_canal` etiquetan el canal publicado; un dato de registro no es canal. `aplicar_fusion` no toca `cumplimiento`; `tipo_titular` sube y nunca baja. Este slice no envía nada. | ✅ |
 | VIII Costos | `overpass_query` por cada intento HTTP, con segundos del request (sin esperas), `computo_seg_usd` como `Decimal`, `gratis=false`, `lead_id=None`, `lote_id=busqueda_id`, escrita antes de devolver o lanzar. Cubierto por `test_costos_por_adaptador` (002), el unitario y la integración con `postgres_costos` real. | ✅ |
 | IX Evals | N/A: sin IA. | — |
@@ -157,11 +157,11 @@ docs/arquitectura-backend.md
 - **revisar:** `obtener_o_crear_lead` del 002 (lead nuevo + su `cumplimiento`) → `registrar_revision(busqueda_id, lead_a, lead_b, similitud)`, con el par ordenado.
 - **nuevo:** `obtener_o_crear_lead` como en el 002.
 
-**Cifrado.** `Cifrador` con dos subclaves HKDF de `CIFRADO_KEY`: AES-256-GCM (nonce de 12 bytes como prefijo, AAD `tabla.columna`) y HMAC-SHA256 del E.164. El repositorio cifra y hashea al escribir (en `obtener_o_crear_lead` y en `aplicar_fusion`) y descifra al leer `Lead`; el dominio nunca ve bytes. Nada de contacto, nombre ni dirección de un no jurídico en logs, tampoco en `httpx` ni en mensajes de error.
+**Cifrado.** `Cifrador` con dos subclaves HKDF de `CIFRADO_KEY`: AES-256-GCM (nonce de 12 bytes como prefijo, AAD `leads.<columna>:<tenant_id>:<lead_id>`) y HMAC-SHA256 del E.164. El repositorio cifra y hashea al escribir (en `obtener_o_crear_lead` y en `aplicar_fusion`) y descifra al leer `Lead`; el dominio nunca ve bytes. Nada de contacto, nombre ni dirección de un no jurídico en logs, tampoco en `httpx` ni en mensajes de error.
 
-**Nombre y dirección de no jurídicos (enmienda 2026-10-18).** `obtener_o_crear_lead` elige columnas por `tipo_titular`: `juridica` → `nombre`/`direccion`/`nombre_normalizado` en claro; otro → `nombre_cifrado`/`direccion_cifrada` y los tres en `NULL`. `aplicar_fusion` pasa de cifrado a claro en el mismo `UPDATE` cuando el tipo sube a `juridica` (el `CHECK` lo exige). `candidatos_por_nombre` une dos fuentes: `pg_trgm` sobre jurídicos y, para no jurídicos de la misma `ciudad_normalizada` (tope 2000), descifra + `normalizar_nombre` + `similitud_trigramas` (función pura de `dominio/normalizacion.py`, misma definición que `pg_trgm`; test de equivalencia contra Postgres). Dedup de OSM contra OSM: teléfono (HMAC) y dominio. La lectura para el tablero pasa solo por el repositorio.
+**Nombre y dirección de no jurídicos (enmienda 2026-10-18).** `obtener_o_crear_lead` elige columnas por `tipo_titular`: `juridica` → `nombre`/`direccion`/`nombre_normalizado` en claro; otro → `nombre_cifrado`/`direccion_cifrada` y los tres en `NULL`. `aplicar_fusion` pasa de cifrado a claro en el mismo `UPDATE` cuando el tipo sube a `juridica` (el `CHECK` lo exige). `candidatos_por_nombre` une dos fuentes: `pg_trgm` sobre jurídicos y, para no jurídicos de la misma `ciudad_normalizada` (`tenant_id = :t` explícito además de RLS, `ORDER BY creado_en`, tope 2000 con conteo de truncados), descifra + `normalizar_nombre` + `similitud_trigramas` (función pura de `dominio/normalizacion.py`, misma definición que `pg_trgm`; test de equivalencia contra Postgres). Dedup de OSM contra OSM: teléfono (HMAC) y dominio. La lectura para el tablero pasa solo por el repositorio.
 
-**Migración de `nombre`/`direccion` cifrados** (a mano, `0003`; DDL propuesto al final de este archivo, sin escribir hasta el OK del dueño): columnas `nombre_cifrado`/`direccion_cifrada`, `nombre` nullable, dos `CHECK` por `tipo_titular` (`NOT VALID` hasta el backfill T056). Sin tabla nueva, sin `GRANT` nuevo.
+**Migración de `nombre`/`direccion` cifrados** (a mano, `0003`; DDL propuesto al final de este archivo, sin escribir hasta el OK del dueño): columnas `nombre_cifrado`/`direccion_cifrada`, `nombre` nullable, dos `CHECK` por `tipo_titular` con `octet_length(nombre_cifrado) > 28`, y `VALIDATE` en bloques `DO` que atrapan `check_violation` (convalidados desde vacío; `NOT VALID` si hay filas viejas hasta el backfill T056 y la migración de validación, número después de la `0004`). Sin tabla nueva, sin `GRANT` nuevo. `crear_engine` pasa `hide_parameters=True`.
 
 **Migración `0003`** (a mano; suma `CHECK (tipo_titular = 'juridica' OR nombre_normalizado IS NULL)`): `CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA extensions`; columnas nuevas de `leads` con los `CHECK` de canal y de dato ⇔ canal; GIN con `extensions.gin_trgm_ops`; btree no únicos `(tenant_id, dominio)` y `(tenant_id, telefono_hmac)`; `revision_dedup` con RLS, `CHECK (lead_a < lead_b)`, `UNIQUE (lead_a, lead_b)` y `GRANT` a `app_rt`. No toca `costos`.
 
@@ -203,7 +203,9 @@ Los pasos 1, 2 y 3 son independientes entre sí. Los cortes son los de la spec (
 
 ## DDL propuesto, pendiente de aprobación del dueño
 
-> **No es un archivo todavía.** Se crea en `supabase/migrations/` solo con el OK explícito del dueño. Una migración propia, independiente de la `0003_osm_dedup.sql` (no usa ninguna de sus columnas), para que entre en el [MIN]. Número asignado por el coordinador: `0003_leads_cifrado_nombre_direccion.sql`; la 005 toma la `0004`. La migración de osm_dedup, que esta spec llama `0003_osm_dedup.sql`, se renumera al siguiente libre en su PR (`migrar_local.sh` rechaza versiones repetidas).
+> **No es un archivo todavía.** Se crea en `supabase/migrations/` solo con el OK explícito del dueño. Una migración propia, independiente de la de osm_dedup (no usa ninguna de sus columnas), para que entre en el [MIN]. Número asignado por el coordinador: `0003_leads_cifrado_nombre_direccion.sql`; la 005 toma la `0004`. La migración de osm_dedup, que esta spec llama `0003_osm_dedup.sql`, se renumera al siguiente libre en su PR (`migrar_local.sh` rechaza versiones repetidas). Versión 2, con los hallazgos de security.
+
+### Migración 1: `0003_leads_cifrado_nombre_direccion.sql`
 
 ```sql
 -- 0003: nombre y dirección cifrados para titulares no jurídicos. SQL a mano. Corre como postgres (dueño).
@@ -217,30 +219,62 @@ ALTER TABLE public.leads
 -- Un lead no jurídico no tiene nombre en claro.
 ALTER TABLE public.leads ALTER COLUMN nombre DROP NOT NULL;
 
+-- octet_length > 28: nonce de 12 bytes + etiqueta GCM de 16; un bytea más corto no es un cifrado.
 -- NOT VALID: las filas ya guardadas (leads OSM del [MIN], en claro) no se pueden cifrar desde SQL.
--- Las filas nuevas y las modificadas sí se validan. Se valida (VALIDATE CONSTRAINT) cuando el script
--- de la app (tarea T056) las haya cifrado; en una base vacía no hay nada que validar.
 ALTER TABLE public.leads
   ADD CONSTRAINT leads_nombre_segun_titular_ck CHECK (
     (tipo_titular =  'juridica' AND nombre IS NOT NULL AND nombre_cifrado IS NULL)
     OR
-    (tipo_titular <> 'juridica' AND nombre IS NULL AND nombre_cifrado IS NOT NULL)
+    (tipo_titular <> 'juridica' AND nombre IS NULL
+       AND nombre_cifrado IS NOT NULL AND octet_length(nombre_cifrado) > 28)
   ) NOT VALID,
   ADD CONSTRAINT leads_direccion_segun_titular_ck CHECK (
     (tipo_titular =  'juridica' AND direccion_cifrada IS NULL)
     OR
-    (tipo_titular <> 'juridica' AND direccion IS NULL)
+    (tipo_titular <> 'juridica' AND direccion IS NULL
+       AND (direccion_cifrada IS NULL OR octet_length(direccion_cifrada) > 28))
   ) NOT VALID;
 
--- Sin GRANT nuevo: app_rt ya tiene SELECT, INSERT, UPDATE, DELETE sobre public.leads (0002) y los
--- GRANT de tabla cubren las columnas nuevas. Sin REVOKE: anon/authenticated ya no tienen nada en public
--- y no hay default privileges para columnas. RLS no cambia: leads ya tiene ENABLE ROW LEVEL SECURITY y
--- la política tenant_aislado (0002); no hay tabla nueva.
+-- Intenta convalidar. En una base vacía (CI, local, prod nueva) no hay filas y los CHECK quedan
+-- convalidated = true. Con filas viejas en claro falla con check_violation: se avisa (sin datos) y
+-- queda NOT VALID hasta el backfill (T056) y la migración de validación. Un bloque por CHECK: si el
+-- segundo falla, el primero no se deshace.
+DO $$
+BEGIN
+  ALTER TABLE public.leads VALIDATE CONSTRAINT leads_nombre_segun_titular_ck;
+EXCEPTION WHEN check_violation THEN
+  RAISE NOTICE 'leads_nombre_segun_titular_ck queda NOT VALID: hay leads no juridicos en claro; correr el backfill y la migracion de validacion';
+END
+$$;
+
+DO $$
+BEGIN
+  ALTER TABLE public.leads VALIDATE CONSTRAINT leads_direccion_segun_titular_ck;
+EXCEPTION WHEN check_violation THEN
+  RAISE NOTICE 'leads_direccion_segun_titular_ck queda NOT VALID: hay leads no juridicos en claro; correr el backfill y la migracion de validacion';
+END
+$$;
+
+-- Sin GRANT/REVOKE nuevos: app_rt ya tiene SELECT, INSERT, UPDATE, DELETE sobre public.leads (0002) y los
+-- privilegios de tabla cubren las columnas nuevas. RLS no cambia: leads ya tiene ENABLE ROW LEVEL SECURITY
+-- y la política tenant_aislado (0002); no hay tabla nueva.
 ```
 
+### Migración 2: validación, aparte (número a definir después de la `0004`)
+
+```sql
+-- NNNN: convalida los CHECK de titular. Corre en prod DESPUÉS de cifrar los leads viejos con T056.
+-- Sin condición: si queda una fila no jurídica en claro, falla y la migración no se registra (se corrige y se reintenta).
+ALTER TABLE public.leads VALIDATE CONSTRAINT leads_nombre_segun_titular_ck;
+ALTER TABLE public.leads VALIDATE CONSTRAINT leads_direccion_segun_titular_ck;
+```
+Sobre una base ya convalidada es un no-op, así que desde vacío corre sin efecto y `migrar_local.sh` dos veces no cambia nada.
+
+**Orden obligatorio:** `0003` → T056 en prod → migración de validación → recién ahí `aplicar_fusion`.
+
 Puntos para la aprobación:
-- **Idempotencia y "dos veces desde vacío":** `migrar_local.sh` registra cada versión en `supabase_migrations.schema_migrations` y salta la ya aplicada, igual que `supabase db push`, así que la segunda corrida no reaplica nada (el `ADD COLUMN`/`ADD CONSTRAINT` sin `IF NOT EXISTS` no se ejecuta dos veces). Desde vacío corre después de la `0002` y no depende de la migración de osm_dedup; `test_migraciones.py::test_migrar_local_desde_vacio_dos_veces_sin_drift` ya cubre la doble corrida y el drift (por eso `app/modelos.py` se actualiza en la misma tarea). Verificar: tras el verde, `migrar_local.sh` dos veces sobre base vacía, la segunda sin "aplicada".
-- **`leads.nombre text NOT NULL` → nullable:** necesario para guardar un no jurídico sin nombre en claro. El `CHECK` devuelve la garantía: una jurídica no puede quedar sin nombre. `app/modelos.py` pasa `nombre` a `nullable=True` y suma las dos columnas para que el drift check quede vacío.
-- **`NOT VALID` y filas existentes:** decisión del dueño. Alternativa si hoy no hay datos que importen (solo dummy): `ADD CONSTRAINT ...` sin `NOT VALID` y vaciar `leads` de las pruebas; se pierde el backfill (T056) y el `VALIDATE`.
-- **`osm_dedup` suma después** `CHECK (tipo_titular = 'juridica' OR nombre_normalizado IS NULL)` en su migración (el `nombre_normalizado` de un no jurídico sería el nombre en claro con otro formato).
-- **Otras tablas:** `revision_dedup` guarda ids y similitud, no nombres; `lead_fuentes.url_origen` y `cumplimiento.url_origen` son la URL del elemento OSM (no llevan el nombre).
+- **Idempotencia y "dos veces desde vacío":** `migrar_local.sh` registra cada versión en `supabase_migrations.schema_migrations` y salta la ya aplicada, igual que `supabase db push`. `test_migraciones.py::test_migrar_local_desde_vacio_dos_veces_sin_drift` ya cubre la doble corrida y el drift (`app/modelos.py` se actualiza en la misma tarea). Test nuevo: `test_checks_de_titular_quedan_convalidados_desde_vacio`.
+- **`leads.nombre text NOT NULL` → nullable:** necesario para guardar un no jurídico sin nombre en claro; el `CHECK` devuelve la garantía (una jurídica no queda sin nombre).
+- **`NOT VALID` y filas existentes:** con filas viejas en claro, la `0003` deja los `CHECK` sin convalidar y avisa. Mientras estén `NOT VALID`, cualquier `UPDATE` a una de esas filas falla. De ahí el orden obligatorio. Alternativa si hoy solo hay datos dummy: vaciar `leads` antes y no hay backfill ni migración 2.
+- **`osm_dedup` suma después** `CHECK (tipo_titular = 'juridica' OR nombre_normalizado IS NULL)` en su migración.
+- **Otras tablas:** `revision_dedup` guarda ids y similitud, no nombres; `url_origen` de `lead_fuentes`/`cumplimiento` queda en claro por decisión (ver spec, "Qué no cambia").
