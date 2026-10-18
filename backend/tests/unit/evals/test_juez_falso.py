@@ -25,4 +25,5 @@ def test_una_salida_invalida_programada_se_lanza():
 
 
 def test_no_es_determinista_por_defecto():
+    # sabotaje: `determinista_si_se_demuestra = True` en JuezFalso → falla por assert (assert True is False).
     assert JuezFalso.determinista_si_se_demuestra is False
