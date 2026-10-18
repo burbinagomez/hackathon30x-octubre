@@ -67,12 +67,11 @@ def _postgres(tenant: UUID) -> tuple[RepositorioLeads, Callable[[UUID], list[Ori
     engine = db.crear_engine(ajustes.database_url)
 
     def listar(busqueda: UUID) -> list[Origen]:
-        # ponytail: ingresos no se persisten en el 002; rango_ingresos sale cuando leads lo guarde.
+        # Solo lead_fuentes: la tabla leads se lee únicamente por el repositorio (test_cifrado). ponytail: el Lead del
+        # 002 no trae actividad ni ingresos, así que salen sin actividad ni rango_ingresos; sumarlos a Lead/obtener_lead.
         with db.unidad_de_trabajo(engine, tenant) as c:
-            filas = c.execute(text(
-                "SELECT lf.lead_id, lf.fuente, lf.encontrado_en, lf.licencia, l.actividad_codigo FROM lead_fuentes lf "
-                "JOIN leads l ON l.tenant_id = lf.tenant_id AND l.id = lf.lead_id "
-                "WHERE lf.busqueda_id = :b ORDER BY lf.encontrado_en"), {"b": busqueda}).all()
+            filas = c.execute(text("SELECT lead_id, fuente, encontrado_en, licencia FROM lead_fuentes "
+                                   "WHERE busqueda_id = :b ORDER BY encontrado_en"), {"b": busqueda}).all()
         return [Origen(*f) for f in filas]
 
     return RepositorioLeadsPostgres(engine, tenant, Cifrador(ajustes.cifrado_key.get_secret_value())), listar
