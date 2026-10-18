@@ -83,6 +83,22 @@ def test_falla_del_juez_sale_2_sin_key_ni_costos(tmp_path, capsys, http):
     assert costos.filas == [] and len(capturados) == 1  # corta en la primera falla: no sigue gastando
 
 
+def test_content_malformado_cuenta_como_salida_invalida(tmp_path, capsys):
+    # Un 200 con usage y content que no es lista: el caso falla como juez_salida_invalida (exit 1), sin traceback.
+    costos, capturados = RegistroCostosFalso(), []
+    try:
+        codigo = run.main(["--config", str(config(tmp_path)), "--tenant", str(uuid4())], entorno=ENTORNO,
+                          registro_costos=costos, transporte=transporte(capturados, content={"type": "tool_use"}))
+    except Exception as e:  # noqa: BLE001  el rojo tiene que ser por assert
+        codigo = repr(e)
+    out, _ = capsys.readouterr()
+
+    assert codigo == 1
+    motivos = {f["motivo"] for f in json.loads(out)["evals"]["encaje_icp"]["fallidos"]}
+    assert motivos == {"juez_salida_invalida"}
+    assert len(costos.filas) == 2 * len(capturados)  # el usage real de cada llamada
+
+
 @pytest.mark.parametrize("http", [None, httpx.ConnectTimeout("timeout")], ids=["ok", "falla_del_juez"])
 def test_cierra_el_cliente_http_al_terminar(tmp_path, capsys, http):
     # httpx.Client.close() cierra su transporte: el transporte falso anota el cierre.

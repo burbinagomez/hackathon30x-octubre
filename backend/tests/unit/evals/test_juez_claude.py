@@ -142,11 +142,33 @@ def test_header_lleva_exactamente_la_key(monkeypatch):
 
 
 def _cadena(e: BaseException) -> str:
-    partes = []
-    for x in (e, e.__cause__, e.__context__):
-        if x is not None:
-            partes += [str(x), repr(x)]
+    # Toda la cadena (__cause__/__context__, recursiva) y los headers del request que httpx cuelga de sus errores.
+    partes, vistos, pendientes = [], set(), [e]
+    while pendientes:
+        x = pendientes.pop()
+        if x is None or id(x) in vistos:
+            continue
+        vistos.add(id(x))
+        partes += [str(x), repr(x)]
+        if (req := getattr(x, "_request", None)) is not None:
+            partes.append(repr(dict(req.headers)))
+        pendientes += [x.__cause__, x.__context__]
     return "\n".join(partes)
+
+
+class RegistroCaido:
+    """Postgres caído: registrar lanza."""
+
+    def registrar(self, op):
+        raise RuntimeError("costos no disponible")
+
+
+def test_registro_caido_tras_timeout_no_arrastra_la_key():
+    # Si el registro falla dentro del except de httpx, su error lleva el ReadTimeout (y su request) en __context__.
+    error = _lanza(juez(RegistroCaido(), [], http=httpx.ReadTimeout("timeout")), Exception)
+
+    assert error is not None
+    assert CLAVE_FALSA not in _cadena(error)
 
 
 FALLAS_HTTP = {
@@ -207,8 +229,12 @@ def test_falla_despues_de_enviar_cobra_el_maximo(http):
 @pytest.mark.parametrize("http", [httpx.Response(200, text="<html>no es json</html>"),
                                   httpx.Response(200, json=["no", "es", "objeto"]),
                                   httpx.Response(200, json={"content": [], "stop_reason": "end_turn"}),
-                                  httpx.Response(200, json={"content": [], "usage": {"input_tokens": 5}})],
-                         ids=["no_json", "no_objeto", "sin_usage", "usage_parcial"])
+                                  httpx.Response(200, json={"content": [], "usage": {"input_tokens": 5}}),
+                                  httpx.Response(200, json={"content": [],
+                                                            "usage": {"input_tokens": True, "output_tokens": 30}}),
+                                  httpx.Response(200, json={"content": [],
+                                                            "usage": {"input_tokens": -5, "output_tokens": 30}})],
+                         ids=["no_json", "no_objeto", "sin_usage", "usage_parcial", "usage_bool", "usage_negativo"])
 def test_200_ilegible_es_salida_invalida_y_cobra_el_maximo(http):
     # Un 200 se factura aunque no se pueda leer el usage: se cobra el techo, nunca una fila con 0 tokens.
     costos, capturados, lote = RegistroCostosFalso(), [], uuid4()
@@ -216,6 +242,16 @@ def test_200_ilegible_es_salida_invalida_y_cobra_el_maximo(http):
 
     assert isinstance(error, SalidaJuezInvalida), f"lanzó {type(error).__name__}"
     _assert_costo_maximo(costos, capturados, lote)
+
+
+@pytest.mark.parametrize("content", [{"type": "tool_use"}, ["texto suelto"]], ids=["content_dict", "bloque_no_dict"])
+def test_content_malformado_es_salida_invalida_con_costo_real(content):
+    # El usage es legible: se cobra lo real (no el techo) y la salida no sirve.
+    costos, lote = RegistroCostosFalso(), uuid4()
+    error = _lanza(juez(costos, [], lote_id=lote, content=content), Exception)
+
+    assert isinstance(error, SalidaJuezInvalida), f"lanzó {type(error).__name__}"
+    assert sorted(costos.filas, key=lambda f: f.tipo) == _filas_esperadas(lote)
 
 
 def test_salida_no_filtra_la_key(capsys, caplog):

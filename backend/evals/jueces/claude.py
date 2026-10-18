@@ -58,7 +58,7 @@ class JuezClaude:
         techo = {"input_tokens": len(body) + TOKENS_OCULTOS, "output_tokens": MAX_TOKENS}
         # Los raise van FUERA del except: `from None` suprime la cadena al mostrarla pero igual setea __context__,
         # y la excepción de httpx lleva request.headers (la key) y response.text.
-        codigo = None
+        codigo, cobrar = None, False
         try:
             r = self._http.post("/v1/messages", content=body,
                                 headers={"x-api-key": self._api_key, "anthropic-version": VERSION_API,
@@ -69,8 +69,11 @@ class JuezClaude:
         except NO_ENVIADO:
             codigo = "red"  # el request no salió: nada que cobrar
         except httpx.HTTPError:
-            codigo = "red"
-            self._registrar(techo)  # salió y se cortó (ReadTimeout, RemoteProtocolError…): pudo facturarse
+            # Salió y se cortó (ReadTimeout, RemoteProtocolError…): pudo facturarse. Se cobra FUERA del except:
+            # si el registro lanza, su error no puede llevar el de httpx (y la key) en __context__.
+            codigo, cobrar = "red", True
+        if cobrar:
+            self._registrar(techo)
         if codigo:
             raise ErrorJuez(codigo)
         try:
@@ -79,7 +82,8 @@ class JuezClaude:
             cuerpo = None
         uso = cuerpo.get("usage") if isinstance(cuerpo, dict) else None
         # Antes de validar: los tokens se gastaron igual. Un 200 sin usage legible se cobra al techo.
-        legible = isinstance(uso, dict) and all(isinstance(uso.get(k), int) for k in techo)
+        # type() y no isinstance: True es int. Negativos tampoco son un usage creíble.
+        legible = isinstance(uso, dict) and all(type(uso.get(k)) is int and uso[k] >= 0 for k in techo)
         self._registrar(uso if legible else techo)
         if not isinstance(cuerpo, dict):
             raise SalidaJuezInvalida("cuerpo_no_objeto")
@@ -96,7 +100,10 @@ class JuezClaude:
 
     @staticmethod
     def _veredicto(cuerpo: dict) -> Veredicto:
-        entradas = [b.get("input") for b in cuerpo.get("content") or []
+        bloques = cuerpo.get("content") or []
+        if not isinstance(bloques, list) or not all(isinstance(b, dict) for b in bloques):
+            raise SalidaJuezInvalida("content_malformado")
+        entradas = [b.get("input") for b in bloques
                     if b.get("type") == "tool_use" and b.get("name") == HERRAMIENTA["name"]]
         if len(entradas) != 1 or not isinstance(entradas[0], dict):
             raise SalidaJuezInvalida(f"sin tool_use (stop_reason={cuerpo.get('stop_reason')})")
