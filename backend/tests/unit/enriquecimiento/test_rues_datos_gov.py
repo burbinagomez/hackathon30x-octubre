@@ -56,7 +56,7 @@ def _verificador(respuesta, intentos=2, naturales=0):
 def test_match_exacto_unico_en_la_misma_ciudad_es_juridica():
     v, _, _ = _verificador([_fila()])
 
-    r = v.verificar(uuid4(), NOMBRE, "Bogotá")
+    r = v.verificar(uuid4(), NOMBRE, "Bogotá", "CO")
 
     assert (r.tipo_titular, r.motivo) == ("juridica", "match_unico")
     c = r.constancia
@@ -67,13 +67,13 @@ def test_match_exacto_unico_en_la_misma_ciudad_es_juridica():
 def test_el_nombre_y_la_ciudad_se_comparan_normalizados():
     v, _, _ = _verificador([_fila(razon="TRANSPORTES ANDINOS LTDA")])
 
-    assert v.verificar(uuid4(), "  transportes   ANDÍNOS S.A.S. ", "BOGOTA D.C.").tipo_titular == "juridica"
+    assert v.verificar(uuid4(), "  transportes   ANDÍNOS S.A.S. ", "BOGOTA D.C.", "CO").tipo_titular == "juridica"
 
 
 def test_dos_nit_distintos_con_el_mismo_nombre_en_la_ciudad_es_desconocido():
     v, _, _ = _verificador([_fila("900111222"), _fila("900333444", razon="TRANSPORTES ANDINOS LTDA")])
 
-    r = v.verificar(uuid4(), NOMBRE, "Bogotá")
+    r = v.verificar(uuid4(), NOMBRE, "Bogotá", "CO")
 
     assert (r.tipo_titular, r.motivo) == ("desconocido", "ambiguo")
     assert r.constancia.candidatos == 2 and r.constancia.nit is None
@@ -82,13 +82,13 @@ def test_dos_nit_distintos_con_el_mismo_nombre_en_la_ciudad_es_desconocido():
 def test_varias_matriculas_del_mismo_nit_son_un_solo_candidato():
     v, _, _ = _verificador([_fila("900111222"), _fila("900111222", razon="TRANSPORTES ANDINOS SAS")])
 
-    assert v.verificar(uuid4(), NOMBRE, "Bogotá").tipo_titular == "juridica"
+    assert v.verificar(uuid4(), NOMBRE, "Bogotá", "CO").tipo_titular == "juridica"
 
 
 def test_la_misma_razon_social_en_otra_ciudad_es_desconocido():
     v, _, _ = _verificador([_fila(camara="14")])  # cámara de Girardot
 
-    r = v.verificar(uuid4(), NOMBRE, "Bogotá")
+    r = v.verificar(uuid4(), NOMBRE, "Bogotá", "CO")
 
     assert (r.tipo_titular, r.motivo) == ("desconocido", "sin_match")
     assert r.constancia.nit is None  # sin match no se guarda a quién se parecía
@@ -98,7 +98,7 @@ def test_otra_empresa_con_el_mismo_nombre_en_otra_ciudad_no_vuelve_ambiguo_el_ma
     # La regla del dueño: "una sola empresa en la misma ciudad".
     v, _, _ = _verificador([_fila("900111222", camara="04"), _fila("900333444", camara="14")])
 
-    r = v.verificar(uuid4(), NOMBRE, "Bogotá")
+    r = v.verificar(uuid4(), NOMBRE, "Bogotá", "CO")
 
     assert (r.tipo_titular, r.constancia.nit) == ("juridica", "900111222")
 
@@ -106,14 +106,14 @@ def test_otra_empresa_con_el_mismo_nombre_en_otra_ciudad_no_vuelve_ambiguo_el_ma
 def test_una_camara_sin_municipio_conocido_nunca_matchea():
     v, _, _ = _verificador([_fila(camara="99")])
 
-    assert v.verificar(uuid4(), NOMBRE, "Bogotá").tipo_titular == "desconocido"
+    assert v.verificar(uuid4(), NOMBRE, "Bogotá", "CO").tipo_titular == "desconocido"
 
 
 @pytest.mark.parametrize("ciudad", [None, "", "   "])
 def test_sin_ciudad_es_desconocido_y_ni_siquiera_consulta(ciudad):
     v, pedidas, costos = _verificador([_fila()])
 
-    r = v.verificar(uuid4(), NOMBRE, ciudad)
+    r = v.verificar(uuid4(), NOMBRE, ciudad, "CO")
 
     assert (r.tipo_titular, r.motivo) == ("desconocido", "sin_ciudad")
     assert r.constancia.motivo == "sin_ciudad"
@@ -123,21 +123,21 @@ def test_sin_ciudad_es_desconocido_y_ni_siquiera_consulta(ciudad):
 def test_un_nombre_que_solo_es_sufijo_no_se_consulta():
     v, pedidas, _ = _verificador([_fila()])
 
-    assert v.verificar(uuid4(), "S.A.S.", "Bogotá").tipo_titular == "desconocido"
+    assert v.verificar(uuid4(), "S.A.S.", "Bogotá", "CO").tipo_titular == "desconocido"
     assert pedidas == []
 
 
 def test_un_nombre_parecido_no_es_exacto():
     v, _, _ = _verificador([_fila(razon="TRANSPORTES ANDINOS DEL SUR SAS"), _fila("900333444", razon="ANDINOS")])
 
-    assert v.verificar(uuid4(), NOMBRE, "Bogotá").tipo_titular == "desconocido"
+    assert v.verificar(uuid4(), NOMBRE, "Bogotá", "CO").tipo_titular == "desconocido"
 
 
 def test_si_la_respuesta_llega_al_tope_no_se_puede_afirmar_que_es_unica():
     filas = [_fila("9001%05d" % i, razon=f"TRANSPORTES ANDINOS {i} SAS") for i in range(LIMITE_COINCIDENCIAS - 1)]
     v, _, _ = _verificador(filas + [_fila()])  # exactamente el tope: pudo haber más sin traer
 
-    r = v.verificar(uuid4(), NOMBRE, "Bogotá")
+    r = v.verificar(uuid4(), NOMBRE, "Bogotá", "CO")
 
     assert (r.tipo_titular, r.motivo) == ("desconocido", "ambiguo")
 
@@ -145,13 +145,13 @@ def test_si_la_respuesta_llega_al_tope_no_se_puede_afirmar_que_es_unica():
 def test_sin_resultados_es_desconocido():
     v, _, _ = _verificador([])
 
-    assert v.verificar(uuid4(), NOMBRE, "Bogotá").motivo == "sin_match"
+    assert v.verificar(uuid4(), NOMBRE, "Bogotá", "CO").motivo == "sin_match"
 
 
 def test_la_fuente_caida_es_desconocido_no_una_excepcion():
     v, _, _ = _verificador(lambda r: httpx.Response(503, json={}))
 
-    r = v.verificar(uuid4(), NOMBRE, "Bogotá")
+    r = v.verificar(uuid4(), NOMBRE, "Bogotá", "CO")
 
     assert (r.tipo_titular, r.motivo) == ("desconocido", "fuente_no_disponible")
     assert r.constancia.motivo == "fuente_no_disponible"
@@ -163,20 +163,20 @@ def test_el_timeout_es_desconocido():
 
     v, _, _ = _verificador(tarda)
 
-    assert v.verificar(uuid4(), NOMBRE, "Bogotá").motivo == "fuente_no_disponible"
+    assert v.verificar(uuid4(), NOMBRE, "Bogotá", "CO").motivo == "fuente_no_disponible"
 
 
 def test_una_respuesta_ilegible_es_desconocido():
     v, _, _ = _verificador([{"nit": ["no", "es", "texto"]}, "basura"])
 
-    assert v.verificar(uuid4(), NOMBRE, "Bogotá").tipo_titular == "desconocido"
+    assert v.verificar(uuid4(), NOMBRE, "Bogotá", "CO").tipo_titular == "desconocido"
 
 
 def test_cada_request_escribe_su_costo_con_el_lead_antes_de_devolver():
     v, pedidas, costos = _verificador([_fila()])
     lead = uuid4()
 
-    v.verificar(lead, NOMBRE, "Bogotá")
+    v.verificar(lead, NOMBRE, "Bogotá", "CO")
 
     assert len(pedidas) == len(costos.filas) == 2  # la búsqueda por razón social y el conteo de naturales
     c = costos.filas[0]
@@ -188,7 +188,7 @@ def test_la_falla_tambien_cobra_cada_intento():
     v, pedidas, costos = _verificador(lambda r: httpx.Response(503, json={}), intentos=2)
     lead = uuid4()
 
-    v.verificar(lead, NOMBRE, "Bogotá")
+    v.verificar(lead, NOMBRE, "Bogotá", "CO")
 
     assert len(pedidas) == len(costos.filas) == 2
     assert {c.lead_id for c in costos.filas} == {lead}
@@ -197,7 +197,7 @@ def test_la_falla_tambien_cobra_cada_intento():
 def test_la_consulta_lleva_el_nombre_normalizado_y_solo_campos_de_empresa():
     v, pedidas, _ = _verificador([_fila()])
 
-    v.verificar(uuid4(), "Transportes Andínos S.A.S.", "Bogotá")
+    v.verificar(uuid4(), "Transportes Andínos S.A.S.", "Bogotá", "CO")
 
     params = pedidas[0].url.params
     assert "'%TRANSPORTES ANDINOS%'" in params["$where"]
@@ -210,7 +210,7 @@ def test_el_nombre_del_lead_no_sale_en_los_logs(caplog, respuesta):
     v, _, _ = _verificador(respuesta)
     secreto = "Zxqvk Ficticia Andina"
 
-    v.verificar(uuid4(), secreto, "Bogotá")
+    v.verificar(uuid4(), secreto, "Bogotá", "CO")
 
     texto = caplog.text.upper() + "".join(str(r.args) for r in caplog.records).upper()
     assert "ZXQVK" not in texto
@@ -221,7 +221,7 @@ def test_el_nombre_no_sale_en_el_mensaje_de_error_interno(caplog):
     v, _, _ = _verificador(lambda r: httpx.Response(500, json={"error": "Zxqvk"}))
     caplog.set_level(logging.DEBUG)
 
-    v.verificar(uuid4(), "Zxqvk Ficticia", "Bogotá")
+    v.verificar(uuid4(), "Zxqvk Ficticia", "Bogotá", "CO")
 
     assert "ZXQVK" not in caplog.text.upper()
 
@@ -230,7 +230,7 @@ def test_una_persona_natural_homonima_en_la_camara_vuelve_ambiguo_el_match():
     # "Juan Pérez" (OSM) y "JUAN PEREZ SAS": si existe la natural matriculada en la misma cámara, no hay certeza.
     v, pedidas, _ = _verificador([_fila(razon="JUAN PEREZ SAS")], naturales=1)
 
-    r = v.verificar(uuid4(), "Juan Pérez", "Bogotá")
+    r = v.verificar(uuid4(), "Juan Pérez", "Bogotá", "CO")
 
     assert (r.tipo_titular, r.motivo) == ("desconocido", "ambiguo")
     assert r.constancia.naturales_homonimas == 1 and r.constancia.nit is None
@@ -239,13 +239,13 @@ def test_una_persona_natural_homonima_en_la_camara_vuelve_ambiguo_el_match():
 def test_sin_naturales_homonimas_el_match_unico_sigue_siendo_juridica():
     v, _, _ = _verificador([_fila(razon="JUAN PEREZ SAS")], naturales=0)
 
-    assert v.verificar(uuid4(), "Juan Pérez", "Bogotá").tipo_titular == "juridica"
+    assert v.verificar(uuid4(), "Juan Pérez", "Bogotá", "CO").tipo_titular == "juridica"
 
 
 def test_el_conteo_de_naturales_es_solo_un_count_filtrado_por_la_camara_de_la_ciudad():
     v, pedidas, _ = _verificador([_fila(razon="JUAN PEREZ SAS")])
 
-    v.verificar(uuid4(), "Juan Pérez", "Bogotá")
+    v.verificar(uuid4(), "Juan Pérez", "Bogotá", "CO")
 
     conteo = [p for p in pedidas if "count(" in p.url.params["$select"]]
     assert len(conteo) == 1
@@ -259,7 +259,7 @@ def test_el_conteo_de_naturales_tambien_cobra_su_request_con_el_lead():
     v, pedidas, costos = _verificador([_fila(razon="JUAN PEREZ SAS")])
     lead = uuid4()
 
-    v.verificar(lead, "Juan Pérez", "Bogotá")
+    v.verificar(lead, "Juan Pérez", "Bogotá", "CO")
 
     assert len(pedidas) == len(costos.filas) == 2
     assert {c.lead_id for c in costos.filas} == {lead}
@@ -268,7 +268,7 @@ def test_el_conteo_de_naturales_tambien_cobra_su_request_con_el_lead():
 def test_sin_match_no_se_gasta_el_conteo_de_naturales():
     v, pedidas, _ = _verificador([_fila(camara="14")])
 
-    v.verificar(uuid4(), NOMBRE, "Bogotá")
+    v.verificar(uuid4(), NOMBRE, "Bogotá", "CO")
 
     assert len(pedidas) == 1
 
@@ -281,4 +281,15 @@ def test_si_el_conteo_de_naturales_falla_es_desconocido():
 
     v, _, _ = _verificador(falla_el_conteo)
 
-    assert v.verificar(uuid4(), NOMBRE, "Bogotá").motivo == "fuente_no_disponible"
+    assert v.verificar(uuid4(), NOMBRE, "Bogotá", "CO").motivo == "fuente_no_disponible"
+
+
+@pytest.mark.parametrize("pais", ["MX", "PE", "BR", "", "co"])
+def test_un_pais_que_no_es_co_es_desconocido_sin_request_ni_costo(pais):
+    v, pedidas, costos = _verificador([_fila()])
+
+    r = v.verificar(uuid4(), NOMBRE, "Bogotá", pais)
+
+    assert (r.tipo_titular, r.motivo) == ("desconocido", "pais_no_soportado")
+    assert r.constancia.motivo == "pais_no_soportado"
+    assert pedidas == [] and costos.filas == []

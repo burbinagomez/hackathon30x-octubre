@@ -40,7 +40,7 @@ def test_desconectado_por_config_queda_el_stub(tmp_path):
 
 
 def test_el_stub_sigue_diciendo_desconocido(tmp_path):
-    v = _verificador(_yaml(tmp_path, rues=False, croma=True)).verificar(uuid4(), "Transportes Andinos", "Bogotá")
+    v = _verificador(_yaml(tmp_path, rues=False, croma=True)).verificar(uuid4(), "Transportes Andinos", "Bogotá", "CO")
 
     assert (v.tipo_titular, v.motivo) == ("desconocido", "sin_match")
 
@@ -54,7 +54,7 @@ def test_el_verificador_real_pide_el_timeout_corto_y_un_solo_intento():
     transporte = httpx.MockTransport(lambda r: pedidas.append(r) or httpx.Response(503, json={}))
     v = adaptadores_enriquecer(AJUSTES, RegistroCostosFalso(), cargar_tarifas(), transporte, ruta_yaml=FUENTES)[0]
 
-    r = v.verificar(uuid4(), "Transportes Andinos", "Bogotá")
+    r = v.verificar(uuid4(), "Transportes Andinos", "Bogotá", "CO")
 
     assert r.motivo == "fuente_no_disponible" and len(pedidas) == 1  # un lead no retiene al worker con reintentos
 

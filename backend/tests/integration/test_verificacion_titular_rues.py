@@ -50,15 +50,15 @@ def _rues(por_nombre: dict[str, list[dict] | int], naturales: dict[str, int] | N
     return httpx.MockTransport(responder), pedidas
 
 
-def _empresa(nombre: str, ciudad: str | None = "Bogotá") -> EmpresaCruda:
-    return EmpresaCruda(pais="CO", nombre=nombre, fuente="osm_overpass", url_origen="https://ejemplo.invalid/osm",
+def _empresa(nombre: str, ciudad: str | None = "Bogotá", pais: str = "CO") -> EmpresaCruda:
+    return EmpresaCruda(pais=pais, nombre=nombre, fuente="osm_overpass", url_origen="https://ejemplo.invalid/osm",
                         as_of=datetime(2026, 10, 1, tzinfo=UTC), actividad=Actividad("4923", "CIIU"), ciudad=ciudad)
 
 
 def _sembrar(repo, admin, cifrador, tenant, busqueda: UUID, nombre: str, ciudad: str | None = "Bogotá",
-             telefono: str | None = TELEFONO) -> UUID:
+             telefono: str | None = TELEFONO, pais: str = "CO") -> UUID:
     """Un lead de OSM: tipo desconocido, con teléfono publicado en OSM."""
-    e = _empresa(nombre, ciudad)
+    e = _empresa(nombre, ciudad, pais)
     lead_id, _ = repo.obtener_o_crear_lead(e, "odbl")
     repo.agregar_lead_fuente(lead_id, busqueda, e, "odbl")
     if telefono:
@@ -225,3 +225,14 @@ def test_una_natural_homonima_deja_el_lead_desconocido_y_la_constancia_lo_dice(a
     assert _lead(admin, lead)[:3] == ("desconocido", False, "persona_natural")
     (entrada,) = _solicitudes(admin, lead)
     assert (entrada["motivo"], entrada["naturales_homonimas"]) == ("ambiguo", 1) and "nit" not in entrada
+
+
+def test_un_lead_de_mx_no_se_verifica_contra_el_rues_colombiano(admin, tenants, cifrador, mundo):
+    repo, costos, busqueda = mundo
+    lead = _sembrar(repo, admin, cifrador, tenants["a"], busqueda, "Transportes Andinos", pais="MX")
+    transporte, pedidas = _rues({"TRANSPORTES ANDINOS": [_fila("900111222", "TRANSPORTES ANDINOS SAS")]})
+
+    _enriquecer(repo, costos, busqueda, transporte)
+
+    assert pedidas == [] and _lead(admin, lead)[:2] == ("desconocido", False)
+    assert _solicitudes(admin, lead)[0]["motivo"] == "pais_no_soportado"

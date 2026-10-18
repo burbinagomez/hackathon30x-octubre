@@ -233,13 +233,13 @@ class RepositorioLeadsPostgres:
             None if blob is None else (self._cifrador.descifrar(columna, bytes(blob), self._tenant_id, lead_id), canal))
         with self._uow() as c:
             filas = c.execute(text(
-                "SELECT DISTINCT l.id, l.tipo_titular, l.nombre, l.nombre_cifrado, l.ciudad, l.web, l.actividad_codigo, "
+                "SELECT DISTINCT l.id, l.pais, l.tipo_titular, l.nombre, l.nombre_cifrado, l.ciudad, l.web, l.actividad_codigo, "
                 "l.telefono_cifrado, l.telefono_canal, l.email_cifrado, l.email_canal, b.descripcion_icp, l.creado_en FROM leads l "
                 "JOIN lead_fuentes lf ON lf.lead_id = l.id JOIN busquedas b ON b.id = lf.busqueda_id "
                 "WHERE lf.busqueda_id = :b AND l.enriquecido_en IS NULL ORDER BY l.creado_en, l.id"),
                 {"b": busqueda_id}).all()
         return [LeadParaEnriquecer(
-            id=f.id, tipo_titular=f.tipo_titular, ciudad=f.ciudad, web=f.web, actividad=f.actividad_codigo,
+            id=f.id, pais=f.pais, tipo_titular=f.tipo_titular, ciudad=f.ciudad, web=f.web, actividad=f.actividad_codigo,
             descripcion_icp=f.descripcion_icp,
             telefono=contacto("telefono_cifrado", f.telefono_cifrado, f.telefono_canal, f.id),
             email=contacto("email_cifrado", f.email_cifrado, f.email_canal, f.id),

@@ -31,7 +31,9 @@ class RuesDatosGov:
         self._municipios = municipio_de_camara
         self._tope = tope
 
-    def verificar(self, lead_id: UUID, nombre_normalizado: str, ciudad: str | None) -> VerificacionTitular:
+    def verificar(self, lead_id: UUID, nombre_normalizado: str, ciudad: str | None, pais: str) -> VerificacionTitular:
+        if pais != "CO":  # el RUES es colombiano: una ciudad que coincida en otro país no prueba nada
+            return _desconocido("pais_no_soportado")
         nombre = normalizar_nombre(nombre_normalizado)
         ciudad_lead = normalizar_ciudad(ciudad or "")
         if not ciudad_lead:  # sin ciudad no hay segundo dato que desambigüe: ni se consulta

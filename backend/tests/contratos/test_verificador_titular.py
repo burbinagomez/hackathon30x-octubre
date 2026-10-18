@@ -72,7 +72,7 @@ def test_el_adaptador_armado_es_el_declarado_en_el_registro(clave, tmp_path):
 def test_siempre_devuelve_una_verificacion_y_nunca_lanza(clave, modo, tmp_path):
     verificador, _, _ = _armar(clave, tmp_path, modo)
 
-    r = verificador.verificar(uuid4(), NOMBRE_SECRETO, "Bogotá")
+    r = verificador.verificar(uuid4(), NOMBRE_SECRETO, "Bogotá", "CO")
 
     assert isinstance(r, VerificacionTitular)
     assert r.tipo_titular in {"juridica", "desconocido"}
@@ -83,7 +83,7 @@ def test_siempre_devuelve_una_verificacion_y_nunca_lanza(clave, modo, tmp_path):
 def test_sin_evidencia_de_la_fuente_falla_cerrado(clave, modo, tmp_path):
     verificador, _, _ = _armar(clave, tmp_path, modo)
 
-    assert verificador.verificar(uuid4(), NOMBRE_SECRETO, "Bogotá").tipo_titular == "desconocido"
+    assert verificador.verificar(uuid4(), NOMBRE_SECRETO, "Bogotá", "CO").tipo_titular == "desconocido"
 
 
 @pytest.mark.parametrize("ciudad", [None, ""])
@@ -91,7 +91,7 @@ def test_sin_evidencia_de_la_fuente_falla_cerrado(clave, modo, tmp_path):
 def test_sin_ciudad_nunca_es_juridica(clave, ciudad, tmp_path):
     verificador, _, _ = _armar(clave, tmp_path, "match")
 
-    assert verificador.verificar(uuid4(), NOMBRE_SECRETO, ciudad).tipo_titular == "desconocido"
+    assert verificador.verificar(uuid4(), NOMBRE_SECRETO, ciudad, "CO").tipo_titular == "desconocido"
 
 
 @pytest.mark.parametrize("modo", MODOS)
@@ -99,7 +99,7 @@ def test_sin_ciudad_nunca_es_juridica(clave, ciudad, tmp_path):
 def test_juridica_solo_con_match_unico_y_con_constancia_coherente(clave, modo, tmp_path):
     verificador, _, _ = _armar(clave, tmp_path, modo)
 
-    r = verificador.verificar(uuid4(), NOMBRE_SECRETO, "Bogotá")
+    r = verificador.verificar(uuid4(), NOMBRE_SECRETO, "Bogotá", "CO")
 
     if r.tipo_titular == "juridica":
         assert r.motivo == "match_unico" and r.constancia is not None and r.constancia.nit
@@ -114,7 +114,7 @@ def test_juridica_solo_con_match_unico_y_con_constancia_coherente(clave, modo, t
 def test_lo_que_no_es_match_no_repite_el_nombre_del_lead(clave, modo, tmp_path):
     verificador, _, _ = _armar(clave, tmp_path, modo)
 
-    assert "zxqvk" not in repr(verificador.verificar(uuid4(), NOMBRE_SECRETO, "Bogotá")).lower()
+    assert "zxqvk" not in repr(verificador.verificar(uuid4(), NOMBRE_SECRETO, "Bogotá", "CO")).lower()
 
 
 @pytest.mark.parametrize("modo", MODOS)
@@ -123,7 +123,17 @@ def test_cada_request_deja_su_fila_de_costos_con_el_lead_antes_de_devolver(clave
     verificador, pedidas, costos = _armar(clave, tmp_path, modo)
     lead = uuid4()
 
-    verificador.verificar(lead, NOMBRE_SECRETO, "Bogotá")
+    verificador.verificar(lead, NOMBRE_SECRETO, "Bogotá", "CO")
 
     assert len(costos.filas) >= len(pedidas)
     assert {f.lead_id for f in costos.filas} <= {lead}
+
+
+@pytest.mark.parametrize("pais", ["MX", "PE", "BR"])
+@pytest.mark.parametrize("clave", CLAVES)
+def test_fuera_de_co_nunca_es_juridica_y_no_consulta(clave, pais, tmp_path):
+    verificador, pedidas, costos = _armar(clave, tmp_path, "match")
+
+    r = verificador.verificar(uuid4(), NOMBRE_SECRETO, "Bogotá", pais)
+
+    assert r.tipo_titular == "desconocido" and pedidas == [] and costos.filas == []

@@ -56,7 +56,7 @@ class EnriquecerLead:
         tipo = lead.tipo_titular
         constancia = None
         if tipo == "desconocido":
-            v = self._verificador.verificar(lead.id, lead.nombre, lead.ciudad)
+            v = self._verificador.verificar(lead.id, lead.nombre, lead.ciudad, lead.pais)
             log.info("verificador_titular: %s", v.motivo)  # solo el motivo: nunca el nombre del lead
             tipo, constancia = v.tipo_titular, v.constancia  # la evidencia va a `cumplimiento`, no al lead
         telefono, email = lead.telefono, lead.email

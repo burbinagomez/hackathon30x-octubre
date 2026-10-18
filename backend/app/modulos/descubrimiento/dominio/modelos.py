@@ -71,6 +71,7 @@ class LeadParaEnriquecer:
     web: str | None
     actividad: str | None
     descripcion_icp: str | None  # de la búsqueda; None = no se clasifica
+    pais: str  # el verificador de titular solo cubre CO
     telefono: Contacto | None = None
     email: Contacto | None = None
 

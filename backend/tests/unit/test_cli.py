@@ -187,7 +187,7 @@ class RepoParaEnriquecer(RepositorioLeadsFalso):
 
 def _lead_con_web():
     return LeadParaEnriquecer(id=uuid4(), tipo_titular="juridica", nombre="Transportes Andinos", ciudad="Bogotá",
-                              web="andinos.invalid", actividad="4923", descripcion_icp="transporte de carga")
+                              web="andinos.invalid", actividad="4923", descripcion_icp="transporte de carga", pais="CO")
 
 
 def _enriquecer(persistencia, argv=None):
@@ -236,4 +236,4 @@ def test_verificador_bloqueado_no_asciende_a_juridica(entorno, monkeypatch):
     # P1 abierto: ascender sin consultar pasaría el nombre de una persona natural a claro.
     monkeypatch.setenv("CIFRADO_KEY", base64.b64encode(b"k" * 32).decode())
     verificador, *_ = _adaptadores_enriquecer(Settings(), RegistroCostosFalso(), cargar_tarifas())
-    assert verificador.verificar(uuid4(), "doña rosa gomez", None).tipo_titular == "desconocido"
+    assert verificador.verificar(uuid4(), "doña rosa gomez", None, "CO").tipo_titular == "desconocido"

@@ -18,7 +18,8 @@ class ContactoPublicado:
 @dataclass(frozen=True)
 class VerificacionTitular:
     tipo_titular: Literal["juridica", "desconocido"]
-    motivo: Literal["match_unico", "sin_match", "ambiguo", "matricula_inactiva", "sin_ciudad", "fuente_no_disponible"]
+    motivo: Literal["match_unico", "sin_match", "ambiguo", "matricula_inactiva", "sin_ciudad", "fuente_no_disponible",
+                     "pais_no_soportado"]
     constancia: ConstanciaTitular | None = None  # va a `cumplimiento`; el motivo, además, al log de la corrida
 
 
@@ -33,7 +34,7 @@ class EnriquecedorContacto(Protocol):  # sitio_web
 
 
 class VerificadorTitular(Protocol):  # rues_datos_gov_co (real) o croma_rues_co (stub que siempre dice desconocido)
-    def verificar(self, lead_id: UUID, nombre_normalizado: str, ciudad: str | None) -> VerificacionTitular: ...
+    def verificar(self, lead_id: UUID, nombre_normalizado: str, ciudad: str | None, pais: str) -> VerificacionTitular: ...
 
 
 class ClasificadorEncaje(Protocol):  # jev
