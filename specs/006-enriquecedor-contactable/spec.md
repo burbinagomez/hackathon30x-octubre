@@ -169,3 +169,39 @@ Este slice corre `uv run python -m evals.run --eval encaje_icp` con el `jev` rea
 - **`sitio_web` contra sitios reales en la demo:** timeouts o bloqueos de WAF pueden dejar varios leads sin contacto nuevo. Mitigación: el fetch fallido no es un error (ver Fuera del alcance), el lead se queda con lo que ya tenía.
 - **Compartir el contador de Croma con la 002/003:** si una búsqueda grande ya gastó cerca del límite de 100 req/24h, `croma_rues_co` puede agotarlo a mitad de la corrida de enriquecimiento. El mismo `LimiteFuenteAgotado` del 002 corta la corrida; los leads ya procesados quedan guardados (no es transaccional sobre toda la corrida).
 - **Cuándo cortar:** si el tiempo no alcanza para los dos adaptadores, `sitio_web` entra primero (es el que sube la confianza del canal y lo necesita más gente, sin país restringido) y `croma_rues_co` queda para rematar el `desconocido` de OSM; si ninguno de los dos entra, `jev_classify` y `contactable` igual se implementan sobre lo que ya hay (`tipo_titular` de Supersociedades/registro), y el `desconocido` de OSM queda documentado como pendiente explícito del 007.
+
+## Enmienda 2026-10-18: `croma_rues_co` se reemplaza por `rues_datos_gov_co` (nombre + ciudad)
+
+**Por qué.** Con datos reales no sale ningún lead hacia Dapta: los de OSM traen teléfono y web, pero `CromaRues` es un stub que siempre responde `desconocido` (el endpoint de Croma busca por NIT, no por nombre, P1/D11); los de datos.gov.co y Supersociedades son jurídicas pero no traen teléfono.
+
+**Decisión de cumplimiento del dueño (Daniel Mejía, 2026-10-18), textual:** "Sí, nombre + ciudad".
+
+**Regla.** Un lead `desconocido` pasa a `juridica` si y solo si su **nombre normalizado coincide EXACTO con la razón social normalizada de una sola empresa** del RUES de datos.gov.co (`c82u-588k`, jurídica y matrícula `ACTIVA`) **en la misma ciudad**. "Una sola" se cuenta por NIT distinto (varias matrículas del mismo NIT son una). Falla cerrado: se queda `desconocido` (= natural, no se contacta) si
+- hay más de un NIT que cumple (`ambiguo`);
+- ninguno cumple, o el nombre no es exacto (`sin_match`);
+- el lead no trae ciudad (`sin_ciudad`; no se consulta ni se cobra);
+- la ciudad no coincide, o la cámara del candidato no tiene municipio en `config/camaras_co.yaml` (`sin_match`);
+- la búsqueda devuelve el tope de 100 filas (`ambiguo`: la respuesta pudo cortar un segundo candidato);
+- la fuente falla o agota el timeout (`fuente_no_disponible`): el resultado es `desconocido`, **no** frena el enriquecimiento del resto.
+
+**Normalización (la misma para nombre y ciudad).** Mayúsculas, sin tildes, sin puntuación (los puntos se borran: `S.A.S.` -> `SAS`; el resto de la puntuación separa palabras), espacios colapsados.
+- **Sufijos societarios (`SAS`, `SA`, `LTDA`, `LTD`, `EU`, `SCA`, `SCS`) al final del nombre: SE IGNORAN** al comparar, en los dos lados. Razón: OSM casi nunca los trae ("Transportes Andinos") y el RUES siempre ("TRANSPORTES ANDINOS S.A.S."); sin ignorarlos no matchea ningún OSM real. Es seguro porque la unicidad se cuenta después: "X LTDA" y "X SAS" en la misma ciudad son dos NIT, y quedan `ambiguo`. Solo al final y repetidos (`X S.A.S. LTDA`); un nombre que quedaría vacío (`SAS`) no se consulta.
+- **Ciudad:** además se ignora un `D.C.` final (`Bogotá D.C.` = `Bogotá`).
+- El RUES (`c82u-588k`) **no trae municipio** (verificado en la 011): la "ciudad del RUES" es el `municipio_sede` de la cámara (`codigo_camara` -> `config/camaras_co.yaml`). Consecuencia consciente: un negocio de Chía registrado en la Cámara de Bogotá queda `desconocido`, y una ciudad cuya cámara no esté en el YAML nunca matchea. Menos cobertura, nunca un falso positivo.
+- La regla literal pide una sola empresa **en la misma ciudad**: otra empresa con el mismo nombre en una ciudad distinta no vuelve ambiguo el match.
+
+**Evidencia en `cumplimiento`.** Toda verificación (también las que terminan `desconocido`) agrega una entrada a `cumplimiento.solicitudes` (sin DDL): `tipo` (`paso_a_claro` si sube, `verificacion_titular` si no), `motivo`, `fuente: datos_gov_co_rues`, `dataset: c82u-588k`, `ts` y, si hay match, `nit`, `razon_social` y `municipio`; si es `ambiguo`, `candidatos` (conteo). **Nunca** teléfono, email ni el nombre del lead.
+
+**Costos.** Cada request a datos.gov.co escribe `socrata_descarga` (segundos de cómputo a `computo_seg_usd`, valor de lista, igual que el descubrimiento de la 011), `proveedor='datos.gov.co'`, con `lead_id` set, **antes de devolver** y por intento. `fuente=NULL`: es costo de enriquecimiento, atribuido al lead y no a la fuente de descubrimiento (misma decisión de esta spec para `croma_consulta`, `web_fetch` y `jev_tokens`); el dataset queda en la evidencia.
+
+**Privacidad.** El nombre del lead nunca se loguea (el log de la corrida lleva solo el `motivo`); los mensajes de error llevan solo la clave de la fuente y el status.
+
+**Config.** `enriquecedores.rues_datos_gov_co` en `fuentes.yaml` (`habilitado: true`). `croma_rues_co` pasa a `habilitado: false`. `composicion.py` elige el real cuando está habilitado y deja el stub (`CromaRues`, siempre `desconocido`) cuando no.
+
+**Terminado cuando (tests que hoy fallan):**
+- `tests/unit/enriquecimiento/test_normalizar_titular.py`: mayúsculas/tildes/puntuación/espacios; sufijos ignorados solo al final; nombre vacío; `D.C.` en ciudad.
+- `tests/unit/enriquecimiento/test_rues_datos_gov.py`: match único -> `juridica`; dos NIT -> `desconocido`; mismo NIT en dos matrículas -> `juridica`; otra ciudad; sin ciudad (sin request, sin costo); nombre no exacto; tope de 100; fuente caída y timeout -> `desconocido`; costos con `lead_id`; el nombre no aparece en logs.
+- `tests/contratos/test_verificador_titular.py`: suite de contrato del puerto `VerificadorTitular` sobre el registro (el stub y el real).
+- `tests/integration/test_enriquecimiento.py`: la evidencia queda en `cumplimiento`; la fuente caída de un lead no frena al siguiente; un lead OSM con teléfono que matchea queda contactable y aparece en `GET /calificaciones/exportar`.
+
+**Fuera del alcance:** ampliar `camaras_co.yaml` a las 58 cámaras (T054 de la 011); países distintos de CO; desambiguar por CIIU o dirección.
