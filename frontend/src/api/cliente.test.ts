@@ -2,6 +2,7 @@ import { http, HttpResponse } from "msw";
 import { afterEach, expect, test, vi } from "vitest";
 import { iniciarSesion } from "../test/fixtures";
 import { server } from "../test/servidor";
+import { auth, estado } from "../test/supabaseFalso";
 import { pedir } from "./cliente";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -33,15 +34,16 @@ test("un_401_lleva_al_login_y_borra_el_token", async () => {
   await pedir("/tablero/fuentes").catch(() => undefined);
 
   expect(assign).toHaveBeenCalledWith("/login");
-  expect(sessionStorage.getItem("token")).toBeNull();
+  expect(auth.signOut).toHaveBeenCalled();
+  expect(estado.sesion).toBeNull();
 });
 
 test("un_401_sin_sesion_no_redirige_y_falla", async () => {
-  // El login con clave mala también da 401: redirigir a /login recargaría la pantalla donde ya está.
+  // Sin sesión, redirigir a /login recargaría la pantalla donde ya está.
   const assign = espiarNavegacion();
-  server.use(http.post("*/auth/sesion", () => new HttpResponse(null, { status: 401 })));
+  server.use(http.get("*/usuarios/me", () => new HttpResponse(null, { status: 401 })));
 
-  await expect(pedir("/auth/sesion", { metodo: "POST", cuerpo: {} })).rejects.toMatchObject({
+  await expect(pedir("/usuarios/me")).rejects.toMatchObject({
     estado: 401,
   });
   expect(assign).not.toHaveBeenCalled();

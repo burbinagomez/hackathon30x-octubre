@@ -2,6 +2,7 @@ import { http, HttpResponse } from "msw";
 import { expect } from "vitest";
 import { screen } from "@testing-library/react";
 import { server } from "./servidor";
+import { estado } from "./supabaseFalso";
 
 /** Campo por etiqueta; si falta, falla con un assert y no con una excepción de Testing Library. */
 export function campo(etiqueta: string): HTMLElement {
@@ -17,11 +18,11 @@ export function boton(nombre: string): HTMLElement {
   return el as HTMLElement;
 }
 
-/** Lo que el front guarda tras el login (spec, flujo principal 1). */
+/** Sesión de Supabase abierta (token de prueba) y los idiomas que el front guarda tras GET /usuarios/me. */
 export function iniciarSesion(
   idiomas: { usuario?: "es" | "en" | null; tenant?: "es" | "en" } = {},
 ) {
-  sessionStorage.setItem("token", "jwt-de-prueba");
+  estado.sesion = { access_token: "jwt-de-prueba" };
   const usuario = idiomas.usuario ?? null;
   if (usuario) sessionStorage.setItem("idioma_usuario", usuario);
   sessionStorage.setItem("idioma_tenant", idiomas.tenant ?? "es");

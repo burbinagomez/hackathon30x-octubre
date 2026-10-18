@@ -4,6 +4,7 @@ import { expect, test } from "vitest";
 import i18n from "../i18n";
 import { boton, campo, espiarFijarIdioma } from "../test/fixtures";
 import { server } from "../test/servidor";
+import { auth, estado } from "../test/supabaseFalso";
 import Login from "./Login";
 
 function enviar(email: string, clave: string) {
@@ -27,28 +28,34 @@ test("selector_sin_sesion_no_guarda", async () => {
   expect(sessionStorage.getItem("idioma_usuario")).toBeNull();
 });
 
-test("login_guarda_la_sesion_y_va_a_nueva_busqueda", async () => {
-  let recibido: unknown;
+test("login_con_supabase_pide_usuarios_me", async () => {
+  let autorizacion: string | null = null;
   server.use(
-    http.post("*/auth/sesion", async ({ request }) => {
-      recibido = await request.json();
-      return HttpResponse.json({ token: "jwt-1", idioma_usuario: "en", idioma_tenant: "es" });
+    http.get("*/usuarios/me", ({ request }) => {
+      autorizacion = request.headers.get("authorization");
+      return HttpResponse.json({ idioma_usuario: "en", idioma_tenant: "es" });
     }),
   );
   render(<Login />);
 
   enviar("ana@ejemplo.test", "clave-de-prueba");
 
-  await waitFor(() => expect(sessionStorage.getItem("token")).toBe("jwt-1"));
-  expect(recibido).toEqual({ email: "ana@ejemplo.test", clave: "clave-de-prueba" });
+  await waitFor(() => expect(location.pathname).toBe("/busqueda/nueva"));
+  expect(auth.signInWithPassword).toHaveBeenCalledWith({
+    email: "ana@ejemplo.test",
+    password: "clave-de-prueba",
+  });
+  expect(autorizacion).toBe("Bearer jwt-supabase");
+  // Los idiomas vienen de /usuarios/me, no del token.
   expect(sessionStorage.getItem("idioma_usuario")).toBe("en");
   expect(sessionStorage.getItem("idioma_tenant")).toBe("es");
-  expect(location.pathname).toBe("/busqueda/nueva");
   expect(i18n.language).toBe("en");
 });
 
-test("credenciales_invalidas_muestran_error_y_no_guardan", async () => {
-  server.use(http.post("*/auth/sesion", () => new HttpResponse(null, { status: 401 })));
+test("credenciales_invalidas_muestran_error_y_no_piden_usuarios_me", async () => {
+  estado.errorLogin = { code: "invalid_credentials", status: 400 };
+  let pedidos = 0;
+  server.use(http.get("*/usuarios/me", () => (pedidos++, HttpResponse.json({}))));
   render(<Login />);
 
   enviar("ana@ejemplo.test", "mala");
@@ -56,12 +63,12 @@ test("credenciales_invalidas_muestran_error_y_no_guardan", async () => {
   await waitFor(() =>
     expect(screen.queryByRole("alert")).toHaveTextContent("Correo o clave incorrectos"),
   );
-  expect(sessionStorage.getItem("token")).toBeNull();
+  expect(pedidos).toBe(0);
   expect(location.pathname).toBe("/");
 });
 
 test("un_fallo_del_servidor_no_se_presenta_como_clave_mala", async () => {
-  server.use(http.post("*/auth/sesion", () => new HttpResponse(null, { status: 500 })));
+  server.use(http.get("*/usuarios/me", () => new HttpResponse(null, { status: 500 })));
   render(<Login />);
 
   enviar("ana@ejemplo.test", "clave-de-prueba");
