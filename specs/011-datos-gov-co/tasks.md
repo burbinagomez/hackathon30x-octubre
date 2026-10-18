@@ -89,6 +89,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`.
   - armado del SoQL desde criterios ya validados;
   - `_es_juridica_valida(fila)` pura, que en (a) compara con `strip().upper()`;
   - mapeo mínimo para que las válidas salgan.
+  - valida el CIIU con `^\d{4}$` antes de cualquier request (`CriterioNoSoportado`; rechaza tuplas y cualquier no-`str`).
 
 **Checkpoint**: el principio VII queda cubierto en las dos capas.
 
@@ -98,6 +99,7 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`.
   - 25 → `in('04','14','47','58')`.
   - Un departamento fuera del YAML y el CIIU `"47' OR '1'='1"` → `CriterioNoSoportado` y 0 requests.
   - Si el caso 11 → `'04'` ya pasa por T018, se comprueba por mutación.
+  - La validación `^\d{4}$` del CIIU (que T018 ya trae) se comprueba por mutación: quitarla debe poner en rojo el caso inyectado.
 - [ ] T024 [MIN] [P] [003] [Paso 6] **Rojo:** `::test_mapea_fila_a_empresa_cruda`. Afirma los campos de la spec que existan en `EmpresaCruda` después de la 003, más `adaptador.meta.licencia == "CC-BY-SA-4.0"`. La licencia va en `meta`, no en `EmpresaCruda` (D4).
 - [ ] T025 [MIN] [P] [Paso 6] **Rojo:** `::test_as_of_sale_del_header`, con el header y sin él (reloj inyectable). *[MIN: `test_habilitada_por_yaml_temporal_da_leads_cc_by_sa` (T043) exige el `as_of` del header en el lead.]*
 - [ ] T027 [MIN] [P] [Paso 6] **Rojo:** `::test_pagina_2_vacia_sin_request`. Afirma 0 requests y 0 filas de costo. *[MIN: sin `$offset`, una página 2 traería otra vez las mismas filas y las mismas filas de costo.]*

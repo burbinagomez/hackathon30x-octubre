@@ -20,6 +20,15 @@ CAMARAS = cargar_camaras(BACKEND / "config" / "camaras_co.yaml")
 CRITERIOS = CriteriosICP(pais="CO", filtros={"ciiu": "4711", "departamento": "11"})
 
 SELECT_FILAS = "nit,digito_verificacion,razon_social,cod_ciiu_act_econ_pri,codigo_camara,organizacion_juridica,fecha_renovacion"
+# Literal de spec.md (Decisiones técnicas): las 6 cláusulas unidas por AND.
+WHERE_FILAS = (
+    "organizacion_juridica != 'PERSONA NATURAL'"
+    " AND organizacion_juridica IS NOT NULL"
+    " AND estado_matricula = 'ACTIVA'"
+    " AND cod_ciiu_act_econ_pri = '4711'"
+    " AND codigo_camara in('04')"
+    " AND nit IS NOT NULL"
+)
 COLUMNAS_DE_PERSONAS = (
     "numero_identificacion",
     "primer_nombre",
@@ -101,6 +110,7 @@ def test_query_filtra_juridicas_en_servidor():
     assert len(de_filas) == 1
     params = de_filas[0].url.params
     where = params["$where"]
+    assert where == WHERE_FILAS
     for clausula in (
         "organizacion_juridica != 'PERSONA NATURAL'",
         "organizacion_juridica IS NOT NULL",
@@ -142,6 +152,8 @@ def test_cliente_descarta_lo_que_no_debio_llegar():
         assert fila.get("nit") not in ids, fila.get("nit")
         assert fila["razon_social"] not in nombres, fila["razon_social"]
     assert len(pagina.empresas) == len(_cargar("filas.json"))
+    assert ids == {"999000001", "999000002", "999000003"}
+    assert all(e.tipo_titular == "juridica" for e in pagina.empresas)
     # descartados_no_juridica == 5 se suma en T021 (Pulido), cuando el campo exista.
 
 
@@ -158,6 +170,6 @@ def test_descartados_no_se_loguean(caplog):
     # Sin esto, la guarda pasa en vacío con un adaptador que no lee filas.
     assert len(_requests_de_filas(capturadas)) == 1
     for record in caplog.records:
-        texto = record.getMessage() + repr(record.args)
+        texto = record.getMessage() + repr(vars(record))
         for secreto in secretos:
             assert secreto not in texto, record.name
