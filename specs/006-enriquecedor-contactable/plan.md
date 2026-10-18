@@ -145,6 +145,7 @@ Son dos puertos y no un `Enriquecedor` genérico porque los dos adaptadores reci
 - `follow_redirects=False` con un loop manual de hasta 3 saltos; el 4.º lanza `DemasiadasRedirecciones`.
 - Lee el stream por chunks y corta en 2 MB.
 - Extrae `mailto:`, `wa.me/` y teléfonos con regex. `wa.me` entra como `whatsapp_comercial` y gana sobre el teléfono plano.
+- `web_fetch` va con `proveedor="web"` (aceptado por Daniel el 2026-10-18; sumado a la lista de `libro-costos`).
 - Registra `web_fetch` solo por request real, robots incluido (P9). El corte por SSRF no hace request y no registra costo; no hay fila con costo 0 ni columna nueva en `costos`.
 - **Spec y T009 reconciliados en capas (Daniel, 2026-10-18).** El validador SSRF interno lanza `IPPrivadaRechazada` (error tipado, con test unitario propio), como pide `spec.md:67`. `SitioWeb.enriquecer()` la atrapa y devuelve `ContactoPublicado(estado="fallo")`, como pide T009. El motivo va al log de la corrida, no al lead. `DemasiadasRedirecciones` sigue el mismo patrón: la lanza el fetch interno y `enriquecer()` la convierte en `fallo`.
 - **Redirecciones solo dentro del dominio del lead.** Un salto se sigue si su host, sin el `www.` inicial, es exactamente el dominio del lead sin `www.` (`empresa.co` ↔ `www.empresa.co`). Cualquier otro host (`facebook.com`, `notempresa.co`) corta con `fallo`. Cada host nuevo pasa por su propia validación SSRF y su propio `robots.txt`. Una página final que no sea 200 también es `fallo`: no se extrae contacto de un 404.

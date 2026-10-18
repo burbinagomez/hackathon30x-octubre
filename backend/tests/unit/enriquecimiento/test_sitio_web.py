@@ -432,3 +432,47 @@ def test_headers_lentos_cortan_la_cadena_de_saltos_por_plazo_total():
     assert resultado.estado == "fallo"
     assert red.paths() == ["empresa.co/robots.txt", "empresa.co/", "empresa.co/r1"]  # t=24 > 20 antes de /r2
     assert len(costos.filas) == 3
+
+
+def test_robots_lento_corta_antes_de_pedir_la_pagina_del_mismo_salto():
+    reloj = [0.0]
+
+    def robots_lento():
+        reloj[0] += 25.0  # robots se come el plazo entero; la página del mismo salto no se pide
+        return httpx.Response(404)
+
+    red = Red({"empresa.co/robots.txt": robots_lento, "empresa.co/": _html("hola")})
+    sitio, costos = _sitio(red, reloj=lambda: reloj[0])
+
+    resultado = sitio.enriquecer(uuid4(), "empresa.co")
+
+    assert resultado.estado == "fallo"
+    assert red.paths() == ["empresa.co/robots.txt"]
+    assert len(costos.filas) == 1
+
+
+def test_httpx_no_loguea_ip_ni_ruta_de_cada_salto(caplog):
+    caplog.set_level(logging.INFO)
+    sitio, _ = _sitio(Red({"empresa.co/": _html("hola")}))
+
+    sitio.enriquecer(uuid4(), "empresa.co")
+
+    assert [r for r in caplog.records if r.name.startswith(("httpx", "httpcore"))] == []
+
+
+def test_dns_lento_vence_el_plazo_sin_request_ni_costo():
+    reloj = [0.0]
+
+    def dns_lento(host):
+        reloj[0] += 25.0
+        return [PUBLICA]
+
+    red = Red({"empresa.co/": _html("hola")})
+    costos = RegistroCostosFalso()
+    sitio = SitioWeb(costos, httpx.MockTransport(red), dns_lento, TARIFA, reloj=lambda: reloj[0])
+
+    resultado = sitio.enriquecer(uuid4(), "empresa.co")
+
+    assert resultado.estado == "fallo"
+    assert red.paths() == []
+    assert costos.filas == []

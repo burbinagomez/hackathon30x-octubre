@@ -22,6 +22,8 @@ from app.modulos.enriquecimiento.dominio.errores import DemasiadasRedirecciones,
 from app.modulos.enriquecimiento.dominio.puertos import ContactoPublicado
 
 log = logging.getLogger(__name__)
+for _ruidoso in ("httpx", "httpcore"):
+    logging.getLogger(_ruidoso).setLevel(logging.WARNING)  # en INFO loguean IP y ruta de cada salto
 
 Resolvedor = Callable[[str], list[str]]  # host -> IPs
 
@@ -104,7 +106,6 @@ class SitioWeb:
                 raise _PlazoVencido
         with httpx.Client(transport=self._transporte, trust_env=False, timeout=TIMEOUT_S) as cliente:
             for _ in range(MAX_REDIRECCIONES + 1):
-                chequear_plazo()
                 host = _host(actual)
                 if actual.scheme not in ("http", "https") or not host or _sin_www(host) != base:
                     raise _RespuestaInvalida
@@ -112,7 +113,7 @@ class SitioWeb:
                 if host not in robots_ok:
                     self._chequear_robots(cliente, lead_id, actual, ip, chequear_plazo)
                     robots_ok.add(host)
-                respuesta = self._pedir(cliente, lead_id, actual, ip)
+                respuesta = self._pedir(cliente, lead_id, actual, ip, chequear_plazo)
                 try:
                     if respuesta.has_redirect_location:
                         actual = actual.join(respuesta.headers["location"])
@@ -126,7 +127,8 @@ class SitioWeb:
 
     def _chequear_robots(self, cliente: httpx.Client, lead_id: UUID, url: httpx.URL, ip: str,
                          chequear_plazo: Callable[[], None]) -> None:
-        respuesta = self._pedir(cliente, lead_id, url.copy_with(path="/robots.txt", query=None, fragment=None), ip)
+        respuesta = self._pedir(cliente, lead_id, url.copy_with(path="/robots.txt", query=None, fragment=None), ip,
+                                 chequear_plazo)
         try:
             if respuesta.status_code >= 500:
                 raise _BloqueadoPorRobots  # RFC 9309: servidor caído = todo prohibido
@@ -140,7 +142,9 @@ class SitioWeb:
         if not reglas.can_fetch(self.TOKEN_ROBOTS, str(url)):
             raise _BloqueadoPorRobots
 
-    def _pedir(self, cliente: httpx.Client, lead_id: UUID, url: httpx.URL, ip: str) -> httpx.Response:
+    def _pedir(self, cliente: httpx.Client, lead_id: UUID, url: httpx.URL, ip: str,
+               chequear_plazo: Callable[[], None]) -> httpx.Response:
+        chequear_plazo()  # antes de cada request: robots y página del mismo salto, y cada redirección
         host = _host(url)
         pedido = cliente.build_request(
             "GET", url.copy_with(host=ip),

@@ -80,6 +80,12 @@
 
 **Checkpoint 2:** los 7 tests verdes sin red.
 
+**Pendientes leves de security (`specs/auditorias/006-fase3-sitio-web.md`, decididos por Daniel el 2026-10-18):**
+- [ ] Tope de cantidad de emails extraídos por sitio (Fase 4, antes de guardar contacto).
+- [ ] robots.txt que responde 3xx hoy cuenta como "sin reglas"; decidir si seguir la redirección o tomarlo como prohibido.
+- [ ] `is_global` deja pasar `fec0::/10`, `64:ff9b::/96` y `::/96`; sumar una lista de rangos IPv6 rechazados.
+- [ ] `KeyError` en el `except` de `enriquecer` existe solo por el DNS falso; sacarlo cuando llegue el resolvedor real (Fase 6).
+
 ## Fase 4: `croma_rues_co` (Paso 3) — advisor
 
 `tests/unit/enriquecimiento/test_croma_rues.py`, 4 tests (`spec.md:75-80`). **Bloqueada por:** P1. Vía NIT: solo P1 (el transporte Croma de D7 lo escribe esta fase). Vía nombre: además D5 y D11.
