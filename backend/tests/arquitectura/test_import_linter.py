@@ -2,6 +2,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
+
 BACKEND = Path(__file__).resolve().parents[2]
 CONTRATO = "Fuentes prohibidas"
 
@@ -35,7 +37,9 @@ def _arbol_modulos(raiz: Path, archivo: str, contenido: str) -> None:
                 "app/modulos/descubrimiento", "app/modulos/costos", "app/modulos/acceso",
                 *(f"app/modulos/descubrimiento/{c}" for c in ("dominio", "aplicacion", "infraestructura")),
                 *(f"app/modulos/costos/{c}" for c in ("dominio", "infraestructura")),
-                *(f"app/modulos/acceso/{c}" for c in ("dominio", "infraestructura"))]
+                *(f"app/modulos/acceso/{c}" for c in ("dominio", "infraestructura")),
+                "app/modulos/contacto",
+                *(f"app/modulos/contacto/{c}" for c in ("dominio", "aplicacion", "infraestructura"))]
     for p in paquetes:
         (raiz / p).mkdir(parents=True, exist_ok=True)
         (raiz / p / "__init__.py").touch()
@@ -100,3 +104,26 @@ def test_acceso_dominio_no_importa_su_infraestructura(tmp_path):
 
     assert r.returncode != 0
     assert f"{CAPAS} BROKEN" in r.stdout
+
+
+def test_contacto_dominio_no_importa_su_infraestructura(tmp_path):
+    _arbol_modulos(tmp_path, "app/modulos/contacto/dominio/x.py", "import app.modulos.contacto.infraestructura\n")
+
+    r = lint_imports(tmp_path)
+
+    assert r.returncode != 0, r.stdout + r.stderr
+    assert f"{CAPAS} BROKEN" in r.stdout
+
+
+SMTP_FUERA = "SMTP y cifrado fuera del dominio de contacto"
+
+
+@pytest.mark.parametrize("libreria", ["smtplib", "cryptography"])
+def test_smtp_y_cifrado_no_entran_al_dominio_de_contacto(tmp_path, libreria):
+    # El dominio compone y firma; mandar por SMTP y descifrar la dirección son adaptadores.
+    _arbol_modulos(tmp_path, "app/modulos/contacto/dominio/x.py", f"import {libreria}\n")
+
+    r = lint_imports(tmp_path)
+
+    assert r.returncode != 0, r.stdout + r.stderr
+    assert f"{SMTP_FUERA} BROKEN" in r.stdout

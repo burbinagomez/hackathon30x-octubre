@@ -1,0 +1,10 @@
+class SinBaseLegal(Exception):
+    """El contacto no tiene `cumplimiento.base_legal` al momento de enviar."""
+
+
+class CanalNoDisponible(Exception):
+    """Error de transporte. El mensaje nunca lleva la dirección."""
+
+
+class SinVistaPrevia(Exception):
+    """`enviar` sin un `--dry-run` previo de esa búsqueda (P1)."""
