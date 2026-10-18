@@ -84,33 +84,37 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`.
 - [ ] T016 [MIN] [Paso 4] **Guarda (advisor):** `::test_descartados_no_se_loguean`.
   - `caplog.set_level(DEBUG)` sobre el root, que incluye `httpx`. Ningún `record.getMessage()` ni `record.args` contiene el `nit` ni la `razon_social` de (a), (a') a (d).
   - **Mutación:** un `logger.debug(fila)` en el descarte → rojo. Se revierte.
-- [ ] T017 [MIN] [Paso 4] **Advisor:** revisa T013–T016 antes del verde. Sus hallazgos se aplican y se vuelve a pedir revisión hasta APRUEBA.
-- [ ] T018 [MIN] [Paso 4] **Verde:**
+- [X] T017 [MIN] [Paso 4] **Advisor:** revisa T013–T016 antes del verde. Sus hallazgos se aplican y se vuelve a pedir revisión hasta APRUEBA.
+- [X] T018 [MIN] [Paso 4] **Verde:**
   - armado del SoQL desde criterios ya validados;
   - `_es_juridica_valida(fila)` pura, que en (a) compara con `strip().upper()`;
   - mapeo mínimo para que las válidas salgan.
+  - valida el CIIU con `^\d{4}$` antes de cualquier request (`CriterioNoSoportado`; rechaza tuplas y cualquier no-`str`).
 
 **Checkpoint**: el principio VII queda cubierto en las dos capas.
 
 ### Fase 5: Resto del adaptador (Paso 6) [002] [003], bloqueada por D4, D9 y (advisor) en costos
 
-- [ ] T023 [MIN] [P] [Paso 6] **Rojo:** `::test_departamento_se_traduce_a_camaras`. *[MIN: el caso del CIIU inyectado es la guarda contra inyección SoQL.]*
+- [X] T023 [MIN] [P] [Paso 6] **Rojo:** `::test_departamento_se_traduce_a_camaras`. *[MIN: el caso del CIIU inyectado es la guarda contra inyección SoQL.]*
   - 25 → `in('04','14','47','58')`.
   - Un departamento fuera del YAML y el CIIU `"47' OR '1'='1"` → `CriterioNoSoportado` y 0 requests.
   - Si el caso 11 → `'04'` ya pasa por T018, se comprueba por mutación.
-- [ ] T024 [MIN] [P] [003] [Paso 6] **Rojo:** `::test_mapea_fila_a_empresa_cruda`. Afirma los campos de la spec que existan en `EmpresaCruda` después de la 003, más `adaptador.meta.licencia == "CC-BY-SA-4.0"`. La licencia va en `meta`, no en `EmpresaCruda` (D4).
-- [ ] T025 [MIN] [P] [Paso 6] **Rojo:** `::test_as_of_sale_del_header`, con el header y sin él (reloj inyectable). *[MIN: `test_habilitada_por_yaml_temporal_da_leads_cc_by_sa` (T043) exige el `as_of` del header en el lead.]*
-- [ ] T027 [MIN] [P] [Paso 6] **Rojo:** `::test_pagina_2_vacia_sin_request`. Afirma 0 requests y 0 filas de costo. *[MIN: sin `$offset`, una página 2 traería otra vez las mismas filas y las mismas filas de costo.]*
-- [ ] T028 [MIN] [Paso 6] **Verde** de T023, T024, T025 y T027.
-- [ ] T029 [MIN] [Paso 6] **Rojo (advisor):** dos tests de costos. *[MIN: principio de costos, todo adaptador de salida escribe su fila antes de devolver.]*
+  - La validación `^\d{4}$` del CIIU (que T018 ya trae) se comprueba por mutación: quitarla debe poner en rojo el caso inyectado.
+- [X] T024 [MIN] [P] [003] [Paso 6] **Rojo:** `::test_mapea_fila_a_empresa_cruda`. Afirma los campos de la spec que existan en `EmpresaCruda` después de la 003, más `adaptador.meta.licencia == "CC-BY-SA-4.0"`. La licencia va en `meta`, no en `EmpresaCruda` (D4).
+- [X] T025 [MIN] [P] [Paso 6] **Rojo:** `::test_as_of_sale_del_header`, con el header y sin él (reloj inyectable). *[MIN: `test_habilitada_por_yaml_temporal_da_leads_cc_by_sa` (T043) exige el `as_of` del header en el lead.]*
+- [X] T027 [MIN] [P] [Paso 6] **Rojo:** `::test_pagina_2_vacia_sin_request`. Afirma 0 requests y 0 filas de costo. *[MIN: sin `$offset`, una página 2 traería otra vez las mismas filas y las mismas filas de costo.]*
+- [X] T028 [MIN] [Paso 6] **Verde** de T023, T024, T025 y T027.
+- [X] T029 [MIN] [Paso 6] **Rojo (advisor):** dos tests de costos. *[MIN: principio de costos, todo adaptador de salida escribe su fila antes de devolver.]*
   - `::test_registra_segundos_de_cada_intento`, con 503 → 200 en filas a 2 s y 3 s. En el mínimo quedan 2 filas `socrata_descarga` con `unidades` 2 y 3, `Decimal(str(computo_seg_usd))`, `proveedor="datos.gov.co"`, `gratis=False`, `lead_id=None` y el `lote_id`. La tercera fila, la del conteo a 1 s, se suma en T021 (Pulido).
   - `::test_segundo_fallo_lanza_fuente_no_disponible`: dos 503 (y la variante con dos `httpx.TimeoutException`) dan `FuenteNoDisponible`, 2 filas y un `str(exc)` que no contiene el cuerpo de la respuesta (un marcador `"CUERPO-SECRETO"`). El assert de "0 requests de conteo" se suma en T021.
   - El advisor revisa antes del verde, hasta APRUEBA.
-- [ ] T030 [MIN] [Paso 6] **Verde:** el bucle de 2 intentos.
+  - **Rojo escrito** con `xfail(strict, raises=AssertionError)` y el helper `_buscar_sin_propagar`, para que el rojo sea un assert y no un `HTTPStatusError`. El `xfail` se saca en T030.
+  - **Decisión (advisor):** `departamento` es obligatorio: sin él, `CriterioNoSoportado` y 0 requests (lo cubre `if not codigos`, porque `camaras_de` no encuentra cámaras). El NIT se valida con `^[89]\d{8}$`, como dice la spec.
+- [X] T030 [MIN] [Paso 6] **Verde:** el bucle de 2 intentos.
   - Registra la fila **antes** de decidir.
   - La espera pasa por `dormir`, que no se mide.
   - `FuenteNoDisponible` lleva solo el status.
-- [ ] T036 [MIN] [002] [Paso 6] **Guarda (advisor):** `backend/tests/integration/test_costos_repo.py::test_socrata_descarga_escribe_fila_en_costos`, con `postgres_costos` real, rol `app_rt` y `SET LOCAL` del tenant. *[MIN: es la prueba de tenant y de rol `app_rt` sobre `costos`.]*
+- [X] T036 [MIN] [002] [Paso 6] **Guarda (advisor):** `backend/tests/integration/test_costos_repo.py::test_socrata_descarga_escribe_fila_en_costos`, con `postgres_costos` real, rol `app_rt` y `SET LOCAL` del tenant. *[MIN: es la prueba de tenant y de rol `app_rt` sobre `costos`.]*
   - Valida `unidades == Decimal(2)`, el `costo_unitario` como `numeric`, `gratis=false` y el `tenant_id`.
   - **Nace verde**, porque el CHECK de `costos.tipo` de la 002 ya incluye `socrata_descarga` (plan 002, línea 210) y el adaptador ya registra desde T030.
   - **Mutación:** registrar `unidades=0` (falla `== Decimal(2)`) o un `tipo` fuera del CHECK (falla la constraint) tiene que ponerlo en rojo. Se revierte.
@@ -120,16 +124,16 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`.
 
 ### Fase 6: Registro, contrato e integración (Pasos 7 y 8) [002] [003], bloqueada por D10 y D11
 
-- [ ] T038 [MIN] [003] [Paso 7] **Rojo:** dos tests, uno real y uno que puede nacer verde.
+- [X] T038 [MIN] [003] [Paso 7] **Rojo:** dos tests, uno real y uno que puede nacer verde.
   - `test_registro.py::test_carga_config_fuentes_yaml_real_sin_error` se invierte: `datos_gov_co_rues` se carga, no está en `sin_implementacion`, y su entrada tiene `dataset == "c82u-588k"`, `filtros == ["ciiu", "departamento"]` y `licencia == "CC-BY-SA-4.0"`. Rojo real, porque hoy está en `false` con `nb3d-v3n7`.
   - `test_seleccion_fuentes.py::test_datos_gov_co_habilitada_recibe_ciiu_y_departamento`, con un registro en memoria. Si nace verde, porque la 003 ya trata `departamento` como geografía, se comprueba por mutación quitando `departamento` de los filtros, lo que da `sin_geografia`.
-- [ ] T039 [MIN] [P] [002] [Paso 7] Fábrica `datos_gov_co_rues` en `backend/tests/contratos/fabricas.py`, con `MockTransport` y `filas.json`. *[MIN: la constitución exige que todo adaptador pase la suite de contrato de su puerto.]*
-- [ ] T043 [MIN] [002] [003] [Paso 8] **Rojo (D11):** `backend/tests/integration/test_conectar_desconectar.py`, 3 de los 5 tests de la spec. Se escriben **antes** del verde de T040.
+- [ ] T039 [MIN] [P] [002] [Paso 7] **ABIERTA, bloqueada:** `backend/tests/contratos/` no existe; deuda compartida con `osm_overpass`, decide el dueño. Fábrica `datos_gov_co_rues` en `backend/tests/contratos/fabricas.py`, con `MockTransport` y `filas.json`. *[MIN: la constitución exige que todo adaptador pase la suite de contrato de su puerto.]*
+- [X] T043 [MIN] [002] [003] [Paso 8] **Rojo (D11):** `backend/tests/integration/test_conectar_desconectar.py`, 3 de los 5 tests de la spec. Se escriben **antes** del verde de T040.
   - `::test_yaml_real_consulta_datos_gov_co`: rojo real, porque el YAML real todavía tiene `habilitado: false` y la búsqueda hace 0 requests al transporte de datos.gov.co.
   - `::test_habilitada_por_yaml_temporal_da_leads_cc_by_sa`: rojo real, porque el adaptador todavía no está en el catálogo y la búsqueda deja 0 leads. Si el rojo sale por excepción del loader y no por aserción, se ajusta el test antes de seguir. Es el test del mínimo: los leads quedan guardados por tenant, con `cumplimiento` y la fila de `costos`, leídos con `app_rt` y `SET LOCAL` del tenant. El aislamiento entre tenants de `leads` lo prueba `test_rls.py` de la 002.
   - `::test_deshabilitada_por_yaml_temporal_no_toca_datos_gov_co`: guarda. Nace verde; la mutación es poner `habilitado: true` en la copia temporal.
   - Los otros 2 (`test_naturales_se_guardan_como_conteo` y `test_mismo_nit_que_supersociedades_fusiona_por_regla_1`) pasan a T055 (Pulido).
-- [ ] T040 [MIN] [002] [003] [Paso 7] **Verde, en UN commit:**
+- [X] T040 [MIN] [002] [003] [Paso 7] **Verde, en UN commit:**
   - `fuentes.yaml` con `habilitado: true`, `dataset: c82u-588k`, `filtros: [ciiu, departamento]` y `trae: [nit, nombre, ciiu, ciudad_camara]`. `cuenta_naturales: true` se suma en T020 (Pulido), cuando el loader lo conozca;
   - el alta en el catálogo;
   - los tests de la 003 que leen el YAML real, actualizados según D10.

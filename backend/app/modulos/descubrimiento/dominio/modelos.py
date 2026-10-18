@@ -2,6 +2,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, NamedTuple
+from uuid import UUID
 
 
 class Actividad(NamedTuple):  # NamedTuple: se compara con ("4711", "CIIU")
@@ -30,6 +31,19 @@ class EmpresaCruda:
     tipo_titular: TipoTitular = "desconocido"
     ciudad: str | None = None
     direccion: str | None = None
+    web: str | None = None
+
+
+@dataclass(frozen=True)
+class Lead:
+    """Un lead guardado, con nombre y dirección en claro: el repositorio descifra, el dominio nunca ve bytes."""
+    id: UUID
+    pais: str
+    tipo_titular: TipoTitular
+    nombre: str | None = None
+    direccion: str | None = None
+    id_fiscal: str | None = None
+    ciudad: str | None = None
     web: str | None = None
 
 

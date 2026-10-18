@@ -3,6 +3,7 @@ name = "dapta-leads-api"
 version = "0.1.0"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "cryptography>=50.0.2",
     "fastapi>=0.143.3",
     # Runtime: lo usa el adaptador Croma en producción.
     "httpx>=0.28.1",
@@ -51,6 +52,13 @@ type = "forbidden"
 # Solo app.cli une los dos módulos: descubrimiento conoce el puerto, nunca el adaptador.
 source_modules = ["app.modulos.descubrimiento"]
 forbidden_modules = ["app.modulos.costos.infraestructura"]
+
+[[tool.importlinter.contracts]]
+name = "Cifrado fuera del dominio"
+type = "forbidden"
+# El dominio maneja texto en claro; cifrar y llamar por HTTP son adaptadores (principio I).
+source_modules = ["app.modulos.descubrimiento.dominio"]
+forbidden_modules = ["cryptography", "httpx"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

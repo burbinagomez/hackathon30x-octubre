@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.config import SecretProhibido
 from app.main import app
+from tests.conftest import nueva_clave_de_cifrado
 
 DOCKERFILE_WEB = Path(__file__).resolve().parents[3] / "frontend" / "Dockerfile"
 
@@ -23,6 +24,7 @@ def entorno(monkeypatch):
         monkeypatch.delenv(k)
     monkeypatch.setenv("DATABASE_URL", "postgresql://app_rt:x@localhost/db")
     monkeypatch.setenv("CORS_ORIGINS", "http://localhost:5173")
+    monkeypatch.setenv("CIFRADO_KEY", nueva_clave_de_cifrado())  # sin ella la app no arranca
     return monkeypatch
 
 

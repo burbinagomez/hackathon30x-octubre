@@ -6,6 +6,7 @@ from sqlalchemy import (
     ForeignKey,
     ForeignKeyConstraint,
     Index,
+    LargeBinary,
     MetaData,
     Numeric,
     Table,
@@ -57,10 +58,12 @@ leads = Table(
     _id(), _tenant(),
     Column("pais", Text, nullable=False),
     Column("id_fiscal", Text),
-    Column("nombre", Text, nullable=False),
+    Column("nombre", Text),  # NULL para no jurídicos: su nombre vive en nombre_cifrado
     Column("tipo_titular", Text, nullable=False, server_default=text("'desconocido'::text")),
     Column("ciudad", Text),
     Column("direccion", Text),
+    Column("nombre_cifrado", LargeBinary),
+    Column("direccion_cifrada", LargeBinary),
     Column("actividad_codigo", Text),
     Column("actividad_sistema", Text),
     Column("web", Text),
@@ -71,6 +74,8 @@ leads = Table(
     Column("creado_en", DateTime(timezone=True), nullable=False, server_default=_AHORA),
     UniqueConstraint("tenant_id", "pais", "id_fiscal", name="leads_tenant_pais_id_fiscal_key"),
     UniqueConstraint("tenant_id", "id", name="leads_tenant_id_id_key"),
+    # Los CHECK de titular (leads_nombre_segun_titular_ck, leads_direccion_segun_titular_ck) viven solo en el SQL de la 0003:
+    # alembic no los compara y declararlos acá solo agrega ruido.
 )
 
 lead_fuentes = Table(
