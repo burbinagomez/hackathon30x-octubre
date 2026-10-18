@@ -247,7 +247,8 @@ def test_salida_invalida_falla_el_caso_con_motivo(tmp_path, correr):
     (ENCAJE, _dataset({**_caso("a"), "etiqueta": None})),
     (CALIBRACION, [{**_mensaje("m-a"), "pertinente": None}]),
     (ENCAJE, _dataset({k: v for k, v in _caso("a").items() if k != "etiqueta"})),
-], ids=["etiqueta", "pertinente", "etiqueta_ausente"])
+    (ENCAJE, _dataset()),  # casos: [] → nace verde; sabotaje "sin chequeo de vacío": borrar el `sin casos` de _preparar
+], ids=["etiqueta", "pertinente", "etiqueta_ausente", "casos_vacios"])
 def test_etiqueta_invalida_es_config_invalida(tmp_path, correr, nombre, datos):
     config = _config(tmp_path, {nombre: {"datos": datos}})
     juez = _juez({"a": [SI] * 3, "m-a": [SI] * 3})
@@ -399,6 +400,26 @@ def test_tolerancia_absorbe_una_baja_dentro_del_margen(tmp_path, correr):
     _assert_llamadas(juez, "abcd")
 
 
+def test_baja_dentro_de_tolerancia_igual_exige_motivo_para_fijar(tmp_path, correr):
+    """Nace verde. Sabotaje con nombre, "bajan con tolerancia": en main(), `bajan` compara con
+    `x < y - tolerancia` en vez de `x < y` → fija sin --motivo y este test queda rojo."""
+    casos = [_caso(i) for i in "abcd"]
+    _fijar_baseline(correr, _encaje(tmp_path, *casos), "abcd", agregado=0.80)
+    config = _encaje(tmp_path, *casos, tolerancia=0.05)
+    antes = _baseline(config).read_bytes()
+    secuencias = {"a": [NO] * 3, **_todos("bcd", SI)}  # 0.75: dentro de la tolerancia, pero baja
+
+    r = correr(config, _juez(secuencias), "--actualizar-baseline")
+
+    assert r.codigo == 1
+    assert _baseline(config).read_bytes() == antes
+
+    r = correr(config, _juez(secuencias))
+
+    assert r.codigo == 0
+    assert r.eval()["estado"] == "ok"
+
+
 def test_bajo_umbral_sale_1_aunque_no_baje(tmp_path, correr):
     config = _encaje(tmp_path, *(_caso(i) for i in "abcde"))
     _fijar_baseline(correr, config, "abcde", agregado=0.60)
@@ -463,6 +484,20 @@ def test_mejora_no_reescribe_baseline_sin_flag(tmp_path, correr):
     assert _baseline(config).read_bytes() == antes
     assert r.reporte["mejora_sin_fijar"] == [ENCAJE]
     assert r.eval()["estado"] == "ok"
+    _assert_llamadas(juez, "abcd")
+
+
+def test_mejora_exige_que_nada_baje(tmp_path, correr):
+    # "Mejora" = algo sube y nada baja: agregado sube 0.50 → 0.75 pero determinacion baja 1.0 → 0.75.
+    config = _encaje(tmp_path, *(_caso(i) for i in "abcd"))
+    _fijar_baseline(correr, config, "abcd", agregado=0.50)
+    juez = _juez({"a": [SI, SI, NO], **_todos("bcd", SI)})
+
+    r = correr(config, juez)
+
+    assert r.codigo == 0
+    assert (r.eval()["agregado"], r.eval()["determinacion"]) == (0.75, 0.75)
+    assert r.reporte["mejora_sin_fijar"] == []
     _assert_llamadas(juez, "abcd")
 
 
