@@ -13,7 +13,7 @@ from app.modulos.descubrimiento.dominio.modelos import MetaFuente
 
 def costo_maximo(costos: RegistroCostos, busqueda_id: UUID, metas: Iterable[MetaFuente]) -> Decimal:
     """Lo ya gastado en el lote + el peor caso de cada fuente que se va a llamar."""
-    return costos.gasto_busqueda(busqueda_id) + sum((m.costo_maximo_llamada for m in metas if m.clave != 'datos_gov_co_rues'), Decimal(0))
+    return costos.gasto_busqueda(busqueda_id) + sum((m.costo_maximo_llamada for m in metas), Decimal(0))
 
 
 def cabe_otra_llamada(costos: RegistroCostos, busqueda_id: UUID, meta: MetaFuente, tope: Decimal) -> bool:
