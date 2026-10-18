@@ -8,35 +8,46 @@ import httpx
 from evals.jueces.claude import JuezClaude
 
 MODELO = "claude-sonnet-5-5"
+CLAVE_FALSA = "sk-ant-test-XXXX"
 # Misma forma que tarifas.yaml (llm.<modelo>), en USD por millón de tokens.
 TARIFA = {"in_usd_por_M": Decimal("2.00"), "out_usd_por_M": Decimal("10.00")}
 USO = {"input_tokens": 120, "output_tokens": 30}
-CASO = {"id": "c1", "nombre": "Ferretería Sintética SAS", "pais": "CO", "icp": "ferreterías en Bogotá"}
+# icp como dict: la forma que manda run.py (`| {"icp": datos["icp"]}`).
+CASO = {"id": "c1", "nombre": "Ferretería Sintética SAS", "pais": "CO",
+        "icp": {"pais": "CO", "ciiu": ["4752"], "descripcion": "Ferreterías con local propio"}}
+SIN_TOOL_USE = {"content": [{"type": "text", "text": "La empresa parece encajar"}], "stop_reason": "max_tokens"}
 
 
-def respuesta(entrada: dict, uso: dict = USO) -> dict:
-    return {
-        "id": "msg_falso", "type": "message", "role": "assistant", "model": MODELO,
-        "content": [{"type": "tool_use", "id": "toolu_falso", "name": "veredicto", "input": entrada}],
-        "stop_reason": "tool_use", "stop_sequence": None, "usage": uso,
-    }
+def respuesta(entrada: dict | None = None, uso: dict = USO, content: list | None = None,
+              stop_reason: str = "tool_use") -> dict:
+    """Cuerpo de la Messages API. `content` propio pisa el bloque tool_use armado con `entrada`."""
+    if content is None:
+        content = [{"type": "tool_use", "id": "toolu_falso", "name": "veredicto", "input": entrada}]
+    return {"id": "msg_falso", "type": "message", "role": "assistant", "model": MODELO, "content": content,
+            "stop_reason": stop_reason, "stop_sequence": None, "usage": uso}
 
 
-def cliente(capturados: list, entrada: dict | None = None) -> httpx.Client:
-    """Cliente con transporte falso. Cada request a POST /v1/messages queda en `capturados` (cuerpo JSON)."""
+def cliente(capturados: list, entrada: dict | None = None, cabeceras: list | None = None,
+            http: httpx.Response | None = None, **cuerpo) -> httpx.Client:
+    """Cliente con transporte falso, sin headers propios: la key y la versión las pone el juez.
+
+    Cada request a POST /v1/messages deja su cuerpo JSON en `capturados` y `dict(request.headers)` en `cabeceras`.
+    `http` reemplaza la respuesta entera (p. ej. un 401); `cuerpo` va a `respuesta()` (content, stop_reason).
+    """
     entrada = {"probabilidad": 0.8, "razon": "encaja"} if entrada is None else entrada
 
     def responder(request: httpx.Request) -> httpx.Response:
         if (request.method, request.url.path) != ("POST", "/v1/messages"):
             return httpx.Response(404)  # fuera del endpoint no se captura: el test lo ve como 0 requests
         capturados.append(json.loads(request.content))
-        return httpx.Response(200, json=respuesta(entrada))
+        if cabeceras is not None:
+            cabeceras.append(dict(request.headers))
+        return http if http is not None else httpx.Response(200, json=respuesta(entrada, **cuerpo))
 
-    return httpx.Client(base_url="https://api.anthropic.com", transport=httpx.MockTransport(responder),
-                        headers={"x-api-key": "falsa-no-real", "anthropic-version": "2023-06-01"})
+    return httpx.Client(base_url="https://api.anthropic.com", transport=httpx.MockTransport(responder))
 
 
 def juez(registro_costos, capturados: list, entrada: dict | None = None, prompt: str = "prompt de prueba",
-         lote_id=None) -> JuezClaude:
-    return JuezClaude(registro_costos=registro_costos, tarifa=TARIFA, modelo=MODELO, prompt=prompt,
-                      lote_id=lote_id or uuid4(), http_client=cliente(capturados, entrada))
+         lote_id=None, tarifa: dict = TARIFA, **kw) -> JuezClaude:
+    return JuezClaude(registro_costos=registro_costos, tarifa=tarifa, modelo=MODELO, prompt=prompt,
+                      lote_id=lote_id or uuid4(), api_key=CLAVE_FALSA, http_client=cliente(capturados, entrada, **kw))
