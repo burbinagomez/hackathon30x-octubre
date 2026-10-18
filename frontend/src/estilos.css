@@ -1,0 +1,267 @@
+/* Estilos de las pantallas. Solo variables de tokens.css; mobile-first (min-width para crecer). */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Objetivos táctiles de al menos 44 px (regla responsive, docs/decisiones.md). */
+button,
+input,
+select,
+textarea {
+  min-height: 44px;
+  font: inherit;
+  color: var(--color-oscuro);
+  background: var(--color-fondo);
+  border: 1px solid var(--color-gris);
+  border-radius: 8px;
+  padding: 8px 12px;
+  max-width: 100%;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+}
+
+textarea {
+  min-height: 112px;
+  resize: vertical;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-oscuro);
+  text-underline-offset: 3px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-oscuro);
+  outline-offset: 2px;
+}
+
+label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+h1 {
+  margin: 0 0 16px;
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+h2 {
+  margin: 24px 0 8px;
+  font-size: 1.125rem;
+}
+
+/* Pantallas */
+.pantalla {
+  width: 100%;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.pantalla-ancha {
+  max-width: 72rem;
+}
+
+.pantalla-tarjeta {
+  max-width: 28rem;
+  padding-top: 32px;
+}
+
+.barra {
+  display: flex;
+  justify-content: flex-end;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 8px 16px 0;
+}
+
+.tarjeta .barra {
+  padding: 0 0 8px;
+}
+
+.tarjeta,
+.resultado,
+.metrica {
+  background: var(--color-fondo);
+  border: 1px solid var(--color-gris);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.tarjeta {
+  border-top: 6px solid var(--color-acento);
+}
+
+.selector-idioma {
+  width: auto;
+  min-width: 44px;
+}
+
+.aviso,
+.salud {
+  text-align: center;
+}
+
+.salud {
+  padding: 16px;
+}
+
+/* Formularios */
+.formulario {
+  display: grid;
+  gap: 16px;
+}
+
+.campo {
+  min-width: 0;
+}
+
+.acciones {
+  display: grid;
+  gap: 8px;
+}
+
+.boton {
+  font-weight: 700;
+  padding: 8px 20px;
+}
+
+/* Lima solo de fondo, con el oscuro encima. */
+.boton-primario {
+  background: var(--color-acento);
+  border-color: var(--color-oscuro);
+}
+
+.error {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--color-oscuro);
+  border-left-width: 6px;
+  border-radius: 8px;
+}
+
+.nota {
+  color: var(--color-oscuro);
+  font-size: 0.875rem;
+}
+
+.resultado p,
+.resultado ul {
+  margin: 8px 0;
+}
+
+.resultado ul,
+.lista {
+  padding-left: 20px;
+}
+
+/* Tablero */
+.tabla-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-gris);
+  border-radius: 12px;
+}
+
+table {
+  width: 100%;
+  min-width: 56rem;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+th,
+td {
+  padding: 10px 12px;
+  text-align: right;
+  border-bottom: 1px solid var(--color-gris);
+}
+
+th:first-child,
+td:first-child {
+  text-align: left;
+}
+
+thead th {
+  background: var(--color-oscuro);
+  color: var(--color-fondo);
+  font-weight: 500;
+}
+
+tr.total td {
+  font-weight: 700;
+  background: var(--color-acento);
+}
+
+.metricas {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.metrica {
+  margin: 0;
+  font-weight: 500;
+}
+
+footer {
+  margin-top: 16px;
+  font-size: 0.875rem;
+}
+
+footer p {
+  margin: 0;
+}
+
+@media (min-width: 48rem) {
+  .pantalla {
+    padding: 32px;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  .formulario-ancho {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .formulario-ancho > .campo:nth-child(n + 5):nth-child(-n + 6),
+  .formulario-ancho > .campo:nth-child(9),
+  .formulario-ancho > .resultado,
+  .formulario-ancho > .acciones,
+  .formulario-ancho > .error {
+    grid-column: 1 / -1;
+  }
+
+  .acciones {
+    grid-template-columns: repeat(auto-fit, minmax(10rem, max-content));
+  }
+
+  .metricas {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .barra {
+    padding: 16px 32px 0;
+  }
+}

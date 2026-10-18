@@ -7,8 +7,8 @@ type Props = { vista: VistaPrevia; tope: number };
 export default function ResultadoVistaPrevia({ vista, tope }: Props) {
   const { t } = useTranslation();
   return (
-    <section>
-      <p>{t("busqueda.conteo_antes_de_filtros")}</p>
+    <section className="resultado">
+      <p className="nota">{t("busqueda.conteo_antes_de_filtros")}</p>
       {vista.fuentes.length === 0 && <p>{t("busqueda.ninguna_fuente_cubre")}</p>}
       <ul>
         {vista.fuentes.map((f) => (
@@ -34,7 +34,7 @@ export default function ResultadoVistaPrevia({ vista, tope }: Props) {
       <p>{t("busqueda.costo_estimado", { monto: moneda(vista.costo_estimado_usd) })}</p>
       <p>{t("busqueda.costo_maximo", { monto: moneda(vista.costo_maximo_usd) })}</p>
       <p>{t("busqueda.tope_linea", { monto: moneda(tope) })}</p>
-      <p>{t("busqueda.se_compara_el_maximo")}</p>
+      <p className="nota">{t("busqueda.se_compara_el_maximo")}</p>
       <p>{t("busqueda.creditos_restantes", { n: entero(vista.creditos_restantes_mes) })}</p>
       <p>{t("busqueda.requests_restantes", { n: entero(vista.requests_restantes_24h) })}</p>
     </section>
