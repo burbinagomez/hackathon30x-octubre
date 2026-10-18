@@ -19,3 +19,14 @@ class FilaRechazada:
     traer de vuelta un teléfono en una columna mal puesta, y esa fila no lo imprime ni lo loggea."""
     fila: int
     motivo: str
+
+
+@dataclass(frozen=True)
+class ResumenImportacion:
+    """Lo que devuelve `ImportarCalificaciones.ejecutar`. Sin empresa ni teléfono (plan.md)."""
+    importadas: int = 0
+    duplicadas: int = 0
+    conflictos: int = 0
+    no_cumple: int = 0
+    ref_desconocida: int = 0
+    rechazadas: tuple[FilaRechazada, ...] = ()
