@@ -235,3 +235,15 @@ Este slice corre `uv run python -m evals.run --eval encaje_icp` con el `jev` rea
 - Un hilo que pasa del presupuesto no se cancela: termina en segundo plano y su costo queda escrito, pero su lead no se guarda y se rehace en la próxima tanda.
 
 **Fuera del alcance:** buscar en buscadores o directorios; dominios de otros países (CO primero); `.net`/`.org`; reintentar candidatos por `http://`.
+
+## Enmienda 2026-10-18: el encaje lo clasifica OpenRouter si no hay jev
+
+**Por qué.** TypeSafe solo entregó una API key, sin URL: `JevClasificador` no se arma y `leads.encaje` quedaba vacío para todos.
+
+**Decisión del dueño (Daniel Mejía, 2026-10-18):** clasificar el encaje con OpenRouter, que ya funciona en la Puerta B.
+
+**Regla.** `ClasificadorOpenRouter` cumple el mismo puerto que `JevClasificador`, con las mismas instrucciones (`encaje_jev_v1.json`) y los mismos datos (actividad, nombre, ciudad, ICP; nunca contacto, con el mismo escape). `/chat/completions` con `tool_choice` forzado y `encaje` como enum; timeout 10 s. Costos `llm_tokens_in`/`llm_tokens_out` (`proveedor='openrouter'`, `lead_id` del lead) con la tarifa de `IA_MODELO`; sin uso legible, el techo. Error, timeout o salida inválida devuelven `ninguna` y el enriquecimiento sigue (a diferencia de jev, no lanza). Composición: con `TYPESAFE_API_KEY` y `TYPESAFE_URL` gana jev; si no y `ia_configurada`, OpenRouter; si no, sin clasificador.
+
+**Terminado cuando:** `tests/unit/enriquecimiento/test_clasificador_openrouter.py`, `tests/unit/test_composicion_clasificador.py` y el caso de integración `test_openrouter_clasifica_encaje_en_el_enriquecimiento`.
+
+**Fuera del alcance:** reintentos; calibrar `probabilidad` (OpenRouter la informa opcional, 0 si falta).

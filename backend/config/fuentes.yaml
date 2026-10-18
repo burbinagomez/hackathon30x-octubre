@@ -124,10 +124,14 @@ calificadores:                           # puerto: Calificador
     habilitado: true                     # respaldo: exportar/importar
 
 # OJO: sección documental, nadie la lee; composicion.py arma el clasificador en código.
+# Honesto: TypeSafe entregó solo la API key, no la URL; sin las dos, jev no se arma. Entonces clasifica openrouter
+# (misma IA de la Puerta B: IA_API_KEY + IA_MODELO). Con TYPESAFE_API_KEY y TYPESAFE_URL gana jev; sin ninguno, no hay.
 clasificadores:                          # puerto: Clasificador
   jev:
-    habilitado: true
+    habilitado: true                     # solo si hay TYPESAFE_API_KEY y TYPESAFE_URL (hoy falta la URL)
     version: jev-1.13.0
+  openrouter:
+    habilitado: true                     # si jev no está y la IA está configurada; falla = encaje 'ninguna'
 
 limites:
   croma_requests_por_24h: 100            # según catálogo; planificar consultas

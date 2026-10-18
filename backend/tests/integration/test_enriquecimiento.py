@@ -15,6 +15,9 @@ from app.modulos.descubrimiento.dominio.modelos import Actividad, CriteriosICP, 
 from app.modulos.descubrimiento.infraestructura.persistencia.repositorio_leads import RepositorioLeadsPostgres
 from app.modulos.enriquecimiento.aplicacion.enriquecer_lead import EnriquecerLead
 from app.modulos.enriquecimiento.dominio.puertos import ContactoPublicado, VerificacionTitular
+from app.modulos.enriquecimiento.infraestructura.adaptadores.clasificador_openrouter import (
+    ClasificadorOpenRouter,
+)
 from app.modulos.enriquecimiento.infraestructura.adaptadores.jev_clasificador import JevClasificador
 from tests.falsos import EnriquecedorFalso, JevFalso, VerificadorFalso
 
@@ -356,6 +359,27 @@ def test_jev_solo_clasifica_juridicas(admin, tenants, mundo):
     assert {x: _fila(admin, x, "encaje").encaje for x in (natural, desconocido, juridica)} == {
         natural: None, desconocido: None, juridica: "encaja"}
     assert [(t, lead) for t, lead, _ in _costos(admin, tenants["a"]) if t == "jev_tokens"] == [("jev_tokens", juridica)]
+
+
+def test_openrouter_clasifica_encaje_en_el_enriquecimiento(admin, tenants, mundo):
+    repo, costos, busqueda = mundo
+    _con_icp(admin, busqueda)
+    lead = _sembrar(repo, busqueda, _empresa("Transportes Andinos", tipo="juridica"))
+    cuerpo = {"choices": [{"message": {"tool_calls": [{"function": {
+        "name": "clasificar_encaje", "arguments": '{"encaje": "no_encaja"}'}}]}}],
+        "usage": {"prompt_tokens": 40, "completion_tokens": 5}}
+    http = httpx.Client(base_url="https://openrouter.invalid/api/v1",
+                        transport=httpx.MockTransport(lambda r: httpx.Response(200, json=cuerpo)))
+    clasificador = ClasificadorOpenRouter(costos, {"in_usd_por_M": Decimal("0.10"), "out_usd_por_M": Decimal("0.50")},
+                                          "proveedor/modelo", "sk-sintetica", http)
+    caso = EnriquecerLead(repo, VerificadorFalso(costos), EnriquecedorFalso(costos), clasificador)
+
+    resumen = caso.ejecutar(busqueda)
+
+    assert resumen.clasificados == 1
+    assert _fila(admin, lead, "encaje").encaje == "no_encaja"
+    assert sorted((t, l) for t, l, _ in _costos(admin, tenants["a"]) if t.startswith("llm_tokens")) == [
+        ("llm_tokens_in", lead), ("llm_tokens_out", lead)]
 
 
 EMAIL_OSM = "info@andinos.invalid"  # sintético; lo que T040p guardará al descubrir
