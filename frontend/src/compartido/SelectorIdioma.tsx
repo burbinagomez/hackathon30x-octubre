@@ -18,6 +18,7 @@ export default function SelectorIdioma() {
 
   return (
     <select
+      className="selector-idioma"
       aria-label={t("idioma.etiqueta")}
       value={i18n.language}
       onChange={(e) => elegir(e.target.value as IdiomaGuardado)}

@@ -1,32 +1,39 @@
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app import db
-from app.api import actividades, auth, busquedas, tablero
-from app.config import Settings, verificar_entorno
+from app.api import actividades, busquedas, tablero, usuarios
+from app.api.sesion import tenant_actual
+from app.config import SettingsApi, verificar_entorno
+from app.modulos.acceso.infraestructura.verificador_jwks import VerificadorJwks, cliente_jwks
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     verificar_entorno()
-    app.state.settings = Settings()
+    app.state.settings = SettingsApi()
     app.state.engine = db.crear_engine(app.state.settings.database_url)
     db.verificar_rol(app.state.engine)
+    app.state.verificador = VerificadorJwks(
+        cliente_jwks(app.state.settings.auth_jwks_url), issuer=app.state.settings.auth_issuer)
     yield
 
 
-app = FastAPI(lifespan=lifespan)
+# Sin docs ni esquema públicos: no se anuncia la superficie de la API.
+app = FastAPI(lifespan=lifespan, openapi_url=None)  # sin esquema tampoco se montan /docs ni /redoc
 # CORS_ORIGINS no es secret: se lee acá, antes de verificar_entorno() en el lifespan.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         o for o in (s.strip().rstrip("/") for s in os.environ.get("CORS_ORIGINS", "").split(",")) if o
     ],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],  # Bearer en header; sin cookies, así que sin allow_credentials
 )
 
 
@@ -40,5 +47,6 @@ def health(request: Request):
     return {"status": "ok", "db": "ok"}
 
 
-for _router in (auth.router, busquedas.router, tablero.router, actividades.router):
-    app.include_router(_router)
+# La dependencia va en el include: una ruta nueva no puede quedar sin auth por olvido.
+for _router in (busquedas.router, tablero.router, actividades.router, usuarios.router):
+    app.include_router(_router, dependencies=[Depends(tenant_actual)])

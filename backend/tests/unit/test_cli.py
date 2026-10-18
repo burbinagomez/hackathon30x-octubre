@@ -39,6 +39,18 @@ def entorno(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", DB_URL)
 
 
+def test_buscar_no_exige_auth_jwks_url_ni_auth_issuer(persistencia, entorno, monkeypatch, capsys):
+    # AUTH_* son de la API; la CLI corre sin ellas (Settings compartido no las pide).
+    monkeypatch.delenv("AUTH_JWKS_URL")
+    monkeypatch.delenv("AUTH_ISSUER")
+    try:
+        codigo = main(BUSCAR, catalogo={"croma_supersociedades_co": FuenteDelCLI}, persistencia=persistencia)
+    except Exception as error:  # una configuración inválida de AUTH no puede cortar la CLI
+        codigo = f"{type(error).__name__} por configuración"
+    assert codigo == 0
+    assert "encontrados 2" in capsys.readouterr().out
+
+
 def test_buscar_sin_tenant_falla(persistencia, capsys):
     codigo = main(["buscar", "--pais", "CO", "--ciiu", "4711"], catalogo={}, persistencia=persistencia)
     assert codigo != 0
