@@ -115,7 +115,9 @@
     "licencia": "License",
     "calificados": "Qualified",
     "pct_calificados": "% qualified (of unique)",
-    "cpql": "CPQL (list)"
+    "cpql": "CPQL (list)",
+    "exportar_dapta": "Export for Dapta (CSV)",
+    "error_exportar": "Export failed. Try again."
   },
   "idioma": {
     "etiqueta": "Language",
