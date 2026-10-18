@@ -1,5 +1,5 @@
 import json
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import Engine, text
 
@@ -8,9 +8,10 @@ from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, EmpresaCrud
 from app.seguridad.cifrado import Cifrador
 
 _INSERT_LEAD = text(
-    "INSERT INTO leads (tenant_id, pais, id_fiscal, nombre, tipo_titular, ciudad, direccion, "
-    "actividad_codigo, actividad_sistema, web) "
-    "VALUES (:t, :pais, :id_fiscal, :nombre, :tipo_titular, :ciudad, :direccion, :codigo, :sistema, :web) "
+    "INSERT INTO leads (id, tenant_id, pais, id_fiscal, nombre, nombre_cifrado, tipo_titular, ciudad, direccion, "
+    "direccion_cifrada, actividad_codigo, actividad_sistema, web) "
+    "VALUES (:id, :t, :pais, :id_fiscal, :nombre, :nombre_cifrado, :tipo_titular, :ciudad, :direccion, "
+    ":direccion_cifrada, :codigo, :sistema, :web) "
     "ON CONFLICT (tenant_id, pais, id_fiscal) DO NOTHING RETURNING id"
 )
 _INSERT_CUMPLIMIENTO = text(
@@ -35,13 +36,26 @@ class RepositorioLeadsPostgres:
                 {"t": self._tenant_id, "pais": criterios.pais, "criterios": json.dumps(dict(criterios.filtros))},
             ).scalar_one()
 
+    def _identidad(self, e: EmpresaCruda, lead_id: UUID) -> dict:
+        """Nombre y dirección: en claro solo para una jurídica; para cualquier otro titular, cifrados (el CHECK lo exige)."""
+        if e.tipo_titular == "juridica":
+            return {"nombre": e.nombre, "direccion": e.direccion, "nombre_cifrado": None, "direccion_cifrada": None}
+        cifrar = lambda columna, valor: (  # noqa: E731
+            None if valor is None else self._cifrador.cifrar(columna, valor, self._tenant_id, lead_id))
+        return {"nombre": None, "direccion": None, "nombre_cifrado": cifrar("nombre_cifrado", e.nombre),
+                "direccion_cifrada": cifrar("direccion_cifrada", e.direccion)}
+
     def obtener_o_crear_lead(self, e: EmpresaCruda, licencia: str) -> tuple[UUID, bool]:
         # ponytail: id_fiscal NULL (OSM) no choca con el UNIQUE, así que siempre crea lead nuevo; dedup difuso en Pulido.
         with unidad_de_trabajo(self._engine, self._tenant_id) as c:
+            # El id lo genera la app: entra al AAD del cifrado, y la base no puede ponerlo después.
+            # Si el INSERT choca con ON CONFLICT, este id se descarta.
+            lead_id = uuid4()
             nuevo = c.execute(_INSERT_LEAD, {
-                "t": self._tenant_id, "pais": e.pais, "id_fiscal": e.id_fiscal, "nombre": e.nombre,
-                "tipo_titular": e.tipo_titular, "ciudad": e.ciudad, "direccion": e.direccion,
+                "id": lead_id, "t": self._tenant_id, "pais": e.pais, "id_fiscal": e.id_fiscal,
+                "tipo_titular": e.tipo_titular, "ciudad": e.ciudad,
                 "codigo": e.actividad.codigo, "sistema": e.actividad.sistema, "web": e.web,
+                **self._identidad(e, lead_id),
             }).scalar_one_or_none()
             if nuevo is None:
                 existente = c.execute(
@@ -66,7 +80,17 @@ class RepositorioLeadsPostgres:
             )
 
     def obtener_lead(self, lead_id: UUID) -> Lead | None:
-        return None
+        with unidad_de_trabajo(self._engine, self._tenant_id) as c:
+            f = c.execute(
+                text("SELECT pais, tipo_titular, id_fiscal, ciudad, web, nombre, direccion, nombre_cifrado, direccion_cifrada "
+                     "FROM leads WHERE id = :id"), {"id": lead_id}).one_or_none()
+        if f is None:
+            return None
+        descifrar = lambda columna, blob: (  # noqa: E731
+            None if blob is None else self._cifrador.descifrar(columna, bytes(blob), self._tenant_id, lead_id))
+        return Lead(id=lead_id, pais=f.pais, tipo_titular=f.tipo_titular, id_fiscal=f.id_fiscal, ciudad=f.ciudad, web=f.web,
+                    nombre=f.nombre if f.nombre is not None else descifrar("nombre_cifrado", f.nombre_cifrado),
+                    direccion=f.direccion if f.direccion is not None else descifrar("direccion_cifrada", f.direccion_cifrada))
 
     def cerrar_busqueda(self, busqueda_id: UUID, estado: str) -> None:
         with unidad_de_trabajo(self._engine, self._tenant_id) as c:
