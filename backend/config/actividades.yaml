@@ -88,3 +88,60 @@
   nombre_es: "Fabricación de muebles"
   nombre_en: "Manufacture of furniture"
   osm: ["shop=furniture", "craft=carpenter"]
+
+# Educación (CIIU Rev. 4 A.C., DANE, división 85). nombre_en: ISIC Rev. 4 (ONU), el grupo más cercano.
+# Sin `osm` donde OSM no distingue el nivel (superior técnico/tecnológico, educación no formal): se ignora y se reporta.
+"8511":
+  nombre_es: "Educación de la primera infancia"
+  nombre_en: "Pre-primary education"
+  osm: ["amenity=kindergarten"]
+"8512":
+  nombre_es: "Educación preescolar"
+  nombre_en: "Pre-primary education"
+  osm: ["amenity=kindergarten"]
+"8513":
+  nombre_es: "Educación básica primaria"
+  nombre_en: "Primary education"
+  osm: ["amenity=school"]
+"8521":
+  nombre_es: "Educación básica secundaria"
+  nombre_en: "General secondary education"
+  osm: ["amenity=school"]
+"8522":
+  nombre_es: "Educación media académica"
+  nombre_en: "General secondary education"
+  osm: ["amenity=school"]
+"8523":
+  nombre_es: "Educación media técnica y de formación laboral"
+  nombre_en: "Technical and vocational secondary education"
+  osm: ["amenity=school"]
+"8530":
+  nombre_es: "Establecimientos que combinan diferentes niveles de educación"
+  nombre_en: "Establishments combining different levels of education"
+  osm: ["amenity=school"]
+"8541":
+  nombre_es: "Educación técnica profesional"
+  nombre_en: "Higher education"
+"8542":
+  nombre_es: "Educación tecnológica"
+  nombre_en: "Higher education"
+"8543":
+  nombre_es: "Educación de instituciones universitarias o de escuelas tecnológicas"
+  nombre_en: "Higher education"
+  osm: ["amenity=university"]
+"8544":
+  nombre_es: "Educación de universidades"
+  nombre_en: "Higher education"
+  osm: ["amenity=university"]
+"8551":
+  nombre_es: "Formación académica no formal"
+  nombre_en: "Other education n.e.c."
+"8552":
+  nombre_es: "Enseñanza deportiva y recreativa"
+  nombre_en: "Sports and recreation education"
+"8553":
+  nombre_es: "Enseñanza cultural"
+  nombre_en: "Cultural education"
+"8559":
+  nombre_es: "Otros tipos de educación n.c.p."
+  nombre_en: "Other education n.e.c."

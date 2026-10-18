@@ -47,10 +47,11 @@ def estado(request: Request):
 def frase(pedido: PedidoFrase, request: Request, tenant_id: UUID = Depends(tenant_actual)):
     e = request.app.state
     costos = PostgresCostos(e.engine, tenant_id)
-    generador = generador_de_frase(e.settings, e.tarifas_llm, costos, e.transporte_http)
+    actividades = actividades_de(e.actividades_yaml)
+    generador = generador_de_frase(e.settings, e.tarifas_llm, costos, e.transporte_http, codigos_ciiu=list(actividades))
     if generador is None:  # sin llamada, sin costo: la API sigue viva sin IA
         raise HTTPException(status_code=503, detail="ia_no_disponible")
-    caso = InterpretarFrase(generador, costos, e.geografia, actividades_de(e.actividades_yaml))
+    caso = InterpretarFrase(generador, costos, e.geografia, actividades)
     try:
         r = caso.ejecutar(pedido.frase, [(t.rol, t.texto) for t in pedido.historial])
     except FraseFueraDeRango:
@@ -60,4 +61,5 @@ def frase(pedido: PedidoFrase, request: Request, tenant_id: UUID = Depends(tenan
     except ErrorGeneracion:
         raise HTTPException(status_code=502, detail="ia_error") from None
     return {"sugerencia": r.sugerencia.como_dict(), "pregunta": r.pregunta, "explicacion": r.explicacion,
+            "ciiu_descartado": r.ciiu_descartado,
             "costo_usd": str(r.costo_usd)}

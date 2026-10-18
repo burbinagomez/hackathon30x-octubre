@@ -70,7 +70,7 @@ def ia_configurada(ajustes, tarifas_llm: Mapping[str, Mapping]) -> bool:
 
 
 def generador_de_frase(ajustes, tarifas_llm: Mapping[str, Mapping], costos: RegistroCostos,
-                       transporte: httpx.BaseTransport) -> InterpretadorClaude | InterpretadorOpenRouter | None:
+                       transporte: httpx.BaseTransport, codigos_ciiu=None) -> InterpretadorClaude | InterpretadorOpenRouter | None:
     """El adaptador de la Puerta B atado a este tenant (por `costos`), o None si la IA no está disponible."""
     if not ia_configurada(ajustes, tarifas_llm):
         return None
@@ -80,8 +80,8 @@ def generador_de_frase(ajustes, tarifas_llm: Mapping[str, Mapping], costos: Regi
     clave, tarifa = ajustes.ia_api_key.get_secret_value(), dict(tarifas_llm[modelo])
     if proveedor == "openrouter":
         nombre = (getattr(ajustes, "ia_modelo_proveedor", None) or modelo).strip()
-        return InterpretadorOpenRouter(costos, tarifa, nombre, clave, http)
-    return InterpretadorClaude(costos, tarifa, modelo, clave, http)
+        return InterpretadorOpenRouter(costos, tarifa, nombre, clave, http, codigos_ciiu=codigos_ciiu)
+    return InterpretadorClaude(costos, tarifa, modelo, clave, http, codigos_ciiu=codigos_ciiu)
 
 
 def registro_api(ruta_yaml: Path, catalogo: dict[str, type]) -> Registro:

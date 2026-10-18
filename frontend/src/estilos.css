@@ -607,6 +607,10 @@ table.tabla-leads {
   font-size: 0.85rem;
   font-weight: 700;
 }
+.resumen-aviso {
+  color: var(--color-aviso);
+  font-weight: 700;
+}
 .resumen dd {
   margin: 0;
   overflow-wrap: anywhere;

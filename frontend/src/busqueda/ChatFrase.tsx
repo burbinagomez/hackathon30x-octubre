@@ -24,6 +24,7 @@ function ResumenSugerencia({ s, actividades, divisiones }: { s: Sugerencia; acti
   const division = divisiones.find((d) => d.codigo_nativo === s.departamento);
   const ciudad = division?.municipios.find((m) => m.codigo_nativo === s.ciudad)?.nombre ?? s.ciudad;
   const filas: [string, string | null][] = [
+    ["pais", t(`paises.${s.pais}`, { defaultValue: s.pais })],
     ["ciiu", s.ciiu && (actividad ? (en ? actividad.nombre_en ?? actividad.nombre_es : actividad.nombre_es) : s.ciiu)],
     ["departamento", s.departamento && (division ? (en ? division.nombre_en : division.nombre_es) : s.departamento)],
     ["ciudad", s.departamento ? ciudad : null],
@@ -38,6 +39,11 @@ function ResumenSugerencia({ s, actividades, divisiones }: { s: Sugerencia; acti
           <div key={clave}>
             <dt>{t(`criterios.${clave}`)}</dt>
             <dd>{valor}</dd>
+          </div>
+        ) : clave === "ciiu" ? (
+          <div key={clave}>
+            <dt>{t("criterios.ciiu")}</dt>
+            <dd className="resumen-aviso">{t("busqueda.frase.actividad_falta")}</dd>
           </div>
         ) : null,
       )}
@@ -112,19 +118,21 @@ export default function ChatFrase({ chat, busqueda, actividades, alEditarEnFiltr
           <section className="tarjeta" aria-labelledby="voy-a-buscar">
             <h2 id="voy-a-buscar">{t("busqueda.frase.voy_a_buscar")}</h2>
             <ResumenSugerencia s={sugerencia} actividades={actividades} divisiones={divisiones} />
+            {chat.ciiuDescartado && <p role="status" className="resumen-aviso">{t("busqueda.frase.ciiu_descartado")}</p>}
           </section>
-          {!sugerencia.ciiu && <p className="nota">{t("busqueda.frase.sin_actividad")}</p>}
+          {!sugerencia.ciiu && <p className="aviso-ancho">{t("busqueda.frase.sin_actividad")}</p>}
           <div className="campo">
             <label htmlFor="tope-chat">{t("busqueda.tope")}</label>
             <input id="tope-chat" type="number" value={chat.tope} onChange={(e) => { chat.setTope(e.target.value); busqueda.reiniciar(); }} />
           </div>
           <BloqueBusqueda busqueda={busqueda} pedido={pedido} tope={Number(chat.tope)}
-            puedeVista={Boolean(sugerencia.ciiu) && Number(chat.tope) > 0} />
-          <div className="acciones">
-            <button type="button" className="boton" onClick={() => alEditarEnFiltros(sugerencia)}>
-              {t("busqueda.frase.editar_en_filtros")}
-            </button>
-          </div>
+            puedeVista={Boolean(sugerencia.ciiu) && Number(chat.tope) > 0} buscarPrimario={Boolean(sugerencia.ciiu)}
+            extra={
+              <button type="button" className={sugerencia.ciiu ? "boton" : "boton boton-primario"}
+                onClick={() => alEditarEnFiltros(sugerencia)}>
+                {t("busqueda.frase.editar_en_filtros")}
+              </button>
+            } />
         </div>
       )}
     </div>

@@ -32,9 +32,11 @@ export type RespuestaFrase = {
   sugerencia: Sugerencia;
   pregunta: string | null;
   explicacion: string | null;
+  /** La IA propuso un CIIU que no está en el catálogo y quedó en null. */
+  ciiu_descartado?: boolean;
   costo_usd: string;
 };
 
-/** Un turno de la conversación: la frase nueva y los turnos previos (el back acepta hasta 6). */
+/** Un turno de la conversación: la frase nueva y los turnos previos (el back acepta hasta 12). */
 export const sugerirDesdeFrase = (frase: string, historial: Turno[] = []) =>
   pedir<RespuestaFrase>("/intake/frase", { metodo: "POST", cuerpo: { frase, historial } });
