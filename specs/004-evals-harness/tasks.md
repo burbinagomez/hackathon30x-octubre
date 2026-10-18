@@ -107,6 +107,7 @@
 
 ### Datos y primera corrida
 - [ ] T023 [US1] 🧑 Correr `uv run python -m evals.exportar_candidatos --tenant <id> --busqueda <id>` contra una búsqueda real del 002/003 (D4, D6).
+  - **BLOQUEADA** hasta que la 002 exponga `actividad` (y opcionalmente `ingresos`) en el puerto `RepositorioLeads`: hoy `Lead` no los trae y la exportación no puede leer la tabla `leads` (solo el repositorio la toca), así que los candidatos salen sin `actividad` y no sirven para etiquetar encaje. La 002 abre el issue; la 004 no toca código de la 002.
 - [ ] T024 [US1] 🧑 Etiquetar (~20 min) 20–40 candidatos con `encaja`/`no_encaja`, mínimo 5 de cada una, y pasarlos a `backend/evals/dataset.json` con su `icp` (`pais`, `ciiu`, `departamentos`, `descripcion`). Si hay casos de OSM, crear `backend/evals/LICENCIA.md` con "© OpenStreetMap contributors" y "ODbL". Los tests de archivo real de `test_dataset.py` pasan de rojo a verde acá. Si quedan menos de 10 casos con nombre, se anota para el reporte del slice.
 - [ ] T025 [US1] 🧑 Primera corrida real, **avisada antes con el costo estimado**: `uv run python -m evals.run --tenant <id> --eval encaje_icp --actualizar-baseline`. Commit de `backend/evals/baseline.json`; `test_jsons_de_evals_sin_datos_de_contacto[baseline.json]` en verde.
 
