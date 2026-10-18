@@ -289,7 +289,7 @@ test("la_ciudad_es_un_input_con_los_municipios_de_la_division_y_manda_el_nombre"
     const ciudad = campo(es.busqueda.ciudad);
     expect(ciudad.tagName).toBe("INPUT");  // autocompletado: input + datalist, no un select
     const lista = document.getElementById(ciudad.getAttribute("list") ?? "");
-    expect([...(lista?.querySelectorAll("option") ?? [])].map((o) => o.getAttribute("value"))).toEqual(["Ibagué", "Melgar"]);
+    expect(Array.from(lista?.querySelectorAll("option") ?? []).map((o) => o.getAttribute("value"))).toEqual(["Ibagué", "Melgar"]);
     fireEvent.change(ciudad, { target: { value: "Ibagué" } });
   });
   expect(pedido0(pedidos)).toMatchObject({ departamento: "73", ciudad: "Ibagué" });
@@ -329,6 +329,18 @@ test("la_etiqueta_de_la_division_sale_por_pais_e_idioma", async () => {
   await waitFor(() => expect(opcion("Lima")).toBeInTheDocument());
   expect(campo("Departamento")).toHaveValue("");  // el código de Tolima no vale en Perú
   expect(opcion("Tolima")).not.toBeInTheDocument();
+  // ...y tampoco viaja: el estado se soltó, no solo la vista del select.
+  const pedidos: unknown[] = [];
+  server.use(http.post("*/busquedas/vista-previa", async ({ request }) => {
+    pedidos.push(await request.json());
+    return HttpResponse.json(respuestaVistaPrevia());
+  }));
+  fireEvent.change(campo("Actividad"), { target: { value: "1081" } });
+  fireEvent.change(campo("Tope de gasto (USD)"), { target: { value: "5" } });
+  fireEvent.click(boton("Vista previa"));
+  await waitFor(() => expect(pedidos).toHaveLength(1));
+  expect(pedido0(pedidos)).toMatchObject({ pais: "PE" });
+  expect(pedido0(pedidos)).not.toHaveProperty("departamento");
 
   await i18n.changeLanguage("en");
   await waitFor(() => expect(campo("Region")).toBeInTheDocument());

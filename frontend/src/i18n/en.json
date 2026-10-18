@@ -24,7 +24,7 @@
     "pais": "Country",
     "actividad": "Activity",
     "actividad_vacia": "Pick an activity",
-    "departamento": "State",
+    "departamento": "Department",
     "ciudad": "City (optional)",
     "departamento_vacio": "All states",
     "ingresos_min": "Minimum revenue (USD)",
@@ -96,5 +96,13 @@
   },
   "canales": {
     "email": "Email"
+  },
+  "geografia": {
+    "division": {
+      "CO": "Department",
+      "MX": "State",
+      "BR": "State",
+      "PE": "Region"
+    }
   }
 }

@@ -51,7 +51,7 @@ const division = (iso: string, nativo: string, es: string, en: string, municipio
   municipios: municipios.map(([codigo_nativo, nombre]) => ({ codigo_nativo, nombre })),
 });
 export const geografiaPaises = { paises: ["CO"] };
-export const geografiaPorPais: Record<string, unknown> = {
+export const geografiaPorPais: Record<string, object> = {
   CO: {
     pais: "CO",
     divisiones: [

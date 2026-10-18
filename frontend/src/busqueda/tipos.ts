@@ -1,14 +1,23 @@
 export type Actividad = { codigo: string; nombre_es: string; nombre_en: string | null };
 
-export type Departamento = { codigo: string; nombre_es: string; nombre_en: string };
-/** GET /geografia: departamentos por país (hoy solo CO), con el código DIVIPOLA que viaja en el pedido. */
-export type Geografia = Record<string, Departamento[]>;
+export type Municipio = { codigo_nativo: string; nombre: string };
+/** División de primer nivel de un país. `codigo_nativo` (DIVIPOLA en CO) es lo que viaja en el pedido; `iso_3166_2` es el común. */
+export type Division = {
+  iso_3166_2: string;
+  codigo_nativo: string;
+  nombre_es: string;
+  nombre_en: string;
+  municipios: Municipio[];
+};
+/** GET /geografia: los países que tienen archivo. GET /geografia?pais=CO: sus divisiones con municipios. */
+export type PaisesConGeografia = { paises: string[] };
+export type GeografiaDePais = { pais: string; divisiones: Division[] };
 
 export type PedidoVistaPrevia = {
   pais: string;
   ciiu: string;
-  departamento?: string; // código DIVIPOLA ("73"), nunca el nombre
-  ciudad?: string;
+  departamento?: string; // código nativo de la división ("73" en CO), nunca el nombre
+  ciudad?: string; // nombre del municipio, dentro de esa división
   ingresos_min?: number;
   palabras_clave: string[];
   exclusiones: string[];

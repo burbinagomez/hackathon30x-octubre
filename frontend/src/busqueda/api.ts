@@ -1,9 +1,12 @@
 import { pedir } from "../api/cliente";
-import type { Actividad, Geografia, PedidoVistaPrevia, VistaPrevia } from "./tipos";
+import type { Actividad, GeografiaDePais, PaisesConGeografia, PedidoVistaPrevia, VistaPrevia } from "./tipos";
 
 export const listarActividades = () => pedir<Actividad[]>("/actividades");
 
-export const listarGeografia = () => pedir<Geografia>("/geografia");
+export const listarPaises = () => pedir<PaisesConGeografia>("/geografia");
+
+export const divisionesDe = (pais: string) =>
+  pedir<GeografiaDePais>(`/geografia?pais=${encodeURIComponent(pais)}`);
 
 export const vistaPrevia = (pedido: PedidoVistaPrevia) =>
   pedir<VistaPrevia>("/busquedas/vista-previa", { metodo: "POST", cuerpo: pedido });

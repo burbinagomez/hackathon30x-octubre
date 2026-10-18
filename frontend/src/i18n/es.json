@@ -96,5 +96,13 @@
   },
   "canales": {
     "email": "Correo electrónico"
+  },
+  "geografia": {
+    "division": {
+      "CO": "Departamento",
+      "MX": "Estado",
+      "BR": "Estado",
+      "PE": "Departamento"
+    }
   }
 }
