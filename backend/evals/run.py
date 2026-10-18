@@ -51,6 +51,8 @@ def _casos_calibracion(datos) -> list[tuple]:
     return casos
 
 
+# ponytail: el tipo de eval se elige por su nombre en evals.yaml (un eval por tipo). Si aparece un
+# segundo eval del mismo tipo, agregar un campo `tipo:` en evals.yaml y despachar por ese campo.
 PREPARAR = {"encaje_icp": _casos_encaje, "juez_mensaje_calibracion": _casos_calibracion}
 
 
@@ -72,7 +74,7 @@ def _preparar(args) -> tuple[dict[str, dict], dict]:
         evals = {args.eval: evals[args.eval]}
     carpeta = args.config.parent
     for nombre, ev in evals.items():
-        if nombre not in PREPARAR:
+        if nombre not in PREPARAR:  # ponytail: despacho por nombre, ver PREPARAR
             raise ConfigInvalida(f"{nombre}: eval desconocido")
         if args.actualizar_baseline and ev["k"] < 3:
             raise ConfigInvalida(f"{nombre}: el baseline solo se fija a k=3")
@@ -192,8 +194,10 @@ def main(argv, entorno=os.environ, fabrica_juez=None, registro_costos=None) -> i
                 r["estado"], r["baseline"] = "ok", r["agregado"]
             (args.config.parent / "baseline.json").write_text(json.dumps(baseline, indent=2, ensure_ascii=False) + "\n")
     else:
+        # Mejora = algo sube y nada baja.
         mejora_sin_fijar = [n for n, r in resultados.items()
-                            if r["estado"] == "ok" and _compara(r, baseline.get(n), lambda x, y: x > y)]
+                            if r["estado"] == "ok" and _compara(r, baseline.get(n), lambda x, y: x > y)
+                            and not _compara(r, baseline.get(n), lambda x, y: x < y)]
 
     print(json.dumps({"lote_id": str(lote_id), "evals": resultados, "mejora_sin_fijar": mejora_sin_fijar}, ensure_ascii=False))
     return 0 if all(r["estado"] == "ok" for r in resultados.values()) else 1
