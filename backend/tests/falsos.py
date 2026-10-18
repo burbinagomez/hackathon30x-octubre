@@ -1,9 +1,16 @@
 """Falsos en memoria de los puertos. Mismo contrato que Postgres: dedup por (pais, id_fiscal), ON CONFLICT en lead_fuentes."""
-from collections.abc import Mapping
+import json
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
+from app.modulos.calificacion.dominio.mapeo import mapear_fila
+from app.modulos.calificacion.dominio.errores import ArchivoInvalido
+from app.modulos.calificacion.dominio.modelos import FilaRechazada, ResultadoCalificacion
 from app.modulos.costos.dominio.modelos import OperacionCosto
+from app.modulos.descubrimiento.dominio.errores import ErrorPersistencia
 from app.modulos.descubrimiento.dominio.modelos import Borrador, CriteriosICP, EmpresaCruda, MetaFuente, PaginaEmpresas
 from app.modulos.descubrimiento.dominio.errores import LimiteFuenteAgotado
 from app.modulos.enriquecimiento.dominio.puertos import ContactoPublicado, Encaje, VerificacionTitular
@@ -13,7 +20,8 @@ from app.modulos.enriquecimiento.dominio.errores import JevNoDisponible, UsoJevI
 
 
 class RepositorioLeadsFalso:
-    def __init__(self):
+    def __init__(self, falla_si=None):
+        self._falla_si = falla_si  # empresa -> bool: si es True, guardarla lanza ErrorPersistencia (la base la rechazó)
         self.busquedas: dict[UUID, str] = {}  # id -> estado
         self.leads: dict[tuple[str, str | None], UUID] = {}  # (pais, id_fiscal) -> id
         self.cumplimiento: dict[UUID, tuple] = {}  # lead_id -> (fuente, licencia, url_origen, as_of)
@@ -49,7 +57,23 @@ class RepositorioLeadsFalso:
         self.busquedas[busqueda_id] = "ejecutando"
         return True
 
+    @contextmanager
+    def transaccion(self) -> Iterator[None]:
+        yield
+
+    @contextmanager
+    def savepoint(self) -> Iterator[None]:
+        """Como el de Postgres: si lo de adentro lanza, se deshace todo lo que se escribió ahí y la excepción sigue."""
+        antes = (dict(self.leads), dict(self.cumplimiento), set(self.lead_fuentes), dict(self.licencia_lead_fuente))
+        try:
+            yield
+        except BaseException:
+            self.leads, self.cumplimiento, self.lead_fuentes, self.licencia_lead_fuente = antes
+            raise
+
     def obtener_o_crear_lead(self, e: EmpresaCruda, licencia: str) -> tuple[UUID, bool]:
+        if self._falla_si is not None and self._falla_si(e):
+            raise ErrorPersistencia("la base rechazó la operación")
         clave = (e.pais, e.id_fiscal)
         if e.id_fiscal is not None and clave in self.leads:
             return self.leads[clave], False
@@ -193,3 +217,35 @@ class EnriquecedorFalso:
             tipo="web_fetch", unidades=Decimal(1), costo_unitario=Decimal(0), moneda="USD", proveedor="web",
             fuente=None, canal=None, lead_id=lead_id, lote_id=None, gratis=False))
         return self._por_dominio.get(dominio, ContactoPublicado((), (), "ok"))
+
+
+LIMITE_FILAS_CALIFICADOR = 1000  # igual que DaptaCSV (plan.md): la suite de contrato exige el mismo límite
+
+
+class CalificadorFalso:
+    """Doble del puerto `Calificador`: mismo contrato que `DaptaCSV`, pero decodifica JSON en vez de CSV
+    (tests/contratos/test_calificador.py prueba que ambos se comportan igual ante los mismos datos)."""
+
+    def leer_resultados(self, archivo: bytes) -> list[ResultadoCalificacion | FilaRechazada]:
+        filas = json.loads(archivo.decode("utf-8"))
+        if len(filas) > LIMITE_FILAS_CALIFICADOR:
+            raise ArchivoInvalido(f"más de {LIMITE_FILAS_CALIFICADOR} filas")
+        ahora = datetime.now(UTC)
+        return [mapear_fila(i, {k: str(v) for k, v in fila.items()}, ahora) for i, fila in enumerate(filas, start=1)]
+
+
+class RepositorioCalificacionesFalso:
+    """Repo en memoria: calificación y costo "en la misma transacción" (los dos se escriben juntos o ninguno).
+    `estados` simula lo que decidiría Postgres para un `lead_id` dado; sin entrada, se asume `importada`."""
+
+    def __init__(self, costos: RegistroCostosFalso, estados: dict[UUID, str] | None = None):
+        self._costos = costos
+        self._estados = estados or {}
+        self.guardadas: list[ResultadoCalificacion] = []
+
+    def guardar(self, resultado: ResultadoCalificacion, costo: OperacionCosto) -> str:
+        estado = self._estados.get(resultado.lead_id, "importada")
+        if estado == "importada":
+            self.guardadas.append(resultado)
+            self._costos.registrar(costo)
+        return estado

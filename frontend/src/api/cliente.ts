@@ -8,8 +8,12 @@ export class ErrorApi extends Error {
   }
 }
 
+// Solo rutas de la API: empiezan con "/" y no con "//" ni "/\" (protocolo relativo), sin espacios ni controles.
+const RUTA_API = /^\/(?![/\\])[^\s\\]*$/;
+
 /** Cliente HTTP único. Un 401 con sesión la borra y lleva al login; sin sesión (login fallido) solo falla. */
 export async function pedir<T>(ruta: string, { metodo, cuerpo }: Opciones = {}): Promise<T> {
+  if (!RUTA_API.test(ruta)) throw new Error("ruta_invalida"); // un dato de la URL nunca elige el host
   const token = await tokenActual();
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;

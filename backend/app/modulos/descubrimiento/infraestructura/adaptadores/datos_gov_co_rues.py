@@ -1,6 +1,6 @@
 import re
 import time
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -10,7 +10,7 @@ from uuid import UUID
 
 import httpx
 
-from app.modulos.costos.dominio.modelos import OperacionCosto
+from app.modulos.costos.dominio.modelos import ContextoCosto, OperacionCosto
 from app.modulos.costos.dominio.puertos import RegistroCostos
 from app.modulos.descubrimiento.aplicacion.camaras import Camara, camaras_de
 from app.modulos.descubrimiento.dominio.errores import (
@@ -38,6 +38,9 @@ SELECT_FILAS = (
     "nit,digito_verificacion,razon_social,cod_ciiu_act_econ_pri,"
     "codigo_camara,organizacion_juridica,fecha_renovacion"
 )
+# Para buscar por razón social: lo mismo más el estado de la matrícula. Sigue sin representante legal ni personas.
+SELECT_COINCIDENCIAS = SELECT_FILAS + ",estado_matricula"
+LIMITE_COINCIDENCIAS = 100
 # [0-9] y no \d: \d acepta dígitos de otros alfabetos y esos no entran al SoQL ni al NIT.
 _CIIU = re.compile(r"[0-9]{4}")
 _NIT = re.compile(r"[89][0-9]{8}")
@@ -57,6 +60,20 @@ def _es_juridica_valida(fila: Mapping[str, Any]) -> bool:
         and isinstance(nombre, str)
         and nombre.strip() != ""
     )
+
+
+@dataclass(frozen=True)
+class CoincidenciaRazonSocial:
+    nit: str
+    ciiu: str | None
+    camara: str | None
+    estado_matricula: str | None
+
+
+def _literal_like(nombre: str) -> str:
+    """Texto del usuario -> contenido seguro de un literal SoQL con LIKE: comillas duplicadas; sin comodines ni control."""
+    limpio = "".join(c for c in nombre if c.isprintable() and c not in "%_\\")
+    return " ".join(limpio.upper().split()).replace("'", "''")
 
 
 class DatosGovCoRues:
@@ -143,7 +160,42 @@ class DatosGovCoRues:
             raise FuenteNoDisponible(f"{self.meta.clave}: respuesta ilegible") from None
         return PaginaEmpresas(empresas=empresas, total=None)
 
-    def _pedir(self, params: Mapping[str, str]) -> httpx.Response:
+    def buscar_coincidencias(
+        self, nombre_normalizado: str, contexto_costo: ContextoCosto
+    ) -> list[CoincidenciaRazonSocial]:
+        """Todas las jurídicas activas cuya razón social contiene el nombre (Puerta A de la 010).
+
+        El costo de cada request se atribuye al contexto (`fuente='intake'`, `lote_id` de la corrida), no a una búsqueda.
+        """
+        nombre = _literal_like(nombre_normalizado)
+        if not nombre:
+            return []
+        where = (
+            f"upper(razon_social) like '%{nombre}%'"
+            " AND organizacion_juridica != 'PERSONA NATURAL'"
+            " AND organizacion_juridica IS NOT NULL"
+            " AND estado_matricula = 'ACTIVA'"
+            " AND nit IS NOT NULL"
+        )
+        respuesta = self._pedir(
+            {"$select": SELECT_COINCIDENCIAS, "$where": where, "$limit": str(LIMITE_COINCIDENCIAS)},
+            contexto_costo,
+        )
+        try:
+            return [
+                CoincidenciaRazonSocial(
+                    nit=fila["nit"].strip(),
+                    ciiu=fila.get("cod_ciiu_act_econ_pri"),
+                    camara=None if fila.get("codigo_camara") is None else str(fila["codigo_camara"]),
+                    estado_matricula=fila.get("estado_matricula"),
+                )
+                for fila in respuesta.json()
+                if _es_juridica_valida(fila)
+            ]
+        except (ValueError, TypeError, AttributeError, KeyError):
+            raise FuenteNoDisponible(f"{self.meta.clave}: respuesta ilegible") from None
+
+    def _pedir(self, params: Mapping[str, str], contexto: ContextoCosto | None = None) -> httpx.Response:
         """GET con hasta 2 intentos. Cada intento deja su fila en costos antes de decidir."""
         cabeceras = {"X-App-Token": self._app_token} if self._app_token else {}
         estado: int | str = "timeout"
@@ -169,7 +221,7 @@ class DatosGovCoRues:
                     ) from None
                 finally:
                     # Por intento y antes de decidir o lanzar: solo los segundos del request.
-                    self._registrar_costo(self._monotonico() - inicio)
+                    self._registrar_costo(self._monotonico() - inicio, contexto)
                 if respuesta is not None and respuesta.status_code == 200:
                     return respuesta
                 if estado not in REINTENTABLES:
@@ -177,7 +229,7 @@ class DatosGovCoRues:
         # Solo el status: el cuerpo de la respuesta no sale en el mensaje.
         raise FuenteNoDisponible(f"{self.meta.clave}: {estado}") from None
 
-    def _registrar_costo(self, segundos: float) -> None:
+    def _registrar_costo(self, segundos: float, contexto: ContextoCosto | None = None) -> None:
         self._costos.registrar(
             OperacionCosto(
                 tipo="socrata_descarga",
@@ -185,10 +237,10 @@ class DatosGovCoRues:
                 costo_unitario=Decimal(str(self._tarifas["computo_seg_usd"])),
                 moneda="USD",
                 proveedor=self.meta.proveedor,
-                fuente=self.meta.clave,
+                fuente=self.meta.clave if contexto is None else contexto.fuente,
                 canal=None,
                 lead_id=None,
-                lote_id=self._lote_id,
+                lote_id=self._lote_id if contexto is None else contexto.lote_id,
                 gratis=False,
             )
         )

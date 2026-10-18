@@ -161,14 +161,15 @@ def test_ninguna_fuente_cubre_el_icp_termina_completada_sin_llamar_a_nadie():
     assert repo.leads == {}
 
 
-def test_error_inesperado_deja_la_busqueda_en_error_y_no_se_traga():
+def test_error_inesperado_en_todas_deja_la_busqueda_en_error_y_el_error_viaja_en_el_resultado():
+    # Spec 015: ya no se propaga (era un 500); sigue sin tragarse: queda por fuente en `errores`.
     caso, repo, _, _, borrador_id = _caso(errores={"osm_overpass": RuntimeError("bug"),
                                                    "croma_supersociedades_co": RuntimeError("bug")})
 
-    with pytest.raises(RuntimeError):
-        caso.ejecutar(borrador_id)
+    r = caso.ejecutar(borrador_id)
 
     assert repo.busquedas[borrador_id] == "error"  # no se queda en `ejecutando` para siempre
+    assert set(r.errores) == {"osm_overpass", "croma_supersociedades_co"}
 
 
 def test_criterio_no_soportado_por_una_fuente_no_tumba_la_busqueda():

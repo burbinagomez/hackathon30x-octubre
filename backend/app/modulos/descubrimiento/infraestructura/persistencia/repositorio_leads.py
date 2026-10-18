@@ -89,6 +89,7 @@ class RepositorioLeadsPostgres:
         self._engine = engine
         self._tenant_id = tenant_id
         self._cifrador = cifrador
+        self._compartida: Connection | None = None  # la conexión de `transaccion()`; None fuera de ella
 
     def crear_busqueda(self, criterios: CriteriosICP) -> UUID:
         with self._uow() as c:
@@ -132,7 +133,30 @@ class RepositorioLeadsPostgres:
                 {"id": busqueda_id}).rowcount == 1
 
     @contextmanager
+    def transaccion(self) -> Iterator[None]:
+        """Los métodos de escritura de adentro comparten esta transacción (en vez de una cada uno)."""
+        with self._uow() as c:
+            self._compartida = c
+            try:
+                yield
+            finally:
+                self._compartida = None
+
+    @contextmanager
+    def savepoint(self) -> Iterator[None]:
+        """SAVEPOINT: si lo de adentro lanza, vuelve a él y la transacción sigue viva para la próxima fuente."""
+        assert self._compartida is not None, "savepoint() va dentro de transaccion()"
+        with self._compartida.begin_nested():
+            yield
+
+    @contextmanager
     def _uow(self) -> Iterator[Connection]:
+        if self._compartida is not None:
+            try:
+                yield self._compartida
+            except DBAPIError:
+                raise ErrorPersistencia("la base rechazó la operación") from None
+            return
         # El mensaje de Postgres trae la fila entera en el DETAIL (nombre, dirección): no sale de acá, ni como causa.
         try:
             with unidad_de_trabajo(self._engine, self._tenant_id) as c:
