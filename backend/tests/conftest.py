@@ -25,4 +25,3 @@ def cifrador(clave_cifrado):
 def _cifrado_key_de_test(monkeypatch):
     # La app no arranca sin CIFRADO_KEY; los tests que la necesitan ausente la quitan con delenv.
     monkeypatch.setenv("CIFRADO_KEY", nueva_clave_de_cifrado())
-

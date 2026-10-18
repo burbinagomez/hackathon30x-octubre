@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -212,3 +213,13 @@ def test_0005_convalida_cuando_el_dueno_borro_los_leads_en_claro(base_vacia, tmp
     assert r.returncode == 0, r.stderr
     assert _aplicadas(base_vacia) == "0001,0002,0003,0005"
     assert _convalidados(base_vacia) == {nombre: True for nombre in CHECKS_DE_TITULAR}
+
+
+def test_las_migraciones_de_titular_son_el_ddl_aprobado_de_plan_md():
+    # El DDL lo aprobó el dueño tal como está en plan.md: el archivo no puede diferir ni en un comentario.
+    plan = (BACKEND.parent / "specs" / "003-osm-dedup" / "plan.md").read_text(encoding="utf-8")
+    seccion = plan[plan.index("## DDL de la 0003"):]
+    bloques = re.findall(r"```sql\n(.*?)```", seccion, re.S)
+    assert len(bloques) == 2
+    for bloque, archivo in zip(bloques, ("0003_leads_cifrado_nombre_direccion.sql", "0005_validar_checks_leads.sql")):
+        assert (MIGRACIONES / archivo).read_text(encoding="utf-8") == bloque, archivo

@@ -191,13 +191,16 @@ def _identidad_en_claro(self, e, lead_id):
     return {"nombre": e.nombre, "direccion": e.direccion, "nombre_cifrado": None, "direccion_cifrada": None}
 
 
-def test_una_violacion_de_check_no_filtra_nombre_ni_direccion(rt, tenants, cifrador, monkeypatch, caplog, capsys):
+@pytest.mark.parametrize("motor", ["rt", "admin"])
+def test_una_violacion_de_check_no_filtra_nombre_ni_direccion(motor, request, tenants, cifrador, monkeypatch, caplog, capsys):
     caplog.set_level(logging.DEBUG)
-    # Un bug que guarde en claro a un desconocido: el CHECK lo frena y Postgres pone la fila entera en el DETAIL.
+    # Un bug que guarde en claro a un desconocido: el CHECK lo frena. Con app_rt (RLS) Postgres no manda la fila
+    # en el DETAIL; con un rol que la saltea (admin) sí la manda: ese caso mata a ErrorPersistencia(str(e.orig)).
+    engine = request.getfixturevalue(motor)
     monkeypatch.setattr(RepositorioLeadsPostgres, "_identidad", _identidad_en_claro)
 
     with pytest.raises(Exception) as exc:
-        _crear(rt, tenants["a"], cifrador, "desconocido")
+        _crear(engine, tenants["a"], cifrador, "desconocido")
 
     captura = capsys.readouterr()
     volcado = "".join(traceback.format_exception(exc.value)) + caplog.text + captura.out + captura.err
