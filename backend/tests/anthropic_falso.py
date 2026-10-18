@@ -27,12 +27,11 @@ def respuesta(entrada: dict | None = None, uso: dict = USO, content: list | None
             "stop_reason": stop_reason, "stop_sequence": None, "usage": uso}
 
 
-def cliente(capturados: list, entrada: dict | None = None, cabeceras: list | None = None,
-            http: httpx.Response | None = None, **cuerpo) -> httpx.Client:
-    """Cliente con transporte falso, sin headers propios: la key y la versión las pone el juez.
-
-    Cada request a POST /v1/messages deja su cuerpo JSON en `capturados` y `dict(request.headers)` en `cabeceras`.
-    `http` reemplaza la respuesta entera (p. ej. un 401); `cuerpo` va a `respuesta()` (content, stop_reason).
+def transporte(capturados: list, entrada: dict | None = None, cabeceras: list | None = None,
+               http: httpx.Response | None = None, **cuerpo) -> httpx.MockTransport:
+    """Messages API falsa. Cada request a POST /v1/messages deja su cuerpo JSON en `capturados` y
+    `dict(request.headers)` en `cabeceras`. `http` reemplaza la respuesta entera (p. ej. un 401);
+    `cuerpo` va a `respuesta()` (content, stop_reason).
     """
     entrada = {"probabilidad": 0.8, "razon": "encaja"} if entrada is None else entrada
 
@@ -44,7 +43,12 @@ def cliente(capturados: list, entrada: dict | None = None, cabeceras: list | Non
             cabeceras.append(dict(request.headers))
         return http if http is not None else httpx.Response(200, json=respuesta(entrada, **cuerpo))
 
-    return httpx.Client(base_url="https://api.anthropic.com", transport=httpx.MockTransport(responder))
+    return httpx.MockTransport(responder)
+
+
+def cliente(capturados: list, entrada: dict | None = None, **kw) -> httpx.Client:
+    """Cliente con transporte falso, sin headers propios: la key y la versión las pone el juez."""
+    return httpx.Client(base_url="https://api.anthropic.com", transport=transporte(capturados, entrada, **kw))
 
 
 def juez(registro_costos, capturados: list, entrada: dict | None = None, prompt: str = "prompt de prueba",

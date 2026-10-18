@@ -96,6 +96,8 @@
   - la rama por defecto usa el `registro_costos` inyectado en `main()` cuando viene (no crea otro);
   - la tarifa del yaml entra como `Decimal(str(v))`: `in_usd_por_M: 0.10` → `costo_unitario == Decimal("0.0000001")` exacto (con `Decimal(0.10)` da `0.1000000000000000055…/1e6` y falla).
 
+  Hecho: `componer(entorno, transporte, *, tenant, evals, carpeta, registro_costos)` en `run.py` y `main(..., transporte=None)`; tests en `tests/unit/evals/test_composicion.py` y `tests/integration/test_costos_repo.py::test_evals_run_compuesto_escribe_en_costos`. **Pendiente:** conectar `__main__` a `main(sys.argv[1:])`. El job `evals` del CI lo corre sin `ANTHROPIC_API_KEY` ni `--tenant` y espera 0: conectarlo lo deja en 2. Decide el dueño (cambiar el job o el `__main__`).
+
 ### Exportación de candidatos
 - [ ] T020 [P] [US1] 🤖 **Rojo:** `backend/tests/unit/evals/test_exportar_candidatos.py` con un repositorio falso que sigue la forma de `RepositorioLeads` del 002 (D4):
   - `::test_aplica_whitelist` (sin email, teléfono, web ni NIT; Croma sin `nombre`, `id = c-` + 12 hex distinto de `sha256(pais:nit)[:12]` y distinto en dos exportaciones; OSM `juridica` con `nombre`; OSM `desconocido` sin `nombre`);

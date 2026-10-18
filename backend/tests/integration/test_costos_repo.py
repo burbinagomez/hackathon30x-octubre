@@ -3,7 +3,7 @@ import os
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
@@ -17,7 +17,9 @@ from app.modulos.descubrimiento.aplicacion.registro import cargar_registro
 from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, MetaFuente
 from app.modulos.descubrimiento.infraestructura.adaptadores.datos_gov_co_rues import DatosGovCoRues
 from app.modulos.descubrimiento.infraestructura.adaptadores.osm_overpass import OsmOverpass
-from tests.anthropic_falso import CASO, juez
+from evals import run
+from tests.anthropic_falso import CASO, CLAVE_FALSA, juez, transporte
+from tests.evals_falso import CASOS, K, config
 
 PROVEEDOR = "croma"
 BACKEND = Path(__file__).resolve().parents[2]
@@ -154,6 +156,24 @@ def test_socrata_descarga_escribe_fila_en_costos(rt, admin, tenant):
     assert filas == [(tenant, "socrata_descarga", Decimal(2), Decimal("0.0000070"), "USD", "datos.gov.co",
                       "datos_gov_co_rues", None, lote, False)]
     assert tipo_costo == "numeric"
+
+
+def test_evals_run_compuesto_escribe_en_costos(admin, tenant, tmp_path, capsys):
+    """T019: la rama por defecto de evals.run arma PostgresCostos (DATABASE_URL del mapeo) + JuezClaude, sin red."""
+    capturados = []
+    entorno = {"ANTHROPIC_API_KEY": CLAVE_FALSA, "DATABASE_URL": _url("TEST_DATABASE_URL")}
+    codigo = run.main(["--config", str(config(tmp_path)), "--tenant", str(tenant)], entorno=entorno,
+                      transporte=transporte(capturados))
+    out, err = capsys.readouterr()
+
+    assert CLAVE_FALSA not in out + err and entorno["DATABASE_URL"] not in out + err
+    reporte = json.loads(out)
+    assert (codigo, reporte["evals"]["encaje_icp"]["estado"]) == (1, "sin_baseline")
+    assert len(capturados) == K * len(CASOS)
+    with admin.connect() as c:
+        filas = c.execute(text("SELECT tipo, lote_id, fuente FROM costos WHERE tenant_id = :t"), {"t": tenant}).all()
+    assert sorted(filas) == sorted([("llm_tokens_in", UUID(reporte["lote_id"]), "evals"),
+                                    ("llm_tokens_out", UUID(reporte["lote_id"]), "evals")] * K * len(CASOS))
 
 
 def test_juez_escribe_filas_llm_en_costos(rt, admin, tenant):

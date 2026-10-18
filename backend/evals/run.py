@@ -9,7 +9,11 @@ import os
 import sys
 import uuid
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
+
+import httpx
+import yaml
 
 from evals.config import ConfigInvalida, cargar
 from evals.fingerprint import fingerprint
@@ -17,6 +21,8 @@ from evals.jueces.puerto import SalidaJuezInvalida
 from evals.scorers import forma
 
 CONFIG_DEFAULT = Path(__file__).parent / "evals.yaml"
+TARIFAS = Path(__file__).parents[1] / "config" / "tarifas.yaml"
+API_ANTHROPIC = "https://api.anthropic.com"
 ENTORNO_REQUERIDO = ("ANTHROPIC_API_KEY", "DATABASE_URL")
 
 
@@ -151,7 +157,47 @@ def _error(codigo: str) -> int:
     return 2
 
 
-def main(argv, entorno=os.environ, fabrica_juez=None, registro_costos=None) -> int:
+def _tarifas_llm() -> dict[str, dict[str, Decimal]]:
+    # Decimal(str(v)), nunca Decimal(v): el float 0.10 arrastra 0.1000000000000000055… al costo_unitario.
+    llm = yaml.safe_load(TARIFAS.read_text())["llm"]
+    return {modelo: {k: Decimal(str(v)) for k, v in t.items()} for modelo, t in llm.items()}
+
+
+def componer(entorno, transporte=None, *, tenant, evals, carpeta, registro_costos=None):
+    """Rama por defecto: JuezClaude del CATALOGO + PostgresCostos del 002 (o el registro inyectado).
+
+    `transporte` es la costura de los tests (httpx.MockTransport); en producción, None = red real.
+    La key sale del mapeo `entorno`, nunca del entorno del proceso. Lanza ConfigInvalida antes de cualquier request.
+    """
+    from evals.jueces.catalogo import CATALOGO
+    from evals.jueces.claude import JuezClaude
+
+    try:
+        tenant_id = uuid.UUID(tenant)
+    except ValueError as e:
+        raise ConfigInvalida("--tenant no es un uuid") from e
+    tarifas = _tarifas_llm()
+    for nombre, ev in evals.items():
+        if CATALOGO.get(ev["juez"]) is not JuezClaude:
+            raise ConfigInvalida(f"{nombre}: juez {ev['juez']} no se compone desde evals.yaml")
+        if ev["modelo"] not in tarifas:
+            raise ConfigInvalida(f"{nombre}: sin tarifa llm para {ev['modelo']}")
+    if registro_costos is None:
+        from app.db import crear_engine
+        from app.modulos.costos.infraestructura.postgres_costos import PostgresCostos
+        registro_costos = PostgresCostos(crear_engine(entorno["DATABASE_URL"]), tenant_id)
+    # ponytail: un cliente por corrida que no se cierra; vive lo que vive el proceso del CLI.
+    http = httpx.Client(base_url=API_ANTHROPIC, transport=transporte, timeout=60)
+
+    def fabrica(nombre, lote_id):
+        ev = evals[nombre]
+        return JuezClaude(registro_costos=registro_costos, tarifa=tarifas[ev["modelo"]], modelo=ev["modelo"],
+                          prompt=(carpeta / ev["prompt"]).read_text(encoding="utf-8"), lote_id=lote_id,
+                          api_key=entorno["ANTHROPIC_API_KEY"], http_client=http)
+    return fabrica
+
+
+def main(argv, entorno=os.environ, fabrica_juez=None, registro_costos=None, transporte=None) -> int:
     try:
         args = _args(argv)
     except SystemExit:
@@ -163,7 +209,11 @@ def main(argv, entorno=os.environ, fabrica_juez=None, registro_costos=None) -> i
     except ConfigInvalida as e:
         return _error(f"config_invalida: {e}")
     if fabrica_juez is None:
-        raise NotImplementedError("composición real (JuezClaude + postgres_costos): T019")
+        try:
+            fabrica_juez = componer(entorno, transporte, tenant=args.tenant, evals=evals, carpeta=args.config.parent,
+                                    registro_costos=registro_costos)
+        except ConfigInvalida as e:
+            return _error(f"config_invalida: {e}")
 
     lote_id = uuid.uuid4()
     jueces = {}
@@ -203,6 +253,8 @@ def main(argv, entorno=os.environ, fabrica_juez=None, registro_costos=None) -> i
     return 0 if all(r["estado"] == "ok" for r in resultados.values()) else 1
 
 
-# El CI corre este módulo y espera 0: hasta la composición real (T019) no llama a main.
+# El job `evals` del CI corre este módulo sin ANTHROPIC_API_KEY ni --tenant y espera 0. La composición real
+# ya existe (componer), pero conectar acá `main(sys.argv[1:])` haría salir 2 ese job: pendiente de decisión
+# del dueño (cambiar el job o este __main__). Mientras tanto no llama a main.
 if __name__ == "__main__":
     raise SystemExit(0)
