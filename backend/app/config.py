@@ -62,6 +62,8 @@ class SettingsApi(Settings):
     # Obligatorias y no vacías: sin ellas la API no arranca (fallaría abierta o cerrada sin avisar).
     auth_jwks_url: str = Field(min_length=1)
     auth_issuer: str = Field(min_length=1)
+    # La misma clave que firma el enlace de baja en SettingsEmail. Sin ella, /baja/{token} responde 404.
+    baja_secret: SecretStr | None = Field(None, min_length=32)
 
 
 

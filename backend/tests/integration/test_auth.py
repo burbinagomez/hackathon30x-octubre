@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from sqlalchemy import text
 
+from app.api import RUTAS_PUBLICAS
 from app.api.sesion import tenant_actual
 from app.config import SettingsApi
 from app.modulos.acceso.infraestructura.verificador_jwks import VerificadorJwks
@@ -123,7 +124,7 @@ def test_token_valido_sin_fila_en_usuarios_da_403(cliente, admin, usuarios):
 def _rutas():
     # FastAPI 0.143 anida los routers en `_IncludedRouter`: `app.routes` ya no los lista planos. El esquema OpenAPI
     # trae método + ruta completa de todas las rutas de la API (ninguna lleva include_in_schema=False).
-    return [(m.upper(), ruta) for ruta, ops in _app().openapi()["paths"].items() if ruta != "/health" for m in ops]
+    return [(m.upper(), ruta) for ruta, ops in _app().openapi()["paths"].items() if ruta not in RUTAS_PUBLICAS for m in ops]
 
 
 @pytest.mark.parametrize("metodo,ruta", _rutas(), ids=lambda v: v)
@@ -144,6 +145,12 @@ def test_todas_las_rutas_de_los_routers_estan_en_el_esquema():
 
 def test_hay_rutas_que_probar():
     assert ("GET", "/usuarios/me") in _rutas()
+
+
+def test_rutas_publicas_son_exactamente_estas():
+    # Literal a propósito: sumar una ruta pública exige tocar este test (y que alguien lo revise).
+    assert RUTAS_PUBLICAS == {"/health", "/baja/{token}"}
+    assert RUTAS_PUBLICAS <= set(_app().openapi()["paths"])
 
 
 @pytest.mark.parametrize("caso", sorted(CASOS_INVALIDOS))

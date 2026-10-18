@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 
+from app import cli
 from app.cli import Persistencia, main
 from app.modulos.descubrimiento.dominio.modelos import Actividad, EmpresaCruda, PaginaEmpresas
 from tests.falsos import FuenteFalsa, RegistroCostosFalso, RepositorioLeadsFalso
@@ -166,7 +167,12 @@ ENTORNO_EMAIL = {"DATABASE_URL": DB_URL, "SMTP_HOST": "smtp.invalido", "SMTP_USU
 ENVIAR = ["enviar", "--tenant", str(uuid4()), "--busqueda", str(uuid4())]
 
 
+def test_la_ruta_de_baja_existe():
+    assert cli._hay_ruta_de_baja() is True
+
+
 def test_enviar_en_modo_real_sin_ruta_de_baja_no_arma_nada(monkeypatch, capsys):
+    monkeypatch.setattr(cli, "_hay_ruta_de_baja", lambda: False)
     for nombre, valor in (ENTORNO_EMAIL | {"EMAIL_MODO": "real"}).items():
         monkeypatch.setenv(nombre, valor)
     armados = []

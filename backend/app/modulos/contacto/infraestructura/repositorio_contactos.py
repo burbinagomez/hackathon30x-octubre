@@ -65,3 +65,18 @@ class RepositorioContactosPostgres:
     def descartar(self, contacto_id: UUID) -> None:
         self._ejecutar("UPDATE contactos SET estado = 'descartado' WHERE id = :c AND estado IN ('aprobado', 'enviando')",
                        c=contacto_id)
+
+    def dar_de_baja(self, contacto_id: UUID, via: str) -> bool:
+        with unidad_de_trabajo(self._engine, self._tenant) as c:
+            lead = c.execute(text(
+                "UPDATE cumplimiento SET opt_out_at = COALESCE(opt_out_at, now()), solicitudes = solicitudes || "
+                "jsonb_build_array(jsonb_build_object('tipo', 'baja', 'via', CAST(:v AS text), 'ts', now())) "
+                "WHERE lead_id = (SELECT lead_id FROM contactos WHERE id = :c) RETURNING lead_id"),
+                {"c": contacto_id, "v": via}).scalar()
+            if lead is None:
+                return False
+            # Por lead, no por contacto: la baja cierra todos los contactos de ese lead.
+            c.execute(text("UPDATE contactos SET bloqueo = true, estado = CASE WHEN estado IN "
+                           "('aprobado', 'pendiente_aprobacion') THEN 'descartado' ELSE estado END WHERE lead_id = :l"),
+                      {"l": lead})
+            return True

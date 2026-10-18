@@ -72,7 +72,26 @@ def _parser() -> argparse.ArgumentParser:
     e.add_argument("--busqueda", type=UUID, required=True)
     e.add_argument("--dry-run", action="store_true", help="Aprueba los contactos y muestra el resumen; no manda nada.")
     e.add_argument("--rehacer", action="store_true", help="Con --dry-run: recompone los aprobados si cambió el mensaje.")
+    d = sub.add_parser("baja", help="Da de baja a mano (via humano) al lead de un contacto: cierra todos los canales.")
+    d.add_argument("--tenant", type=UUID, required=True)
+    d.add_argument("--contacto", type=UUID, required=True)
     return p
+
+
+def _baja(args) -> int:
+    from app import db
+    from app.modulos.contacto.infraestructura.repositorio_contactos import RepositorioContactosPostgres
+
+    try:
+        settings = Settings()
+    except ValidationError as error:
+        return _invalida(error)
+    repo = RepositorioContactosPostgres(db.crear_engine(settings.database_url), args.tenant)
+    if not repo.dar_de_baja(args.contacto, "humano"):
+        print("no existe ese contacto en ese tenant", file=sys.stderr)
+        return 1
+    print("baja: 1")
+    return 0
 
 
 def _invalida(error: ValidationError) -> int:
@@ -84,7 +103,8 @@ def _invalida(error: ValidationError) -> int:
 
 def _hay_ruta_de_baja() -> bool:
     from app.main import app
-    return any(getattr(r, "path", None) == "/baja/{token}" for r in app.routes)
+    # app.routes no lista los routers incluidos (FastAPI 0.143); el esquema sí, aunque openapi_url sea None.
+    return "/baja/{token}" in app.openapi()["paths"]
 
 
 def _armar_envio_postgres(ajustes: SettingsEmail, tenant: UUID):
@@ -129,6 +149,8 @@ def main(argv=None, *, catalogo=catalogo, persistencia=None, armar_envio=None) -
         return int(salida.code or 0)
     if args.comando == "enviar":
         return _enviar(args, armar_envio)
+    if args.comando == "baja":
+        return _baja(args)
 
     @cache
     def ajustes() -> Settings:

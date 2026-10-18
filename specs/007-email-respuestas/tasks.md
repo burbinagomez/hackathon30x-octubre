@@ -53,12 +53,16 @@
 
 ## Fase 6: Baja (Paso 5) — security
 
-- [ ] T050 [Paso 5] `tests/integration/test_api_baja.py`: `::test_get_muestra_confirmacion_y_no_da_de_baja`, `::test_post_da_de_baja_y_es_idempotente` (`via='enlace'`), `::test_one_click_rfc8058_sin_sesion`, `::test_token_invalido_404_generico` (alterado, `msgid` como baja, basura: mismo cuerpo), `::test_baja_no_expone_el_email`.
-- [ ] T051 [Paso 5] `::test_opt_out_es_monotonico`: dos bajas → `opt_out_at` de la primera, 2 entradas en `solicitudes`. Mutación `sabotaje_baja_no_monotonica`: `opt_out_at = now()` sin `COALESCE`.
-- [ ] T052 [Paso 5] `::test_baja_cierra_todos_los_canales`: tras la baja, el lead no sale en `de_busqueda(..., 'email')` ni en `de_busqueda(..., 'whatsapp')`, y todos sus `contactos` quedan con `bloqueo=true`. Mutación `sabotaje_baja_un_solo_canal`: filtrar el bloqueo por `canal`.
-- [ ] T053 [Paso 5] `::test_baja_entre_reclamo_y_envio_gana`: baja después de crear el contacto → 0 mensajes, `descartado`.
-- [ ] T054 [Paso 5] `test_auth.py`: `test_sin_token_da_401` excluye `RUTAS_PUBLICAS`; `::test_rutas_publicas_son_exactamente_estas`.
-- [ ] T055 [Paso 5] Implementar `DarDeBaja`, `api/baja.py`, `app.cli baja --contacto <id>` (`via='humano'`) hasta verde.
+- [x] T050 [Paso 5] `tests/integration/test_api_baja.py`: `::test_get_muestra_confirmacion_y_no_da_de_baja`, `::test_post_da_de_baja_y_es_idempotente` (`via='enlace'`), `::test_one_click_rfc8058_sin_sesion`, `::test_token_invalido_404_generico` (alterado, `msgid` como baja, basura: mismo cuerpo), `::test_baja_no_expone_el_email`.
+  - Los 404 nacen verdes (la ruta no existía). Los validan dos sabotajes: `sabotaje_token_msgid_como_baja` da 1 rojo y la ruta con `tenant_actual` da rojos en GET, POST y one-click.
+- [x] T051 [Paso 5] `::test_opt_out_es_monotonico`: dos bajas → `opt_out_at` de la primera, 2 entradas en `solicitudes`. Mutación `sabotaje_baja_no_monotonica`: `opt_out_at = now()` sin `COALESCE`.
+- [x] T052 [Paso 5] `::test_baja_cierra_todos_los_canales`: tras la baja, el lead no sale en `de_busqueda(..., 'email')` ni en `de_busqueda(..., 'whatsapp')`, y todos sus `contactos` quedan con `bloqueo=true`. Mutación `sabotaje_baja_un_solo_canal`: filtrar el bloqueo por `canal`.
+  - **Desvío**: `canal` solo admite 'email' y no hay adaptador de leads contactables de la 006. Por eso el cierre se prueba con el opt-out del lead (`v_leads_con_opt_out` y `crear` en otra búsqueda → False), que es lo que mira la elegibilidad SQL de cualquier canal.
+  - `sabotaje_baja_un_solo_canal` = bloquear el contacto sin opt-out del lead: 5 rojos.
+  - Bloquear por `id` en vez de por `lead_id` sobrevive. Es equivalente mientras `unique (tenant_id, lead_id, canal)` y un solo canal den como mucho un contacto por lead; el test con dos canales entra con la 006.
+- [x] T053 [Paso 5] `::test_baja_entre_reclamo_y_envio_gana`: baja después de crear el contacto → 0 mensajes, `descartado`.
+- [x] T054 [Paso 5] `test_auth.py`: `test_sin_token_da_401` excluye `RUTAS_PUBLICAS`; `::test_rutas_publicas_son_exactamente_estas`.
+- [x] T055 [Paso 5] Implementar `DarDeBaja`, `api/baja.py`, `app.cli baja --contacto <id>` (`via='humano'`) hasta verde.
 
 ## Fase 7: Respuestas y tasa (Paso 6)
 
