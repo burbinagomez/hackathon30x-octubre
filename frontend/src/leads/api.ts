@@ -18,15 +18,18 @@ export const listarLeadsDeFuente = (fuente: string | null, pagina: number, conCo
   return pedir<PaginaLeads>(`/leads?${q.toString()}`);
 };
 
-export type ResumenEnriquecimiento = {
+export type EstadoEnriquecimiento = {
+  en_curso: boolean;
   procesados: number;
   contactables: number;
-  clasificados: number;
-  sin_clasificar: number;
-  cortado: boolean;
   pendientes: number;
+  total: number;
+  error: string | null;
 };
 
-/** Una tanda de enriquecimiento (sitio web, RUES, jev) para los leads de la búsqueda. Solo vuelven conteos. */
-export const enriquecer = (id: string) =>
-  pedir<ResumenEnriquecimiento>(`/busquedas/${encodeURIComponent(id)}/enriquecer`, { metodo: "POST" });
+/** Arranca (idempotente) la búsqueda de contactos en segundo plano. Solo vuelven conteos. */
+export const iniciarEnriquecimiento = (id: string) =>
+  pedir<EstadoEnriquecimiento>(`/busquedas/${encodeURIComponent(id)}/enriquecer`, { metodo: "POST" });
+
+export const estadoEnriquecimiento = (id: string) =>
+  pedir<EstadoEnriquecimiento>(`/busquedas/${encodeURIComponent(id)}/enriquecimiento`);

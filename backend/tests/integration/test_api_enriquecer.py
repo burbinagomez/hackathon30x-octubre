@@ -40,18 +40,102 @@ def test_busqueda_de_otro_tenant_es_404(cliente, admin, usuarios):
     assert (r.status_code, r.json()) == (404, {"detail": "no_encontrada"})
 
 
-def test_enriquece_y_devuelve_solo_conteos(cliente, admin, usuarios):
+def _con_sitio_falso(cliente):
     cliente.app.state.transporte_http = httpx.MockTransport(_sitio)
     cliente.app.state.resolver_dns = lambda host: ["93.184.216.34"]  # público: pasa la guarda SSRF
+
+
+def test_la_tanda_enriquece_y_devuelve_solo_conteos(cliente, admin, usuarios):
+    from app.api.enriquecimiento import tanda
+    _con_sitio_falso(cliente)
     busqueda, lead_id = _busqueda_con_lead(cliente, admin, usuarios["tenant_a"])
+
+    r = tanda(cliente.app.state, usuarios["tenant_a"], busqueda)
+
+    assert (r.procesados, r.pendientes) == (1, 0)
+    with admin.connect() as c:
+        fila = c.execute(text("SELECT enriquecido_en, telefono_cifrado FROM leads WHERE id = :id"), {"id": lead_id}).one()
+        costos = c.execute(text("SELECT count(*) FROM costos WHERE tenant_id = :t"), {"t": usuarios["tenant_a"]}).scalar()
+    assert fila.enriquecido_en is not None and fila.telefono_cifrado is not None
+    assert costos > 0  # cada operación de salida deja su fila
+
+
+def test_post_arranca_en_segundo_plano_y_responde_202_sin_contacto(cliente, admin, usuarios):
+    lanzados = []
+    cliente.app.state.lanzador_enriquecimiento = lanzados.append  # el trabajo no corre: el endpoint no espera nada
+    busqueda, _ = _busqueda_con_lead(cliente, admin, usuarios["tenant_a"])
 
     r = cliente.post(f"/busquedas/{busqueda}/enriquecer", headers=_bearer(usuarios["a"]))
 
-    assert r.status_code == 200
+    assert r.status_code == 202
+    assert len(lanzados) == 1
     cuerpo = r.json()
-    assert set(cuerpo) == {"procesados", "contactables", "clasificados", "sin_clasificar", "cortado", "pendientes"}
-    assert (cuerpo["procesados"], cuerpo["pendientes"]) == (1, 0)
-    assert "andinos" not in r.text and "555" not in r.text  # nunca el contacto en la respuesta
-    with admin.connect() as c:
-        fila = c.execute(text("SELECT enriquecido_en, telefono_cifrado FROM leads WHERE id = :id"), {"id": lead_id}).one()
-    assert fila.enriquecido_en is not None and fila.telefono_cifrado is not None
+    assert (cuerpo["en_curso"], cuerpo["pendientes"], cuerpo["total"], cuerpo["error"]) == (True, 1, 1, None)
+    assert "andinos" not in r.text and "555" not in r.text
+
+
+def test_post_dos_veces_no_duplica_el_proceso(cliente, admin, usuarios):
+    lanzados = []
+    cliente.app.state.lanzador_enriquecimiento = lanzados.append
+    busqueda, _ = _busqueda_con_lead(cliente, admin, usuarios["tenant_a"])
+
+    r1 = cliente.post(f"/busquedas/{busqueda}/enriquecer", headers=_bearer(usuarios["a"]))
+    r2 = cliente.post(f"/busquedas/{busqueda}/enriquecer", headers=_bearer(usuarios["a"]))
+
+    assert (r1.status_code, r2.status_code) == (202, 202)
+    assert len(lanzados) == 1 and r2.json()["en_curso"] is True
+
+
+def test_el_proceso_completo_enriquece_y_el_get_da_el_progreso(cliente, admin, usuarios):
+    _con_sitio_falso(cliente)
+    cliente.app.state.lanzador_enriquecimiento = lambda trabajo: trabajo()  # síncrono: determinista
+    busqueda, lead_id = _busqueda_con_lead(cliente, admin, usuarios["tenant_a"])
+
+    cliente.post(f"/busquedas/{busqueda}/enriquecer", headers=_bearer(usuarios["a"]))
+    r = cliente.get(f"/busquedas/{busqueda}/enriquecimiento", headers=_bearer(usuarios["a"]))
+
+    assert r.status_code == 200
+    assert r.json() == {"en_curso": False, "procesados": 1, "contactables": 1, "pendientes": 0, "total": 1, "error": None}
+    assert "andinos" not in r.text and "555" not in r.text
+
+
+def test_get_sin_nada_en_memoria_calcula_desde_la_base(cliente, admin, usuarios):
+    busqueda, _ = _busqueda_con_lead(cliente, admin, usuarios["tenant_a"])
+
+    r = cliente.get(f"/busquedas/{busqueda}/enriquecimiento", headers=_bearer(usuarios["a"]))
+
+    assert r.json() == {"en_curso": False, "procesados": 0, "contactables": 0, "pendientes": 1, "total": 1, "error": None}
+
+
+def test_get_no_cruza_tenants(cliente, admin, usuarios):
+    busqueda, _ = _busqueda_con_lead(cliente, admin, usuarios["tenant_b"])
+    r = cliente.get(f"/busquedas/{busqueda}/enriquecimiento", headers=_bearer(usuarios["a"]))
+    assert (r.status_code, r.json()) == (404, {"detail": "no_encontrada"})
+    assert cliente.get(f"/busquedas/{uuid4()}/enriquecimiento").status_code == 401
+
+
+def test_una_tanda_que_falla_queda_en_el_estado_con_solo_el_codigo(cliente, admin, usuarios):
+    def rota(estado, tenant_id, busqueda_id):
+        raise RuntimeError("secreto andinos@x.invalid")
+
+    cliente.app.state.tanda_enriquecimiento = rota
+    cliente.app.state.lanzador_enriquecimiento = lambda trabajo: trabajo()
+    busqueda, _ = _busqueda_con_lead(cliente, admin, usuarios["tenant_a"])
+
+    cliente.post(f"/busquedas/{busqueda}/enriquecer", headers=_bearer(usuarios["a"]))
+    r = cliente.get(f"/busquedas/{busqueda}/enriquecimiento", headers=_bearer(usuarios["a"]))
+
+    assert (r.json()["en_curso"], r.json()["error"], r.json()["pendientes"]) == (False, "error_tanda", 1)
+    assert "andinos" not in r.text
+
+
+def test_repite_tandas_hasta_que_no_quedan_pendientes(cliente, admin, usuarios):
+    from app.modulos.enriquecimiento.aplicacion.enriquecer_lead import ResumenEnriquecimiento
+    pendientes = iter([2, 1, 0])
+    cliente.app.state.tanda_enriquecimiento = lambda e, t, b: ResumenEnriquecimiento(1, 1, 0, 1, False, next(pendientes))
+    cliente.app.state.lanzador_enriquecimiento = lambda trabajo: trabajo()
+    busqueda, _ = _busqueda_con_lead(cliente, admin, usuarios["tenant_a"])
+
+    cliente.post(f"/busquedas/{busqueda}/enriquecer", headers=_bearer(usuarios["a"]))
+
+    assert next(pendientes, "agotado") == "agotado"  # las tres tandas corrieron

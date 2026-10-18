@@ -10,6 +10,8 @@ from types import SimpleNamespace
 from uuid import UUID
 
 import httpx
+
+from app.api.enriquecimiento import tanda
 import pytest
 from sqlalchemy import text
 
@@ -204,15 +206,15 @@ def test_lead_osm_con_telefono_que_matchea_queda_contactable_y_sale_en_el_export
         "FLETES DOBLES": [_fila("900777888", "FLETES DOBLES SAS"), _fila("900999000", "FLETES DOBLES LTDA")]})
     caplog.set_level(logging.DEBUG)
 
-    r = cliente.post(f"/busquedas/{busqueda}/enriquecer", headers=_bearer(usuarios["a"]))
+    r = tanda(estado, tenant, busqueda)
 
-    assert r.status_code == 200 and (r.json()["procesados"], r.json()["contactables"]) == (3, 1)
+    assert (r.procesados, r.contactables) == (3, 1)
     assert _lead(admin, si)[:3] == ("juridica", True, None)
     assert _lead(admin, otra_ciudad)[:2] == ("desconocido", False) and _lead(admin, ambiguo)[:2] == ("desconocido", False)
     export = cliente.get("/calificaciones/exportar", headers=_bearer(usuarios["a"]))
     filas = list(csv.DictReader(io.StringIO(export.text)))
     assert [(f["lead_id"], f["to_number"], f["first_name"]) for f in filas] == [(str(si), TELEFONO, "Transportes Andinos")]
-    for texto in (r.text, caplog.text):
+    for texto in (repr(r), caplog.text):
         assert "ANDINOS" not in texto.upper() and "CARGA RAPIDA" not in texto.upper()
 
 

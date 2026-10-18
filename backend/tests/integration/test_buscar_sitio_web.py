@@ -7,6 +7,8 @@ import logging
 from datetime import UTC, datetime
 
 import httpx
+
+from app.api.enriquecimiento import tanda
 from sqlalchemy import text
 
 from app.modulos.descubrimiento.dominio.modelos import Actividad, CriteriosICP, EmpresaCruda
@@ -57,7 +59,7 @@ def _correr(cliente, usuarios, mundo, *leads):
     repo = RepositorioLeadsPostgres(estado.engine, usuarios["tenant_a"], estado.cifrador)
     busqueda = repo.crear_busqueda(CriteriosICP("CO", {}))
     ids = [_sembrar(repo, busqueda, e) for e in leads]
-    return busqueda, ids, cliente.post(f"/busquedas/{busqueda}/enriquecer", headers=_bearer(usuarios["a"]))
+    return busqueda, ids, tanda(estado, usuarios["tenant_a"], busqueda)  # la tanda del proceso en segundo plano
 
 
 def _lead(admin, lead_id):
@@ -72,7 +74,7 @@ def test_lead_del_rues_sin_web_queda_con_web_telefono_cifrado_contactable_y_en_e
 
     busqueda, (lead,), r = _correr(cliente, usuarios, mundo, _rues("GRUPO PROCESSA S.A.S"))
 
-    assert r.status_code == 200 and (r.json()["procesados"], r.json()["contactables"]) == (1, 1)
+    assert (r.procesados, r.contactables) == (1, 1)
     fila = _lead(admin, lead)
     assert (fila.web, fila.contactable, fila.razon_no_contactable, fila.telefono_canal) == (
         "grupoprocessa.com.co", True, None, "sitio_web")
@@ -80,7 +82,7 @@ def test_lead_del_rues_sin_web_queda_con_web_telefono_cifrado_contactable_y_en_e
     export = cliente.get("/calificaciones/exportar", headers=_bearer(usuarios["a"]))
     filas = list(csv.DictReader(io.StringIO(export.text)))
     assert [(f["lead_id"], f["to_number"]) for f in filas] == [(str(lead), TEL_EXPORT)]
-    for texto in (r.text, caplog.text):
+    for texto in (repr(r), caplog.text):
         assert "555" not in texto and "grupoprocessa" not in texto.lower()
 
 
@@ -127,7 +129,7 @@ def test_dns_que_no_resuelve_no_genera_ni_un_request_ni_un_costo(cliente, admin,
 
     _, (lead,), r = _correr(cliente, usuarios, mundo, _rues("GRUPO PROCESSA SAS"))
 
-    assert r.json()["procesados"] == 1 and mundo.pedidos == []
+    assert r.procesados == 1 and mundo.pedidos == []
     with admin.connect() as c:
         assert c.execute(text("SELECT count(*) FROM costos WHERE tenant_id = :t"), {"t": usuarios["tenant_a"]}).scalar() == 0
     assert _lead(admin, lead).web is None
@@ -151,5 +153,5 @@ def test_una_tanda_mezcla_leads_con_y_sin_sitio(cliente, admin, usuarios):  # no
 
     _, (con, sin), r = _correr(cliente, usuarios, mundo, _rues("GRUPO PROCESSA SAS"), _rues("OTRA EMPRESA SAS", "900555444"))
 
-    assert (r.json()["procesados"], r.json()["contactables"], r.json()["pendientes"]) == (2, 1, 0)
+    assert (r.procesados, r.contactables, r.pendientes) == (2, 1, 0)
     assert _lead(admin, con).contactable is True and _lead(admin, sin).web is None

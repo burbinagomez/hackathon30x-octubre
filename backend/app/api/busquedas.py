@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app.api.canales import canal_habilitado
+from app.api.enriquecimiento import iniciar as iniciar_enriquecimiento
 from app.api.sesion import tenant_actual
 from app.composicion import fabrica_de_fuentes
 from app.modulos.costos.infraestructura.postgres_costos import PostgresCostos
@@ -109,6 +110,7 @@ def vista_previa(pedido: PedidoVistaPrevia, request: Request, tenant_id: UUID = 
                        PostgresCostos(request.app.state.engine, tenant_id))
     r = caso.ejecutar(_criterios(pedido), pedido.canal_preferido, pedido.tope_gasto_usd, pedido.mensaje_base)
     # Sin `contar` (Pulido) no hay conteo ni estimado: null, nunca 0. El costo máximo y el veredicto del tope sí se calculan.
+    iniciar_enriquecimiento(request.app.state, tenant_id, r.busqueda_id)  # en segundo plano; no bloquea ni tira la respuesta
     return {
         "busqueda_id": str(r.busqueda_id),
         "fuentes": [{"fuente": f.clave, "conteo": None, "motivo": "sin_conteo", "ignorados": list(f.ignorados),
