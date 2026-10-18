@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
@@ -11,6 +12,7 @@ from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.descubrimiento.aplicacion.camaras import cargar_camaras
 from app.modulos.descubrimiento.dominio.errores import (
     CriterioNoSoportado,
+    FuenteNoDisponible,
 )
 from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, MetaFuente
 from app.modulos.descubrimiento.infraestructura.adaptadores.datos_gov_co_rues import (
@@ -316,3 +318,56 @@ def test_pagina_2_vacia_sin_request():
     assert pagina.empresas == ()
     assert capturadas == []
     assert adaptador._costos.filas == []
+
+
+LOTE = UUID("00000000-0000-4000-8000-000000000011")
+ROJO_T029 = pytest.mark.xfail(
+    strict=True, raises=AssertionError, reason="rojo T029; verde en T030"
+)
+
+
+def _buscar_sin_propagar(
+    adaptador: DatosGovCoRues,
+) -> httpx.HTTPError | FuenteNoDisponible | None:
+    """Devuelve la excepción en vez de propagarla: así el rojo es un assert y no un error de la fuente."""
+    try:
+        adaptador.buscar(CRITERIOS, 1)
+    except (httpx.HTTPError, FuenteNoDisponible) as exc:
+        return exc
+    return None
+
+
+@ROJO_T029
+def test_registra_segundos_de_cada_intento():
+    adaptador, capturadas = _adaptador(pasos=[(503, 2), (200, 3)], lote_id=LOTE)
+
+    error = _buscar_sin_propagar(adaptador)
+
+    filas = adaptador._costos.filas
+    assert [f.unidades for f in filas] == [Decimal(2), Decimal(3)]
+    assert error is None
+    assert len(_requests_de_filas(capturadas)) == 2
+    for fila in filas:
+        assert fila.tipo == "socrata_descarga"
+        assert fila.costo_unitario == Decimal(str(0.000007))
+        assert fila.proveedor == "datos.gov.co"
+        assert fila.fuente == "datos_gov_co_rues"
+        assert fila.gratis is False
+        assert fila.lead_id is None
+        assert fila.lote_id == LOTE
+    # La tercera fila (conteo de naturales, 1 s) se suma en T021 (Pulido).
+
+
+@ROJO_T029
+@pytest.mark.parametrize("fallo", [503, "timeout"])
+def test_segundo_fallo_lanza_fuente_no_disponible(fallo):
+    adaptador, capturadas = _adaptador(pasos=[(fallo, 2), (fallo, 3)])
+
+    error = _buscar_sin_propagar(adaptador)
+
+    assert isinstance(error, FuenteNoDisponible)
+    assert CUERPO_SECRETO not in str(error)
+    assert len(adaptador._costos.filas) == 2
+    assert (
+        len(capturadas) == 2
+    )  # ninguna request de conteo (T021 suma el assert propio)
