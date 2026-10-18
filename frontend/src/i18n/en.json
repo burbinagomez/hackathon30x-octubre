@@ -150,5 +150,19 @@
     },
     "titulo_de_fuente": "Leads from {{fuente}}",
     "titulo_todos": "All leads"
+  },
+  "ejecucion": {
+    "titulo": "Result by source",
+    "estado": {
+      "con_resultados_one": "{{n}} company",
+      "con_resultados_other": "{{n}} companies",
+      "sin_resultados": "no results for this filter",
+      "no_disponible": "not available right now",
+      "no_soporta_criterio": "does not support this search criterion",
+      "limite_agotado": "source limit reached",
+      "omitida_por_tope": "not queried, it would exceed the spending cap"
+    },
+    "ninguna_respondio": "No source responded. Try again later.",
+    "ver_tablero": "View the dashboard"
   }
 }
