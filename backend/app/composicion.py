@@ -73,6 +73,12 @@ def ia_configurada(ajustes, tarifas_llm: Mapping[str, Mapping]) -> bool:
     return bool(key and key.get_secret_value().strip() and modelo in tarifas_llm and _proveedor(ajustes) in URL_IA)
 
 
+# Cloudflare corta a los 100 s y las fuentes de una búsqueda corren en serie (OSM 30 s + Croma ~21 s):
+# datos.gov.co, con sus dos requests, no puede pasar de 40 s. El costo máximo sigue calculado con el peor caso del cliente.
+DATOS_GOV_TIMEOUT_BUSQUEDA = 20.0
+DATOS_GOV_INTENTOS_BUSQUEDA = 1
+
+
 def generador_de_frase(ajustes, tarifas_llm: Mapping[str, Mapping], costos: RegistroCostos,
                        transporte: httpx.BaseTransport, codigos_ciiu=None) -> InterpretadorClaude | InterpretadorOpenRouter | None:
     """El adaptador de la Puerta B atado a este tenant (por `costos`), o None si la IA no está disponible."""
@@ -112,7 +118,8 @@ def armador_de_fuente(
                 dormir=time.sleep, costos=costos, cache=None,
                 camaras=cargar_camaras(camaras_yaml()),
                 tarifas={"computo_seg_usd": tarifas["datos.gov.co"]}, lote_id=lote_id, meta=meta,
-                app_token=token.get_secret_value() if token else None, **extra,
+                app_token=token.get_secret_value() if token else None,
+                timeout_seg=DATOS_GOV_TIMEOUT_BUSQUEDA, intentos=DATOS_GOV_INTENTOS_BUSQUEDA, **extra,
             )
         kwargs = {"meta": meta, "registro_costos": costos, "transporte": transporte(), "lote_id": lote_id}
         if meta.proveedor in tarifas:
