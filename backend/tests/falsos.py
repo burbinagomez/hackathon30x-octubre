@@ -1,8 +1,13 @@
 """Falsos en memoria de los puertos. Mismo contrato que Postgres: dedup por (pais, id_fiscal), ON CONFLICT en lead_fuentes."""
+import json
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
+from app.modulos.calificacion.dominio.mapeo import mapear_fila
+from app.modulos.calificacion.dominio.errores import ArchivoInvalido
+from app.modulos.calificacion.dominio.modelos import FilaRechazada, ResultadoCalificacion
 from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.descubrimiento.dominio.modelos import Borrador, CriteriosICP, EmpresaCruda, MetaFuente, PaginaEmpresas
 
@@ -125,3 +130,35 @@ class FabricaFalsa:
         return {clave: FuenteFalsa(meta, self._costos, lote_id, self._empresas.get(clave, ()), self._errores.get(clave),
                                   self.criterios_por_fuente)
                 for clave, meta in self._metas.items()}
+
+
+LIMITE_FILAS_CALIFICADOR = 1000  # igual que DaptaCSV (plan.md): la suite de contrato exige el mismo límite
+
+
+class CalificadorFalso:
+    """Doble del puerto `Calificador`: mismo contrato que `DaptaCSV`, pero decodifica JSON en vez de CSV
+    (tests/contratos/test_calificador.py prueba que ambos se comportan igual ante los mismos datos)."""
+
+    def leer_resultados(self, archivo: bytes) -> list[ResultadoCalificacion | FilaRechazada]:
+        filas = json.loads(archivo.decode("utf-8"))
+        if len(filas) > LIMITE_FILAS_CALIFICADOR:
+            raise ArchivoInvalido(f"más de {LIMITE_FILAS_CALIFICADOR} filas")
+        ahora = datetime.now(UTC)
+        return [mapear_fila(i, {k: str(v) for k, v in fila.items()}, ahora) for i, fila in enumerate(filas, start=1)]
+
+
+class RepositorioCalificacionesFalso:
+    """Repo en memoria: calificación y costo "en la misma transacción" (los dos se escriben juntos o ninguno).
+    `estados` simula lo que decidiría Postgres para un `lead_id` dado; sin entrada, se asume `importada`."""
+
+    def __init__(self, costos: RegistroCostosFalso, estados: dict[UUID, str] | None = None):
+        self._costos = costos
+        self._estados = estados or {}
+        self.guardadas: list[ResultadoCalificacion] = []
+
+    def guardar(self, resultado: ResultadoCalificacion, costo: OperacionCosto) -> str:
+        estado = self._estados.get(resultado.lead_id, "importada")
+        if estado == "importada":
+            self.guardadas.append(resultado)
+            self._costos.registrar(costo)
+        return estado
