@@ -3,6 +3,7 @@
 Defensas: SSRF validado en cada salto y conexión a la IP validada (anti-rebinding), robots.txt por host,
 tope de 2 MB sobre bytes decodificados, 3 redirecciones como máximo y solo dentro del dominio del lead.
 """
+import contextvars
 import ipaddress
 import logging
 import re
@@ -22,8 +23,9 @@ from app.modulos.enriquecimiento.dominio.errores import DemasiadasRedirecciones,
 from app.modulos.enriquecimiento.dominio.puertos import ContactoPublicado
 
 log = logging.getLogger(__name__)
-for _ruidoso in ("httpx", "httpcore"):
-    logging.getLogger(_ruidoso).setLevel(logging.WARNING)  # en INFO loguean IP y ruta de cada salto
+# httpx en INFO loguea IP y ruta de cada salto. Se calla solo dentro de obtener: un setLevel global callaba al resto.
+_en_sitio_web = contextvars.ContextVar("en_sitio_web", default=False)
+logging.getLogger("httpx").addFilter(lambda _registro: not _en_sitio_web.get())
 
 Resolvedor = Callable[[str], list[str]]  # host -> IPs
 
@@ -96,6 +98,13 @@ class SitioWeb:
         return ContactoPublicado(emails, telefonos, "truncado" if truncado else "ok")
 
     def obtener(self, lead_id: UUID, url: str) -> tuple[bytes, bool]:
+        marca = _en_sitio_web.set(True)
+        try:
+            return self._obtener(lead_id, url)
+        finally:
+            _en_sitio_web.reset(marca)
+
+    def _obtener(self, lead_id: UUID, url: str) -> tuple[bytes, bool]:
         actual = httpx.URL(url)
         base = _sin_www(_host(actual))
         robots_ok: set[str] = set()

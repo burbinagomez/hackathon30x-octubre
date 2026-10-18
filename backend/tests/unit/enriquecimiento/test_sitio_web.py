@@ -476,3 +476,13 @@ def test_dns_lento_vence_el_plazo_sin_request_ni_costo():
     assert resultado.estado == "fallo"
     assert red.paths() == []
     assert costos.filas == []
+
+
+def test_el_silencio_de_httpx_no_se_derrama_fuera_de_sitio_web(caplog):
+    # Importar sitio_web no puede callar a httpx para el resto de la app: otros tests y módulos leen sus logs.
+    caplog.set_level(logging.INFO)
+
+    with httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(200))) as cliente:
+        cliente.get("https://otro.example/")
+
+    assert [r for r in caplog.records if r.name == "httpx"] != []
