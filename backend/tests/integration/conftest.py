@@ -28,7 +28,7 @@ def admin():
     engine.dispose()
 
 
-TABLAS_DE_TENANT = ["lead_fuentes", "cumplimiento", "leads", "busquedas", "costos"]
+TABLAS_DE_TENANT = ["lead_fuentes", "cumplimiento", "leads", "busquedas", "costos", "usuarios"]
 
 
 @pytest.fixture

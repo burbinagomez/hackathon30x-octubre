@@ -1,6 +1,6 @@
 # Constitución — Reto Dapta (30X Hackathon)
 
-> Ubicación: `.specify/memory/constitution.md` · **Versión 1.4.0** · Ratificada 2026-10-17 · 1.1.0: PASS^K en IX · 1.2.0: Postgres en Supabase (III, IV, V) · 1.3.0: límites del front por feature (I) · 1.4.0: migraciones SQL del Supabase CLI (III, IV, V)
+> Ubicación: `.specify/memory/constitution.md` · **Versión 2.0.0** · Ratificada 2026-10-17 · 1.1.0: PASS^K en IX · 1.2.0: Postgres en Supabase (III, IV, V) · 1.3.0: límites del front por feature (I) · 1.4.0: migraciones SQL del Supabase CLI (III, IV, V) · 2.0.0 (MAJOR, 2026-10-18): login con Supabase Auth; la publishable key se permite solo en `web` (V)
 > Regla de oro: **una regla entra aquí solo si tiene un chequeo automático que la hace cumplir.** Sin chequeo, es un deseo.
 > Regla del proyecto: **nada se desarrolla sin spec, sin reglas, sin agentes y sin skills definidos.** Este archivo es las reglas; `docs/prd.md` es la spec de producto; `.claude/agents/` y `.claude/skills/` son los agentes y skills.
 
@@ -27,8 +27,8 @@ Todo cambio de esquema es un `supabase/migrations/NNNN_nombre.sql` escrito a man
 **Chequeo:** CI levanta Postgres vacío → `scripts/migrar_local.sh` dos veces (la segunda no reaplica) → drift check contra modelos (`compare_metadata`), acotado al esquema `public` (los de Supabase quedan fuera). **Si falla:** sin merge.
 
 ### V. Seguridad en el pipeline
-Secrets en variables de entorno (Railway para `api`; GitHub Environment `produccion` para las credenciales del Supabase CLI), nunca en el repo ni en el front; `.env*` ignorado. Ninguna key de Supabase (anon, service_role, publishable, secret) existe en el entorno de `api` ni de `web`: la app no arranca si la ve. Dependabot activo. `pip-audit` + `npm audit` (CVE alta/crítica bloquea). CodeQL. Secret scanning + step que falla si el diff introduce un secret. Revisión OWASP Top 10 por PR con el agente `security` (CRITICAL/HIGH bloquea). Toda entrada se valida en el back; texto externo que llegue a un LLM se trata como hostil (prompt injection).
-**Chequeo:** los steps son *required checks* de `main`; un test de configuración falla si falta alguno. **Si falla:** sin merge.
+Secrets en variables de entorno (Railway para `api`; GitHub Environment `produccion` para las credenciales del Supabase CLI), nunca en el repo ni en el front; `.env*` ignorado. En el entorno de `api` no existe ninguna key de Supabase (anon, publishable, service_role, secret): la app no arranca si la ve. En `web` solo se permite la publishable key (`VITE_SUPABASE_PUBLISHABLE_KEY`, pública por diseño, para Supabase Auth); `service_role`, secret y cualquier otra siguen prohibidas, y la api verifica los tokens con JWKS, sin secreto de firma. Dependabot activo. `pip-audit` + `npm audit` (CVE alta/crítica bloquea). CodeQL. Secret scanning + step que falla si el diff introduce un secret. Revisión OWASP Top 10 por PR con el agente `security` (CRITICAL/HIGH bloquea). Toda entrada se valida en el back; texto externo que llegue a un LLM se trata como hostil (prompt injection).
+**Chequeo:** los steps son *required checks* de `main`; un test de configuración falla si falta alguno. Un test del front falla si `src/` o el build contienen `sb_secret_` o `service_role` (`frontend/tests/arquitectura/sin_secretos.test.ts`, T039 de la 005); el guard de `verificar_entorno` cubre `api`. **Si falla:** sin merge.
 
 ### VI. Datos de contacto tratados como sensibles
 Teléfonos, correos, nombres de personas y textos de respuesta se **cifran en reposo** (cifrado a nivel de app, clave en entorno) y **nunca aparecen en logs**. Minimización: solo lo que el flujo necesita. Retención definida por tipo.

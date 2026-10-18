@@ -7,7 +7,7 @@
 El equipo. Nadie externo ve este slice; su valor es que **todo lo que venga después se despliega solo y se prueba solo**.
 
 ## Qué hace
-Un repo con back y front **desplegados en Railway** y la base **Postgres en Supabase** (solo Postgres: sin Auth, Storage, Edge Functions ni Data API sobre `public`), **públicos, en verde en CI, con secrets fuera del repo y con el barandal de arquitectura puesto**, antes de escribir una sola regla de negocio.
+Un repo con back y front **desplegados en Railway** y la base **Postgres en Supabase** (solo Postgres: sin Auth, Storage, Edge Functions ni Data API sobre `public`) _("sin Auth": reemplazado por la spec 005 y la constitución 2.0.0, que suman Supabase Auth solo para el login; ver docs/decisiones.md 2026-10-18)_, **públicos, en verde en CI, con secrets fuera del repo y con el barandal de arquitectura puesto**, antes de escribir una sola regla de negocio.
 
 ## Flujo principal
 1. `GET /health` en el back responde `200 {"status":"ok","db":"ok"}` tras consultar la base.
