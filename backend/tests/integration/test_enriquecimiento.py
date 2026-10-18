@@ -396,3 +396,17 @@ def test_email_de_osm_se_conserva_si_el_sitio_no_trae_email(admin, tenants, mund
     assert (f.email_canal, f.contactable, f.razon_no_contactable) == ("osm_contacto", True, None)
     assert cifrador.descifrar("email_cifrado", bytes(f.email_cifrado), tenants["a"], lead) == EMAIL_OSM
     assert resumen.contactables == 1
+
+
+def test_con_limite_procesa_solo_n_y_dice_cuantos_quedan(mundo):
+    """El botón de la API corre por tandas: una petición no puede quedarse minutos bajando sitios web."""
+    repo, costos, busqueda = mundo
+    for i in range(3):
+        _sembrar(repo, busqueda, _empresa(f"Empresa {i} SAS", tipo="juridica"))
+    caso, _ = _caso(repo, costos, jev=False)
+
+    primera = caso.ejecutar(busqueda, limite=2)
+    segunda = caso.ejecutar(busqueda, limite=2)
+
+    assert (primera.procesados, primera.pendientes) == (2, 1)
+    assert (segunda.procesados, segunda.pendientes) == (1, 0)
