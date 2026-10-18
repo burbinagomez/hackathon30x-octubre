@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { delay, http, HttpResponse } from "msw";
-import { expect, test } from "vitest";
+import { http, HttpResponse } from "msw";
+import { beforeEach, expect, test } from "vitest";
 import i18n from "../i18n";
 import en from "../i18n/en.json";
 import es from "../i18n/es.json";
@@ -17,6 +17,14 @@ const lead = (n: number, extra: Partial<LeadListado> = {}): LeadListado => ({
 });
 const pagina = (items: LeadListado[], extra = {}) => ({
   items, total: items.length, pagina: 1, tamano: 25, atribuciones: [OSM], ...extra,
+});
+
+const sinTrabajo = { en_curso: false, procesados: 0, contactables: 0, pendientes: 0, total: 0, error: null };
+beforeEach(() => {
+  server.use(
+    http.post("*/busquedas/:id/enriquecer", () => HttpResponse.json(sinTrabajo, { status: 202 })),
+    http.get("*/busquedas/:id/enriquecimiento", () => HttpResponse.json(sinTrabajo)),
+  );
 });
 
 async function montar(respuesta: ReturnType<typeof pagina>, idioma = "es") {
@@ -148,24 +156,88 @@ test("404 muestra no encontrada", async () => {
   await waitFor(() => expect(screen.queryByRole("alert")).toHaveTextContent("No se encontró la búsqueda."));
 });
 
-test("enriquecer_muestra_que_trabaja_y_despues_el_resumen_con_lo_que_queda", async () => {
-  let llamadas = 0;
+const estado = (extra = {}) => ({ en_curso: false, procesados: 0, contactables: 0, pendientes: 0, total: 0, error: null, ...extra });
+
+test("no hay boton de buscar telefono y email: la busqueda de contactos es automatica", async () => {
+  await montar(pagina([lead(1)]));
+  expect(screen.queryByRole("button", { name: /Buscar teléfono y email/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Seguir con los que quedan/ })).not.toBeInTheDocument();
+});
+
+test("al montar hace POST una vez y consulta el avance hasta que termina, recargando la lista", async () => {
+  let posts = 0;
+  let gets = 0;
+  let listas = 0;
   server.use(
-    http.post("*/busquedas/:id/enriquecer", async () => {
-      llamadas += 1;
-      await delay(50); // que se alcance a ver la píldora de trabajo
-      return HttpResponse.json(llamadas === 1
-        ? { procesados: 15, contactables: 6, clasificados: 0, sin_clasificar: 15, cortado: false, pendientes: 5 }
-        : { procesados: 5, contactables: 2, clasificados: 0, sin_clasificar: 5, cortado: false, pendientes: 0 });
+    http.get("*/busquedas/:id/leads", () => { listas += 1; return HttpResponse.json(pagina([lead(1)])); }),
+    http.post("*/busquedas/:id/enriquecer", () => {
+      posts += 1;
+      return HttpResponse.json(estado({ en_curso: true, procesados: 0, pendientes: 4, total: 4 }), { status: 202 });
+    }),
+    http.get("*/busquedas/:id/enriquecimiento", () => {
+      gets += 1;
+      return HttpResponse.json(gets === 1
+        ? estado({ en_curso: true, procesados: 2, pendientes: 2, total: 4, contactables: 1 })
+        : estado({ procesados: 4, pendientes: 0, total: 4, contactables: 3 }));
     }),
   );
-  await montar(pagina([lead(1)]));
+  await i18n.changeLanguage("es");
+  render(<LeadsDeBusqueda id={ID} cadaMs={20} />);
 
-  fireEvent.click(screen.getByRole("button", { name: es.enriquecer.boton }));
-  expect(await screen.findByRole("status", { name: es.enriquecer.trabajando })).toBeInTheDocument();
-  await waitFor(() => expect(screen.queryByText(/15 procesados · 6 con contacto · quedan 5/)).toBeInTheDocument());
+  expect(await screen.findByText("Buscando contactos… 0 de 4")).toBeInTheDocument();
+  expect(await screen.findByText("Buscando contactos… 2 de 4")).toBeInTheDocument();
+  expect(await screen.findByText("3 con contacto")).toBeInTheDocument();
+  expect(posts).toBe(1);
+  expect(gets).toBe(2);
+  await waitFor(() => expect(listas).toBeGreaterThanOrEqual(3)); // cada cambio de procesados recarga la lista
+  expect(screen.queryByText(/Buscando contactos/)).not.toBeInTheDocument();
+});
 
-  fireEvent.click(screen.getByRole("button", { name: es.enriquecer.seguir }));
-  await waitFor(() => expect(screen.queryByText(/5 procesados · 2 con contacto · quedan 0/)).toBeInTheDocument());
-  expect(screen.queryByRole("button", { name: es.enriquecer.seguir })).not.toBeInTheDocument();
+test("si hubo error muestra el aviso chico con Reintentar, que vuelve a arrancar", async () => {
+  let posts = 0;
+  server.use(
+    http.get("*/busquedas/:id/leads", () => HttpResponse.json(pagina([lead(1)]))),
+    http.post("*/busquedas/:id/enriquecer", () => {
+      posts += 1;
+      return HttpResponse.json(posts === 1 ? estado({ error: "error_tanda", pendientes: 3, total: 4, procesados: 1 })
+        : estado({ en_curso: true, procesados: 1, pendientes: 3, total: 4 }), { status: 202 });
+    }),
+    http.get("*/busquedas/:id/enriquecimiento", () => HttpResponse.json(estado({ en_curso: true, procesados: 1, pendientes: 3, total: 4 }))),
+  );
+  await i18n.changeLanguage("es");
+  render(<LeadsDeBusqueda id={ID} cadaMs={20} />);
+
+  expect(await screen.findByText(es.enriquecer.error)).toBeInTheDocument();
+  const reintentar = screen.getByRole("button", { name: es.enriquecer.reintentar });
+  expect(reintentar).not.toHaveClass("boton-primario");
+  fireEvent.click(reintentar);
+
+  expect(await screen.findByText("Buscando contactos… 1 de 4")).toBeInTheDocument();
+  expect(posts).toBe(2);
+  expect(screen.queryByText(es.enriquecer.error)).not.toBeInTheDocument();
+});
+
+test("la fila de herramientas tiene el conteo y el checkbox", async () => {
+  await montar(pagina([lead(1)], { total: 12 }));
+  const fila = document.querySelector(".lista-herramientas") as HTMLElement;
+  expect(fila).not.toBeNull();
+  expect(within(fila).getByText(/12 leads/)).toBeInTheDocument();
+  expect(within(fila).getByRole("checkbox", { name: "Solo con contacto" })).toBeInTheDocument();
+  expect(screen.getByRole("checkbox").closest("label")).toHaveClass("filtro-contacto"); // el label envuelve al input
+});
+
+test("el progreso sale en ingles", async () => {
+  server.use(
+    http.get("*/busquedas/:id/leads", () => HttpResponse.json(pagina([lead(1)]))),
+    http.post("*/busquedas/:id/enriquecer", () =>
+      HttpResponse.json(estado({ en_curso: true, procesados: 1, pendientes: 1, total: 2 }), { status: 202 })),
+    http.get("*/busquedas/:id/enriquecimiento", () =>
+      HttpResponse.json(estado({ procesados: 2, total: 2, contactables: 1 }))),
+  );
+  await i18n.changeLanguage("en");
+  render(<LeadsDeBusqueda id={ID} cadaMs={20} />);
+  expect(await screen.findByText("Finding contacts… 1 of 2")).toBeInTheDocument();
+  expect(await screen.findByText("1 with contact")).toBeInTheDocument();
+  expect(en.enriquecer.buscando).not.toBe(es.enriquecer.buscando);
+  await i18n.changeLanguage("es");
 });

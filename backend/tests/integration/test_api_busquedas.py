@@ -133,6 +133,26 @@ def test_tenant_b_no_ejecuta_busqueda_de_a_y_no_distingue_ajena_de_inexistente(a
                    a=usuarios["tenant_a"], b=usuarios["tenant_b"]) == 0
 
 
+def test_ejecutar_dispara_el_enriquecimiento_de_esa_busqueda_en_segundo_plano(api, usuarios):
+    lanzados = []
+    api.app.state.lanzador_enriquecimiento = lanzados.append  # sin hilos reales: solo se ve que se pidió
+    busqueda_id = _crear(api, usuarios["a"])
+
+    r = _ejecutar(api, usuarios["a"], busqueda_id)
+
+    assert r.status_code == 200
+    assert len(lanzados) == 1
+    e = api.get(f"/busquedas/{busqueda_id}/enriquecimiento", headers=_bearer(usuarios["a"])).json()
+    assert e["en_curso"] is True
+
+
+def test_ejecutar_con_error_no_dispara_el_enriquecimiento(api, usuarios):
+    lanzados = []
+    api.app.state.lanzador_enriquecimiento = lanzados.append
+    assert _ejecutar(api, usuarios["a"], uuid4()).status_code == 404
+    assert lanzados == []
+
+
 def test_ejecutar_dos_veces_da_409_y_no_vuelve_a_llamar_ni_a_cobrar(api, admin, usuarios):
     busqueda_id = _crear(api, usuarios["a"])
     primera = _ejecutar(api, usuarios["a"], busqueda_id)

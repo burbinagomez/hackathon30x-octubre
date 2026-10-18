@@ -43,13 +43,62 @@ input[type="checkbox"] {
   cursor: pointer;
 }
 
+/* Fila de herramientas de la lista: conteo y progreso a la izquierda, filtro a la derecha; en 360 px se parte en dos líneas. */
+.lista-herramientas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 8px 0 12px;
+}
+
+.lista-herramientas .nota {
+  margin: 0;
+}
+
+.lista-herramientas .estado-contactos {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
+  font-size: 0.8125rem;
+  color: var(--color-texto);
+}
+
+.lista-herramientas .estado-contactos .anillo-chico {
+  margin-right: 0;
+}
+
+.lista-herramientas .enlace-reintentar {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-decoration: underline;
+  font-size: inherit;
+}
+
 .filtro-contacto {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 44px;
+  min-height: 0;
   cursor: pointer;
-  margin: 8px 0;
+  margin: 0 0 0 auto;
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+
+/* Más específico que `input` y `.campo input`: ningún ancho de campo de texto estira el checkbox. */
+.filtro-contacto input[type="checkbox"] {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
 }
 
 button {
@@ -802,7 +851,6 @@ table.tabla-leads {
   border-radius: 0.4rem;
   background: var(--color-superficie);
 }
-.panel-enriquecer { margin-bottom: 1.5rem; }
 
 /* Importar resultados de Dapta: el archivo se parte en líneas en pantallas angostas. */
 .importar-dapta label {
@@ -840,5 +888,232 @@ table.tabla-costos {
 @media (min-width: 48rem) {
   .subtotales {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Landing del home (`/`). Solo tokens; mobile-first. */
+.landing {
+  min-height: 100vh;
+  background: var(--color-fondo-landing);
+  color: var(--color-texto);
+  overflow-x: hidden;
+}
+
+.landing-contenedor {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0 16px 32px;
+}
+
+.landing-barra {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 12px;
+}
+
+.landing h1,
+.landing h2,
+.landing h3 {
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.landing-hero {
+  padding: 48px 0 32px;
+}
+
+.landing-etiqueta {
+  margin: 0 0 12px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--color-acento-2);
+}
+
+.landing-titulo {
+  margin: 0 0 16px;
+  font-size: 2.5rem;
+  overflow-wrap: anywhere;
+}
+
+.landing-bajada {
+  max-width: 40rem;
+  margin: 0 0 24px;
+  font-size: 1.125rem;
+  line-height: 1.5;
+  color: var(--color-texto-suave);
+}
+
+.landing-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espacio-chico);
+}
+
+.landing-boton {
+  justify-content: center;
+  min-height: 48px;
+  padding: 10px 24px;
+  border-radius: 8px;
+  text-decoration: none;
+}
+
+.landing-boton-secundario {
+  color: var(--color-texto);
+  background: transparent;
+  border: 1px solid var(--color-borde-suave);
+}
+
+.landing-seccion {
+  padding: 32px 0 8px;
+}
+
+.landing h2 {
+  margin: 0 0 20px;
+  font-size: 1.75rem;
+}
+
+.landing-rejilla,
+.landing-pasos,
+.landing-puntos {
+  display: grid;
+  gap: var(--espacio);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.landing-tarjeta {
+  height: 100%;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde-suave);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.landing-tarjeta p {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--color-texto-suave);
+}
+
+.landing-tarjeta .landing-cifra {
+  margin-bottom: 8px;
+  font-family: var(--fuente-titulos);
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--color-acento-texto);
+}
+
+.landing-tarjeta h3 {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+  color: var(--color-acento-2);
+}
+
+.landing-paso {
+  display: grid;
+  gap: var(--espacio-chico);
+  justify-items: stretch;
+}
+
+/* Flecha entre pasos: hacia abajo apilados, hacia la derecha en fila. */
+.landing-flecha {
+  display: none;
+  width: 10px;
+  height: 10px;
+  justify-self: center;
+  border-right: 3px solid var(--color-acento-2);
+  border-bottom: 3px solid var(--color-acento-2);
+  transform: rotate(45deg);
+}
+
+.landing-paso:not(:last-child) .landing-flecha {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.landing-puntos li {
+  padding: 16px 20px;
+  font-size: 1.125rem;
+  font-weight: 700;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde-suave);
+  border-left: 6px solid var(--color-acento-2);
+  border-radius: 12px;
+}
+
+.landing-final {
+  margin-top: 40px;
+  padding: 32px 20px;
+  text-align: center;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde-suave);
+  border-radius: 12px;
+}
+
+.landing-final .landing-acciones {
+  justify-content: center;
+}
+
+.landing-titulo-cta {
+  font-size: 1.75rem;
+}
+
+.landing-pie {
+  margin-top: 24px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--color-texto-suave);
+}
+
+@media (min-width: 48rem) {
+  .landing-contenedor {
+    padding: 0 32px 48px;
+  }
+
+  .landing-hero {
+    padding: 80px 0 48px;
+  }
+
+  .landing-titulo {
+    font-size: 4rem;
+  }
+
+  .landing-rejilla,
+  .landing-puntos {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .landing-pasos {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+  }
+
+  .landing-paso {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 0;
+  }
+
+  .landing-flecha {
+    width: 12px;
+    height: 12px;
+    margin: 0 8px;
+    transform: rotate(-45deg);
+  }
+
+  .landing-paso:not(:last-child) .landing-flecha {
+    margin-bottom: 0;
+  }
+
+  .landing-paso:last-child {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-titulo-cta {
+    font-size: 2.5rem;
   }
 }

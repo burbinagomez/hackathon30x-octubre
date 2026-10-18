@@ -4,6 +4,7 @@ import Login from "./acceso/Login";
 import { configuracionValida } from "./api/supabase";
 import NuevaBusqueda from "./busqueda/NuevaBusqueda";
 import Costos from "./costos/Costos";
+import Landing from "./landing/Landing";
 import LeadsDeBusqueda from "./leads/LeadsDeBusqueda";
 import LeadsDeFuente from "./leads/LeadsDeFuente";
 import ListaBusquedas from "./leads/ListaBusquedas";
@@ -15,6 +16,7 @@ import Tablero from "./tablero/Tablero";
 type Estado = { api: "…" | "ok" | "error"; db: "…" | "ok" | "error" };
 
 const RUTAS: Record<string, ComponentType> = {
+  "/": Landing,
   "/login": Login,
   "/busqueda/nueva": NuevaBusqueda,
   "/tablero": Tablero,
@@ -76,8 +78,8 @@ export default function App() {
   if (!pantalla) return <Salud />;
   return (
     <>
-      {/* Login lleva su propio selector. */}
-      {!ruta.startsWith("/login") && (
+      {/* Login y la landing llevan su propio selector. */}
+      {!ruta.startsWith("/login") && ruta.split("?")[0] !== "/" && (
         <div className="barra">
           <SelectorIdioma />
         </div>

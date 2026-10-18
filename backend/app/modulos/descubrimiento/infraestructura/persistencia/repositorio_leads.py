@@ -241,6 +241,16 @@ class RepositorioLeadsPostgres:
         with self._uow() as c:
             c.execute(text("UPDATE busquedas SET estado = :estado WHERE id = :id"), {"estado": estado, "id": busqueda_id})
 
+    def conteos_enriquecimiento(self, busqueda_id: UUID) -> tuple[int, int, int]:
+        """(total, pendientes, con contacto) de la búsqueda. Solo conteos: no descifra nada."""
+        with self._uow() as c:
+            f = c.execute(text(
+                "SELECT count(*) AS total, count(*) FILTER (WHERE enriquecido_en IS NULL) AS pendientes, "
+                "count(*) FILTER (WHERE telefono_cifrado IS NOT NULL OR email_cifrado IS NOT NULL) AS con_contacto "
+                "FROM leads WHERE id IN (SELECT lead_id FROM lead_fuentes WHERE busqueda_id = :b)"),
+                {"b": busqueda_id}).one()
+        return f.total, f.pendientes, f.con_contacto
+
     def sin_enriquecer(self, busqueda_id: UUID) -> list[LeadParaEnriquecer]:
         contacto = lambda columna, blob, canal, lead_id: (  # noqa: E731  el que ya trae el lead compite con el del sitio
             None if blob is None else (self._cifrador.descifrar(columna, bytes(blob), self._tenant_id, lead_id), canal))

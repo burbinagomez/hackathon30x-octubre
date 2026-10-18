@@ -1,51 +1,60 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import Trabajando from "../compartido/Trabajando";
-import { enriquecer, listarLeads, type ResumenEnriquecimiento } from "./api";
+import { estadoEnriquecimiento, iniciarEnriquecimiento, listarLeads, type EstadoEnriquecimiento } from "./api";
 import ListaLeads from "./ListaLeads";
 
-export default function LeadsDeBusqueda({ id }: { id: string }) {
-  const { t } = useTranslation();
-  const [trabajando, setTrabajando] = useState(false);
-  const [resumen, setResumen] = useState<ResumenEnriquecimiento | null>(null);
-  const [fallo, setFallo] = useState(false);
-  const [version, setVersion] = useState(0); // cambia al terminar una tanda: la lista se vuelve a pedir
+const CADA_MS = 4000;
 
-  async function tanda() {
+/** Lista de leads de una búsqueda. La búsqueda de contactos corre sola en el servidor: acá solo se muestra el avance. */
+export default function LeadsDeBusqueda({ id, cadaMs = CADA_MS }: { id: string; cadaMs?: number }) {
+  const { t } = useTranslation();
+  const [estado, setEstado] = useState<EstadoEnriquecimiento | null>(null);
+  const [fallo, setFallo] = useState(false);
+  const [version, setVersion] = useState(0); // cambia con `procesados`: la lista se vuelve a pedir
+  const ultimo = useRef<number | null>(null);
+
+  function arrancar() {
     setFallo(false);
-    setTrabajando(true);
-    try {
-      setResumen(await enriquecer(id));
-      setVersion((v) => v + 1);
-    } catch {
-      setFallo(true);
-    } finally {
-      setTrabajando(false);
-    }
+    iniciarEnriquecimiento(id).then(setEstado).catch(() => setFallo(true)); // idempotente: si ya corre, devuelve su estado
   }
 
-  const etiqueta = resumen && resumen.pendientes > 0 ? t("enriquecer.seguir") : t("enriquecer.boton");
+  useEffect(arrancar, [id]);
+
+  useEffect(() => {
+    if (!estado?.en_curso) return;
+    const h = setTimeout(() => {
+      estadoEnriquecimiento(id).then(setEstado).catch(() => setFallo(true));
+    }, cadaMs);
+    return () => clearTimeout(h);
+  }, [estado, id, cadaMs]);
+
+  useEffect(() => {
+    if (!estado) return;
+    if (ultimo.current !== null && ultimo.current !== estado.procesados) setVersion((v) => v + 1);
+    ultimo.current = estado.procesados;
+  }, [estado?.procesados]);
+
+  const hayError = fallo || !!estado?.error;
+  const progreso = (hayError || estado) && (
+    <span className="estado-contactos" role="status">
+      {hayError ? (
+        <>
+          <span>{t("enriquecer.error")}</span>
+          <button type="button" className="enlace-reintentar" onClick={arrancar}>{t("enriquecer.reintentar")}</button>
+        </>
+      ) : estado?.en_curso ? (
+        <>
+          <span className="anillo anillo-chico" aria-hidden="true" />
+          <span>{t("enriquecer.buscando", { procesados: estado.procesados, total: estado.total })}</span>
+        </>
+      ) : estado && estado.total > 0 ? (
+        <span>{t("enriquecer.listo", { contactables: estado.contactables })}</span>
+      ) : null}
+    </span>
+  );
+
   return (
-    <>
-      <section className="tarjeta panel-enriquecer">
-        <p className="ayuda">{t("enriquecer.ayuda")}</p>
-        <div className="acciones acciones-fin">
-          {(!resumen || resumen.pendientes > 0) && (
-            <button type="button" className="boton boton-primario" disabled={trabajando} aria-busy={trabajando} onClick={tanda}>
-              {trabajando && <span className="anillo anillo-chico" aria-hidden="true" />}
-              {etiqueta}
-            </button>
-          )}
-        </div>
-        {trabajando && <Trabajando texto={t("enriquecer.trabajando")} flotante />}
-        {resumen && !trabajando && (
-          <p role="status" className="aviso aviso-ancho">
-            {t("enriquecer.resumen", { procesados: resumen.procesados, contactables: resumen.contactables, pendientes: resumen.pendientes })}
-          </p>
-        )}
-        {fallo && <p role="alert" className="error">{t("enriquecer.error")}</p>}
-      </section>
-      <ListaLeads key={version} clave={`busqueda:${id}:${version}`} titulo={t("leads.titulo_leads")} cargar={(p, c) => listarLeads(id, p, c)} />
-    </>
+    <ListaLeads clave={`busqueda:${id}:${version}`} titulo={t("leads.titulo_leads")} cargar={(p, c) => listarLeads(id, p, c)}
+      progreso={progreso || undefined} />
   );
 }
