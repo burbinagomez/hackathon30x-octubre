@@ -37,10 +37,18 @@ ROLES_SUPABASE = ["anon", "authenticated"]
 PRIVILEGIOS = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE"]
 
 
+PRIVILEGIOS_DE_COLUMNA = ["SELECT", "INSERT", "UPDATE"]
+
+
 def _concedidos(c, rol, tablas):
-    return [(t, p) for t in tablas for p in PRIVILEGIOS
-            if c.execute(text("SELECT has_table_privilege(:rol, :t, :p)"),
-                         {"rol": rol, "t": f"public.{t}", "p": p}).scalar()]
+    # has_table_privilege no ve un GRANT por columna: has_any_column_privilege sí.
+    de_tabla = [(t, p) for t in tablas for p in PRIVILEGIOS
+                if c.execute(text("SELECT has_table_privilege(:rol, :t, :p)"),
+                             {"rol": rol, "t": f"public.{t}", "p": p}).scalar()]
+    de_columna = [(t, f"{p} (columna)") for t in tablas for p in PRIVILEGIOS_DE_COLUMNA
+                  if c.execute(text("SELECT has_any_column_privilege(:rol, :t, :p)"),
+                               {"rol": rol, "t": f"public.{t}", "p": p}).scalar()]
+    return de_tabla + [x for x in de_columna if x[0] not in {t for t, _ in de_tabla}]
 
 
 @pytest.fixture

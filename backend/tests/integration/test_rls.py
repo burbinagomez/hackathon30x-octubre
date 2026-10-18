@@ -149,6 +149,12 @@ def test_tenant_b_no_accede_a_datos_de_a_en_vistas(rt, datos, vista):
     assert _filas_de_la_vista(rt, datos["b"], vista) == []
 
 
+def test_la_lista_cubre_todas_las_vistas_de_public(rt):
+    with rt.connect() as c:
+        en_public = set(c.execute(text("SELECT viewname FROM pg_views WHERE schemaname = 'public'")).scalars())
+    assert en_public == set(VISTAS)
+
+
 def test_toda_vista_es_security_invoker(rt):
     with rt.connect() as c:
         vistas = dict(c.execute(text(
