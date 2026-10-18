@@ -6,8 +6,8 @@ Fixture calculada a mano, tenant A (usa `tenants` + `TABLAS_DE_TENANT` del conft
 - lead2 (jurídica + cumplimiento): encontrado solo por `osm_overpass`, calificado=true. No está en `datos_gov_co_rues`:
   por eso `calificados` difiere entre fuentes aunque TOTAL cuenta los dos una sola vez (sin importar en cuántas
   fuentes aparecen).
-- lead3 (jurídica + cumplimiento): encontrado solo por `osm_overpass`, SIN calificar (no tiene fila en
-  `calificaciones`). Prueba que el divisor de `osm_overpass` cuenta calificados (2), no todos los leads de la
+- lead3 (jurídica + cumplimiento): encontrado solo por `osm_overpass`, con fila en `calificaciones` y
+  calificado=false. Tiene que tener la fila: sin ella el JOIN ya lo deja afuera y el filtro `calificado` no se prueba. Prueba que el divisor de `osm_overpass` cuenta calificados (2), no todos los leads de la
   fuente (3): lo que rompe la mutación `cpql_divide_por_todos_los_leads`.
 - costos `osm_overpass`: 1 fila gratis (lista 0.10) + 1 fila pagada (lista y real 0.40) -> lista 0.50, real 0.40.
 - costos `datos_gov_co_rues`: 1 fila gratis (lista 0.05) + 1 fila pagada (lista y real 0.30) -> lista 0.35, real 0.30.
@@ -37,7 +37,7 @@ _INSERT_LEAD_FUENTE = text(
     "VALUES (:t, :l, :b, :f, 'u', 'l')")
 _INSERT_CALIFICACION = text(
     "INSERT INTO calificaciones (tenant_id, lead_id, calificado, calificado_en, minutos) "
-    "VALUES (:t, :l, true, now(), :m)")
+    "VALUES (:t, :l, :c, now(), :m)")
 _INSERT_COSTO = text(
     "INSERT INTO costos (tenant_id, tipo, unidades, costo_unitario, moneda, proveedor, fuente, gratis) "
     "VALUES (:t, :tipo, :u, :cu, 'USD', :p, :f, :g)")
@@ -57,8 +57,8 @@ def fixture_cpql(admin, tenants):
         for lid, n in ((lead1, "L1"), (lead2, "L2"), (lead3, "L3")):
             c.execute(_INSERT_LEAD, {"id": lid, "t": tenant, "n": n})
             c.execute(_INSERT_CUMPLIMIENTO, {"t": tenant, "l": lid})
-        for lid in (lead1, lead2):  # lead3 queda sin calificar a propósito
-            c.execute(_INSERT_CALIFICACION, {"t": tenant, "l": lid, "m": "1"})
+        for lid, calificado in ((lead1, True), (lead2, True), (lead3, False)):
+            c.execute(_INSERT_CALIFICACION, {"t": tenant, "l": lid, "c": calificado, "m": "1"})
         c.execute(_INSERT_LEAD_FUENTE, {"t": tenant, "l": lead1, "b": busqueda, "f": OSM})
         c.execute(_INSERT_LEAD_FUENTE, {"t": tenant, "l": lead1, "b": busqueda, "f": DATOS_GOV})
         c.execute(_INSERT_LEAD_FUENTE, {"t": tenant, "l": lead2, "b": busqueda, "f": OSM})
