@@ -66,9 +66,6 @@ class CromaSupersociedadesCo:
         respuesta = self._enviar(cuerpo)
         try:
             datos = respuesta.json()
-            # Forma real: {"data": {"total", "results": [...]}}. La plana {"total", "data": [...]} queda por compatibilidad.
-            if isinstance(datos.get("data"), dict):
-                datos = {"total": datos["data"]["total"], "data": datos["data"]["results"]}
             total = datos["total"]
             if type(total) is not int or not isinstance(datos["data"], list):
                 raise TypeError

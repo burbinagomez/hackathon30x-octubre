@@ -222,3 +222,17 @@ def adaptadores_enriquecer(ajustes, costos: RegistroCostos, tarifas: Mapping, tr
         clasificador = JevClasificador(costos, transporte, ajustes.typesafe_url, ajustes.typesafe_api_key,
                                        tarifas["jev_in_por_M"])
     return verificador_titular(ajustes, costos, tarifas, transporte, ruta_yaml), SitioWeb(costos, transporte, resolver, tarifas["web_fetch"]), clasificador
+
+
+def buscador_sitio_web(costos: RegistroCostos, tarifas: Mapping, transporte: httpx.BaseTransport,
+                       resolver=_resolver_dns, ruta_yaml: Path = CONFIG / "fuentes.yaml"):
+    """`dominio_por_razon_social` (006, buscador de sitio web) si `fuentes.yaml` lo habilita; si no, None y el lead sin web
+    se queda sin web. Un flag: ni el dominio ni el caso de uso saben si existe."""
+    from app.modulos.enriquecimiento.infraestructura.adaptadores.dominio_por_razon_social import (
+        DominioPorRazonSocial,
+    )
+
+    config = ((yaml.safe_load(Path(ruta_yaml).read_text()) or {}).get("enriquecedores") or {}).get("dominio_por_razon_social") or {}
+    if not config.get("habilitado"):
+        return None
+    return DominioPorRazonSocial(costos, transporte, resolver, tarifas["web_fetch"])

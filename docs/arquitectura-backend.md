@@ -66,6 +66,20 @@ datos.gov.co (`c82u-588k`, activa) en la misma ciudad. Decisión del dueño: "S�
 - Tests: `tests/unit/enriquecimiento/test_normalizar_titular.py`, `test_rues_datos_gov.py`, `tests/unit/test_composicion_verificador.py`,
   `tests/contratos/test_verificador_titular.py`, `tests/integration/test_verificacion_titular_rues.py`.
 
+### Buscador de sitio web (006, enmienda 2026-10-18)
+- Puerto `BuscadorSitioWeb` (`enriquecimiento/dominio/puertos.py`): `buscar(lead_id, razon_social, nit) -> EvidenciaSitioWeb | None`. Adaptador
+  `DominioPorRazonSocial`. Dominio puro en `enriquecimiento/dominio/dominios.py`: `candidatos_de_dominio` (hasta 6: pegado y con guion x `.com.co`/`.com`/`.co`,
+  sin sufijos societarios ni `EN LIQUIDACION`, sin palabras genéricas solas) y `verifica_pagina` (NIT con o sin puntos, o razón social completa).
+- Flujo: DNS de cada candidato (no resuelve = sin HTTP) -> SSRF (`validar_destino` de `sitio_web`, por salto, conexión a la IP validada) -> GET de la portada
+  (4 s, mismo User-Agent, redirecciones solo dentro del dominio) -> verificación. Nunca se acepta un dominio sin verificar; el primero verificado gana.
+- `EnriquecerLead`: jurídica sin web -> buscador; si halla, `leads.web` (columna existente, sin DDL; nunca pisa la que ya traía el lead) y sigue `sitio_web`.
+  Evidencia en `cumplimiento.solicitudes` (`tipo=sitio_web_encontrado`, `fuente`, `url`, `motivo`, `ts`), nunca contacto. Costos: `web_fetch` por request, con `lead_id`.
+- Tanda de la API: `EnriquecerLead(max_hilos=8).ejecutar(busqueda, TANDA, presupuesto_s=60)`. Los leads corren en paralelo; el repo lo escribe solo el hilo
+  principal; lo que no terminó en 60 s queda pendiente ("Seguir con los que quedan"). Plazo de 12 s por lead para el buscador.
+- Config: `enriquecedores.dominio_por_razon_social.habilitado` (`composicion.buscador_sitio_web`); en `false` un lead sin web se queda sin web.
+- Tests: `tests/unit/enriquecimiento/test_dominios.py`, `test_dominio_por_razon_social.py`, `test_enriquecer_lead_sitio.py`,
+  `tests/unit/test_composicion_buscador.py`, `tests/integration/test_buscar_sitio_web.py`.
+
 ## Libro de costos: pantalla de solo lectura (spec 005)
 
 `GET /costos?pagina=N[&busqueda_id=]` (`api/costos.py`, `costos/infraestructura/repositorio_libro.py`): SQL inline sobre `costos`, sin DDL, bajo
