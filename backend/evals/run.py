@@ -69,6 +69,7 @@ def _args(argv):
     p.add_argument("--eval")
     p.add_argument("--actualizar-baseline", action="store_true")
     p.add_argument("--motivo")
+    p.add_argument("--validar", action="store_true", help="solo evals.yaml: prompt y tarifa; sin key ni requests")
     return p.parse_args(argv)
 
 
@@ -163,6 +164,21 @@ def _tarifas_llm() -> dict[str, dict[str, Decimal]]:
     return {modelo: {k: Decimal(str(v)) for k, v in t.items()} for modelo, t in llm.items()}
 
 
+def _validar(ruta: Path) -> int:
+    """Costo cero (job `evals` del CI): evals.yaml carga, cada prompt existe y cada modelo tiene tarifa.
+    No lee datasets (dataset.json lo etiqueta un humano, T023) ni el entorno."""
+    try:
+        evals, tarifas = cargar(ruta), _tarifas_llm()
+    except ConfigInvalida as e:
+        return _error(f"config_invalida: {e}")
+    for nombre, ev in evals.items():
+        if not (ruta.parent / ev["prompt"]).is_file():
+            return _error(f"config_invalida: {nombre}: falta el prompt")
+        if ev["modelo"] not in tarifas:
+            return _error(f"config_invalida: {nombre}: sin tarifa llm para {ev['modelo']}")
+    return 0
+
+
 def componer(entorno, transporte=None, *, tenant, evals, carpeta, registro_costos=None):
     """Rama por defecto: JuezClaude del CATALOGO + PostgresCostos del 002 (o el registro inyectado).
 
@@ -202,6 +218,8 @@ def main(argv, entorno=os.environ, fabrica_juez=None, registro_costos=None, tran
         args = _args(argv)
     except SystemExit:
         return 2
+    if args.validar:
+        return _validar(args.config)
     if faltan := [v for v in ENTORNO_REQUERIDO if not entorno.get(v)] + ([] if args.tenant else ["--tenant"]):
         return _error(f"falta_entorno: {', '.join(faltan)}")  # nombres, nunca valores
     try:
@@ -256,8 +274,6 @@ def main(argv, entorno=os.environ, fabrica_juez=None, registro_costos=None, tran
     return 0 if all(r["estado"] == "ok" for r in resultados.values()) else 1
 
 
-# El job `evals` del CI corre este módulo sin ANTHROPIC_API_KEY ni --tenant y espera 0. La composición real
-# ya existe (componer), pero conectar acá `main(sys.argv[1:])` haría salir 2 ese job: pendiente de decisión
-# del dueño (cambiar el job o este __main__). Mientras tanto no llama a main.
+# Sin key ni --tenant sale 2 (falta_entorno). El job `evals` del CI corre `--validar` (costo cero).
 if __name__ == "__main__":
-    raise SystemExit(0)
+    raise SystemExit(main(sys.argv[1:]))

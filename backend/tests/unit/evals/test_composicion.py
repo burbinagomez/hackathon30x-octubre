@@ -83,6 +83,21 @@ def test_falla_del_juez_sale_2_sin_key_ni_costos(tmp_path, capsys, http):
     assert costos.filas == [] and len(capturados) == 1  # corta en la primera falla: no sigue gastando
 
 
+@pytest.mark.parametrize("ruta, esperado", [
+    (None, 0),  # el evals.yaml versionado: lo que corre el job `evals` del CI
+    ("sin_tarifa", 2),
+], ids=["evals_yaml_real", "modelo_sin_tarifa"])
+def test_validar_sale_sin_key_ni_requests(tmp_path, capsys, ruta, esperado):
+    # Costo cero: sin ANTHROPIC_API_KEY, sin --tenant, sin DATABASE_URL; el transporte no recibe nada.
+    capturados = []
+    argv = ["--validar"] + ([] if ruta is None else ["--config", str(config(tmp_path, "claude-sin-tarifa"))])
+    codigo = run.main(argv, entorno={}, transporte=transporte(capturados))
+    out, err = capsys.readouterr()
+
+    assert (codigo, capturados) == (esperado, [])
+    assert ("config_invalida" in err) == (esperado == 2)
+
+
 def test_evals_yaml_real_declara_encaje_icp():
     """T022: la entrada versionada; el prompt existe y el modelo tiene tarifa (si no, componer sale 2)."""
     ruta = Path(run.__file__).parent / "evals.yaml"
