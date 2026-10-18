@@ -9,14 +9,14 @@ from sqlalchemy import text
 from app import db
 from app.api import actividades, busquedas, tablero, usuarios
 from app.api.sesion import tenant_actual
-from app.config import Settings, verificar_entorno
+from app.config import SettingsApi, verificar_entorno
 from app.modulos.acceso.infraestructura.verificador_jwks import VerificadorJwks, cliente_jwks
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     verificar_entorno()
-    app.state.settings = Settings()
+    app.state.settings = SettingsApi()
     app.state.engine = db.crear_engine(app.state.settings.database_url)
     db.verificar_rol(app.state.engine)
     app.state.verificador = VerificadorJwks(

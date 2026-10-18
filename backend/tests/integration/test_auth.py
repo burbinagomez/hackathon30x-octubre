@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from sqlalchemy import text
 
 from app.api.sesion import tenant_actual
-from app.config import Settings
+from app.config import SettingsApi
 from app.modulos.acceso.infraestructura.verificador_jwks import VerificadorJwks
 from tests.integration.conftest import _url
 from tests.unit.acceso.test_verificar_token import (
@@ -186,10 +186,10 @@ def test_jwks_inaccesible_da_503(cliente):
 def test_app_no_arranca_sin_auth_jwks_url_ni_issuer(entorno, faltante):
     entorno.delenv(faltante)
     with pytest.raises(ValidationError):
-        Settings(_env_file=None)
+        SettingsApi(_env_file=None)
     entorno.setenv(faltante, "")  # vacío tampoco vale
     with pytest.raises(ValidationError):
-        Settings(_env_file=None)
+        SettingsApi(_env_file=None)
 
 
 # --- superficie: docs, CORS, logs --------------------------------------------------------------------------------

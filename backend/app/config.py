@@ -42,10 +42,6 @@ class Settings(BaseSettings):
     datos_gov_co_url: str | None = None
     datos_gov_co_app_token: SecretStr | None = None
     repo_url: str = "https://github.com/burbinagomez/hackathon30x-octubre"
-    # Supabase Auth: URLs públicas (JWKS del proyecto y emisor del token). Ningún secreto de firma en la api.
-    # Obligatorias y no vacías: sin ellas la API no arranca (fallaría abierta o cerrada sin avisar).
-    auth_jwks_url: str = Field(min_length=1)
-    auth_issuer: str = Field(min_length=1)
 
     @field_validator("cifrado_key")
     @classmethod
@@ -55,6 +51,15 @@ class Settings(BaseSettings):
         except ConfigInvalida as error:
             raise ValueError(str(error)) from None
         return valor
+
+
+class SettingsApi(Settings):
+    """Lo que solo la API necesita: la CLI sigue con Settings y no exige AUTH_*."""
+
+    # Supabase Auth: URLs públicas (JWKS del proyecto y emisor del token). Ningún secreto de firma en la api.
+    # Obligatorias y no vacías: sin ellas la API no arranca (fallaría abierta o cerrada sin avisar).
+    auth_jwks_url: str = Field(min_length=1)
+    auth_issuer: str = Field(min_length=1)
 
 
 class SecretProhibido(RuntimeError):

@@ -182,8 +182,8 @@
 - [x] T030 [MIN] [Paso 6] **Verde:**
   - `repositorio_usuarios.py` (llama a `tenant_de_usuario`);
   - `app/api/sesion.py` (Bearer → `VerificadorToken` → `tenant_de_usuario(sub)` → `tenant_actual`);
-  - `GET /usuarios/me` y `PATCH /usuarios/me`;
-  - `web_origin` en `Settings`;
+  - `GET /usuarios/me` y `PATCH /usuarios/me` → Pulido;
+  - `web_origin` en `Settings` → reemplazado por `CORS_ORIGINS` (plan.md:359);
   - docs off y CORS.
 
 ## Fase 8: Endpoints (Paso 7)
