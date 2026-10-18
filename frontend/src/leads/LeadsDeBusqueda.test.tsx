@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { http, HttpResponse } from "msw";
+import { delay, http, HttpResponse } from "msw";
 import { expect, test } from "vitest";
 import i18n from "../i18n";
 import en from "../i18n/en.json";
@@ -50,13 +50,58 @@ test("muestra fuentes, ciudad, licencia y web, y no pinta columnas de contacto s
   expect(encabezados).toContain("Sitio web");
 });
 
-test("con contacto booleano pinta Si/No y nunca un valor", async () => {
+test("con contacto booleano pinta Si o guion, nunca un valor", async () => {
   await montar(pagina([lead(1, { tiene_telefono: true, tiene_email: false })]));
   const encabezados = screen.getAllByRole("columnheader").map((h) => h.textContent);
   expect(encabezados).toContain("Teléfono");
-  const fila = screen.getAllByRole("row")[1];
-  expect(within(fila).queryAllByText("Sí").length).toBeGreaterThan(0);
-  expect(within(fila).queryAllByText("No").length).toBeGreaterThan(0);
+  expect(encabezados).toContain("Correo");
+  const celdas = within(screen.getAllByRole("row")[1]).getAllByRole("cell");
+  const de = (etiqueta: string) => celdas.find((c) => c.getAttribute("data-etiqueta") === etiqueta)?.textContent;
+  expect(de("Teléfono")).toBe("Sí");
+  expect(de("Correo")).toBe("—");
+});
+
+test("la natural (contacto null) no pinta Si ni guion en contacto", async () => {
+  await montar(pagina([lead(1, { tiene_telefono: true, tiene_email: true }), lead(2, { nombre: null, tipo_titular: "natural" })]));
+  const celdas = within(screen.getAllByRole("row")[2]).getAllByRole("cell");
+  expect(celdas.find((c) => c.getAttribute("data-etiqueta") === "Teléfono")?.textContent).toBe("");
+});
+
+test("el checkbox Solo con contacto agrega con_contacto=true, vuelve a la pagina 1 y se quita", async () => {
+  const pedidas: string[] = [];
+  server.use(http.get("*/busquedas/:id/leads", ({ request }) => {
+    pedidas.push(new URL(request.url).search);
+    return HttpResponse.json(pagina([lead(1, { tiene_telefono: true, tiene_email: true })], { total: 30 }));
+  }));
+  await i18n.changeLanguage("es");
+  render(<LeadsDeBusqueda id={ID} />);
+  await waitFor(() => expect(screen.queryByRole("table")).toBeInTheDocument());
+  fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+  await waitFor(() => expect(pedidas).toHaveLength(2));
+
+  const caja = screen.getByRole("checkbox", { name: "Solo con contacto" });
+  expect(caja).not.toBeChecked();
+  fireEvent.click(caja);
+
+  await waitFor(() => expect(pedidas).toHaveLength(3));
+  expect(pedidas).toEqual(["?pagina=1&tamano=25", "?pagina=2&tamano=25", "?pagina=1&tamano=25&con_contacto=true"]);
+  expect(screen.getByRole("checkbox", { name: "Solo con contacto" })).toBeChecked();
+  fireEvent.click(screen.getByRole("checkbox", { name: "Solo con contacto" }));
+  await waitFor(() => expect(pedidas).toHaveLength(4));
+  expect(pedidas[3]).toBe("?pagina=1&tamano=25");
+});
+
+test("con el filtro y sin resultados el checkbox sigue para quitarlo, y en ingles", async () => {
+  server.use(http.get("*/busquedas/:id/leads", ({ request }) =>
+    HttpResponse.json(pagina([], { total: 0 }), { headers: { "x-q": new URL(request.url).search } })));
+  await i18n.changeLanguage("en");
+  render(<LeadsDeBusqueda id={ID} />);
+  const caja = await screen.findByRole("checkbox", { name: en.leads.solo_con_contacto });
+  expect(en.leads.solo_con_contacto).not.toBe(es.leads.solo_con_contacto);
+  fireEvent.click(caja);
+  await waitFor(() => expect(screen.getByRole("checkbox", { name: en.leads.solo_con_contacto })).toBeChecked());
+  expect(screen.getByText(en.leads.sin_leads)).toBeInTheDocument();
+  await i18n.changeLanguage("es");
 });
 
 test("pagina: pide la siguiente con tamano 25 y deshabilita Anterior en la primera", async () => {
@@ -101,4 +146,26 @@ test("404 muestra no encontrada", async () => {
   server.use(http.get("*/busquedas/:id/leads", () => HttpResponse.json({ detail: "no_encontrada" }, { status: 404 })));
   render(<LeadsDeBusqueda id={ID} />);
   await waitFor(() => expect(screen.queryByRole("alert")).toHaveTextContent("No se encontró la búsqueda."));
+});
+
+test("enriquecer_muestra_que_trabaja_y_despues_el_resumen_con_lo_que_queda", async () => {
+  let llamadas = 0;
+  server.use(
+    http.post("*/busquedas/:id/enriquecer", async () => {
+      llamadas += 1;
+      await delay(50); // que se alcance a ver la píldora de trabajo
+      return HttpResponse.json(llamadas === 1
+        ? { procesados: 15, contactables: 6, clasificados: 0, sin_clasificar: 15, cortado: false, pendientes: 5 }
+        : { procesados: 5, contactables: 2, clasificados: 0, sin_clasificar: 5, cortado: false, pendientes: 0 });
+    }),
+  );
+  await montar(pagina([lead(1)]));
+
+  fireEvent.click(screen.getByRole("button", { name: es.enriquecer.boton }));
+  expect(await screen.findByRole("status", { name: es.enriquecer.trabajando })).toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByText(/15 procesados · 6 con contacto · quedan 5/)).toBeInTheDocument());
+
+  fireEvent.click(screen.getByRole("button", { name: es.enriquecer.seguir }));
+  await waitFor(() => expect(screen.queryByText(/5 procesados · 2 con contacto · quedan 0/)).toBeInTheDocument());
+  expect(screen.queryByRole("button", { name: es.enriquecer.seguir })).not.toBeInTheDocument();
 });

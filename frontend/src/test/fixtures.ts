@@ -137,6 +137,10 @@ const filaTablero = {
   cpl_real: "0.2375",
   cuenta_naturales: false,
   naturales_no_contactables: null,
+  enriquecidos: 3,
+  contactables: 2,
+  con_telefono: 2,
+  calificados: 1,
 };
 
 export function respuestaTablero(cambios: Record<string, unknown> = {}) {

@@ -108,8 +108,14 @@ h2 {
   padding: 16px;
 }
 
+/* Tarjeta de las puertas, como las de Dapti: borde sutil, esquinas redondeadas, acciones agrupadas a la derecha. */
 .tarjeta {
-  border-top: 6px solid var(--color-acento);
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 0.75rem;
+  background: var(--color-superficie);
 }
 
 .selector-idioma {
@@ -129,16 +135,46 @@ h2 {
 /* Formularios */
 .formulario {
   display: grid;
-  gap: 16px;
+  gap: var(--espacio);
 }
 
 .campo {
   min-width: 0;
 }
 
+/* Nueva búsqueda: el mismo espacio entre campos que entre bloques. */
+.formulario-ancho,
+.grupo {
+  gap: var(--espacio);
+}
+
+.grupo {
+  display: grid;
+  min-width: 0; /* un fieldset no se achica por debajo de su contenido sin esto */
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.grupo legend {
+  padding: 0;
+  margin-bottom: var(--espacio-chico);
+  font-family: var(--fuente-titulos);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
 .acciones {
   display: grid;
-  gap: 8px;
+  gap: var(--espacio-chico);
+}
+
+/* Botones al pie, a la derecha; en pantallas angostas bajan de a uno. */
+.acciones-fin {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--espacio-chico);
 }
 
 .boton {
@@ -174,6 +210,44 @@ h2 {
 .resultado ul,
 .lista {
   padding-left: 20px;
+}
+
+/* Vista previa: una fila por fuente (nombre | conteo, y debajo lo que no filtra). */
+.resultado .fuentes-vista {
+  display: grid;
+  gap: var(--espacio-chico);
+  padding: 0;
+  list-style: none;
+}
+
+.fila-fuente {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0 var(--espacio);
+  padding-bottom: var(--espacio-chico);
+  border-bottom: 1px solid var(--color-borde);
+}
+
+.fila-fuente-nombre {
+  font-weight: 500;
+}
+
+.fila-fuente-ignora {
+  grid-column: 1 / -1;
+  font-size: 0.8125rem;
+  opacity: 0.75;
+}
+
+.metricas-vista {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--espacio-chico);
+}
+
+.metricas-vista > .metrica {
+  margin: 0;
+  padding: var(--espacio-chico) var(--espacio);
 }
 
 /* Tablero */
@@ -358,16 +432,20 @@ table.tabla-leads {
     font-size: 2rem;
   }
 
-  .formulario-ancho {
+  .grupo {
     grid-template-columns: 1fr 1fr;
   }
 
-  .formulario-ancho > .campo:nth-child(n + 5):nth-child(-n + 6),
-  .formulario-ancho > .campo:nth-child(9),
-  .formulario-ancho > .resultado,
-  .formulario-ancho > .acciones,
-  .formulario-ancho > .error {
+  .campo-ancho {
     grid-column: 1 / -1;
+  }
+
+  .fila-fuente {
+    grid-template-columns: minmax(0, 1fr) max-content minmax(0, 1fr);
+  }
+
+  .fila-fuente-ignora {
+    grid-column: auto;
   }
 
   .acciones {
@@ -535,3 +613,168 @@ table.tabla-leads {
   border-color: var(--color-acento);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
+
+/* Chat de "En una frase": burbujas del usuario a la derecha y de la IA a la izquierda. Solo tokens: claro y oscuro. */
+.chat {
+  display: grid;
+  gap: 1rem;
+}
+.chat-mensajes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 24rem;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+.burbuja {
+  max-width: 85%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+.burbuja p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.burbuja-usuario {
+  align-self: flex-end;
+  background: var(--color-acento);
+  color: var(--color-sobre-acento);
+  border-bottom-right-radius: 2px;
+}
+.burbuja-ia {
+  align-self: flex-start;
+  background: var(--color-superficie);
+  color: var(--color-texto);
+  border-bottom-left-radius: 2px;
+}
+.burbuja-nombre {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.chat-mensajes > .error {
+  align-self: stretch;
+}
+.chat-entrada {
+  display: grid;
+  gap: 0.5rem;
+}
+.chat-entrada textarea {
+  min-height: 5rem;
+}
+.chat-busqueda {
+  display: grid;
+  gap: 1rem;
+}
+.resumen {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+}
+.resumen dt {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.resumen dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+@media (min-width: 40rem) {
+  .resumen > div {
+    display: grid;
+    grid-template-columns: 11rem 1fr;
+    gap: 0.5rem;
+  }
+}
+
+/* Embudo por fuente: barras proporcionales a los únicos. La pista es gris, la barra lima; el número y el % van en texto. */
+.embudo {
+  margin: 24px 0;
+}
+
+.embudo-ayuda {
+  margin: 4px 0 12px;
+  font-size: 0.875rem;
+}
+
+.embudo-fuente {
+  margin-bottom: 16px;
+}
+
+.embudo-pasos {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.embudo-paso {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 2px 12px;
+  align-items: baseline;
+  padding: 4px 0;
+}
+
+.embudo-valor,
+.embudo-pct {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.embudo-pista {
+  grid-column: 1 / -1;
+  height: 10px;
+  overflow: hidden;
+  background: var(--color-pista);
+  border-radius: 5px;
+}
+
+.embudo-barra {
+  display: block;
+  height: 100%;
+  background: var(--color-acento);
+}
+
+@media (min-width: 40rem) {
+  .embudo-paso {
+    grid-template-columns: 10rem 5rem 5rem 1fr;
+  }
+
+  .embudo-pista {
+    grid-column: auto;
+  }
+}
+
+.tarjeta h2 { margin: 0; }
+.tarjeta .ayuda { margin: 0; }
+.campo-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.4rem;
+}
+.campo-cabecera label { margin: 0; }
+.boton-chico {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.85rem;
+  min-height: 0;
+}
+/* El aviso de "prellenamos los filtros" ocupa la fila entera, también dentro de la grilla de dos columnas. */
+.aviso-ancho,
+.formulario-ancho > .aviso-ancho {
+  grid-column: 1 / -1;
+  text-align: left;
+  margin: 0 0 0.5rem;
+}
+.aviso-ancho {
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid var(--color-acento);
+  border-radius: 0.4rem;
+  background: var(--color-superficie);
+}
+.panel-enriquecer { margin-bottom: 1.5rem; }

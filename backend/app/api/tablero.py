@@ -20,6 +20,8 @@ def _fila(f: FilaFuente) -> dict:
         "costo_lista": _monto(f.costo_lista), "costo_real": _monto(f.costo_real),
         "desperdicio_lista": None, "desperdicio_real": None,
         "cpl_lista": _monto(f.cpl_lista), "cpl_real": _monto(f.cpl_real), "cuenta_naturales": False, "naturales_no_contactables": None,
+        "enriquecidos": f.enriquecidos, "contactables": f.contactables, "con_telefono": f.con_telefono,
+        "calificados": f.calificados,
     }
 
 

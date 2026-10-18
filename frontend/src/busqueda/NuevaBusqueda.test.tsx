@@ -270,7 +270,7 @@ test("vista_previa_sin_costos_habilita_buscar_y_no_muestra_costos_ni_tope", asyn
   await waitFor(() => expect(fila("OpenStreetMap")).toBeDefined());
   // dentro_del_tope null = el tope no se evalúa: no bloquea (solo `false` bloquea).
   expect(boton("Buscar")).toBeEnabled();
-  expect(fila("OpenStreetMap")).toHaveTextContent(es.motivos.sin_conteo);
+  expect(fila("OpenStreetMap")).toHaveTextContent(es.busqueda.sin_conteo_corto);
   for (const clave of ["Costo estimado", "Costo máximo", "Tope:", "Créditos de Croma", "Consultas de Croma"]) {
     expect(screen.queryByText(new RegExp(clave))).not.toBeInTheDocument();
   }
@@ -459,4 +459,50 @@ test("la_pildora_de_busqueda_se_despliega_con_lo_que_consulta_y_el_costo", async
   const pildora = screen.getByRole("status", { name: es.busqueda.trabajando.buscando });
   expect(within(pildora).getByText(/OpenStreetMap: 7 previstas/)).toHaveTextContent("no filtra por: ingresos_min");
   expect(within(pildora).getByText(/Costo máximo/)).toHaveTextContent("tope");
+});
+
+test("el_formulario_va_en_tres_bloques_con_subtitulo_y_sus_campos", async () => {
+  server.use(http.get("*/actividades", () => HttpResponse.json(actividades)), manejarGeografia());
+  render(<NuevaBusqueda />);
+  await waitFor(() => expect(screen.queryByLabelText("Departamento")).toBeInTheDocument());
+  const bloques: [string, string[]][] = [
+    [es.busqueda.grupos.quien, ["País", "Actividad", "Departamento", "Ciudad (opcional)"]],
+    [es.busqueda.grupos.afinar, ["Ingresos mínimos (USD)", "Canal preferido", "Palabras clave (separadas por coma)", "Exclusiones (separadas por coma)"]],
+    [es.busqueda.grupos.mensaje, ["Tope de gasto (USD)", "Mensaje base"]],
+  ];
+  for (const [titulo, campos] of bloques) {
+    const grupo = screen.getByRole("group", { name: titulo });
+    for (const c of campos) expect(within(grupo).queryByLabelText(c), `${titulo} › ${c}`).toBeInTheDocument();
+  }
+  expect(en.busqueda.grupos.quien && en.busqueda.grupos.afinar && en.busqueda.grupos.mensaje).toBeTruthy();
+});
+
+test("vista_previa_y_buscar_van_juntos_al_final_despues_del_resultado", async () => {
+  await previsualizar();
+  await waitFor(() => expect(fila("OpenStreetMap")).toBeDefined());
+  const acciones = boton("Vista previa").parentElement!;
+  expect(acciones).toHaveClass("acciones", "acciones-fin");
+  expect(boton("Buscar").parentElement).toBe(acciones);
+  expect(acciones.firstElementChild).toBe(boton("Vista previa"));
+  const resultado = document.querySelector("section.resultado")!;
+  expect(resultado.compareDocumentPosition(acciones) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test("la_vista_previa_es_una_fila_por_fuente_y_tres_metricas", async () => {
+  await previsualizar(respuestaVistaPreviaMinima({ costo_maximo_usd: "1.4", dentro_del_tope: true }));
+  await waitFor(() => expect(fila("OpenStreetMap")).toBeDefined());
+
+  const filas = document.querySelectorAll(".fuentes-vista > .fila-fuente");
+  expect(filas).toHaveLength(2);
+  expect(fila("OpenStreetMap")).toHaveTextContent(es.busqueda.sin_conteo_corto);
+  expect(fila("OpenStreetMap")).not.toHaveTextContent(es.motivos.sin_conteo);
+  expect(fila("OpenStreetMap")).toHaveTextContent("no filtra por: Palabras clave, Exclusiones");
+  // La explicación larga no se pierde: queda una sola vez debajo de la lista.
+  expect(screen.getAllByText(es.motivos.sin_conteo)).toHaveLength(1);
+
+  const metricas = document.querySelectorAll(".metricas-vista > .metrica");
+  expect(metricas).toHaveLength(3);
+  expect(metricas[0]).toHaveTextContent("Costo máximo:");
+  expect(metricas[1]).toHaveTextContent("Tope:");
+  expect(metricas[2]).toHaveTextContent(es.busqueda.dentro_del_tope);
 });

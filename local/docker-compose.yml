@@ -1,0 +1,98 @@
+# Stack local completo: Postgres + migraciones + auth local + api + web. Sin servicios externos para entrar. Solo para validar en una máquina; prod sigue en
+# Railway/Vercel/Supabase. Uso (desde la raíz del repo):
+#   cp local/.env.example local/.env   # y completar
+#   docker compose -f local/docker-compose.yml --env-file local/.env up --build
+# web: http://localhost:8080 · api: http://localhost:8000/docs · postgres: localhost:5433 · auth: localhost:9999
+name: profitdata-local
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres-local}
+    ports: ["5433:5432"]
+    volumes: [db:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 2s
+      retries: 30
+
+  # Lo mismo que hace CI: roles + simulación del schema de Supabase + migraciones en orden + tenant y usuario.
+  preparar-db:
+    image: postgres:16
+    depends_on:
+      db: {condition: service_healthy}
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres-local}
+      APP_RT_PASSWORD: ${APP_RT_PASSWORD:-app-rt-local}
+      LOCAL_AUTH_USER_ID: ${LOCAL_AUTH_USER_ID:-11111111-1111-4111-8111-111111111111}
+      LOCAL_TENANT_ID: ${LOCAL_TENANT_ID:-00000000-0000-4000-8000-000000000001}
+    volumes:
+      - ../backend/scripts:/scripts:ro
+      - ../supabase/migrations:/migrations:ro
+      - ./preparar_db.sh:/preparar_db.sh:ro
+    entrypoint: ["bash", "/preparar_db.sh"]
+
+  # Imita lo mínimo de Supabase Auth (login, refresco, JWKS) con UN usuario de local/.env. Reusa la imagen de api.
+  auth-local:
+    build: ../backend
+    command: ["python", "/local/auth_local.py"]
+    volumes: [./auth_local.py:/local/auth_local.py:ro]
+    environment:
+      LOCAL_EMAIL: ${LOCAL_EMAIL:?falta LOCAL_EMAIL en local/.env}
+      LOCAL_PASSWORD: ${LOCAL_PASSWORD:?falta LOCAL_PASSWORD en local/.env}
+      LOCAL_AUTH_USER_ID: ${LOCAL_AUTH_USER_ID:-11111111-1111-4111-8111-111111111111}
+      LOCAL_AUTH_ISSUER: http://localhost:9999/auth/v1
+      LOCAL_WEB_ORIGIN: http://localhost:8080
+    ports: ["9999:9999"]
+
+  api:
+    build: ../backend
+    depends_on:
+      preparar-db: {condition: service_completed_successfully}
+      auth-local: {condition: service_started}
+    # Lista explícita, sin env_file: la api corta el arranque si ve una key de front (sb_publishable_) o del CLI.
+    environment:
+      PORT: "8000"
+      DATABASE_URL: postgresql+psycopg://app_rt:${APP_RT_PASSWORD:-app-rt-local}@db:5432/postgres
+      CIFRADO_KEY: ${CIFRADO_KEY:?falta CIFRADO_KEY en local/.env}
+      AUTH_JWKS_URL: http://auth-local:9999/auth/v1/.well-known/jwks.json
+      AUTH_ISSUER: http://localhost:9999/auth/v1
+      CORS_ORIGINS: http://localhost:8080
+      DOCS_HABILITADAS: "true"
+      IA_API_KEY: ${IA_API_KEY:-}
+      IA_MODELO: ${IA_MODELO:-}
+      IA_PROVEEDOR: ${IA_PROVEEDOR:-}
+      IA_MODELO_PROVEEDOR: ${IA_MODELO_PROVEEDOR:-}
+      CROMA_API_KEY: ${CROMA_API_KEY:-}
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+      TYPESAFE_URL: ${TYPESAFE_URL:-}
+      # Email (spec 007): los lee `enviar` de la CLI; BAJA_SECRET también la api (/baja). Vacías, la api arranca igual.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USUARIO: ${SMTP_USUARIO:-}
+      SMTP_CLAVE: ${SMTP_CLAVE:-}
+      SMTP_SEGURIDAD: ${SMTP_SEGURIDAD:-ssl}
+      REMITENTE: ${REMITENTE:-}
+      BAJA_SECRET: ${BAJA_SECRET:-}
+      API_BASE_URL: http://localhost:8000
+      URL_PRIVACIDAD: ${URL_PRIVACIDAD:-}
+      EMAIL_MODO: ${EMAIL_MODO:-prueba}
+      EMAIL_PRUEBA_DESTINOS: ${EMAIL_PRUEBA_DESTINOS:-}
+    ports: ["8000:8000"]
+
+  web:
+    build:
+      context: ../frontend
+      args:
+        VITE_API_URL: http://localhost:8000
+        # El front cree que habla con Supabase: es el auth local. La "key" no es secreta, solo pasa el chequeo de forma.
+        VITE_SUPABASE_URL: http://localhost:9999
+        VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_local
+    depends_on: [api]
+    environment:
+      PORT: "8080"
+    ports: ["8080:8080"]
+
+volumes:
+  db:

@@ -7,6 +7,8 @@
   --color-blanco: #FFFFFF;
   --fuente-titulos: "Poppins", system-ui, sans-serif;
   --fuente-texto: "DM Sans", system-ui, sans-serif;
+  --espacio: 1rem; /* entre campos y entre bloques */
+  --espacio-chico: 0.5rem; /* entre botones y entre filas de una lista */
 
   /* Semánticos, tema claro. Las pantallas usan estos, no las variables de marca. */
   color-scheme: light dark;
@@ -17,6 +19,7 @@
   --color-cabecera-fondo: var(--color-oscuro);
   --color-cabecera-texto: var(--color-blanco);
   --color-foco: var(--color-oscuro);
+  --color-pista: var(--color-gris); /* pista de las barras del embudo; la barra es --color-acento */
   --color-sobre-acento: var(--color-oscuro); /* texto sobre lima: oscuro en ambos temas */
 }
 

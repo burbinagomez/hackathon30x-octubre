@@ -2,6 +2,7 @@
 
 Es el único lugar (junto con `app.cli` y `app.main`) que une descubrimiento con la infraestructura de costos.
 """
+import socket
 import time
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
@@ -18,8 +19,19 @@ from app.modulos.costos.dominio.puertos import RegistroCostos
 from app.modulos.descubrimiento.aplicacion.camaras import cargar_camaras
 from app.modulos.descubrimiento.aplicacion.registro import Registro, cargar_registro
 from app.modulos.descubrimiento.dominio.modelos import MetaFuente
-from app.modulos.descubrimiento.dominio.puertos import FabricaFuentes, FuenteDescubrimiento
-from app.modulos.intake.infraestructura.llm.interpretador_claude import InterpretadorClaude
+from app.modulos.descubrimiento.dominio.puertos import (
+    FabricaFuentes,
+    FuenteDescubrimiento,
+)
+from app.modulos.intake.infraestructura.llm.interpretador_claude import (
+    InterpretadorClaude,
+)
+from app.modulos.intake.infraestructura.llm.interpretador_openrouter import (
+    URL_BASE as URL_OPENROUTER,
+)
+from app.modulos.intake.infraestructura.llm.interpretador_openrouter import (
+    InterpretadorOpenRouter,
+)
 
 CONFIG = Path(__file__).resolve().parents[1] / "config"
 
@@ -42,20 +54,34 @@ def cargar_tarifas_llm() -> dict[str, dict[str, Decimal]]:
     return {modelo: {k: Decimal(str(v)) for k, v in t.items()} for modelo, t in llm.items()}
 
 
+# Proveedores de la Puerta B: mismo puerto (GeneradorEstructurado), un adaptador cada uno. Se elige con IA_PROVEEDOR.
+URL_IA = {"anthropic": "https://api.anthropic.com", "openrouter": URL_OPENROUTER}
+
+
+def _proveedor(ajustes) -> str:
+    return (getattr(ajustes, "ia_proveedor", None) or "anthropic").strip().lower()
+
+
 def ia_configurada(ajustes, tarifas_llm: Mapping[str, Mapping]) -> bool:
-    """Key + modelo + tarifa de ese modelo. Cualquier falta = la Puerta B no está disponible."""
+    """Key + modelo + tarifa de ese modelo + proveedor conocido. Cualquier falta = la Puerta B no está disponible.
+    La tarifa se busca por IA_MODELO (el nombre del libro de costos), no por el nombre que usa el proveedor."""
     key, modelo = ajustes.ia_api_key, (ajustes.ia_modelo or "").strip()
-    return bool(key and key.get_secret_value().strip() and modelo in tarifas_llm)
+    return bool(key and key.get_secret_value().strip() and modelo in tarifas_llm and _proveedor(ajustes) in URL_IA)
 
 
 def generador_de_frase(ajustes, tarifas_llm: Mapping[str, Mapping], costos: RegistroCostos,
-                       transporte: httpx.BaseTransport) -> InterpretadorClaude | None:
+                       transporte: httpx.BaseTransport) -> InterpretadorClaude | InterpretadorOpenRouter | None:
     """El adaptador de la Puerta B atado a este tenant (por `costos`), o None si la IA no está disponible."""
     if not ia_configurada(ajustes, tarifas_llm):
         return None
     modelo = ajustes.ia_modelo.strip()
-    http = httpx.Client(base_url="https://api.anthropic.com", transport=transporte, timeout=30)
-    return InterpretadorClaude(costos, dict(tarifas_llm[modelo]), modelo, ajustes.ia_api_key.get_secret_value(), http)
+    proveedor = _proveedor(ajustes)
+    http = httpx.Client(base_url=URL_IA[proveedor], transport=transporte, timeout=30)
+    clave, tarifa = ajustes.ia_api_key.get_secret_value(), dict(tarifas_llm[modelo])
+    if proveedor == "openrouter":
+        nombre = (getattr(ajustes, "ia_modelo_proveedor", None) or modelo).strip()
+        return InterpretadorOpenRouter(costos, tarifa, nombre, clave, http)
+    return InterpretadorClaude(costos, tarifa, modelo, clave, http)
 
 
 def registro_api(ruta_yaml: Path, catalogo: dict[str, type]) -> Registro:
@@ -123,3 +149,22 @@ def calificador_api(ruta_yaml: Path):
     """`DaptaCSV` si `calificadores.dapta_csv.habilitado` en fuentes.yaml; si no, None (el import responde 503)."""
     calificadores = (yaml.safe_load(ruta_yaml.read_text()) or {}).get("calificadores") or {}
     return DaptaCSV() if (calificadores.get("dapta_csv") or {}).get("habilitado") else None
+
+
+def _resolver_dns(host: str) -> list[str]:
+    return [info[4][0] for info in socket.getaddrinfo(host, None)]
+
+
+def adaptadores_enriquecer(ajustes, costos: RegistroCostos, tarifas: Mapping, transporte: httpx.BaseTransport,
+                           resolver=_resolver_dns):
+    """Croma RUES, sitio web y jev (006), los mismos para la CLI y la API. Sin TYPESAFE_API_KEY o TYPESAFE_URL no hay
+    clasificador: encaje queda NULL. `resolver` lo usa la guarda SSRF del sitio web; los tests lo reemplazan."""
+    from app.modulos.enriquecimiento.infraestructura.adaptadores.croma_rues import CromaRues
+    from app.modulos.enriquecimiento.infraestructura.adaptadores.jev_clasificador import JevClasificador
+    from app.modulos.enriquecimiento.infraestructura.adaptadores.sitio_web import SitioWeb
+
+    clasificador = None
+    if ajustes.typesafe_api_key and ajustes.typesafe_url:
+        clasificador = JevClasificador(costos, transporte, ajustes.typesafe_url, ajustes.typesafe_api_key,
+                                       tarifas["jev_in_por_M"])
+    return CromaRues(), SitioWeb(costos, transporte, resolver, tarifas["web_fetch"]), clasificador

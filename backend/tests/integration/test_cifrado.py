@@ -22,8 +22,19 @@ REPOSITORIO = APP / "modulos" / "descubrimiento" / "infraestructura" / "persiste
 # PostgresCalificaciones (008) lee leads para el chequeo juridica+cumplimiento antes de importar: solo
 # tipo_titular e id, nunca nombre/direccion/nombre_cifrado/direccion_cifrada.
 CALIFICACIONES = APP / "modulos" / "calificacion" / "infraestructura" / "persistencia" / "postgres_calificaciones.py"
+# El embudo del tablero cuenta leads en su propio módulo: solo count, nunca selecciona contacto
+# (lo ata test_el_sql_del_embudo_solo_cuenta y las columnas devueltas, test_tablero_embudo.py).
+EMBUDO = APP / "modulos" / "tablero" / "infraestructura" / "persistencia" / "embudo_sql.py"
+# El export para Dapta (008) lee leads de jurídicas y descifra solo telefono_cifrado: nunca nombre_cifrado,
+# direccion_cifrada ni email_cifrado (lo ata test_export_dapta_solo_descifra_el_telefono).
+ELEGIBLES_DAPTA = APP / "modulos" / "calificacion" / "infraestructura" / "persistencia" / "elegibles_dapta.py"
 # modelos.py y el catálogo nombran columnas, no ejecutan SQL sobre ellas.
-PERMITIDOS = (REPOSITORIO, CALIFICACIONES, APP / "modelos.py", APP / "seguridad" / "catalogo_sensibles.py")
+LEADS_CONTACTABLES = APP / "modulos" / "contacto" / "infraestructura" / "leads_contactables.py"
+PERMITIDOS = (
+    REPOSITORIO, CALIFICACIONES, EMBUDO, ELEGIBLES_DAPTA, LEADS_CONTACTABLES, APP / "modelos.py", APP / "seguridad" / "catalogo_sensibles.py"
+)
+# Leen leads para la elegibilidad legal (tipo_titular), nunca una columna cifrada.
+SIN_CIFRADAS = (APP / "modulos" / "contacto" / "infraestructura" / "repositorio_contactos.py",)
 NOMBRE = "Tienda Doña Rosa"  # sintéticos
 DIRECCION = "Calle 10 # 5-20"
 TELEFONO = "+57 601 555 0199"
@@ -161,8 +172,12 @@ def test_el_escaneo_no_se_alarma_con_lo_inocente(codigo):
 
 def test_nombre_solo_se_lee_por_el_repositorio():
     sueltos = [str(f.relative_to(BACKEND)) for carpeta in ("app", "evals", "scripts") for f in (BACKEND / carpeta).rglob("*.py")
-               if f not in PERMITIDOS and menciona_la_tabla_leads(f.read_text())]
+               if f not in PERMITIDOS + SIN_CIFRADAS and menciona_la_tabla_leads(f.read_text())]
     assert sueltos == []
+
+
+def test_los_que_leen_leads_sin_cifrar_no_nombran_columnas_cifradas():
+    assert [str(f.relative_to(BACKEND)) for f in SIN_CIFRADAS if any(c in f.read_text() for c in CLARO)] == []
 
 
 class _FuenteConNombre(FuenteFalsa):
@@ -232,3 +247,16 @@ def test_el_repo_de_calificaciones_no_lee_nombre_ni_direccion():
     """Está en PERMITIDOS porque toca `leads`, pero solo para filtrar juridica + cumplimiento: nunca el contacto."""
     sql = CALIFICACIONES.read_text()
     assert "nombre" not in sql and "direccion" not in sql
+
+
+def test_leads_contactables_solo_lee_el_email_cifrado():
+    """Está en PERMITIDOS para descifrar la dirección a la que se manda; ninguna otra columna cifrada."""
+    texto = LEADS_CONTACTABLES.read_text()
+    assert [c for c in CLARO if c in texto] == ["email_cifrado"]
+
+
+def test_export_dapta_solo_descifra_el_telefono():
+    fuente = ELEGIBLES_DAPTA.read_text()
+    for columna in ("nombre_cifrado", "direccion_cifrada", "email_cifrado"):
+        assert columna not in fuente, columna
+    assert "tipo_titular = 'juridica'" in fuente

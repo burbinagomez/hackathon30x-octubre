@@ -54,7 +54,7 @@ def test_el_prompt_versionado_viaja_como_system():
 
     adaptador(RegistroCostosFalso(), capturados).generar(FRASE, uuid4())
 
-    assert "frase_a_icp_v1" in capturados[0]["system"]  # el archivo se nombra a sí mismo: la versión viaja
+    assert "frase_a_icp_v2" in capturados[0]["system"]  # el archivo se nombra a sí mismo: la versión viaja
 
 
 def test_datos_de_la_frase_van_delimitados():

@@ -46,7 +46,7 @@
     "creditos_restantes": "Créditos de Croma restantes este mes: {{n}}",
     "requests_restantes": "Consultas de Croma restantes en 24 h: {{n}}",
     "descartadas": "Fuentes descartadas",
-    "ignorados": "se ignora: {{lista}}",
+    "ignorados": "no filtra por: {{lista}}",
     "error": "No se pudo completar la operación. Probá de nuevo.",
     "pestanas": {
       "lookalike": "Ya me compran",
@@ -55,12 +55,19 @@
     },
     "frase": {
       "etiqueta": "¿A quién le vendés y qué ofrecés?",
-      "ayuda": "Una o dos frases. Ejemplo: vendo software contable a ferreterías medianas en Antioquia.",
-      "sugerir": "Sugerir filtros",
+      "ayuda": "Contame a quién le vendés y qué ofrecés, en una o dos frases. Por ejemplo: vendo software contable a ferreterías medianas en Antioquia.",
       "pensando": "Pensando…",
       "revisar": "Prellenamos los filtros con tu frase. Revisalos y ajustalos antes de la vista previa.",
       "error_no_disponible": "La sugerencia con IA no está disponible ahora. Usá los filtros directamente.",
-      "error_interpretacion": "No pudimos interpretar la frase. Probá con otra redacción o usá los filtros."
+      "error_interpretacion": "No pudimos interpretar la frase. Probá con otra redacción o usá los filtros.",
+      "enviar": "Enviar",
+      "asistente": "Asistente",
+      "conversacion": "Conversación con el asistente",
+      "voy_a_buscar": "Voy a buscar",
+      "editar_en_filtros": "Editar en Filtros",
+      "empezar_de_nuevo": "Empezar de nuevo",
+      "limite_turnos": "Esta conversación ya es larga. Tocá «Empezar de nuevo» para armar otra búsqueda.",
+      "sin_actividad": "Falta elegir la actividad para calcular la vista previa. Tocá «Editar en Filtros» y elegila."
     },
     "trabajando": {
       "buscando": "Buscando empresas en las fuentes",
@@ -73,6 +80,13 @@
       "detalle_fuente_sin_conteo": "{{fuente}}: sin conteo previo",
       "detalle_ignora": "no filtra por: {{campos}}",
       "detalle_costo": "Costo máximo {{maximo}} · tope {{tope}}"
+    },
+    "revisar_clientes": "Prellenamos los filtros con tus clientes. Revisalos y ajustalos antes de la vista previa.",
+    "sin_conteo_corto": "sin conteo previo",
+    "grupos": {
+      "quien": "¿A quién buscás?",
+      "afinar": "Afinar la búsqueda",
+      "mensaje": "Mensaje y gasto"
     }
   },
   "fuentes": {
@@ -114,7 +128,15 @@
     "licencia": "Licencia",
     "calificados": "Calificados",
     "pct_calificados": "% calificados (de únicos)",
-    "cpql": "CPQL (lista)"
+    "cpql": "CPQL (lista)",
+    "embudo": "Embudo por fuente",
+    "embudo_enriquecidos": "Enriquecidos",
+    "embudo_contactables": "Contactables",
+    "embudo_con_telefono": "Con teléfono",
+    "embudo_calificados": "Calificados",
+    "embudo_ayuda": "Cada barra se mide contra los leads únicos de la fuente.",
+    "exportar_dapta": "Exportar para Dapta (CSV)",
+    "error_exportar": "No se pudo exportar. Probá de nuevo."
   },
   "idioma": {
     "etiqueta": "Idioma",
@@ -159,6 +181,7 @@
     "telefono": "Teléfono",
     "email": "Correo",
     "licencia": "Licencia",
+    "solo_con_contacto": "Solo con contacto",
     "si": "Sí",
     "no": "No",
     "anterior": "Anterior",
@@ -188,14 +211,15 @@
       "ejemplo": "Usar ejemplo",
       "sugerir": "Sugerir filtros",
       "enviando": "Buscando…",
-      "resueltos": "{{n}} empresas encontradas",
       "explicacion": "Por qué estos filtros",
       "ciiu": "Actividad (CIIU)",
-      "departamento": "Departamento (código)",
+      "departamento": "Departamento",
       "no_resueltos": "No pudimos identificar estas empresas (no cuentan en la sugerencia)",
       "rango": "Pegá entre 5 y 50 empresas, una por línea.",
       "no_disponible": "La búsqueda de empresas no está disponible ahora. Probá de nuevo o usá los filtros.",
-      "error": "No pudimos sugerir filtros. Probá de nuevo o usá los filtros."
+      "error": "No pudimos sugerir filtros. Probá de nuevo o usá los filtros.",
+      "resueltos_one": "{{n}} empresa encontrada",
+      "resueltos_other": "{{n}} empresas encontradas"
     }
   },
   "ejecucion": {
@@ -214,5 +238,13 @@
   },
   "comun": {
     "cargando": "Cargando…"
+  },
+  "enriquecer": {
+    "boton": "Buscar teléfono y email",
+    "seguir": "Seguir con los que quedan",
+    "ayuda": "Busca el contacto público (teléfono y email) en el sitio web de cada empresa. Solo empresas: las personas naturales no se contactan.",
+    "trabajando": "Buscando contacto en los sitios web",
+    "resumen": "{{procesados}} procesados · {{contactables}} con contacto · quedan {{pendientes}}",
+    "error": "No se pudo completar. Probá de nuevo."
   }
 }

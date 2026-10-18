@@ -5,7 +5,7 @@ import Esqueleto from "../compartido/Esqueleto";
 import Enlace from "../compartido/Enlace";
 import { RUTA_BUSQUEDAS, RUTA_LEADS } from "../compartido/rutas";
 import { entero, moneda, monedaFina, porcentaje } from "../compartido/formato";
-import { obtenerCpql, obtenerTablero } from "./api";
+import { obtenerCpql, exportarParaDapta, obtenerTablero } from "./api";
 import type { Cpql, FilaCpql, FilaTablero, Tablero as DatosTablero } from "./tipos";
 
 type Columna =
@@ -62,11 +62,70 @@ function columnasConDatos(d: DatosTablero, cpql: Cpql | null): Columna[] {
   return columnas;
 }
 
+const PASOS_EMBUDO = [
+  ["encontrados", "tablero.encontrados"],
+  ["unicos", "tablero.unicos"],
+  ["enriquecidos", "tablero.embudo_enriquecidos"],
+  ["contactables", "tablero.embudo_contactables"],
+  ["con_telefono", "tablero.embudo_con_telefono"],
+  ["calificados", "tablero.embudo_calificados"],
+] as const;
+
+const CAMPOS_NUEVOS = ["enriquecidos", "contactables", "con_telefono", "calificados"] as const;
+
+/** Ancho de la barra: proporción de únicos, tope 100 (encontrados puede superar a únicos); sin dato o sin únicos, 0. */
+function anchoBarra(valor: number | null, unicos: number): string {
+  if (valor === null || !unicos) return "0%";
+  return `${Math.min(100, Math.round((valor / unicos) * 100))}%`;
+}
+
+function EmbudoFuente({ fila, total = false }: { fila: FilaTablero; total?: boolean }) {
+  const { t } = useTranslation();
+  const nombre = total ? t("tablero.total") : t(`fuentes.${fila.fuente}`);
+  return (
+    <div role="group" aria-label={nombre} className="embudo-fuente">
+      <h3>{nombre}</h3>
+      <ul className="embudo-pasos">
+        {PASOS_EMBUDO.map(([campo, etiqueta]) => {
+          const valor = fila[campo] ?? null;  // un backend sin el campo es "sin dato", no cero
+          return (
+            <li key={campo} className="embudo-paso">
+              <span data-paso="etiqueta" className="embudo-etiqueta">{t(etiqueta)}</span>
+              <span data-paso="valor" className="embudo-valor">{entero(valor)}</span>
+              <span data-paso="pct" className="embudo-pct">{porcentaje(valor, fila.unicos)}</span>
+              <span className="embudo-pista" aria-hidden="true">
+                <span className="embudo-barra" style={{ width: anchoBarra(valor, fila.unicos) }} />
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function Embudo({ datos }: { datos: DatosTablero }) {
+  const { t } = useTranslation();
+  const fuentes = datos.fuentes.filter((f) => f.fuente !== SIN_ATRIBUIR);  // costo sin lead: no tiene embudo
+  // Como las columnas de la tabla: si la API no manda ningún dato del embudo (backend viejo), no se pinta una sección de "—".
+  const hayDatos = [...fuentes, datos.total].some((f) => CAMPOS_NUEVOS.some((c) => (f[c] ?? null) !== null));
+  if (!fuentes.length || !hayDatos) return null;
+  return (
+    <section className="embudo" aria-labelledby="embudo-titulo">
+      <h2 id="embudo-titulo">{t("tablero.embudo")}</h2>
+      <p className="embudo-ayuda">{t("tablero.embudo_ayuda")}</p>
+      {fuentes.map((f) => <EmbudoFuente key={f.fuente} fila={f} />)}
+      <EmbudoFuente fila={datos.total} total />
+    </section>
+  );
+}
+
 export default function Tablero() {
   const { t } = useTranslation();
   const [datos, setDatos] = useState<DatosTablero | null>(null);
   const [fallo, setFallo] = useState(false);
   const [cpql, setCpql] = useState<Cpql | null>(null);
+  const [falloExport, setFalloExport] = useState(false);
 
   useEffect(() => {
     obtenerTablero().then(setDatos).catch(() => setFallo(true));
@@ -91,7 +150,13 @@ export default function Tablero() {
   return (
     <main className="pantalla pantalla-ancha">
       <h1>{t("tablero.titulo")}</h1>
-      <Enlace a={RUTA_BUSQUEDAS}>{t("tablero.ver_busquedas")}</Enlace>
+      <div className="acciones acciones-fin">
+        <Enlace a={RUTA_BUSQUEDAS}>{t("tablero.ver_busquedas")}</Enlace>
+        <button type="button" className="boton" onClick={() => exportarParaDapta().catch(() => setFalloExport(true))}>
+          {t("tablero.exportar_dapta")}
+        </button>
+      </div>
+      {falloExport && <p role="alert" className="error">{t("tablero.error_exportar")}</p>}
       <div className="tabla-scroll">
       <table>
         <thead>
@@ -105,6 +170,7 @@ export default function Tablero() {
         </tbody>
       </table>
       </div>
+      <Embudo datos={datos} />
       {(datos.costo_evals !== null || datos.revisiones_pendientes !== null) && (
         <div className="metricas">
           {datos.costo_evals !== null && (

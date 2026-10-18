@@ -27,5 +27,14 @@ export type Sugerencia = {
 
 export const estadoIntake = () => pedir<EstadoIntake>("/intake/estado");
 
-export const sugerirDesdeFrase = (frase: string) =>
-  pedir<{ sugerencia: Sugerencia; costo_usd: string }>("/intake/frase", { metodo: "POST", cuerpo: { frase } });
+export type Turno = { rol: "usuario" | "asistente"; texto: string };
+export type RespuestaFrase = {
+  sugerencia: Sugerencia;
+  pregunta: string | null;
+  explicacion: string | null;
+  costo_usd: string;
+};
+
+/** Un turno de la conversación: la frase nueva y los turnos previos (el back acepta hasta 6). */
+export const sugerirDesdeFrase = (frase: string, historial: Turno[] = []) =>
+  pedir<RespuestaFrase>("/intake/frase", { metodo: "POST", cuerpo: { frase, historial } });

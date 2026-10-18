@@ -4,8 +4,10 @@ import json
 import os
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Annotated, Literal
+
+from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # sbp_: access token del CLI. `migrar` ya no lo usa (usa SUPABASE_DB_URL), pero en la api sigue prohibido.
 PREFIJOS_PROHIBIDOS = ("sb_publishable_", "sb_secret_", "sbp_")
@@ -66,13 +68,63 @@ class SettingsApi(Settings):
     # Obligatorias y no vacías: sin ellas la API no arranca (fallaría abierta o cerrada sin avisar).
     auth_jwks_url: str = Field(min_length=1)
     auth_issuer: str = Field(min_length=1)
+    # La misma clave que firma el enlace de baja en SettingsEmail. Sin ella, /baja/{token} responde 404.
+    baja_secret: SecretStr | None = Field(None, min_length=32)
+
+    @field_validator("baja_secret", mode="before")
+    @classmethod
+    def _baja_secret_vacia_es_none(cls, valor: object) -> object:
+        # El compose local la pasa vacía si no está en el .env: sin baja, no sin api.
+        return None if valor == "" else valor
 
     # Puerta B de intake (frase -> ICP): proveedor Anthropic. Opcionales: sin key, sin modelo o con un modelo sin tarifa
     # en config/tarifas.yaml la API arranca igual y la ruta responde 503 ia_no_disponible (sin tarifa no hay costo que
     # registrar, principio VIII). Solo backend, nunca VITE_.
     ia_api_key: SecretStr | None = None
     ia_modelo: str | None = None
+    # Proveedor de la Puerta B: anthropic (por defecto) u openrouter. Con openrouter, IA_MODELO_PROVEEDOR es el nombre
+    # exacto del modelo allá (ej. anthropic/claude-...); IA_MODELO sigue siendo la clave de la tarifa en tarifas.yaml.
+    ia_proveedor: str | None = None
+    ia_modelo_proveedor: str | None = None
 
+
+
+class SettingsEmail(Settings):
+    """Lo que solo `enviar` y la baja necesitan: la CLI de búsqueda y la api siguen sin SMTP."""
+
+    smtp_host: str = Field(min_length=1)
+    smtp_port: int = 465
+    smtp_usuario: SecretStr = Field(min_length=1)
+    smtp_clave: SecretStr
+    # ninguna: solo contra el SMTP falso de los tests (localhost); nunca credenciales en claro por la red.
+    smtp_seguridad: Literal["ssl", "starttls", "ninguna"] = "ssl"
+    remitente: str = Field(min_length=1)
+    baja_secret: SecretStr = Field(min_length=32)
+    api_base_url: str = Field(min_length=1)
+    # Va en el pie de cada mail (Ley 1581): dónde está la política de tratamiento de datos.
+    url_privacidad: str = Field(min_length=1)
+    # prueba: solo se manda a email_prueba_destinos. "real" lo cambia solo Daniel en Railway (P1).
+    email_modo: Literal["prueba", "real"] = "prueba"
+    # NoDecode: en Railway va "a@x.co,b@x.co", no JSON.
+    email_prueba_destinos: Annotated[list[str], NoDecode] = []
+
+    @field_validator("email_prueba_destinos", mode="before")
+    @classmethod
+    def _destinos_por_coma(cls, valor: object) -> object:
+        if isinstance(valor, str):
+            return [d.strip() for d in valor.split(",") if d.strip()]
+        return valor
+
+    @model_validator(mode="after")
+    def _sin_tls_solo_local(self) -> "SettingsEmail":
+        if self.smtp_seguridad == "ninguna" and self.smtp_host not in ("localhost", "127.0.0.1"):
+            raise ValueError("SMTP_SEGURIDAD=ninguna solo con SMTP_HOST local")
+        # El enlace de baja va en cada mail: http solo contra la api local de los tests.
+        url = urlsplit(self.api_base_url)
+        local = url.scheme == "http" and url.hostname in ("localhost", "127.0.0.1")
+        if not url.hostname or not (url.scheme == "https" or local):
+            raise ValueError("API_BASE_URL tiene que ser https")
+        return self
 
 class SecretProhibido(RuntimeError):
     pass
