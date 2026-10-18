@@ -12,3 +12,7 @@ class FuenteNoDisponible(RuntimeError):
 
 class RegistroInvalido(ValueError):
     """fuentes.yaml no cumple lo que exige el registro."""
+
+
+class ErrorPersistencia(RuntimeError):
+    """La base rechazó una escritura. Mensaje fijo: el de Postgres trae la fila entera (nombre, dirección)."""
