@@ -38,7 +38,9 @@ _INSERT_CUMPLIMIENTO = text(
 _UPDATE_ENRIQUECIMIENTO = text(
     "UPDATE leads SET tipo_titular = :tipo_titular, contactable = :contactable, razon_no_contactable = :razon, "
     "encaje = :encaje, enriquecido_en = now(), "
-    "telefono_cifrado = :telefono, telefono_canal = :telefono_canal, email_cifrado = :email, email_canal = :email_canal, "
+    # COALESCE: un contacto ya guardado (p. ej. el de OSM, T040p) nunca se pisa con NULL.
+    "telefono_cifrado = COALESCE(:telefono, telefono_cifrado), telefono_canal = COALESCE(:telefono_canal, telefono_canal), "
+    "email_cifrado = COALESCE(:email, email_cifrado), email_canal = COALESCE(:email_canal, email_canal), "
     "nombre = CASE WHEN CAST(:claro AS boolean) THEN :nombre ELSE nombre END, "
     "direccion = CASE WHEN CAST(:claro AS boolean) THEN :direccion ELSE direccion END, "
     "nombre_cifrado = CASE WHEN CAST(:claro AS boolean) THEN NULL ELSE nombre_cifrado END, "
@@ -199,16 +201,20 @@ class RepositorioLeadsPostgres:
             c.execute(text("UPDATE busquedas SET estado = :estado WHERE id = :id"), {"estado": estado, "id": busqueda_id})
 
     def sin_enriquecer(self, busqueda_id: UUID) -> list[LeadParaEnriquecer]:
+        contacto = lambda columna, blob, canal, lead_id: (  # noqa: E731  el que ya trae el lead compite con el del sitio
+            None if blob is None else (self._cifrador.descifrar(columna, bytes(blob), self._tenant_id, lead_id), canal))
         with self._uow() as c:
             filas = c.execute(text(
                 "SELECT DISTINCT l.id, l.tipo_titular, l.nombre, l.nombre_cifrado, l.ciudad, l.web, l.actividad_codigo, "
-                "b.descripcion_icp, l.creado_en FROM leads l "
+                "l.telefono_cifrado, l.telefono_canal, l.email_cifrado, l.email_canal, b.descripcion_icp, l.creado_en FROM leads l "
                 "JOIN lead_fuentes lf ON lf.lead_id = l.id JOIN busquedas b ON b.id = lf.busqueda_id "
                 "WHERE lf.busqueda_id = :b AND l.enriquecido_en IS NULL ORDER BY l.creado_en, l.id"),
                 {"b": busqueda_id}).all()
         return [LeadParaEnriquecer(
             id=f.id, tipo_titular=f.tipo_titular, ciudad=f.ciudad, web=f.web, actividad=f.actividad_codigo,
             descripcion_icp=f.descripcion_icp,
+            telefono=contacto("telefono_cifrado", f.telefono_cifrado, f.telefono_canal, f.id),
+            email=contacto("email_cifrado", f.email_cifrado, f.email_canal, f.id),
             nombre=f.nombre if f.nombre is not None else self._cifrador.descifrar(
                 "nombre_cifrado", bytes(f.nombre_cifrado), self._tenant_id, f.id)) for f in filas]
 

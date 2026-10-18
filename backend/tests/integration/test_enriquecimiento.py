@@ -1,8 +1,12 @@
 """EnriquecerLead contra Postgres real: repo, costos y cifrado de verdad; Croma, sitio web y jev falsos. Sin red."""
+import logging
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import UUID
 
+import httpx
 import pytest
+from pydantic import SecretStr
 from sqlalchemy import text
 
 from app.modulos.costos.infraestructura.postgres_costos import PostgresCostos
@@ -11,6 +15,7 @@ from app.modulos.descubrimiento.dominio.modelos import Actividad, CriteriosICP, 
 from app.modulos.descubrimiento.infraestructura.persistencia.repositorio_leads import RepositorioLeadsPostgres
 from app.modulos.enriquecimiento.aplicacion.enriquecer_lead import EnriquecerLead
 from app.modulos.enriquecimiento.dominio.puertos import ContactoPublicado, VerificacionTitular
+from app.modulos.enriquecimiento.infraestructura.adaptadores.jev_clasificador import JevClasificador
 from tests.falsos import EnriquecedorFalso, JevFalso, VerificadorFalso
 
 TELEFONO = "+57 602 555 0101"  # sintético
@@ -159,7 +164,7 @@ def test_no_encaja_no_borra_el_lead(admin, tenants, mundo):
     repo, costos, busqueda = mundo
     with admin.begin() as c:
         c.execute(text("UPDATE busquedas SET descripcion_icp = 'agentes de carga' WHERE id = :id"), {"id": busqueda})
-    lead = _sembrar(repo, busqueda, _empresa("Panadería La Espiga"))
+    lead = _sembrar(repo, busqueda, _empresa("Panadería La Espiga", tipo="juridica"))
     caso, _ = _caso(repo, costos, salida={"etiqueta": "no_encaja", "probabilidad": 0.1})
 
     caso.ejecutar(busqueda)
@@ -232,9 +237,10 @@ def test_lead_ya_enriquecido_no_se_reprocesa(admin, tenants, mundo):
 
 
 def test_jev_caido_en_un_lead_lo_deja_sin_clasificar_y_sigue(admin, tenants, mundo, caplog):
+    caplog.set_level(logging.DEBUG)  # ningún nivel lleva datos del lead, no solo WARNING
     repo, costos, busqueda = mundo
     _con_icp(admin, busqueda)
-    leads = [_sembrar(repo, busqueda, _empresa(f"Empresa {i}")) for i in range(3)]
+    leads = [_sembrar(repo, busqueda, _empresa(f"Empresa {i}", tipo="juridica")) for i in range(3)]
     caido = leads[1]
     caso, _ = _caso(repo, costos, falla_en={caido})
 
@@ -284,3 +290,109 @@ def test_email_nominal_no_se_guarda_si_hay_telefono(admin, tenants, mundo):
     f = _fila(admin, lead, "email_cifrado, email_canal, telefono_canal, contactable")
     assert (f.email_cifrado, f.email_canal) == (None, None)  # dato de una persona: no se persiste
     assert (f.telefono_canal, f.contactable) == ("sitio_web", True)
+
+
+def test_solo_email_nominal_sin_telefono_no_es_contactable(admin, tenants, mundo):
+    # Guarda de cumplimiento: el único canal es de una persona, así que ni se guarda ni habilita el contacto.
+    repo, costos, busqueda = mundo
+    lead = _sembrar(repo, busqueda, _empresa("Transportes Andinos", web="andinos.invalid", tipo="juridica"))
+    sitio = {"andinos.invalid": ContactoPublicado(("juan.perez@andinos.invalid",), (), "ok")}
+    caso, _ = _caso(repo, costos, sitio=sitio)
+
+    resumen = caso.ejecutar(busqueda)
+
+    f = _fila(admin, lead, "email_cifrado, email_canal, telefono_cifrado, contactable, razon_no_contactable")
+    assert (f.email_cifrado, f.email_canal, f.telefono_cifrado) == (None, None, None)
+    assert (f.contactable, f.razon_no_contactable) == (False, "contacto_nominal")
+    assert resumen.contactables == 0
+
+
+@pytest.mark.parametrize("error", [httpx.ConnectError, httpx.ReadError], ids=["connect_error", "read_error"])
+def test_jev_con_error_de_transporte_cobra_el_techo_y_sigue(admin, tenants, mundo, error):
+    repo, costos, busqueda = mundo
+    _con_icp(admin, busqueda)
+    leads = [_sembrar(repo, busqueda, _empresa(f"Empresa {i}", tipo="juridica")) for i in range(2)]
+    pedidos: list[httpx.Request] = []
+
+    def jev(request):  # el primer pedido se corta en el transporte; el segundo responde bien
+        pedidos.append(request)
+        if len(pedidos) == 1:
+            raise error("sintetico", request=request)
+        return httpx.Response(200, json={"salida": {"etiqueta": "encaja", "probabilidad": 0.9}, "uso": {"tokens_in": 7}})
+    clasificador = JevClasificador(costos, httpx.MockTransport(jev), "https://jev.invalid/v1/clasificar",
+                                   SecretStr("credencial-sintetica"), Decimal("0.042"))
+    caso = EnriquecerLead(repo, VerificadorFalso(costos), EnriquecedorFalso(costos), clasificador)
+
+    resumen = caso.ejecutar(busqueda)
+
+    assert (resumen.procesados, resumen.clasificados, resumen.sin_clasificar, resumen.cortado) == (2, 1, 1, False)
+    with admin.connect() as c:
+        filas = c.execute(text("SELECT lead_id, unidades FROM costos WHERE tenant_id = :t AND tipo = 'jev_tokens'"),
+                          {"t": tenants["a"]}).all()
+    assert {f.lead_id for f in filas} == set(leads)  # una fila por lead, la del corte incluida
+    assert sorted(f.unidades for f in filas) == sorted([Decimal(7), Decimal(len(pedidos[0].content))])  # corte: techo
+
+
+def test_jev_solo_clasifica_juridicas(admin, tenants, mundo):
+    # §2.5: natural y desconocido no son contactables; su nombre (quizás de una persona) no sale hacia jev.
+    repo, costos, busqueda = mundo
+    _con_icp(admin, busqueda)
+    natural = _sembrar(repo, busqueda, _empresa("Doña Rosa Gómez", tipo="natural"))
+    desconocido = _sembrar(repo, busqueda, _empresa("Don Pedro Pérez"))  # Croma sin_match: sigue desconocido
+    juridica = _sembrar(repo, busqueda, _empresa("Transportes Andinos", tipo="juridica"))
+    pedidos: list[httpx.Request] = []
+
+    def jev(request):
+        pedidos.append(request)
+        return httpx.Response(200, json={"salida": {"etiqueta": "encaja", "probabilidad": 0.9}, "uso": {"tokens_in": 7}})
+    clasificador = JevClasificador(costos, httpx.MockTransport(jev), "https://jev.invalid/v1/clasificar",
+                                   SecretStr("credencial-sintetica"), Decimal("0.042"))
+    caso = EnriquecerLead(repo, VerificadorFalso(costos), EnriquecedorFalso(costos), clasificador)
+
+    resumen = caso.ejecutar(busqueda)
+
+    assert len(pedidos) == 1 and b"Transportes Andinos" in pedidos[0].content  # solo la jurídica
+    assert (resumen.procesados, resumen.clasificados, resumen.sin_clasificar) == (3, 1, 2)
+    assert {x: _fila(admin, x, "encaje").encaje for x in (natural, desconocido, juridica)} == {
+        natural: None, desconocido: None, juridica: "encaja"}
+    assert [(t, lead) for t, lead, _ in _costos(admin, tenants["a"]) if t == "jev_tokens"] == [("jev_tokens", juridica)]
+
+
+EMAIL_OSM = "info@andinos.invalid"  # sintético; lo que T040p guardará al descubrir
+
+
+def _con_email_osm(admin, cifrador, tenant, lead):
+    with admin.begin() as c:
+        c.execute(text("UPDATE leads SET email_cifrado = :e, email_canal = 'osm_contacto' WHERE id = :id"),
+                  {"e": cifrador.cifrar("email_cifrado", EMAIL_OSM, tenant, lead), "id": lead})
+
+
+def test_guardar_sin_contacto_no_pisa_el_que_ya_existe(admin, tenants, mundo, cifrador):
+    # El UPDATE nunca pone NULL sobre un teléfono o email guardado (COALESCE).
+    repo, _, busqueda = mundo
+    lead = _sembrar(repo, busqueda, _empresa("Transportes Andinos", tipo="juridica"))
+    _con_email_osm(admin, cifrador, tenants["a"], lead)
+    with admin.begin() as c:
+        c.execute(text("UPDATE leads SET telefono_cifrado = :t, telefono_canal = 'osm_contacto' WHERE id = :id"),
+                  {"t": cifrador.cifrar("telefono_cifrado", "+5716000000", tenants["a"], lead), "id": lead})
+
+    repo.guardar_enriquecimiento(lead, ResultadoEnriquecimiento("juridica", None, None, False, "sin_canal_publicado", None))
+
+    f = _fila(admin, lead, "email_cifrado, email_canal, telefono_cifrado, telefono_canal")
+    assert (f.email_canal, f.telefono_canal) == ("osm_contacto", "osm_contacto")
+    assert cifrador.descifrar("telefono_cifrado", bytes(f.telefono_cifrado), tenants["a"], lead) == "+5716000000"
+    assert cifrador.descifrar("email_cifrado", bytes(f.email_cifrado), tenants["a"], lead) == EMAIL_OSM
+
+
+def test_email_de_osm_se_conserva_si_el_sitio_no_trae_email(admin, tenants, mundo, cifrador):
+    repo, costos, busqueda = mundo
+    lead = _sembrar(repo, busqueda, _empresa("Transportes Andinos", web="andinos.invalid", tipo="juridica"))
+    _con_email_osm(admin, cifrador, tenants["a"], lead)
+    caso, _ = _caso(repo, costos, sitio={"andinos.invalid": ContactoPublicado((), (), "ok")})
+
+    resumen = caso.ejecutar(busqueda)
+
+    f = _fila(admin, lead, "email_cifrado, email_canal, contactable, razon_no_contactable")
+    assert (f.email_canal, f.contactable, f.razon_no_contactable) == ("osm_contacto", True, None)
+    assert cifrador.descifrar("email_cifrado", bytes(f.email_cifrado), tenants["a"], lead) == EMAIL_OSM
+    assert resumen.contactables == 1

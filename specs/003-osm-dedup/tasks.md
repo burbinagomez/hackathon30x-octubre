@@ -145,7 +145,7 @@ Va después del [MIN], en este orden de bloques. **El bloque P1 entra entero o n
 - [ ] T026 [Paso 4] **Verde:** `repositorio_leads.py` cifra `telefono` y `email` con AAD de su columna, calcula `telefono_hmac` y descifra al leer (nombre y dirección ya los cifra T056e).
 - [ ] T027 [Paso 4] **Advisor** revisa T023 y T025 (más T021 si P2 ya lo trajo).
 - [ ] T039p [Paso 7] **Rojo:** `::test_telefono_invalido_queda_nulo`, `::test_web_en_host_compartido_no_se_guarda` (necesita T006/T007), `::test_web_wa_me_pasa_a_telefono`; la fixture suma `phone` inválido, `wa.me` y host compartido.
-- [ ] T040p [Paso 7] **Verde:** `EmpresaCruda` suma `telefono`, `email`, `telefono_canal`, `email_canal` con default (enmienda §Puertos); mapeo con `a_e164` y `normalizar_dominio`; `wa.me` a `telefono` con `whatsapp_osm`, nunca en `web`.
+- [ ] T040p [Paso 7] **Verde:** `EmpresaCruda` suma `telefono`, `email`, `telefono_canal`, `email_canal` con default (enmienda §Puertos); mapeo con `a_e164` y `normalizar_dominio`; `wa.me` a `telefono` con `whatsapp_osm`, nunca en `web`. *Nota 2026-10-18: la 006 ya lo consume (`sin_enriquecer` lo lee y el UPDATE de enriquecimiento no lo pisa, por COALESCE). Al descubrir, descartar los emails nominales (`es_contacto_nominal`): el COALESCE conservaría uno.*
 - [ ] T050 [Paso 9] **Rojo:** `test_cifrado.py::test_contacto_no_aparece_en_logs` y `::test_contacto_no_queda_en_claro_en_columnas_no_catalogadas`, cada uno con su sabotaje con nombre. *Auditoría 2026-10-18: los dos tests existen y pasan, pero cubren nombre y dirección; falta el contacto (teléfono/email), que todavía no se mapea ni se guarda*
 
 ### P2: normalización y dedup (Pasos 1, 4, 5, 6 y 9)

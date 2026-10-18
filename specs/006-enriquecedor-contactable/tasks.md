@@ -147,6 +147,12 @@ Notas de cierre (2026-10-18):
 - [x] T028 [MIN] [Paso 5] 🤖 **Verde:** `sin_enriquecer` y `guardar_enriquecimiento` en el repo Postgres.
 - [x] T029 [MIN] [Paso 5] 🤖 **Verde:** `aplicacion/enriquecer_lead.py`. Primero se junta todo en memoria y después una UPDATE por lead. `ClasificarEncajeICP` quedó inline (`EnriquecerLead._clasificar`): un solo llamador, sin archivo propio. Si jev falla, `enriquecido_en` queda puesto, `encaje` NULL, cuenta como `sin_clasificar` y la corrida sigue.
 - [x] T030 [MIN] [Paso 5] 🤖 **Rojo → verde:** subcomando `enriquecer --tenant --busqueda` en `cli.py`. El test con adaptadores falsos asierta el resumen impreso, y que `capsys` no contiene contacto. **Mutación:** imprimir el `ContactoPublicado`.
+- [x] T030a [MIN] [Paso 5] 🤖 **Medios del advisor y decisiones de Daniel (2026-10-18), rojo → verde con sabotaje:**
+  - **Medio 1:** todo `httpx.TransportError` de jev (ConnectError, ReadError…) es `JevNoDisponible`, cobra el techo y la corrida sigue.
+  - **§2.5:** jev clasifica solo jurídicas; natural y desconocido quedan con `encaje` NULL, sin llamada y sin costo.
+  - El test de "solo email nominal, sin teléfono" asierta que el lead no es contactable y que el email no se guarda. `caplog` revisa todos los niveles, desde DEBUG.
+  - **Medio 2:** `sin_enriquecer` lee y descifra el teléfono y el email que el lead ya trae, y esos compiten con los del sitio. El UPDATE usa `COALESCE`, así que nunca pisa con NULL un contacto guardado.
+  - **Queda afuera T040p (003):** guardar el contacto de OSM al descubrir depende de T002 (phonenumbers), T007 (`normalizar_dominio`), T009 (`a_e164`) y T039p, y ninguno existe todavía. Por eso la 006 ya está lista para recibirlo, pero no lo produce. Ojo: el COALESCE conserva lo que haya, y eso incluye un email nominal. T040p tiene que descartar los nominales al descubrir.
 
 **Checkpoint 5:** `scripts/test-backend.sh tests/integration/test_enriquecimiento.py tests/arquitectura` verde.
 

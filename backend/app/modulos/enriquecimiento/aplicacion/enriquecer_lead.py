@@ -19,7 +19,7 @@ class ResumenEnriquecimiento:
     procesados: int
     contactables: int
     clasificados: int
-    sin_clasificar: int  # encaje NULL: sin ICP, jev apagado o jev falló; candidatos a reclasificar
+    sin_clasificar: int  # encaje NULL: no jurídica, sin ICP, jev apagado o jev falló; candidatos a reclasificar
     cortado: bool
 
 
@@ -62,10 +62,11 @@ class EnriquecerLead:
         nominal = email is not None and es_contacto_nominal(email[0])
         contactable, razon = calcular_contactable(tipo, telefono and telefono[1], email and email[1], nominal)
         return ResultadoEnriquecimiento(tipo, telefono, None if nominal else email, contactable, razon,
-                                        self._clasificar(lead))
+                                        self._clasificar(lead, tipo))
 
-    def _clasificar(self, lead: LeadParaEnriquecer) -> str | None:
-        if lead.descripcion_icp is None or self._clasificador is None:
+    def _clasificar(self, lead: LeadParaEnriquecer, tipo: str) -> str | None:
+        # §2.5: solo jurídicas. Natural o desconocido no es contactable y su nombre puede ser el de una persona.
+        if tipo != "juridica" or lead.descripcion_icp is None or self._clasificador is None:
             return None
         try:
             return self._clasificador.clasificar(

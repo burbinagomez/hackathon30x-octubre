@@ -89,15 +89,24 @@ def _timeout(request):
     raise httpx.ReadTimeout("sintetico", request=request)
 
 
+def _lanza(error: type[httpx.TransportError]):
+    def responder(request):
+        raise error("sintetico", request=request)
+    return responder
+
+
 @pytest.mark.parametrize("responder, unidades", [
     (lambda r: httpx.Response(503, text="caido"), 0),   # jev no procesó: fila en 0
     (lambda r: httpx.Response(504, text="tarde"), TECHO),  # el gateway cortó, jev pudo haber procesado: techo
     (_timeout, TECHO),                                  # timeout propio: no sabemos, techo
-], ids=["503", "504", "timeout"])
+    (_lanza(httpx.ConnectError), TECHO),                # cualquier TransportError: no sabemos, techo
+    (_lanza(httpx.ReadError), TECHO),
+], ids=["503", "504", "timeout", "connect_error", "read_error"])
 def test_falla_http_registra_costo_y_lanza_jev_no_disponible(responder, unidades):
     costos = RegistroCostosFalso()
 
-    with pytest.raises(JevNoDisponible):
+    with pytest.raises(Exception) as error:  # amplio a propósito: el rojo es un assert, no un TransportError suelto
         _clasificar(_jev_que_responde(responder, costos))
 
+    assert error.type is JevNoDisponible
     assert _filas(costos) == [("jev_tokens", "jev", Decimal(unidades), Decimal("0.042") * unidades / 1_000_000)]

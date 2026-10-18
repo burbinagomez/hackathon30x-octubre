@@ -4,7 +4,7 @@ Defensas: los datos del lead van como JSON dentro de un bloque delimitado, con <
 abre ni cierra el bloque); las instrucciones salen de encaje_jev_v1.json, nunca del lead. El costo se registra
 con los tokens que informa jev, antes de validar la salida: una salida rota también se paga. Un 200 sin uso
 legible (no es JSON, o falta tokens_in válido) se cobra al techo, los bytes del body enviado, como JuezClaude.
-Una falla HTTP también deja fila: 500/502/503 en 0, 504 o timeout propio al techo, y lanza JevNoDisponible.
+Una falla HTTP también deja fila: 500/502/503 en 0, 504 o error de transporte (timeout, conexión, lectura) al techo, y lanza JevNoDisponible.
 """
 import json
 from decimal import Decimal
@@ -79,8 +79,8 @@ class JevClasificador:
             try:
                 respuesta = cliente.post(self._url, headers={"Authorization": f"Bearer {self._credencial.get_secret_value()}",
                                                              "Content-Type": "application/json"}, content=contenido)
-            except httpx.TimeoutException:
-                respuesta = None  # timeout propio: no sabemos si jev procesó
+            except httpx.TransportError:
+                respuesta = None  # timeout, conexión o lectura cortada: no sabemos si jev procesó
         if respuesta is None or respuesta.status_code >= 500:
             # 500/502/503: jev no procesó, fila en 0. 504 y timeout: pudo haber procesado, techo. Siempre hay fila.
             no_proceso = respuesta is not None and respuesta.status_code in NO_PROCESO
