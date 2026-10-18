@@ -22,13 +22,16 @@ REPOSITORIO = APP / "modulos" / "descubrimiento" / "infraestructura" / "persiste
 # PostgresCalificaciones (008) lee leads para el chequeo juridica+cumplimiento antes de importar: solo
 # tipo_titular e id, nunca nombre/direccion/nombre_cifrado/direccion_cifrada.
 CALIFICACIONES = APP / "modulos" / "calificacion" / "infraestructura" / "persistencia" / "postgres_calificaciones.py"
+# El embudo del tablero cuenta leads en su propio módulo: solo count, nunca selecciona contacto
+# (lo ata test_el_sql_del_embudo_solo_cuenta y las columnas devueltas, test_tablero_embudo.py).
+EMBUDO = APP / "modulos" / "tablero" / "infraestructura" / "persistencia" / "embudo_sql.py"
 # El export para Dapta (008) lee leads de jurídicas y descifra solo telefono_cifrado: nunca nombre_cifrado,
 # direccion_cifrada ni email_cifrado (lo ata test_export_dapta_solo_descifra_el_telefono).
 ELEGIBLES_DAPTA = APP / "modulos" / "calificacion" / "infraestructura" / "persistencia" / "elegibles_dapta.py"
 # modelos.py y el catálogo nombran columnas, no ejecutan SQL sobre ellas.
 LEADS_CONTACTABLES = APP / "modulos" / "contacto" / "infraestructura" / "leads_contactables.py"
 PERMITIDOS = (
-    REPOSITORIO, CALIFICACIONES, ELEGIBLES_DAPTA, LEADS_CONTACTABLES, APP / "modelos.py", APP / "seguridad" / "catalogo_sensibles.py"
+    REPOSITORIO, CALIFICACIONES, EMBUDO, ELEGIBLES_DAPTA, LEADS_CONTACTABLES, APP / "modelos.py", APP / "seguridad" / "catalogo_sensibles.py"
 )
 # Leen leads para la elegibilidad legal (tipo_titular), nunca una columna cifrada.
 SIN_CIFRADAS = (APP / "modulos" / "contacto" / "infraestructura" / "repositorio_contactos.py",)

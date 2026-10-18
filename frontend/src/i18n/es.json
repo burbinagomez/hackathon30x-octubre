@@ -55,12 +55,19 @@
     },
     "frase": {
       "etiqueta": "¿A quién le vendés y qué ofrecés?",
-      "ayuda": "Una o dos frases. Ejemplo: vendo software contable a ferreterías medianas en Antioquia.",
-      "sugerir": "Sugerir filtros",
+      "ayuda": "Contame a quién le vendés y qué ofrecés, en una o dos frases. Por ejemplo: vendo software contable a ferreterías medianas en Antioquia.",
       "pensando": "Pensando…",
       "revisar": "Prellenamos los filtros con tu frase. Revisalos y ajustalos antes de la vista previa.",
       "error_no_disponible": "La sugerencia con IA no está disponible ahora. Usá los filtros directamente.",
-      "error_interpretacion": "No pudimos interpretar la frase. Probá con otra redacción o usá los filtros."
+      "error_interpretacion": "No pudimos interpretar la frase. Probá con otra redacción o usá los filtros.",
+      "enviar": "Enviar",
+      "asistente": "Asistente",
+      "conversacion": "Conversación con el asistente",
+      "voy_a_buscar": "Voy a buscar",
+      "editar_en_filtros": "Editar en Filtros",
+      "empezar_de_nuevo": "Empezar de nuevo",
+      "limite_turnos": "Esta conversación ya es larga. Tocá «Empezar de nuevo» para armar otra búsqueda.",
+      "sin_actividad": "Falta elegir la actividad para calcular la vista previa. Tocá «Editar en Filtros» y elegila."
     },
     "trabajando": {
       "buscando": "Buscando empresas en las fuentes",
@@ -122,6 +129,12 @@
     "calificados": "Calificados",
     "pct_calificados": "% calificados (de únicos)",
     "cpql": "CPQL (lista)",
+    "embudo": "Embudo por fuente",
+    "embudo_enriquecidos": "Enriquecidos",
+    "embudo_contactables": "Contactables",
+    "embudo_con_telefono": "Con teléfono",
+    "embudo_calificados": "Calificados",
+    "embudo_ayuda": "Cada barra se mide contra los leads únicos de la fuente.",
     "exportar_dapta": "Exportar para Dapta (CSV)",
     "error_exportar": "No se pudo exportar. Probá de nuevo."
   },
@@ -168,6 +181,7 @@
     "telefono": "Teléfono",
     "email": "Correo",
     "licencia": "Licencia",
+    "solo_con_contacto": "Solo con contacto",
     "si": "Sí",
     "no": "No",
     "anterior": "Anterior",

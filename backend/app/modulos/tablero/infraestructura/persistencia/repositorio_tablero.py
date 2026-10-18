@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import Engine, text
 
 from app.db import unidad_de_trabajo
+from app.modulos.tablero.infraestructura.persistencia.embudo_sql import SQL_EMBUDO_FUENTES, SQL_EMBUDO_TOTAL
 
 
 @dataclass(frozen=True)
@@ -17,6 +18,11 @@ class FilaFuente:
     costo_real: Decimal | None = None
     cpl_lista: Decimal | None = None
     cpl_real: Decimal | None = None
+    # Embudo: solo conteos de leads únicos de la fuente. None = no aplica (costo sin fuente), nunca un 0 inventado.
+    enriquecidos: int | None = None
+    contactables: int | None = None
+    con_telefono: int | None = None
+    calificados: int | None = None
 
 
 @dataclass(frozen=True)
@@ -51,9 +57,9 @@ _SQL_FUENTES = text("""
       SELECT COALESCE(t.fuente, c.fuente) AS fuente, COALESCE(t.encontrados, 0) AS encontrados,
              COALESCE(t.unicos, 0) AS unicos, c.lista, c.real
       FROM t FULL JOIN c ON c.fuente = t.fuente)
-    SELECT fuente, encontrados, unicos, lista, real, lista / NULLIF(unicos, 0) AS cpl_lista,
+    SELECT f.fuente, encontrados, unicos, lista, real, lista / NULLIF(unicos, 0) AS cpl_lista,
            real / NULLIF(unicos, 0) AS cpl_real
-    FROM f ORDER BY fuente""")
+    FROM f ORDER BY f.fuente""")
 _SQL_TOTAL = text("""
     WITH k AS (
       SELECT COALESCE((SELECT encontrados FROM v_tablero_fuentes WHERE fuente = 'TOTAL'), 0) AS encontrados,
@@ -66,12 +72,27 @@ _SQL_TOTAL = text("""
     SELECT *, lista / NULLIF(unicos, 0) AS cpl_lista, real / NULLIF(unicos, 0) AS cpl_real FROM k""")
 
 
+_SIN_EMBUDO = ("enriquecidos", "contactables", "con_telefono", "calificados")
+
+
 def leer_tablero(engine: Engine, tenant_id: UUID) -> DatosTablero:
     with unidad_de_trabajo(engine, tenant_id) as c:
-        filas = tuple(FilaFuente(f.fuente, f.encontrados, f.unicos, f.lista, f.real, f.cpl_lista, f.cpl_real)
-                      for f in c.execute(_SQL_FUENTES))
+        base = c.execute(_SQL_FUENTES).all()
         t = c.execute(_SQL_TOTAL).one()
+        embudo = {e.fuente: e for e in c.execute(SQL_EMBUDO_FUENTES)}
+        e_total = c.execute(SQL_EMBUDO_TOTAL).one()
         atribuciones = tuple(Atribucion(a.fuente, a.texto, a.url) for a in c.execute(
             text("SELECT fuente, texto, url FROM v_atribuciones ORDER BY orden")))
-    total = FilaFuente("TOTAL", t.encontrados, t.unicos, t.lista, t.real, t.cpl_lista, t.cpl_real)
-    return DatosTablero(filas, total, atribuciones, t.evals, t.intake)
+
+    def fila(f) -> FilaFuente:
+        # `sin_atribuir` es costo sin lead: el embudo no le aplica (None). Una fuente con leads sin enriquecer da ceros reales.
+        e = embudo.get(f.fuente)
+        if f.fuente == "sin_atribuir":
+            conteos = (None,) * 4
+        else:
+            conteos = tuple(getattr(e, k) if e else 0 for k in _SIN_EMBUDO)
+        return FilaFuente(f.fuente, f.encontrados, f.unicos, f.lista, f.real, f.cpl_lista, f.cpl_real, *conteos)
+
+    total = FilaFuente("TOTAL", t.encontrados, t.unicos, t.lista, t.real, t.cpl_lista, t.cpl_real,
+                       e_total.enriquecidos, e_total.contactables, e_total.con_telefono, e_total.calificados)
+    return DatosTablero(tuple(fila(f) for f in base), total, atribuciones, t.evals, t.intake)

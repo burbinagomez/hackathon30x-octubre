@@ -154,3 +154,31 @@ def test_la_frase_y_la_respuesta_nunca_salen_en_logs(caplog):
         uso.ejecutar(frase)
 
     assert "ZZ-" not in caplog.text and "ZZ-" not in str(e.value) and "ZZ-" not in repr(e.value)
+
+
+# --- Conversación (enmienda 2026-10-18): la IA pregunta si falta a quién le vende, y explica lo que propone ---------
+
+def test_si_la_ia_pregunta_la_pregunta_viaja_y_no_hace_falta_sugerencia_completa():
+    r = caso(GeneradorFalso({**VALIDA, "pregunta": "¿A qué tipo de empresas le vendés?", "explicacion": None})).ejecutar(
+        "desarrollo de software a la medida")
+    assert r.pregunta == "¿A qué tipo de empresas le vendés?"
+
+
+def test_la_explicacion_viaja_recortada_y_sin_saltos():
+    larga = "Busco ferreterías\nen Antioquia " + "x" * 500
+    r = caso(GeneradorFalso({**VALIDA, "pregunta": None, "explicacion": larga})).ejecutar(FRASE)
+    assert r.pregunta is None
+    assert len(r.explicacion) <= 240 and "\n" not in r.explicacion
+
+
+def test_el_historial_viaja_como_conversacion_delimitada_en_un_solo_dato():
+    g = GeneradorFalso({**VALIDA, "pregunta": None, "explicacion": "ok"})
+    caso(g).ejecutar("a ferreterías de Antioquia", historial=[("usuario", "vendo software a la medida"),
+                                                             ("asistente", "¿A qué tipo de empresas le vendés?")])
+    texto = g.llamadas[0][0]
+    assert texto.index("Usuario: vendo software") < texto.index("Asistente: ¿A qué") < texto.index("Usuario: a ferreterías")
+
+
+def test_el_historial_tiene_tope():
+    with pytest.raises(FraseFueraDeRango):
+        caso(GeneradorFalso(VALIDA)).ejecutar("x", historial=[("usuario", "y")] * 7)

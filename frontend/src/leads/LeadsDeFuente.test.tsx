@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { expect, test } from "vitest";
 import i18n from "../i18n";
@@ -35,6 +35,22 @@ test("sin fuente pide todos y lo titula asi, en ingles tambien", async () => {
   await waitFor(() => expect(screen.queryByText("Acme SAS")).toBeInTheDocument());
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("All leads");
   expect(pedido).toBe("?pagina=1&tamano=25");
+});
+
+test("Solo con contacto en /leads conserva la fuente y agrega con_contacto=true", async () => {
+  const pedidas: string[] = [];
+  server.use(http.get("*/leads", ({ request }) => {
+    pedidas.push(new URL(request.url).search);
+    return HttpResponse.json(respuesta);
+  }));
+  await i18n.changeLanguage("es");
+  render(<LeadsDeFuente fuente="osm_overpass" />);
+  await waitFor(() => expect(screen.queryByText("Acme SAS")).toBeInTheDocument());
+
+  fireEvent.click(screen.getByRole("checkbox", { name: "Solo con contacto" }));
+
+  await waitFor(() => expect(pedidas).toHaveLength(2));
+  expect(pedidas[1]).toBe("?fuente=osm_overpass&pagina=1&tamano=25&con_contacto=true");
 });
 
 test("la licencia del pie es externa", async () => {

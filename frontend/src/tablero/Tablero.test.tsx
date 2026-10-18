@@ -276,6 +276,92 @@ test.each([["falla", 500], ["vacio", CPQL_VACIO]] as const)("cpql_%s_el_tablero_
   expect(celda("Supersociedades (Croma)", "Costo (lista)")).toBe(monto("es", "1.35"));
 });
 
+// --- Embudo por fuente: encontrados -> únicos -> enriquecidos -> contactables -> con teléfono -> calificados ---
+
+/** Los pasos del grupo del embudo de una fuente como [etiqueta, valor], con los espacios normalizados. */
+function pasosEmbudo(nombre: string): string[][] {
+  const grupo = within(screen.getByRole("region", { name: /embudo|funnel/i })).getByRole("group", { name: nombre });
+  return within(grupo).getAllByRole("listitem").map((li) =>
+    Array.from(li.querySelectorAll("[data-paso]")).map((e) => (e.textContent ?? "").replace(/\s/g, " ")));
+}
+
+test.each<[Idioma, string[]]>([
+  ["es", ["75 %", "50 %", "50 %", "25 %"]],
+  ["en", ["75%", "50%", "50%", "25%"]],
+])("embudo_muestra_numero_y_porcentaje_de_unicos_en_orden[%s]", async (idioma, pct) => {
+  const t = textos[idioma].tablero;
+  const pct100 = idioma === "es" ? "100 %" : "100%";
+  await montar(respuestaTablero(), idioma);
+  const nombre = textos[idioma].fuentes.croma_supersociedades_co;
+  expect(pasosEmbudo(nombre)).toEqual([
+    [t.encontrados, "4", pct100],
+    [t.unicos, "4", pct100],
+    [t.embudo_enriquecidos, "3", pct[0]],
+    [t.embudo_contactables, "2", pct[1]],
+    [t.embudo_con_telefono, "2", pct[2]],
+    [t.embudo_calificados, "1", pct[3]],
+  ]);
+  expect(screen.getByRole("region", { name: t.embudo })).toBeInTheDocument();
+});
+
+test("embudo_incluye_el_total_y_deja_fuera_sin_atribuir", async () => {
+  await montar(respuestaTablero());
+  const region = screen.getByRole("region", { name: "Embudo por fuente" });
+  expect(within(region).getByRole("group", { name: "Total" })).toBeInTheDocument();
+  expect(within(region).queryByRole("group", { name: "Sin atribuir" })).not.toBeInTheDocument();
+});
+
+test("embudo_la_barra_es_proporcional_a_unicos_y_usa_solo_tokens", async () => {
+  await montar(respuestaTablero());
+  const grupo = within(screen.getByRole("region", { name: "Embudo por fuente" })).getByRole("group", { name: "Supersociedades (Croma)" });
+  const anchos = Array.from(grupo.querySelectorAll<HTMLElement>(".embudo-barra")).map((b) => b.style.width);
+  expect(anchos).toEqual(["100%", "100%", "75%", "50%", "50%", "25%"]);
+  expect(grupo.querySelector("[style*='#'], [style*='rgb']")).toBeNull();
+});
+
+test("embudo_encontrados_mayor_que_unicos_no_desborda_la_barra", async () => {
+  await montar(respuestaTablero({ fuentes: [{ ...respuestaTablero().fuentes[0], fuente: "osm_overpass", encontrados: 8, unicos: 7 }] }));
+  const grupo = within(screen.getByRole("region", { name: "Embudo por fuente" })).getByRole("group", { name: "OpenStreetMap" });
+  expect(grupo.querySelector<HTMLElement>(".embudo-barra")!.style.width).toBe("100%");
+  expect(pasosEmbudo("OpenStreetMap")[0]).toEqual(["Encontrados", "8", "114,3 %"]);
+});
+
+test("embudo_sin_unicos_no_divide_por_cero_ni_pinta_barras", async () => {
+  const vacia = { ...respuestaTablero().fuentes[0], encontrados: 0, unicos: 0, enriquecidos: 0, contactables: 0, con_telefono: 0, calificados: 0 };
+  await montar(respuestaTablero({ fuentes: [vacia], total: { ...vacia, fuente: "TOTAL" } }));
+  const region = screen.getByRole("region", { name: "Embudo por fuente" });
+  expect(region).not.toHaveTextContent(/NaN|Infinity|∞/);
+  expect(pasosEmbudo("Supersociedades (Croma)").map((p) => p[2])).toEqual(Array(6).fill("—"));
+  expect(Array.from(region.querySelectorAll<HTMLElement>(".embudo-barra")).every((b) => b.style.width === "0%")).toBe(true);
+});
+
+test("embudo_sin_fuentes_ni_campos_no_rompe_la_pantalla", async () => {
+  // Un backend viejo (sin los campos nuevos) o sin leads: la tabla se ve y el embudo no inventa nada.
+  await montar(respuestaTableroMinima({ fuentes: [], total: { ...respuestaTableroMinima().total, encontrados: 0, unicos: 0 } }));
+  expect(screen.getByRole("table")).toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "Embudo por fuente" })).not.toBeInTheDocument();
+});
+
+test("embudo_sin_ningun_campo_de_la_api_no_pinta_la_seccion", async () => {
+  await montar(respuestaTableroMinima());
+  expect(screen.queryByRole("region", { name: "Embudo por fuente" })).not.toBeInTheDocument();
+});
+
+test("embudo_una_fuente_sin_dato_muestra_sin_dato_y_nunca_cero", async () => {
+  const sinDato = { ...respuestaTablero().fuentes[0], fuente: "osm_overpass", enriquecidos: null, contactables: null, con_telefono: null, calificados: null };
+  await montar(respuestaTablero({ fuentes: [respuestaTablero().fuentes[0], sinDato] }));
+  expect(pasosEmbudo("OpenStreetMap").slice(2).map((p) => p[1])).toEqual(["—", "—", "—", "—"]);
+});
+
+test("embudo_cada_paso_tiene_texto_visible_ademas_de_la_barra", async () => {
+  await montar(respuestaTablero());
+  const grupo = within(screen.getByRole("region", { name: "Embudo por fuente" })).getByRole("group", { name: "Supersociedades (Croma)" });
+  for (const li of within(grupo).getAllByRole("listitem")) {
+    expect(li.textContent).toMatch(/\d/);
+    expect(li.querySelector(".embudo-pista")).toHaveAttribute("aria-hidden", "true");
+  }
+});
+
 test("exportar_para_dapta_baja_el_csv", async () => {
   let pedido = false;
   server.use(

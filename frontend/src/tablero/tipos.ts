@@ -12,6 +12,11 @@ export type FilaTablero = {
   cpl_real: string | null;
   cuenta_naturales: boolean;
   naturales_no_contactables: number | null;
+  /** Embudo: conteos de leads únicos. null = no aplica (sin_atribuir); nunca un 0 inventado. */
+  enriquecidos: number | null;
+  contactables: number | null;
+  con_telefono: number | null;
+  calificados: number | null;
 };
 
 export type Tablero = {

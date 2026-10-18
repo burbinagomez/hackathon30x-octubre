@@ -19,6 +19,7 @@
   --color-cabecera-fondo: var(--color-oscuro);
   --color-cabecera-texto: var(--color-blanco);
   --color-foco: var(--color-oscuro);
+  --color-pista: var(--color-gris); /* pista de las barras del embudo; la barra es --color-acento */
   --color-sobre-acento: var(--color-oscuro); /* texto sobre lima: oscuro en ambos temas */
 }
 

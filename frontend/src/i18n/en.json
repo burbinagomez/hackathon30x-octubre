@@ -55,12 +55,19 @@
     },
     "frase": {
       "etiqueta": "Who do you sell to and what do you offer?",
-      "ayuda": "One or two sentences. Example: I sell accounting software to mid-sized hardware stores in Antioquia.",
-      "sugerir": "Suggest filters",
+      "ayuda": "Tell me who you sell to and what you offer, in one or two sentences. For example: I sell accounting software to mid-sized hardware stores in Antioquia.",
       "pensando": "Thinking…",
       "revisar": "We prefilled the filters from your sentence. Review and adjust them before the preview.",
       "error_no_disponible": "AI suggestions are not available right now. Use the filters directly.",
-      "error_interpretacion": "We could not interpret the sentence. Try rewording it or use the filters."
+      "error_interpretacion": "We could not interpret the sentence. Try rewording it or use the filters.",
+      "enviar": "Send",
+      "asistente": "Assistant",
+      "conversacion": "Conversation with the assistant",
+      "voy_a_buscar": "I'm going to search for",
+      "editar_en_filtros": "Edit in Filters",
+      "empezar_de_nuevo": "Start over",
+      "limite_turnos": "This conversation is already long. Tap \"Start over\" to set up another search.",
+      "sin_actividad": "The activity is missing, so the preview cannot be calculated. Tap \"Edit in Filters\" and pick one."
     },
     "trabajando": {
       "buscando": "Searching companies in the sources",
@@ -122,6 +129,12 @@
     "calificados": "Qualified",
     "pct_calificados": "% qualified (of unique)",
     "cpql": "CPQL (list)",
+    "embudo": "Funnel by source",
+    "embudo_enriquecidos": "Enriched",
+    "embudo_contactables": "Contactable",
+    "embudo_con_telefono": "With phone",
+    "embudo_calificados": "Qualified",
+    "embudo_ayuda": "Each bar is measured against the source's unique leads.",
     "exportar_dapta": "Export for Dapta (CSV)",
     "error_exportar": "Export failed. Try again."
   },
@@ -168,6 +181,7 @@
     "telefono": "Phone",
     "email": "Email",
     "licencia": "License",
+    "solo_con_contacto": "Only with contact",
     "si": "Yes",
     "no": "No",
     "anterior": "Previous",

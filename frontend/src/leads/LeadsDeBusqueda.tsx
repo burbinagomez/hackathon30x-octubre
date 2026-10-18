@@ -45,7 +45,7 @@ export default function LeadsDeBusqueda({ id }: { id: string }) {
         )}
         {fallo && <p role="alert" className="error">{t("enriquecer.error")}</p>}
       </section>
-      <ListaLeads key={version} clave={`busqueda:${id}:${version}`} titulo={t("leads.titulo_leads")} cargar={(p) => listarLeads(id, p)} />
+      <ListaLeads key={version} clave={`busqueda:${id}:${version}`} titulo={t("leads.titulo_leads")} cargar={(p, c) => listarLeads(id, p, c)} />
     </>
   );
 }
