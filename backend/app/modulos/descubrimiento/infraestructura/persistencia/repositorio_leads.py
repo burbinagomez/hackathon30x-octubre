@@ -8,7 +8,8 @@ from sqlalchemy.exc import DBAPIError
 
 from app.db import unidad_de_trabajo
 from app.modulos.descubrimiento.dominio.errores import ErrorPersistencia
-from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, EmpresaCruda, Lead
+from app.modulos.descubrimiento.dominio.modelos import (
+    CriteriosICP, EmpresaCruda, Lead, LeadParaEnriquecer, ResultadoEnriquecimiento)
 from app.seguridad.cifrado import Cifrador
 
 _INSERT_LEAD = text(
@@ -23,6 +24,16 @@ _INSERT_CUMPLIMIENTO = text(
     "VALUES (:t, :lead_id, :fuente, :licencia, :url_origen, :as_of)"
 )
 
+_UPDATE_ENRIQUECIMIENTO = text(
+    "UPDATE leads SET tipo_titular = :tipo_titular, contactable = :contactable, razon_no_contactable = :razon, "
+    "encaje = :encaje, enriquecido_en = now(), "
+    "telefono_cifrado = :telefono, telefono_canal = :telefono_canal, email_cifrado = :email, email_canal = :email_canal, "
+    "nombre = CASE WHEN CAST(:claro AS boolean) THEN :nombre ELSE nombre END, "
+    "direccion = CASE WHEN CAST(:claro AS boolean) THEN :direccion ELSE direccion END, "
+    "nombre_cifrado = CASE WHEN CAST(:claro AS boolean) THEN NULL ELSE nombre_cifrado END, "
+    "direccion_cifrada = CASE WHEN CAST(:claro AS boolean) THEN NULL ELSE direccion_cifrada END "
+    "WHERE id = :id"
+)
 
 class RepositorioLeadsPostgres:
     """Cada método abre su propia unidad de trabajo con el tenant fijado: RLS filtra todo lo que toca."""
@@ -108,3 +119,43 @@ class RepositorioLeadsPostgres:
     def cerrar_busqueda(self, busqueda_id: UUID, estado: str) -> None:
         with self._uow() as c:
             c.execute(text("UPDATE busquedas SET estado = :estado WHERE id = :id"), {"estado": estado, "id": busqueda_id})
+
+    def sin_enriquecer(self, busqueda_id: UUID) -> list[LeadParaEnriquecer]:
+        with self._uow() as c:
+            filas = c.execute(text(
+                "SELECT DISTINCT l.id, l.tipo_titular, l.nombre, l.nombre_cifrado, l.ciudad, l.web, l.actividad_codigo, "
+                "b.descripcion_icp, l.creado_en FROM leads l "
+                "JOIN lead_fuentes lf ON lf.lead_id = l.id JOIN busquedas b ON b.id = lf.busqueda_id "
+                "WHERE lf.busqueda_id = :b AND l.enriquecido_en IS NULL ORDER BY l.creado_en, l.id"),
+                {"b": busqueda_id}).all()
+        return [LeadParaEnriquecer(
+            id=f.id, tipo_titular=f.tipo_titular, ciudad=f.ciudad, web=f.web, actividad=f.actividad_codigo,
+            descripcion_icp=f.descripcion_icp,
+            nombre=f.nombre if f.nombre is not None else self._cifrador.descifrar(
+                "nombre_cifrado", bytes(f.nombre_cifrado), self._tenant_id, f.id)) for f in filas]
+
+    def guardar_enriquecimiento(self, lead_id: UUID, r: ResultadoEnriquecimiento) -> None:
+        cifrar = lambda columna, contacto: (  # noqa: E731
+            None if contacto is None else self._cifrador.cifrar(columna, contacto[0], self._tenant_id, lead_id))
+        with self._uow() as c:
+            f = c.execute(text("SELECT tipo_titular, nombre_cifrado, direccion_cifrada FROM leads WHERE id = :id FOR UPDATE"),
+                          {"id": lead_id}).one_or_none()
+            if f is None:  # otro tenant o inexistente: RLS lo esconde
+                raise ErrorPersistencia("el lead no existe")
+            # Sube a jurídica: nombre y dirección pasan a claro (dato de empresa) y queda la constancia sin datos.
+            claro = r.tipo_titular == "juridica" and f.tipo_titular != "juridica"
+            descifrar = lambda columna, blob: (  # noqa: E731
+                None if not claro or blob is None else self._cifrador.descifrar(columna, bytes(blob), self._tenant_id, lead_id))
+            c.execute(_UPDATE_ENRIQUECIMIENTO, {
+                "id": lead_id, "tipo_titular": r.tipo_titular, "contactable": r.contactable,
+                "razon": r.razon_no_contactable, "encaje": r.encaje, "claro": claro,
+                "nombre": descifrar("nombre_cifrado", f.nombre_cifrado),
+                "direccion": descifrar("direccion_cifrada", f.direccion_cifrada),
+                "telefono": cifrar("telefono_cifrado", r.telefono), "telefono_canal": r.telefono and r.telefono[1],
+                "email": cifrar("email_cifrado", r.email), "email_canal": r.email and r.email[1],
+            })
+            if claro:
+                c.execute(text(
+                    "UPDATE cumplimiento SET solicitudes = solicitudes || jsonb_build_array(jsonb_build_object("
+                    "'tipo', 'paso_a_claro', 'motivo', 'match_unico', 'fuente', 'croma_rues_co', 'ts', now())) "
+                    "WHERE lead_id = :id"), {"id": lead_id})

@@ -89,7 +89,7 @@ class SitioWeb:
         except _BloqueadoPorRobots:
             return ContactoPublicado((), (), "fetch_bloqueado_por_robots")
         except (IPPrivadaRechazada, DemasiadasRedirecciones, _RespuestaInvalida, _PlazoVencido, httpx.HTTPError, httpx.InvalidURL, OSError,
-                zlib.error, KeyError) as e:
+                zlib.error) as e:
             log.info("sitio_web fallo lead_id=%s motivo=%s", lead_id, type(e).__name__)  # nunca el contenido
             return ContactoPublicado((), (), "fallo")
         emails, telefonos = _extraer(cuerpo.decode("utf-8", errors="replace"))

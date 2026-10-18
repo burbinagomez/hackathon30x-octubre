@@ -144,9 +144,9 @@ Notas de cierre (2026-10-18):
   **Mutaciones:** sacar `SET LOCAL app.tenant_id`; guardar el email sin `Cifrador`; olvidar `nombre_cifrado = NULL` (el CHECK de 0003 tiene que saltar); hacer el HTTP dentro de la transacción.
 - [x] T026 [MIN] [Paso 5] 🤖 Crear `supabase/migrations/0007_enriquecimiento.sql` con el texto **aprobado en T005/T023**, sin cambios. `app/modelos.py` suma las 8 columnas de `leads` y `descripcion_icp` de `busquedas`; `catalogo_sensibles` suma `telefono`/`email` (P3) **con T028**: `test_cifrado` exige que cada columna del catálogo se llene al escribir, y eso recién lo hace `guardar_enriquecimiento`. El drift queda vacío; `test_rls` suma `v_leads_icp` a `VISTAS` (sabotaje: sin `security_invoker`, B ve filas de A). T024 pasa a verde.
 - [ ] T027 [MIN] [Paso 5] 🛡🧠 Security y advisor revisan T025. **APROBADOS antes de T028.** Foco security: el paso a claro y el UPDATE de `cumplimiento` (P7), el catálogo de sensibles suma `telefono`/`email` (D3) y nada de contacto en logs. Foco advisor: cumplimiento y costos.
-- [ ] T028 [MIN] [Paso 5] 🤖 **Verde:** `sin_enriquecer` y `guardar_enriquecimiento` en el repo Postgres.
-- [ ] T029 [MIN] [Paso 5] 🤖 **Verde:** `aplicacion/enriquecer_lead.py` y `aplicacion/clasificar_encaje.py`. Primero se junta todo en memoria y después una UPDATE por lead.
-- [ ] T030 [MIN] [Paso 5] 🤖 **Rojo → verde:** subcomando `enriquecer --tenant --busqueda` en `cli.py`. El test con adaptadores falsos asierta el resumen impreso, y que `capsys` no contiene contacto. **Mutación:** imprimir el `ContactoPublicado`.
+- [x] T028 [MIN] [Paso 5] 🤖 **Verde:** `sin_enriquecer` y `guardar_enriquecimiento` en el repo Postgres.
+- [x] T029 [MIN] [Paso 5] 🤖 **Verde:** `aplicacion/enriquecer_lead.py`. Primero se junta todo en memoria y después una UPDATE por lead. `ClasificarEncajeICP` quedó inline (`EnriquecerLead._clasificar`): un solo llamador, sin archivo propio. Si jev falla, `enriquecido_en` queda puesto, `encaje` NULL, cuenta como `sin_clasificar` y la corrida sigue.
+- [x] T030 [MIN] [Paso 5] 🤖 **Rojo → verde:** subcomando `enriquecer --tenant --busqueda` en `cli.py`. El test con adaptadores falsos asierta el resumen impreso, y que `capsys` no contiene contacto. **Mutación:** imprimir el `ContactoPublicado`.
 
 **Checkpoint 5:** `scripts/test-backend.sh tests/integration/test_enriquecimiento.py tests/arquitectura` verde.
 
@@ -195,6 +195,7 @@ Notas de cierre (2026-10-18):
 - [ ] T045 [P] [Paso 9] 🐝 Docs: `docs/arquitectura-backend.md` suma el módulo; `docs/decisiones.md` suma la 0007 y el criterio de `BASE TABLE`. Solo `docs/`.
 - [ ] T046 [MIN] [Paso 9] 🐝 Corre la suite completa (`scripts/test-backend.sh`, `scripts/test-frontend.sh`, `lint-imports`) y pega el output sin interpretar.
 - [ ] T047 [MIN] [Paso 9] 🧠 Advisor revisa el diff final contra la constitución §5. 🧑 Daniel hace el push y el PR.
+- [ ] T048 [Pulido] 🤖 Comando manual `reclasificar` para los `sin_clasificar` (encaje NULL con `descripcion_icp`): llama solo a jev, sin Croma ni `sitio_web`. Necesita una columna de intentos (DDL nuevo, 🧑 Daniel aprueba) para no reintentar sin fin.
 
 ## Dependencias y paralelismo
 

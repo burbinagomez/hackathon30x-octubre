@@ -118,13 +118,14 @@ Este slice corre `uv run python -m evals.run --eval encaje_icp` con el `jev` rea
 - **Bajar `encaje_icp` a k=1:** se intenta (ver Evals), pero si `jev` no da determinación perfecta sobre el dataset, se queda en k=3 y no bloquea el slice.
 - **008: el reparto del enriquecimiento en `CPQL(fuente, canal)` para leads de dos fuentes.** Este slice deja esas filas con `fuente=NULL` y `lead_id` set: así no distorsiona el `CPL(fuente)`, y el costo queda completo por lead en `v_costo_por_lead`. Un lead con una sola fuente no tiene ambigüedad. Para un lead con dos (caso C del fixture de la 005), cómo se reparte su costo `sin_atribuir` entre las dos fuentes al calcular el CPQL queda **pendiente explícito de la 008**, que es la que define `demos_agendadas`.
 - **`nombre_contacto`:** este slice no lo extrae, porque `sitio_web` solo saca `mailto:` y teléfonos. La 003 anticipaba sumarlo al catálogo de cifrado acá. Se corre al slice que lo persista primero. La guarda ya existe: `test_ninguna_columna_de_contacto_fuera_del_catalogo` (003) falla si aparece una columna `nombre_contacto` sin estar en el catálogo.
+- **Clasificar un lead enriquecido antes de que la búsqueda tenga `descripcion_icp`:** queda con `encaje` NULL para siempre (`enriquecido_en` ya puesto, `sin_enriquecer` no lo vuelve a tomar). Lo recoge el `reclasificar` manual de T048.
 - **Re-enriquecer leads de búsquedas anteriores a este slice:** solo los de `v_leads_icp` sin `enriquecido_en`; no hay backfill retroactivo.
 
 ## Decisiones técnicas
 
 **Módulo nuevo** `backend/app/modulos/enriquecimiento/`:
 - `dominio/`: `calcular_contactable(tipo_titular, telefono_canal, email_canal, es_nominal) -> (bool, RazonNoContactable | None)`, `CONFIANZA_CANAL` (mapa `CanalPublicado -> int` con los cuatro valores, `whatsapp_comercial` arriba; reusa el tipo de la 003), `es_contacto_nominal(email) -> bool`. Puros, sin I/O.
-- `aplicacion/enriquecer_lead.py` (`EnriquecerLead`) y `clasificar_encaje.py` (`ClasificarEncajeICP`).
+- `aplicacion/enriquecer_lead.py` (`EnriquecerLead`); `ClasificarEncajeICP` quedó inline como `EnriquecerLead._clasificar` (un solo llamador).
 - `infraestructura/adaptadores/{sitio_web.py, croma_rues.py, jev_clasificador.py}`.
 - `backend/app/seguridad/{cifrado.py,catalogo_sensibles.py}`: se reusan, no se tocan (ya están en el módulo compartido desde la 003).
 

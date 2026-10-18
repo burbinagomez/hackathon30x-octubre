@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     croma_api_key: SecretStr | None = None
     # Credencial de jev (TypeSafe). Solo la usa JevClasificador.
     typesafe_api_key: SecretStr | None = None
+    # Endpoint de jev: sin documentar (P8). Sin URL o sin key no se clasifica y encaje queda NULL.
+    typesafe_url: str | None = None
     # Overpass: None = la constante del adaptador. repo_url va en el User-Agent (política de Overpass).
     overpass_url: str | None = None
     # datos.gov.co: None = la constante del adaptador / sin token (SODA limita por IP).

@@ -36,7 +36,7 @@ def _arbol_modulos(raiz: Path, archivo: str, contenido: str) -> None:
                 *(f"app/modulos/descubrimiento/{c}" for c in ("dominio", "aplicacion", "infraestructura")),
                 *(f"app/modulos/costos/{c}" for c in ("dominio", "infraestructura")),
                 *(f"app/modulos/acceso/{c}" for c in ("dominio", "infraestructura")),
-                *(f"app/modulos/enriquecimiento/{c}" for c in ("dominio", "infraestructura"))]
+                *(f"app/modulos/enriquecimiento/{c}" for c in ("dominio", "aplicacion", "infraestructura"))]
     for p in paquetes:
         (raiz / p).mkdir(parents=True, exist_ok=True)
         (raiz / p / "__init__.py").touch()
@@ -113,3 +113,16 @@ def test_enriquecimiento_dominio_no_importa_httpx(tmp_path):
 
     assert r.returncode != 0
     assert f"{SIN_HTTP_ENRIQ} BROKEN" in r.stdout
+
+
+SIN_DB_APLIC = "Enriquecimiento: aplicacion sin base de datos"
+
+
+def test_enriquecimiento_aplicacion_no_importa_sqlalchemy(tmp_path):
+    # El caso de uso no abre transacciones: el HTTP nunca queda dentro de una.
+    _arbol_modulos(tmp_path, "app/modulos/enriquecimiento/aplicacion/x.py", "import sqlalchemy\n")
+
+    r = lint_imports(tmp_path)
+
+    assert r.returncode != 0
+    assert f"{SIN_DB_APLIC} BROKEN" in r.stdout

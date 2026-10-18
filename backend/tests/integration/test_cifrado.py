@@ -10,7 +10,7 @@ from sqlalchemy import text
 
 from app.cli import Persistencia, main
 from app.modulos.descubrimiento.dominio.errores import ErrorPersistencia
-from app.modulos.descubrimiento.dominio.modelos import Actividad, EmpresaCruda
+from app.modulos.descubrimiento.dominio.modelos import Actividad, EmpresaCruda, ResultadoEnriquecimiento
 from app.modulos.descubrimiento.infraestructura.persistencia.repositorio_leads import RepositorioLeadsPostgres
 from app.seguridad.catalogo_sensibles import CIFRADAS, CONDICIONALES
 from tests.falsos import FuenteFalsa, RegistroCostosFalso
@@ -23,7 +23,10 @@ REPOSITORIO = APP / "modulos" / "descubrimiento" / "infraestructura" / "persiste
 PERMITIDOS = (REPOSITORIO, APP / "modelos.py", APP / "seguridad" / "catalogo_sensibles.py")
 NOMBRE = "Tienda Doña Rosa"  # sintéticos
 DIRECCION = "Calle 10 # 5-20"
-CLARO = {"nombre_cifrado": NOMBRE, "direccion_cifrada": DIRECCION}  # lo que guarda cada columna cifrada
+TELEFONO = "+57 601 555 0199"
+EMAIL = "ventas@donarosa.invalid"
+CLARO = {"nombre_cifrado": NOMBRE, "direccion_cifrada": DIRECCION, "telefono_cifrado": TELEFONO,
+         "email_cifrado": EMAIL}  # lo que guarda cada columna cifrada
 
 
 def _empresa(tipo):
@@ -48,6 +51,8 @@ def _crudo(admin, lead_id):
 @pytest.mark.parametrize("tipo", ["desconocido", "natural"])
 def test_nombre_y_direccion_de_no_juridica_van_cifrados(rt, admin, tenants, cifrador, tipo):
     repo, lead_id = _crear(rt, tenants["a"], cifrador, tipo)
+    repo.guardar_enriquecimiento(lead_id, ResultadoEnriquecimiento(  # sigue sin ser jurídica: nombre sigue cifrado
+        tipo, (TELEFONO, "sitio_web"), (EMAIL, "sitio_web"), False, "persona_natural"))
 
     assert _crudo(admin, lead_id)[:2] == (None, None)
     # Recorre el catálogo: una columna cifrada nueva sin su texto en CLARO hace fallar el primer assert.

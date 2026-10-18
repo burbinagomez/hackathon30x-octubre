@@ -69,6 +69,13 @@ source_modules = ["app.modulos.enriquecimiento.dominio"]
 forbidden_modules = ["httpx", "app.modulos.enriquecimiento.infraestructura"]
 
 [[tool.importlinter.contracts]]
+name = "Enriquecimiento: aplicacion sin base de datos"
+type = "forbidden"
+# El caso de uso no abre transacciones: el HTTP queda siempre fuera de una (cada guardado es su propia UoW en el repo).
+source_modules = ["app.modulos.enriquecimiento.aplicacion"]
+forbidden_modules = ["sqlalchemy", "app.db"]
+
+[[tool.importlinter.contracts]]
 name = "App no importa evals"
 type = "forbidden"
 # evals es tooling hermano de app y no entra en la imagen de api: evals -> app vale, al revés no.
