@@ -316,30 +316,6 @@ test("el_boton_de_enviar_exige_un_mensaje", async () => {
   expect(boton(es.busqueda.frase.enviar)).toBeEnabled();
 });
 
-test("una_sugerencia_con_campos_null_deja_esos_campos_vacios", async () => {
-  await montar({ frase: true, lookalike: false }, () =>
-    HttpResponse.json({ sugerencia: { ...SUGERENCIA, ciiu: null, departamento: null, ciudad: null, ingresos_min: null, palabras_clave: [], exclusiones: [] }, costo_usd: "0" }));
-
-  await escribirYSugerir();
-
-  await waitFor(() => expect(pestana(es.busqueda.pestanas.filtros)).toHaveAttribute("aria-selected", "true"));
-  expect(campo("Actividad")).toHaveValue("");
-  expect(campo("Ingresos mínimos (USD)")).toHaveValue(null);
-  expect(campo("Palabras clave (separadas por coma)")).toHaveValue("");
-});
-
-test("la_sugerencia_no_pisa_canal_tope_ni_mensaje", async () => {
-  await montar();
-  fireEvent.change(campo("Tope de gasto (USD)"), { target: { value: "7" } });
-  fireEvent.change(campo("Mensaje base"), { target: { value: "Hola" } });
-
-  await escribirYSugerir();
-
-  await waitFor(() => expect(pestana(es.busqueda.pestanas.filtros)).toHaveAttribute("aria-selected", "true"));
-  expect(campo("Tope de gasto (USD)")).toHaveValue(7);
-  expect(campo("Mensaje base")).toHaveValue("Hola");
-});
-
 test("filtros_es_la_pestana_por_defecto_y_la_de_frase_trae_su_texto", async () => {
   await montar();
 

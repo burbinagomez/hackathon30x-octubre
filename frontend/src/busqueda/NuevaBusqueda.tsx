@@ -1,64 +1,20 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { ErrorApi } from "../api/cliente";
-import { navegar } from "../compartido/navegar";
 import {
-  divisionesDe, ejecutar, estadoIntake, listarActividades, listarPaises, sugerirDesdeFrase, vistaPrevia,
+  divisionesDe, estadoIntake, listarActividades, listarPaises,
   type EstadoIntake, type Sugerencia,
 } from "./api";
-import { entero, moneda, monedaFina } from "../compartido/formato";
-import Trabajando from "../compartido/Trabajando";
+import BloqueBusqueda from "./BloqueBusqueda";
+import ChatFrase from "./ChatFrase";
+import { aPedido, conSugerencia, INICIAL, type Formulario } from "./formulario";
 import IntakeLookalike from "./IntakeLookalike";
-import ResultadoPorFuente from "./ResultadoPorFuente";
-import ResultadoVistaPrevia from "./ResultadoVistaPrevia";
-import type { Actividad, Division, PedidoVistaPrevia, ResultadoEjecucion, VistaPrevia } from "./tipos";
+import type { Actividad, Division } from "./tipos";
+import { useBusqueda } from "./useBusqueda";
+import { useChatFrase } from "./useChatFrase";
 
 const CANALES = ["email"];
 
-type Formulario = Record<
-  "pais" | "ciiu" | "departamento" | "ciudad" | "ingresosMin" | "palabrasClave" | "exclusiones" | "canal" | "tope" | "mensaje",
-  string
->;
-const INICIAL: Formulario = {
-  pais: "CO", ciiu: "", departamento: "", ciudad: "", ingresosMin: "", palabrasClave: "",
-  exclusiones: "", canal: "email", tope: "", mensaje: "",
-};
-
 type Pestana = "lookalike" | "frase" | "filtros";
-type Ocupado = "vista" | "buscar" | null;
-const MAX_FRASE = 500;
-
-/** La sugerencia de una puerta pisa solo los criterios del ICP; canal, tope y mensaje son del usuario. */
-function conSugerencia(f: Formulario, s: Sugerencia): Formulario {
-  return {
-    ...f,
-    pais: s.pais,
-    ciiu: s.ciiu ?? "",
-    departamento: s.departamento ?? "",
-    ciudad: s.departamento && s.ciudad ? s.ciudad : "",
-    ingresosMin: s.ingresos_min === null ? "" : String(s.ingresos_min),
-    palabrasClave: s.palabras_clave.join(", "),
-    exclusiones: s.exclusiones.join(", "),
-  };
-}
-
-const lista = (texto: string) => texto.split(",").map((p) => p.trim()).filter(Boolean);
-
-function aPedido(f: Formulario): PedidoVistaPrevia {
-  return {
-    pais: f.pais,
-    ciiu: f.ciiu,
-    // Códigos, no nombres. La ciudad solo viaja dentro de una división (el select de división lo garantiza).
-    departamento: f.departamento || undefined,
-    ciudad: f.departamento && f.ciudad.trim() ? f.ciudad.trim() : undefined,
-    ingresos_min: f.ingresosMin ? Number(f.ingresosMin) : undefined,
-    palabras_clave: lista(f.palabrasClave),
-    exclusiones: lista(f.exclusiones),
-    canal_preferido: f.canal,
-    tope_gasto_usd: Number(f.tope),
-    mensaje_base: f.mensaje,
-  };
-}
 
 function Campo({ id, etiqueta, children }: { id: string; etiqueta: string; children: ReactNode }) {
   return (
@@ -69,45 +25,18 @@ function Campo({ id, etiqueta, children }: { id: string; etiqueta: string; child
   );
 }
 
-/** Lo que la búsqueda en curso está consultando, con los números de la vista previa: nada inventado. */
-function DetalleBusqueda({ vista, tope }: { vista: VistaPrevia; tope: number }) {
-  const { t } = useTranslation();
-  const nombre = (clave: string) => t(`fuentes.${clave}`, { defaultValue: clave });
-  return (
-    <>
-      <ul>
-        {vista.fuentes.map((f) => (
-          <li key={f.fuente}>
-            {f.conteo === null
-              ? t("busqueda.trabajando.detalle_fuente_sin_conteo", { fuente: nombre(f.fuente) })
-              : t("busqueda.trabajando.detalle_fuente", { fuente: nombre(f.fuente), conteo: entero(f.conteo) })}
-            {f.ignorados.length > 0 && ` · ${t("busqueda.trabajando.detalle_ignora", { campos: f.ignorados.join(", ") })}`}
-          </li>
-        ))}
-      </ul>
-      {vista.costo_maximo_usd !== null && (
-        <p>{t("busqueda.trabajando.detalle_costo", { maximo: monedaFina(vista.costo_maximo_usd), tope: moneda(tope) })}</p>
-      )}
-    </>
-  );
-}
-
 export default function NuevaBusqueda() {
   const { t, i18n } = useTranslation();
   const [form, setForm] = useState<Formulario>(INICIAL);
-  const [vista, setVista] = useState<VistaPrevia | null>(null);
+  const filtros = useBusqueda();
+  const chat = useChatFrase();
+  const busquedaChat = useBusqueda();
   const [actividades, setActividades] = useState<Actividad[]>([]);
   const [paises, setPaises] = useState<string[]>([]);
   const [divisiones, setDivisiones] = useState<Division[]>([]);
-  const [fallo, setFallo] = useState(false);
   const [puertas, setPuertas] = useState<EstadoIntake>({ frase: false, lookalike: false });
   const [pestana, setPestana] = useState<Pestana>("filtros");
-  const [frase, setFrase] = useState("");
-  const [pensando, setPensando] = useState(false);
-  const [ocupado, setOcupado] = useState<Ocupado>(null);
-  const [errorFrase, setErrorFrase] = useState<string | null>(null);
   const [sugerido, setSugerido] = useState(false);
-  const [resultado, setResultado] = useState<ResultadoEjecucion | null>(null);
 
   useEffect(() => {
     // Sin estado (o si falla) solo queda Filtros: las puertas son un atajo, no un requisito.
@@ -132,43 +61,22 @@ export default function NuevaBusqueda() {
     const sueltan: Partial<Formulario> =
       campo === "pais" ? { departamento: "", ciudad: "" } : campo === "departamento" ? { ciudad: "" } : {};
     setForm((f) => ({ ...f, [campo]: valor, ...sueltan }));
-    setVista(null);
-    setResultado(null);
+    filtros.reiniciar();
   }
 
   // Puerta A: prellena y se queda en su pestaña, porque ahí se ve la explicación (conteos y no resueltos).
   function aplicarLookalike(sugerencia: Sugerencia) {
     setForm((f) => conSugerencia(f, sugerencia));
-    setVista(null);
+    filtros.soltarVista();
     setSugerido(true);
   }
 
-  async function sugerir() {
-    setErrorFrase(null);
-    setPensando(true);
-    try {
-      const { sugerencia } = await sugerirDesdeFrase(frase.trim());
-      setForm((f) => conSugerencia(f, sugerencia));
-      setVista(null);
-      setSugerido(true);
-      setPestana("filtros");  // el usuario revisa y edita antes de gastar en vista previa
-    } catch (e) {
-      setErrorFrase(e instanceof ErrorApi && e.estado === 503 ? "error_no_disponible" : "error_interpretacion");
-    } finally {
-      setPensando(false);
-    }
-  }
-
-  async function intentar(accion: () => Promise<void>, enCurso: Ocupado) {
-    setFallo(false);
-    setOcupado(enCurso);
-    try {
-      await accion();
-    } catch {
-      setFallo(true);
-    } finally {
-      setOcupado(null);
-    }
+  // Del chat a Filtros: prellena los criterios y salta, para ajustarlos a mano. El tope viaja solo si la persona lo cambió.
+  function editarEnFiltros(sugerencia: Sugerencia) {
+    setForm((f) => ({ ...conSugerencia(f, sugerencia), ...(chat.topeEditado ? { tope: chat.tope } : {}) }));
+    filtros.reiniciar();
+    setSugerido(true);
+    setPestana("filtros");  // el usuario revisa y edita antes de gastar en vista previa
   }
 
   const entrada = (campo: keyof Formulario, etiqueta: string, tipo = "text") => (
@@ -183,14 +91,12 @@ export default function NuevaBusqueda() {
   const palabrasClave = entrada("palabrasClave", t("busqueda.palabras_clave"));
   const exclusiones = entrada("exclusiones", t("busqueda.exclusiones"));
   const tope = entrada("tope", t("busqueda.tope"), "number");
-  const nombreFuente = (clave: string) => t(`fuentes.${clave}`, { defaultValue: clave });
   const nombre = (a: Actividad) => (i18n.language === "en" ? a.nombre_en ?? a.nombre_es : a.nombre_es);
   const pestanas: Pestana[] = [
     ...(puertas.lookalike ? (["lookalike"] as const) : []),
     ...(puertas.frase ? (["frase"] as const) : []),
     "filtros",
   ];
-  const puedeBuscar = resultado === null && vista !== null && vista.dentro_del_tope !== false && vista.fuentes.length > 0;
 
   return (
     <main className="pantalla">
@@ -206,20 +112,7 @@ export default function NuevaBusqueda() {
         </div>
       )}
       {pestana === "frase" && (
-        <div className="formulario panel-intake" role="tabpanel">
-          <Campo id="frase" etiqueta={t("busqueda.frase.etiqueta")}>
-            <textarea id="frase" maxLength={MAX_FRASE} value={frase} onChange={(e) => setFrase(e.target.value)} />
-          </Campo>
-          <p className="ayuda">{t("busqueda.frase.ayuda")}</p>
-          <div className="acciones">
-            <button type="button" className="boton boton-primario" disabled={!frase.trim() || pensando} aria-busy={pensando} onClick={sugerir}>
-              {pensando && <span className="anillo anillo-chico" aria-hidden="true" />}
-              {pensando ? t("busqueda.frase.pensando") : t("busqueda.frase.sugerir")}
-            </button>
-          </div>
-          {pensando && <Trabajando texto={t("busqueda.trabajando.frase")} />}
-          {errorFrase && <p role="alert" className="error">{t(`busqueda.frase.${errorFrase}`)}</p>}
-        </div>
+        <ChatFrase chat={chat} busqueda={busquedaChat} actividades={actividades} alEditarEnFiltros={editarEnFiltros} />
       )}
       {pestana === "lookalike" && (
         <div className="panel-intake" role="tabpanel">
@@ -278,57 +171,8 @@ export default function NuevaBusqueda() {
         <textarea id="mensaje" value={form.mensaje} onChange={(e) => cambiar("mensaje", e.target.value)} />
       </Campo>
 
-      <div className="acciones">
-      <button
-        type="button"
-        className="boton"
-        disabled={!form.ciiu || !(Number(form.tope) > 0) || ocupado !== null}
-        aria-busy={ocupado === "vista"}
-        onClick={() => intentar(async () => setVista(await vistaPrevia(aPedido(form))), "vista")}
-      >
-        {t("busqueda.vista_previa")}
-      </button>
-      </div>
-      {ocupado === "vista" && <Trabajando texto={t("busqueda.trabajando.vista_previa")} />}
-      {vista && <ResultadoVistaPrevia vista={vista} tope={Number(form.tope)} />}
-      <div className="acciones">
-      <button
-        type="button"
-        className="boton boton-primario"
-        disabled={!puedeBuscar || ocupado !== null}
-        aria-busy={ocupado === "buscar"}
-        onClick={() =>
-          intentar(async () => {
-            // Se queda en la pantalla: primero se lee qué pasó con cada fuente; el tablero es un clic aparte.
-            setResultado(await ejecutar(vista!.busqueda_id));
-          }, "buscar")
-        }
-      >
-        {ocupado === "buscar" && <span className="anillo anillo-chico" aria-hidden="true" />}
-        {ocupado === "buscar" ? t("busqueda.trabajando.buscando_boton") : t("busqueda.buscar")}
-      </button>
-      </div>
-      {ocupado === "buscar" && vista && (
-        // La API responde todo junto al final: mientras tanto se ve qué fuentes se están consultando.
-        <Trabajando
-          flotante
-          texto={t("busqueda.trabajando.buscando")}
-          pasos={vista.fuentes.map((f) => t("busqueda.trabajando.consultando", { fuente: nombreFuente(f.fuente) }))}
-          detalle={<DetalleBusqueda vista={vista} tope={Number(form.tope)} />}
-        />
-      )}
-      {resultado && (
-        <>
-          <ResultadoPorFuente porFuente={resultado.por_fuente} />
-          {resultado.estado === "error" && <p role="status">{t("ejecucion.ninguna_respondio")}</p>}
-          <div className="acciones">
-            <button type="button" className="boton" onClick={() => navegar("/tablero")}>
-              {t("ejecucion.ver_tablero")}
-            </button>
-          </div>
-        </>
-      )}
-      {fallo && <p role="alert" className="error">{t("busqueda.error")}</p>}
+      <BloqueBusqueda busqueda={filtros} pedido={aPedido(form)} tope={Number(form.tope)}
+        puedeVista={Boolean(form.ciiu) && Number(form.tope) > 0} />
       </div>
       )}
     </main>
