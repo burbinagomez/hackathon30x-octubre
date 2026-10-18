@@ -18,9 +18,18 @@ Los checkboxes de `tasks.md` no siempre están al día. Para saber qué está he
 | 002 puertos + Supersociedades | `feature/002-puertos-registro-supersociedades` | #24 (borrador) | Las tareas [MIN] que faltaban (T021, T023, T025 y T039) están en verde: repositorio de leads, costos en Postgres, `sembrar_tenant.py` y `EjecutarBusqueda` con `lote_id = busqueda_id`. Va a Pulido: T026, T027, T040, T041 (CLI) y T043 (doc) | main |
 | 003 OSM + dedup | `feature/003-osm-dedup` | #25 (borrador) | En verde: T012–T015, T037–T041, T044, T047 y T048. Falta del [MIN]: T016a/b, T042, T049, T051, T052, T053 y T055 (cierre). T048b solo si se decide adelantar 002 T034/T035 | 002 en main |
 | 011 datos.gov.co (RUES) | `feature/011-datos-gov-co` | #26 (borrador) | T003–T008 en verde. T012 tiene el stub. T013–T016 tienen 4 rojos, marcados con xfail strict. Lo que sigue es T017: el advisor revisa los tests. Después T018 (verde) y la Fase 4 en adelante | 002 en main (puerto de caché, `tests/contratos/fabricas.py`), 005 para el tablero |
-| 005 libro de costos + búsqueda | `docs/005-plan` (**solo local, sin push**) | — | El plan y las tasks tienen APRUEBA del advisor (`7dc6bc4`, 33 [MIN]). P1, P2 y P4 están sin decidir: P1 choca con los estados `terminada`/`con_errores` de la 002 (nota H16) | 002, 003, 011 |
-| 014 marca responsive | `feature/014-marca-responsive` (**solo local**) | — | Lista, sin push. `spec.md:67` sigue en `[ ]` y se cierra con `e2e.yml` contra Railway después del deploy | 012 (fijar SHA de `e2e.yml`) |
-| 004 evals | `docs/004-plan-evals` (**solo local**) | — | Hay plan, todavía sin implementar | — |
+| 005 libro de costos + búsqueda | `docs/005-plan` (sin PR) | — | El plan y las tasks tienen APRUEBA del advisor (`7dc6bc4`, 33 [MIN]). P1, P2 y P4 están sin decidir: P1 choca con los estados `terminada`/`con_errores` de la 002 (nota H16) | 002, 003, 011 |
+| 014 marca responsive | `feature/014-marca-responsive` (sin PR) | — | Lista. `spec.md:67` sigue en `[ ]` y se cierra con `e2e.yml` contra Railway después del deploy | 012 (fijar SHA de `e2e.yml`) |
+| 004 evals | `docs/004-plan-evals` (sin PR) | — | Hay plan, todavía sin implementar | — |
+
+### Ramas pusheadas sin PR y atrasadas respecto de `main`
+
+Quedaron atrasadas a propósito: rebasá o mergeá `origin/main` cuando tomes cada una.
+
+- `docs/005-plan` (7dc6bc4): plan y tasks de la 005, con APRUEBA del advisor y 33 tareas [MIN]. Está 26 commits atrás de `main`.
+- `docs/004-plan-evals` (3686a6b): plan de evals de la 004, después de cuatro pasadas del advisor. Está 26 commits atrás de `main`.
+- `feature/014-marca-responsive` (c884a3e): marca y layout responsive, con el rojo mobile verificado en local contra `vite preview`. Está 31 commits atrás de `main`.
+- `docs/specs-003-004-tasks` (41afa51): lo que queda pendiente de implementar en la 007 y la 008. Está 35 commits atrás de `main`.
 
 ## Orden de merge
 
