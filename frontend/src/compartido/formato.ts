@@ -13,3 +13,13 @@ export function moneda(valor: string | number | null): string {
 export function entero(valor: number | null): string {
   return valor === null ? SIN_DATO : formatear({}, valor);
 }
+
+/** Marca de enlace que sale de la app (las atribuciones de licencia abren en pestaña nueva). */
+export const FLECHA_EXTERNA = "↗";
+
+/** USD con hasta 6 decimales: el costo máximo de una búsqueda son fracciones de centavo y `moneda` lo mostraría como $0.00. */
+export function monedaFina(valor: string | number | null): string {
+  return valor === null
+    ? SIN_DATO
+    : formatear({ style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 6 }, Number(valor));
+}

@@ -6,7 +6,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.cli import Persistencia, _adaptadores_enriquecer, _cargar_tarifas, main
+from app.cli import Persistencia, _adaptadores_enriquecer, main
+from app.composicion import cargar_tarifas
 from app.config import Settings
 from app.modulos.descubrimiento.dominio.modelos import Actividad, EmpresaCruda, LeadParaEnriquecer, PaginaEmpresas
 from app.modulos.enriquecimiento.dominio.puertos import ContactoPublicado
@@ -218,7 +219,7 @@ def test_sin_typesafe_api_key_no_hay_clasificador(entorno, monkeypatch):
     monkeypatch.setenv("CIFRADO_KEY", base64.b64encode(b"k" * 32).decode())
     monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
     monkeypatch.setenv("TYPESAFE_URL", "https://jev.invalido/clasificar")
-    *_, clasificador = _adaptadores_enriquecer(Settings(), RegistroCostosFalso(), _cargar_tarifas())
+    *_, clasificador = _adaptadores_enriquecer(Settings(), RegistroCostosFalso(), cargar_tarifas())
     assert clasificador is None
 
 
@@ -226,7 +227,7 @@ def test_con_typesafe_api_key_y_url_arma_jev(entorno, monkeypatch):
     monkeypatch.setenv("CIFRADO_KEY", base64.b64encode(b"k" * 32).decode())
     monkeypatch.setenv("TYPESAFE_API_KEY", "clave-jev-falsa-4b2e")
     monkeypatch.setenv("TYPESAFE_URL", "https://jev.invalido/clasificar")
-    *_, clasificador = _adaptadores_enriquecer(Settings(), RegistroCostosFalso(), _cargar_tarifas())
+    *_, clasificador = _adaptadores_enriquecer(Settings(), RegistroCostosFalso(), cargar_tarifas())
     assert isinstance(clasificador, JevClasificador)
     assert "clave-jev-falsa-4b2e" not in repr(vars(clasificador))
 
@@ -234,5 +235,5 @@ def test_con_typesafe_api_key_y_url_arma_jev(entorno, monkeypatch):
 def test_verificador_bloqueado_no_asciende_a_juridica(entorno, monkeypatch):
     # P1 abierto: ascender sin consultar pasaría el nombre de una persona natural a claro.
     monkeypatch.setenv("CIFRADO_KEY", base64.b64encode(b"k" * 32).decode())
-    verificador, *_ = _adaptadores_enriquecer(Settings(), RegistroCostosFalso(), _cargar_tarifas())
+    verificador, *_ = _adaptadores_enriquecer(Settings(), RegistroCostosFalso(), cargar_tarifas())
     assert verificador.verificar(uuid4(), "doña rosa gomez", None).tipo_titular == "desconocido"

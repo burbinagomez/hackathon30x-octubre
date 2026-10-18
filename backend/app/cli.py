@@ -2,37 +2,25 @@
 import argparse
 import socket
 import sys
-import time
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from decimal import Decimal
 from functools import cache
-from pathlib import Path
 from uuid import UUID
 
 import httpx
 import yaml
 from pydantic import ValidationError
 
+from app.composicion import CONFIG, armador_de_fuente, cargar_tarifas
 from app.config import Settings
 from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.costos.dominio.puertos import RegistroCostos
-from app.modulos.descubrimiento.aplicacion.camaras import cargar_camaras
 from app.modulos.descubrimiento.aplicacion.ejecutar_busqueda import EjecutarBusqueda
 from app.modulos.descubrimiento.aplicacion.registro import cargar_actividades, cargar_registro
 from app.modulos.descubrimiento.dominio.modelos import CriteriosICP
 from app.modulos.descubrimiento.dominio.puertos import RepositorioLeads
 from app.modulos.descubrimiento.infraestructura.adaptadores import catalogo
 
-CONFIG = Path(__file__).resolve().parents[1] / "config"
-
-
-def _cargar_tarifas() -> dict[str, Decimal]:
-    """Tarifa unitaria por proveedor desde tarifas.yaml; cada valor pasa por str para no arrastrar el error del float."""
-    t = yaml.safe_load((CONFIG / "tarifas.yaml").read_text())
-    return {"croma": Decimal(str(t["croma"]["usd_por_credito"])), "osm": Decimal(str(t["computo_seg_usd"])),
-            "datos.gov.co": Decimal(str(t["computo_seg_usd"])), "web_fetch": Decimal(str(t["web_fetch_usd"])),
-            "jev_in_por_M": Decimal(str(t["jev"]["in_usd_por_M"]))}
 
 
 @dataclass(frozen=True)
@@ -108,7 +96,7 @@ def _enriquecer(args, ajustes, persistencia, adaptadores) -> int:
     try:
         if persistencia is None:
             persistencia = _persistencia_postgres(ajustes(), args.tenant)
-        verificador, enriquecedor, clasificador = adaptadores(ajustes(), persistencia.costos, _cargar_tarifas())
+        verificador, enriquecedor, clasificador = adaptadores(ajustes(), persistencia.costos, cargar_tarifas())
     except ValidationError as error:  # solo los nombres de las variables, nunca sus valores
         print(f"configuración inválida: {', '.join(sorted({str(e['loc'][0]).upper() for e in error.errors()}))}",
               file=sys.stderr)
@@ -150,34 +138,12 @@ def main(argv=None, *, catalogo=catalogo, persistencia=None, adaptadores=None) -
         return 2
 
     costos = _ContadorDeCreditos(persistencia.costos)
-    tarifas = _cargar_tarifas()
+    tarifas = cargar_tarifas()
     filtros = {k: v for k, v in (("ciiu", args.ciiu), ("departamento", args.departamento), ("ciudad", args.ciudad)) if v}
 
     def fabrica(clase, meta):
-        def armar(lote_id: UUID):
-            if meta.proveedor == "datos.gov.co":
-                extra = {}
-                if ajustes().datos_gov_co_url:
-                    extra["url"] = ajustes().datos_gov_co_url
-                token = ajustes().datos_gov_co_app_token
-                return clase(
-                    transporte=httpx.HTTPTransport(), reloj=lambda: datetime.now(UTC), monotonico=time.monotonic,
-                    dormir=time.sleep, costos=costos, cache=None,
-                    camaras=cargar_camaras(CONFIG / "camaras_co.yaml"),
-                    tarifas={"computo_seg_usd": tarifas["datos.gov.co"]}, lote_id=lote_id, meta=meta,
-                    app_token=token.get_secret_value() if token else None, **extra,
-                )
-            kwargs = {"meta": meta, "registro_costos": costos, "transporte": httpx.HTTPTransport(), "lote_id": lote_id}
-            if meta.proveedor in tarifas:
-                kwargs["costo_unitario"] = tarifas[meta.proveedor]
-            if meta.proveedor == "osm":
-                kwargs["repo_url"] = ajustes().repo_url
-                if ajustes().overpass_url:
-                    kwargs["url"] = ajustes().overpass_url
-            elif meta.proveedor == "croma":
-                kwargs.update(api_key=api_key.get_secret_value(), limites=limites)
-            return clase(**kwargs)
-        return armar
+        return armador_de_fuente(clase, meta, ajustes=ajustes, costos=costos, tarifas=tarifas, limites=limites,
+                                 api_key=api_key, transporte=httpx.HTTPTransport)
 
     fuentes = {clave: (meta, fabrica(clase, meta)) for clave, (clase, meta) in registro.fuentes.items()}
     caso = EjecutarBusqueda(persistencia.repo, fuentes, cargar_actividades(CONFIG / "actividades.yaml"))

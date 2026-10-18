@@ -1,0 +1,2416 @@
+# Colombia: divisiones (32 departamentos + Bogotá, D.C.) y municipios. Datos estáticos versionados.
+# Fuente oficial: DANE, DIVIPOLA (División Político-Administrativa de Colombia), publicada en datos.gov.co.
+# Dataset: gdxc-w37w (datos.gov.co).
+# Generado el 2026-10-18 por backend/scripts/geografia_co.py. No se edita a mano; no corre en runtime ni en CI.
+# iso_3166_2: código ISO 3166-2:CO (común entre países). codigo_nativo: código DIVIPOLA (lo que usan los adaptadores).
+pais: CO
+divisiones:
+- iso_3166_2: "CO-ANT"
+  codigo_nativo: "05"
+  nombre_es: Antioquia
+  nombre_en: Antioquia
+  municipios:
+  - codigo_nativo: "05001"
+    nombre: Medellín
+  - codigo_nativo: "05002"
+    nombre: Abejorral
+  - codigo_nativo: "05004"
+    nombre: Abriaquí
+  - codigo_nativo: "05021"
+    nombre: Alejandría
+  - codigo_nativo: "05030"
+    nombre: Amagá
+  - codigo_nativo: "05031"
+    nombre: Amalfi
+  - codigo_nativo: "05034"
+    nombre: Andes
+  - codigo_nativo: "05036"
+    nombre: Angelópolis
+  - codigo_nativo: "05038"
+    nombre: Angostura
+  - codigo_nativo: "05040"
+    nombre: Anorí
+  - codigo_nativo: "05042"
+    nombre: Santa Fé de Antioquia
+  - codigo_nativo: "05044"
+    nombre: Anzá
+  - codigo_nativo: "05045"
+    nombre: Apartadó
+  - codigo_nativo: "05051"
+    nombre: Arboletes
+  - codigo_nativo: "05055"
+    nombre: Argelia
+  - codigo_nativo: "05059"
+    nombre: Armenia
+  - codigo_nativo: "05079"
+    nombre: Barbosa
+  - codigo_nativo: "05086"
+    nombre: Belmira
+  - codigo_nativo: "05088"
+    nombre: Bello
+  - codigo_nativo: "05091"
+    nombre: Betania
+  - codigo_nativo: "05093"
+    nombre: Betulia
+  - codigo_nativo: "05101"
+    nombre: Ciudad Bolívar
+  - codigo_nativo: "05107"
+    nombre: Briceño
+  - codigo_nativo: "05113"
+    nombre: Buriticá
+  - codigo_nativo: "05120"
+    nombre: Cáceres
+  - codigo_nativo: "05125"
+    nombre: Caicedo
+  - codigo_nativo: "05129"
+    nombre: Caldas
+  - codigo_nativo: "05134"
+    nombre: Campamento
+  - codigo_nativo: "05138"
+    nombre: Cañasgordas
+  - codigo_nativo: "05142"
+    nombre: Caracolí
+  - codigo_nativo: "05145"
+    nombre: Caramanta
+  - codigo_nativo: "05147"
+    nombre: Carepa
+  - codigo_nativo: "05148"
+    nombre: El Carmen de Viboral
+  - codigo_nativo: "05150"
+    nombre: Carolina
+  - codigo_nativo: "05154"
+    nombre: Caucasia
+  - codigo_nativo: "05172"
+    nombre: Chigorodó
+  - codigo_nativo: "05190"
+    nombre: Cisneros
+  - codigo_nativo: "05197"
+    nombre: Cocorná
+  - codigo_nativo: "05206"
+    nombre: Concepción
+  - codigo_nativo: "05209"
+    nombre: Concordia
+  - codigo_nativo: "05212"
+    nombre: Copacabana
+  - codigo_nativo: "05234"
+    nombre: Dabeiba
+  - codigo_nativo: "05237"
+    nombre: Donmatías
+  - codigo_nativo: "05240"
+    nombre: Ebéjico
+  - codigo_nativo: "05250"
+    nombre: El Bagre
+  - codigo_nativo: "05264"
+    nombre: Entrerríos
+  - codigo_nativo: "05266"
+    nombre: Envigado
+  - codigo_nativo: "05282"
+    nombre: Fredonia
+  - codigo_nativo: "05284"
+    nombre: Frontino
+  - codigo_nativo: "05306"
+    nombre: Giraldo
+  - codigo_nativo: "05308"
+    nombre: Girardota
+  - codigo_nativo: "05310"
+    nombre: Gómez Plata
+  - codigo_nativo: "05313"
+    nombre: Granada
+  - codigo_nativo: "05315"
+    nombre: Guadalupe
+  - codigo_nativo: "05318"
+    nombre: Guarne
+  - codigo_nativo: "05321"
+    nombre: Guatapé
+  - codigo_nativo: "05347"
+    nombre: Heliconia
+  - codigo_nativo: "05353"
+    nombre: Hispania
+  - codigo_nativo: "05360"
+    nombre: Itagüí
+  - codigo_nativo: "05361"
+    nombre: Ituango
+  - codigo_nativo: "05364"
+    nombre: Jardín
+  - codigo_nativo: "05368"
+    nombre: Jericó
+  - codigo_nativo: "05376"
+    nombre: La Ceja
+  - codigo_nativo: "05380"
+    nombre: La Estrella
+  - codigo_nativo: "05390"
+    nombre: La Pintada
+  - codigo_nativo: "05400"
+    nombre: La Unión
+  - codigo_nativo: "05411"
+    nombre: Liborina
+  - codigo_nativo: "05425"
+    nombre: Maceo
+  - codigo_nativo: "05440"
+    nombre: Marinilla
+  - codigo_nativo: "05467"
+    nombre: Montebello
+  - codigo_nativo: "05475"
+    nombre: Murindó
+  - codigo_nativo: "05480"
+    nombre: Mutatá
+  - codigo_nativo: "05483"
+    nombre: Nariño
+  - codigo_nativo: "05490"
+    nombre: Necoclí
+  - codigo_nativo: "05495"
+    nombre: Nechí
+  - codigo_nativo: "05501"
+    nombre: Olaya
+  - codigo_nativo: "05541"
+    nombre: Peñol
+  - codigo_nativo: "05543"
+    nombre: Peque
+  - codigo_nativo: "05576"
+    nombre: Pueblorrico
+  - codigo_nativo: "05579"
+    nombre: Puerto Berrío
+  - codigo_nativo: "05585"
+    nombre: Puerto Nare
+  - codigo_nativo: "05591"
+    nombre: Puerto Triunfo
+  - codigo_nativo: "05604"
+    nombre: Remedios
+  - codigo_nativo: "05607"
+    nombre: Retiro
+  - codigo_nativo: "05615"
+    nombre: Rionegro
+  - codigo_nativo: "05628"
+    nombre: Sabanalarga
+  - codigo_nativo: "05631"
+    nombre: Sabaneta
+  - codigo_nativo: "05642"
+    nombre: Salgar
+  - codigo_nativo: "05647"
+    nombre: San Andrés de Cuerquía
+  - codigo_nativo: "05649"
+    nombre: San Carlos
+  - codigo_nativo: "05652"
+    nombre: San Francisco
+  - codigo_nativo: "05656"
+    nombre: San Jerónimo
+  - codigo_nativo: "05658"
+    nombre: San José de la Montaña
+  - codigo_nativo: "05659"
+    nombre: San Juan de Urabá
+  - codigo_nativo: "05660"
+    nombre: San Luis
+  - codigo_nativo: "05664"
+    nombre: San Pedro de los Milagros
+  - codigo_nativo: "05665"
+    nombre: San Pedro de Urabá
+  - codigo_nativo: "05667"
+    nombre: San Rafael
+  - codigo_nativo: "05670"
+    nombre: San Roque
+  - codigo_nativo: "05674"
+    nombre: San Vicente Ferrer
+  - codigo_nativo: "05679"
+    nombre: Santa Bárbara
+  - codigo_nativo: "05686"
+    nombre: Santa Rosa de Osos
+  - codigo_nativo: "05690"
+    nombre: Santo Domingo
+  - codigo_nativo: "05697"
+    nombre: El Santuario
+  - codigo_nativo: "05736"
+    nombre: Segovia
+  - codigo_nativo: "05756"
+    nombre: Sonsón
+  - codigo_nativo: "05761"
+    nombre: Sopetrán
+  - codigo_nativo: "05789"
+    nombre: Támesis
+  - codigo_nativo: "05790"
+    nombre: Tarazá
+  - codigo_nativo: "05792"
+    nombre: Tarso
+  - codigo_nativo: "05809"
+    nombre: Titiribí
+  - codigo_nativo: "05819"
+    nombre: Toledo
+  - codigo_nativo: "05837"
+    nombre: Turbo
+  - codigo_nativo: "05842"
+    nombre: Uramita
+  - codigo_nativo: "05847"
+    nombre: Urrao
+  - codigo_nativo: "05854"
+    nombre: Valdivia
+  - codigo_nativo: "05856"
+    nombre: Valparaíso
+  - codigo_nativo: "05858"
+    nombre: Vegachí
+  - codigo_nativo: "05861"
+    nombre: Venecia
+  - codigo_nativo: "05873"
+    nombre: Vigía del Fuerte
+  - codigo_nativo: "05885"
+    nombre: Yalí
+  - codigo_nativo: "05887"
+    nombre: Yarumal
+  - codigo_nativo: "05890"
+    nombre: Yolombó
+  - codigo_nativo: "05893"
+    nombre: Yondó
+  - codigo_nativo: "05895"
+    nombre: Zaragoza
+- iso_3166_2: "CO-ATL"
+  codigo_nativo: "08"
+  nombre_es: Atlántico
+  nombre_en: Atlántico
+  municipios:
+  - codigo_nativo: "08001"
+    nombre: Barranquilla
+  - codigo_nativo: "08078"
+    nombre: Baranoa
+  - codigo_nativo: "08137"
+    nombre: Campo de la Cruz
+  - codigo_nativo: "08141"
+    nombre: Candelaria
+  - codigo_nativo: "08296"
+    nombre: Galapa
+  - codigo_nativo: "08372"
+    nombre: Juan de Acosta
+  - codigo_nativo: "08421"
+    nombre: Luruaco
+  - codigo_nativo: "08433"
+    nombre: Malambo
+  - codigo_nativo: "08436"
+    nombre: Manatí
+  - codigo_nativo: "08520"
+    nombre: Palmar de Varela
+  - codigo_nativo: "08549"
+    nombre: Piojó
+  - codigo_nativo: "08558"
+    nombre: Polonuevo
+  - codigo_nativo: "08560"
+    nombre: Ponedera
+  - codigo_nativo: "08573"
+    nombre: Puerto Colombia
+  - codigo_nativo: "08606"
+    nombre: Repelón
+  - codigo_nativo: "08634"
+    nombre: Sabanagrande
+  - codigo_nativo: "08638"
+    nombre: Sabanalarga
+  - codigo_nativo: "08675"
+    nombre: Santa Lucía
+  - codigo_nativo: "08685"
+    nombre: Santo Tomás
+  - codigo_nativo: "08758"
+    nombre: Soledad
+  - codigo_nativo: "08770"
+    nombre: Suan
+  - codigo_nativo: "08832"
+    nombre: Tubará
+  - codigo_nativo: "08849"
+    nombre: Usiacurí
+- iso_3166_2: "CO-DC"
+  codigo_nativo: "11"
+  nombre_es: Bogotá, D.C.
+  nombre_en: Bogotá, D.C.
+  municipios:
+  - codigo_nativo: "11001"
+    nombre: Bogotá, D.C.
+- iso_3166_2: "CO-BOL"
+  codigo_nativo: "13"
+  nombre_es: Bolívar
+  nombre_en: Bolívar
+  municipios:
+  - codigo_nativo: "13001"
+    nombre: Cartagena de Indias
+  - codigo_nativo: "13006"
+    nombre: Achí
+  - codigo_nativo: "13030"
+    nombre: Altos del Rosario
+  - codigo_nativo: "13042"
+    nombre: Arenal
+  - codigo_nativo: "13052"
+    nombre: Arjona
+  - codigo_nativo: "13062"
+    nombre: Arroyohondo
+  - codigo_nativo: "13074"
+    nombre: Barranco de Loba
+  - codigo_nativo: "13140"
+    nombre: Calamar
+  - codigo_nativo: "13160"
+    nombre: Cantagallo
+  - codigo_nativo: "13188"
+    nombre: Cicuco
+  - codigo_nativo: "13212"
+    nombre: Córdoba
+  - codigo_nativo: "13222"
+    nombre: Clemencia
+  - codigo_nativo: "13244"
+    nombre: El Carmen de Bolívar
+  - codigo_nativo: "13248"
+    nombre: El Guamo
+  - codigo_nativo: "13268"
+    nombre: El Peñón
+  - codigo_nativo: "13300"
+    nombre: Hatillo de Loba
+  - codigo_nativo: "13430"
+    nombre: Magangué
+  - codigo_nativo: "13433"
+    nombre: Mahates
+  - codigo_nativo: "13440"
+    nombre: Margarita
+  - codigo_nativo: "13442"
+    nombre: María la Baja
+  - codigo_nativo: "13458"
+    nombre: Montecristo
+  - codigo_nativo: "13468"
+    nombre: Santa Cruz de Mompox
+  - codigo_nativo: "13473"
+    nombre: Morales
+  - codigo_nativo: "13490"
+    nombre: Norosí
+  - codigo_nativo: "13549"
+    nombre: Pinillos
+  - codigo_nativo: "13580"
+    nombre: Regidor
+  - codigo_nativo: "13600"
+    nombre: Río Viejo
+  - codigo_nativo: "13620"
+    nombre: San Cristóbal
+  - codigo_nativo: "13647"
+    nombre: San Estanislao
+  - codigo_nativo: "13650"
+    nombre: San Fernando
+  - codigo_nativo: "13654"
+    nombre: San Jacinto
+  - codigo_nativo: "13655"
+    nombre: San Jacinto del Cauca
+  - codigo_nativo: "13657"
+    nombre: San Juan Nepomuceno
+  - codigo_nativo: "13667"
+    nombre: San Martín de Loba
+  - codigo_nativo: "13670"
+    nombre: San Pablo
+  - codigo_nativo: "13673"
+    nombre: Santa Catalina
+  - codigo_nativo: "13683"
+    nombre: Santa Rosa
+  - codigo_nativo: "13688"
+    nombre: Santa Rosa del Sur
+  - codigo_nativo: "13744"
+    nombre: Simití
+  - codigo_nativo: "13760"
+    nombre: Soplaviento
+  - codigo_nativo: "13780"
+    nombre: Talaigua Nuevo
+  - codigo_nativo: "13810"
+    nombre: Tiquisio
+  - codigo_nativo: "13836"
+    nombre: Turbaco
+  - codigo_nativo: "13838"
+    nombre: Turbaná
+  - codigo_nativo: "13873"
+    nombre: Villanueva
+  - codigo_nativo: "13894"
+    nombre: Zambrano
+- iso_3166_2: "CO-BOY"
+  codigo_nativo: "15"
+  nombre_es: Boyacá
+  nombre_en: Boyacá
+  municipios:
+  - codigo_nativo: "15001"
+    nombre: Tunja
+  - codigo_nativo: "15022"
+    nombre: Almeida
+  - codigo_nativo: "15047"
+    nombre: Aquitania
+  - codigo_nativo: "15051"
+    nombre: Arcabuco
+  - codigo_nativo: "15087"
+    nombre: Belén
+  - codigo_nativo: "15090"
+    nombre: Berbeo
+  - codigo_nativo: "15092"
+    nombre: Betéitiva
+  - codigo_nativo: "15097"
+    nombre: Boavita
+  - codigo_nativo: "15104"
+    nombre: Boyacá
+  - codigo_nativo: "15106"
+    nombre: Briceño
+  - codigo_nativo: "15109"
+    nombre: Buenavista
+  - codigo_nativo: "15114"
+    nombre: Busbanzá
+  - codigo_nativo: "15131"
+    nombre: Caldas
+  - codigo_nativo: "15135"
+    nombre: Campohermoso
+  - codigo_nativo: "15162"
+    nombre: Cerinza
+  - codigo_nativo: "15172"
+    nombre: Chinavita
+  - codigo_nativo: "15176"
+    nombre: Chiquinquirá
+  - codigo_nativo: "15180"
+    nombre: Chiscas
+  - codigo_nativo: "15183"
+    nombre: Chita
+  - codigo_nativo: "15185"
+    nombre: Chitaraque
+  - codigo_nativo: "15187"
+    nombre: Chivatá
+  - codigo_nativo: "15189"
+    nombre: Ciénega
+  - codigo_nativo: "15204"
+    nombre: Cómbita
+  - codigo_nativo: "15212"
+    nombre: Coper
+  - codigo_nativo: "15215"
+    nombre: Corrales
+  - codigo_nativo: "15218"
+    nombre: Covarachía
+  - codigo_nativo: "15223"
+    nombre: Cubará
+  - codigo_nativo: "15224"
+    nombre: Cucaita
+  - codigo_nativo: "15226"
+    nombre: Cuítiva
+  - codigo_nativo: "15232"
+    nombre: Chíquiza
+  - codigo_nativo: "15236"
+    nombre: Chivor
+  - codigo_nativo: "15238"
+    nombre: Duitama
+  - codigo_nativo: "15244"
+    nombre: El Cocuy
+  - codigo_nativo: "15248"
+    nombre: El Espino
+  - codigo_nativo: "15272"
+    nombre: Firavitoba
+  - codigo_nativo: "15276"
+    nombre: Floresta
+  - codigo_nativo: "15293"
+    nombre: Gachantivá
+  - codigo_nativo: "15296"
+    nombre: Gámeza
+  - codigo_nativo: "15299"
+    nombre: Garagoa
+  - codigo_nativo: "15317"
+    nombre: Guacamayas
+  - codigo_nativo: "15322"
+    nombre: Guateque
+  - codigo_nativo: "15325"
+    nombre: Guayatá
+  - codigo_nativo: "15332"
+    nombre: Güicán de la Sierra
+  - codigo_nativo: "15362"
+    nombre: Iza
+  - codigo_nativo: "15367"
+    nombre: Jenesano
+  - codigo_nativo: "15368"
+    nombre: Jericó
+  - codigo_nativo: "15377"
+    nombre: Labranzagrande
+  - codigo_nativo: "15380"
+    nombre: La Capilla
+  - codigo_nativo: "15401"
+    nombre: La Victoria
+  - codigo_nativo: "15403"
+    nombre: La Uvita
+  - codigo_nativo: "15407"
+    nombre: Villa de Leyva
+  - codigo_nativo: "15425"
+    nombre: Macanal
+  - codigo_nativo: "15442"
+    nombre: Maripí
+  - codigo_nativo: "15455"
+    nombre: Miraflores
+  - codigo_nativo: "15464"
+    nombre: Mongua
+  - codigo_nativo: "15466"
+    nombre: Monguí
+  - codigo_nativo: "15469"
+    nombre: Moniquirá
+  - codigo_nativo: "15476"
+    nombre: Motavita
+  - codigo_nativo: "15480"
+    nombre: Muzo
+  - codigo_nativo: "15491"
+    nombre: Nobsa
+  - codigo_nativo: "15494"
+    nombre: Nuevo Colón
+  - codigo_nativo: "15500"
+    nombre: Oicatá
+  - codigo_nativo: "15507"
+    nombre: Otanche
+  - codigo_nativo: "15511"
+    nombre: Pachavita
+  - codigo_nativo: "15514"
+    nombre: Páez
+  - codigo_nativo: "15516"
+    nombre: Paipa
+  - codigo_nativo: "15518"
+    nombre: Pajarito
+  - codigo_nativo: "15522"
+    nombre: Panqueba
+  - codigo_nativo: "15531"
+    nombre: Pauna
+  - codigo_nativo: "15533"
+    nombre: Paya
+  - codigo_nativo: "15537"
+    nombre: Paz de Río
+  - codigo_nativo: "15542"
+    nombre: Pesca
+  - codigo_nativo: "15550"
+    nombre: Pisba
+  - codigo_nativo: "15572"
+    nombre: Puerto Boyacá
+  - codigo_nativo: "15580"
+    nombre: Quípama
+  - codigo_nativo: "15599"
+    nombre: Ramiriquí
+  - codigo_nativo: "15600"
+    nombre: Ráquira
+  - codigo_nativo: "15621"
+    nombre: Rondón
+  - codigo_nativo: "15632"
+    nombre: Saboyá
+  - codigo_nativo: "15638"
+    nombre: Sáchica
+  - codigo_nativo: "15646"
+    nombre: Samacá
+  - codigo_nativo: "15660"
+    nombre: San Eduardo
+  - codigo_nativo: "15664"
+    nombre: San José de Pare
+  - codigo_nativo: "15667"
+    nombre: San Luis de Gaceno
+  - codigo_nativo: "15673"
+    nombre: San Mateo
+  - codigo_nativo: "15676"
+    nombre: San Miguel de Sema
+  - codigo_nativo: "15681"
+    nombre: San Pablo de Borbur
+  - codigo_nativo: "15686"
+    nombre: Santana
+  - codigo_nativo: "15690"
+    nombre: Santa María
+  - codigo_nativo: "15693"
+    nombre: Santa Rosa de Viterbo
+  - codigo_nativo: "15696"
+    nombre: Santa Sofía
+  - codigo_nativo: "15720"
+    nombre: Sativanorte
+  - codigo_nativo: "15723"
+    nombre: Sativasur
+  - codigo_nativo: "15740"
+    nombre: Siachoque
+  - codigo_nativo: "15753"
+    nombre: Soatá
+  - codigo_nativo: "15755"
+    nombre: Socotá
+  - codigo_nativo: "15757"
+    nombre: Socha
+  - codigo_nativo: "15759"
+    nombre: Sogamoso
+  - codigo_nativo: "15761"
+    nombre: Somondoco
+  - codigo_nativo: "15762"
+    nombre: Sora
+  - codigo_nativo: "15763"
+    nombre: Sotaquirá
+  - codigo_nativo: "15764"
+    nombre: Soracá
+  - codigo_nativo: "15774"
+    nombre: Susacón
+  - codigo_nativo: "15776"
+    nombre: Sutamarchán
+  - codigo_nativo: "15778"
+    nombre: Sutatenza
+  - codigo_nativo: "15790"
+    nombre: Tasco
+  - codigo_nativo: "15798"
+    nombre: Tenza
+  - codigo_nativo: "15804"
+    nombre: Tibaná
+  - codigo_nativo: "15806"
+    nombre: Tibasosa
+  - codigo_nativo: "15808"
+    nombre: Tinjacá
+  - codigo_nativo: "15810"
+    nombre: Tipacoque
+  - codigo_nativo: "15814"
+    nombre: Toca
+  - codigo_nativo: "15816"
+    nombre: Togüí
+  - codigo_nativo: "15820"
+    nombre: Tópaga
+  - codigo_nativo: "15822"
+    nombre: Tota
+  - codigo_nativo: "15832"
+    nombre: Tununguá
+  - codigo_nativo: "15835"
+    nombre: Turmequé
+  - codigo_nativo: "15837"
+    nombre: Tuta
+  - codigo_nativo: "15839"
+    nombre: Tutazá
+  - codigo_nativo: "15842"
+    nombre: Úmbita
+  - codigo_nativo: "15861"
+    nombre: Ventaquemada
+  - codigo_nativo: "15879"
+    nombre: Viracachá
+  - codigo_nativo: "15897"
+    nombre: Zetaquira
+- iso_3166_2: "CO-CAL"
+  codigo_nativo: "17"
+  nombre_es: Caldas
+  nombre_en: Caldas
+  municipios:
+  - codigo_nativo: "17001"
+    nombre: Manizales
+  - codigo_nativo: "17013"
+    nombre: Aguadas
+  - codigo_nativo: "17042"
+    nombre: Anserma
+  - codigo_nativo: "17050"
+    nombre: Aranzazu
+  - codigo_nativo: "17088"
+    nombre: Belalcázar
+  - codigo_nativo: "17174"
+    nombre: Chinchiná
+  - codigo_nativo: "17272"
+    nombre: Filadelfia
+  - codigo_nativo: "17380"
+    nombre: La Dorada
+  - codigo_nativo: "17388"
+    nombre: La Merced
+  - codigo_nativo: "17433"
+    nombre: Manzanares
+  - codigo_nativo: "17442"
+    nombre: Marmato
+  - codigo_nativo: "17444"
+    nombre: Marquetalia
+  - codigo_nativo: "17446"
+    nombre: Marulanda
+  - codigo_nativo: "17486"
+    nombre: Neira
+  - codigo_nativo: "17495"
+    nombre: Norcasia
+  - codigo_nativo: "17513"
+    nombre: Pácora
+  - codigo_nativo: "17524"
+    nombre: Palestina
+  - codigo_nativo: "17541"
+    nombre: Pensilvania
+  - codigo_nativo: "17614"
+    nombre: Riosucio
+  - codigo_nativo: "17616"
+    nombre: Risaralda
+  - codigo_nativo: "17653"
+    nombre: Salamina
+  - codigo_nativo: "17662"
+    nombre: Samaná
+  - codigo_nativo: "17665"
+    nombre: San José
+  - codigo_nativo: "17777"
+    nombre: Supía
+  - codigo_nativo: "17867"
+    nombre: Victoria
+  - codigo_nativo: "17873"
+    nombre: Villamaría
+  - codigo_nativo: "17877"
+    nombre: Viterbo
+- iso_3166_2: "CO-CAQ"
+  codigo_nativo: "18"
+  nombre_es: Caquetá
+  nombre_en: Caquetá
+  municipios:
+  - codigo_nativo: "18001"
+    nombre: Florencia
+  - codigo_nativo: "18029"
+    nombre: Albania
+  - codigo_nativo: "18094"
+    nombre: Belén de los Andaquíes
+  - codigo_nativo: "18150"
+    nombre: Cartagena del Chairá
+  - codigo_nativo: "18205"
+    nombre: Curillo
+  - codigo_nativo: "18247"
+    nombre: El Doncello
+  - codigo_nativo: "18256"
+    nombre: El Paujíl
+  - codigo_nativo: "18410"
+    nombre: La Montañita
+  - codigo_nativo: "18460"
+    nombre: Milán
+  - codigo_nativo: "18479"
+    nombre: Morelia
+  - codigo_nativo: "18592"
+    nombre: Puerto Rico
+  - codigo_nativo: "18610"
+    nombre: San José del Fragua
+  - codigo_nativo: "18753"
+    nombre: San Vicente del Caguán
+  - codigo_nativo: "18756"
+    nombre: Solano
+  - codigo_nativo: "18785"
+    nombre: Solita
+  - codigo_nativo: "18860"
+    nombre: Valparaíso
+- iso_3166_2: "CO-CAU"
+  codigo_nativo: "19"
+  nombre_es: Cauca
+  nombre_en: Cauca
+  municipios:
+  - codigo_nativo: "19001"
+    nombre: Popayán
+  - codigo_nativo: "19022"
+    nombre: Almaguer
+  - codigo_nativo: "19050"
+    nombre: Argelia
+  - codigo_nativo: "19075"
+    nombre: Balboa
+  - codigo_nativo: "19100"
+    nombre: Bolívar
+  - codigo_nativo: "19110"
+    nombre: Buenos Aires
+  - codigo_nativo: "19130"
+    nombre: Cajibío
+  - codigo_nativo: "19137"
+    nombre: Caldono
+  - codigo_nativo: "19142"
+    nombre: Caloto
+  - codigo_nativo: "19212"
+    nombre: Corinto
+  - codigo_nativo: "19256"
+    nombre: El Tambo
+  - codigo_nativo: "19290"
+    nombre: Florencia
+  - codigo_nativo: "19300"
+    nombre: Guachené
+  - codigo_nativo: "19318"
+    nombre: Guapi
+  - codigo_nativo: "19355"
+    nombre: Inzá
+  - codigo_nativo: "19364"
+    nombre: Jambaló
+  - codigo_nativo: "19392"
+    nombre: La Sierra
+  - codigo_nativo: "19397"
+    nombre: La Vega
+  - codigo_nativo: "19418"
+    nombre: López de Micay
+  - codigo_nativo: "19450"
+    nombre: Mercaderes
+  - codigo_nativo: "19455"
+    nombre: Miranda
+  - codigo_nativo: "19473"
+    nombre: Morales
+  - codigo_nativo: "19513"
+    nombre: Padilla
+  - codigo_nativo: "19517"
+    nombre: Páez
+  - codigo_nativo: "19532"
+    nombre: Patía
+  - codigo_nativo: "19533"
+    nombre: Piamonte
+  - codigo_nativo: "19548"
+    nombre: Piendamó - Tunía
+  - codigo_nativo: "19573"
+    nombre: Puerto Tejada
+  - codigo_nativo: "19585"
+    nombre: Puracé
+  - codigo_nativo: "19622"
+    nombre: Rosas
+  - codigo_nativo: "19693"
+    nombre: San Sebastián
+  - codigo_nativo: "19698"
+    nombre: Santander de Quilichao
+  - codigo_nativo: "19701"
+    nombre: Santa Rosa
+  - codigo_nativo: "19743"
+    nombre: Silvia
+  - codigo_nativo: "19760"
+    nombre: Sotará - Paispamba
+  - codigo_nativo: "19780"
+    nombre: Suárez
+  - codigo_nativo: "19785"
+    nombre: Sucre
+  - codigo_nativo: "19807"
+    nombre: Timbío
+  - codigo_nativo: "19809"
+    nombre: Timbiquí
+  - codigo_nativo: "19821"
+    nombre: Toribío
+  - codigo_nativo: "19824"
+    nombre: Totoró
+  - codigo_nativo: "19845"
+    nombre: Villa Rica
+- iso_3166_2: "CO-CES"
+  codigo_nativo: "20"
+  nombre_es: Cesar
+  nombre_en: Cesar
+  municipios:
+  - codigo_nativo: "20001"
+    nombre: Valledupar
+  - codigo_nativo: "20011"
+    nombre: Aguachica
+  - codigo_nativo: "20013"
+    nombre: Agustín Codazzi
+  - codigo_nativo: "20032"
+    nombre: Astrea
+  - codigo_nativo: "20045"
+    nombre: Becerril
+  - codigo_nativo: "20060"
+    nombre: Bosconia
+  - codigo_nativo: "20175"
+    nombre: Chimichagua
+  - codigo_nativo: "20178"
+    nombre: Chiriguaná
+  - codigo_nativo: "20228"
+    nombre: Curumaní
+  - codigo_nativo: "20238"
+    nombre: El Copey
+  - codigo_nativo: "20250"
+    nombre: El Paso
+  - codigo_nativo: "20295"
+    nombre: Gamarra
+  - codigo_nativo: "20310"
+    nombre: González
+  - codigo_nativo: "20383"
+    nombre: La Gloria
+  - codigo_nativo: "20400"
+    nombre: La Jagua de Ibirico
+  - codigo_nativo: "20443"
+    nombre: Manaure Balcón del Cesar
+  - codigo_nativo: "20517"
+    nombre: Pailitas
+  - codigo_nativo: "20550"
+    nombre: Pelaya
+  - codigo_nativo: "20570"
+    nombre: Pueblo Bello
+  - codigo_nativo: "20614"
+    nombre: Río de Oro
+  - codigo_nativo: "20621"
+    nombre: La Paz
+  - codigo_nativo: "20710"
+    nombre: San Alberto
+  - codigo_nativo: "20750"
+    nombre: San Diego
+  - codigo_nativo: "20770"
+    nombre: San Martín
+  - codigo_nativo: "20787"
+    nombre: Tamalameque
+- iso_3166_2: "CO-COR"
+  codigo_nativo: "23"
+  nombre_es: Córdoba
+  nombre_en: Córdoba
+  municipios:
+  - codigo_nativo: "23001"
+    nombre: Montería
+  - codigo_nativo: "23068"
+    nombre: Ayapel
+  - codigo_nativo: "23079"
+    nombre: Buenavista
+  - codigo_nativo: "23090"
+    nombre: Canalete
+  - codigo_nativo: "23162"
+    nombre: Cereté
+  - codigo_nativo: "23168"
+    nombre: Chimá
+  - codigo_nativo: "23182"
+    nombre: Chinú
+  - codigo_nativo: "23189"
+    nombre: Ciénaga de Oro
+  - codigo_nativo: "23300"
+    nombre: Cotorra
+  - codigo_nativo: "23350"
+    nombre: La Apartada
+  - codigo_nativo: "23417"
+    nombre: Lorica
+  - codigo_nativo: "23419"
+    nombre: Los Córdobas
+  - codigo_nativo: "23464"
+    nombre: Momil
+  - codigo_nativo: "23466"
+    nombre: Montelíbano
+  - codigo_nativo: "23500"
+    nombre: Moñitos
+  - codigo_nativo: "23555"
+    nombre: Planeta Rica
+  - codigo_nativo: "23570"
+    nombre: Pueblo Nuevo
+  - codigo_nativo: "23574"
+    nombre: Puerto Escondido
+  - codigo_nativo: "23580"
+    nombre: Puerto Libertador
+  - codigo_nativo: "23586"
+    nombre: Purísima de la Concepción
+  - codigo_nativo: "23660"
+    nombre: Sahagún
+  - codigo_nativo: "23670"
+    nombre: San Andrés de Sotavento
+  - codigo_nativo: "23672"
+    nombre: San Antero
+  - codigo_nativo: "23675"
+    nombre: San Bernardo del Viento
+  - codigo_nativo: "23678"
+    nombre: San Carlos
+  - codigo_nativo: "23682"
+    nombre: San José de Uré
+  - codigo_nativo: "23686"
+    nombre: San Pelayo
+  - codigo_nativo: "23807"
+    nombre: Tierralta
+  - codigo_nativo: "23815"
+    nombre: Tuchín
+  - codigo_nativo: "23855"
+    nombre: Valencia
+- iso_3166_2: "CO-CUN"
+  codigo_nativo: "25"
+  nombre_es: Cundinamarca
+  nombre_en: Cundinamarca
+  municipios:
+  - codigo_nativo: "25001"
+    nombre: Agua de Dios
+  - codigo_nativo: "25019"
+    nombre: Albán
+  - codigo_nativo: "25035"
+    nombre: Anapoima
+  - codigo_nativo: "25040"
+    nombre: Anolaima
+  - codigo_nativo: "25053"
+    nombre: Arbeláez
+  - codigo_nativo: "25086"
+    nombre: Beltrán
+  - codigo_nativo: "25095"
+    nombre: Bituima
+  - codigo_nativo: "25099"
+    nombre: Bojacá
+  - codigo_nativo: "25120"
+    nombre: Cabrera
+  - codigo_nativo: "25123"
+    nombre: Cachipay
+  - codigo_nativo: "25126"
+    nombre: Cajicá
+  - codigo_nativo: "25148"
+    nombre: Caparrapí
+  - codigo_nativo: "25151"
+    nombre: Cáqueza
+  - codigo_nativo: "25154"
+    nombre: Carmen de Carupa
+  - codigo_nativo: "25168"
+    nombre: Chaguaní
+  - codigo_nativo: "25175"
+    nombre: Chía
+  - codigo_nativo: "25178"
+    nombre: Chipaque
+  - codigo_nativo: "25181"
+    nombre: Choachí
+  - codigo_nativo: "25183"
+    nombre: Chocontá
+  - codigo_nativo: "25200"
+    nombre: Cogua
+  - codigo_nativo: "25214"
+    nombre: Cota
+  - codigo_nativo: "25224"
+    nombre: Cucunubá
+  - codigo_nativo: "25245"
+    nombre: El Colegio
+  - codigo_nativo: "25258"
+    nombre: El Peñón
+  - codigo_nativo: "25260"
+    nombre: El Rosal
+  - codigo_nativo: "25269"
+    nombre: Facatativá
+  - codigo_nativo: "25279"
+    nombre: Fómeque
+  - codigo_nativo: "25281"
+    nombre: Fosca
+  - codigo_nativo: "25286"
+    nombre: Funza
+  - codigo_nativo: "25288"
+    nombre: Fúquene
+  - codigo_nativo: "25290"
+    nombre: Fusagasugá
+  - codigo_nativo: "25293"
+    nombre: Gachalá
+  - codigo_nativo: "25295"
+    nombre: Gachancipá
+  - codigo_nativo: "25297"
+    nombre: Gachetá
+  - codigo_nativo: "25299"
+    nombre: Gama
+  - codigo_nativo: "25307"
+    nombre: Girardot
+  - codigo_nativo: "25312"
+    nombre: Granada
+  - codigo_nativo: "25317"
+    nombre: Guachetá
+  - codigo_nativo: "25320"
+    nombre: Guaduas
+  - codigo_nativo: "25322"
+    nombre: Guasca
+  - codigo_nativo: "25324"
+    nombre: Guataquí
+  - codigo_nativo: "25326"
+    nombre: Guatavita
+  - codigo_nativo: "25328"
+    nombre: Guayabal de Síquima
+  - codigo_nativo: "25335"
+    nombre: Guayabetal
+  - codigo_nativo: "25339"
+    nombre: Gutiérrez
+  - codigo_nativo: "25368"
+    nombre: Jerusalén
+  - codigo_nativo: "25372"
+    nombre: Junín
+  - codigo_nativo: "25377"
+    nombre: La Calera
+  - codigo_nativo: "25386"
+    nombre: La Mesa
+  - codigo_nativo: "25394"
+    nombre: La Palma
+  - codigo_nativo: "25398"
+    nombre: La Peña
+  - codigo_nativo: "25402"
+    nombre: La Vega
+  - codigo_nativo: "25407"
+    nombre: Lenguazaque
+  - codigo_nativo: "25426"
+    nombre: Machetá
+  - codigo_nativo: "25430"
+    nombre: Madrid
+  - codigo_nativo: "25436"
+    nombre: Manta
+  - codigo_nativo: "25438"
+    nombre: Medina
+  - codigo_nativo: "25473"
+    nombre: Mosquera
+  - codigo_nativo: "25483"
+    nombre: Nariño
+  - codigo_nativo: "25486"
+    nombre: Nemocón
+  - codigo_nativo: "25488"
+    nombre: Nilo
+  - codigo_nativo: "25489"
+    nombre: Nimaima
+  - codigo_nativo: "25491"
+    nombre: Nocaima
+  - codigo_nativo: "25506"
+    nombre: Venecia
+  - codigo_nativo: "25513"
+    nombre: Pacho
+  - codigo_nativo: "25518"
+    nombre: Paime
+  - codigo_nativo: "25524"
+    nombre: Pandi
+  - codigo_nativo: "25530"
+    nombre: Paratebueno
+  - codigo_nativo: "25535"
+    nombre: Pasca
+  - codigo_nativo: "25572"
+    nombre: Puerto Salgar
+  - codigo_nativo: "25580"
+    nombre: Pulí
+  - codigo_nativo: "25592"
+    nombre: Quebradanegra
+  - codigo_nativo: "25594"
+    nombre: Quetame
+  - codigo_nativo: "25596"
+    nombre: Quipile
+  - codigo_nativo: "25599"
+    nombre: Apulo
+  - codigo_nativo: "25612"
+    nombre: Ricaurte
+  - codigo_nativo: "25645"
+    nombre: San Antonio del Tequendama
+  - codigo_nativo: "25649"
+    nombre: San Bernardo
+  - codigo_nativo: "25653"
+    nombre: San Cayetano
+  - codigo_nativo: "25658"
+    nombre: San Francisco
+  - codigo_nativo: "25662"
+    nombre: San Juan de Rioseco
+  - codigo_nativo: "25718"
+    nombre: Sasaima
+  - codigo_nativo: "25736"
+    nombre: Sesquilé
+  - codigo_nativo: "25740"
+    nombre: Sibaté
+  - codigo_nativo: "25743"
+    nombre: Silvania
+  - codigo_nativo: "25745"
+    nombre: Simijaca
+  - codigo_nativo: "25754"
+    nombre: Soacha
+  - codigo_nativo: "25758"
+    nombre: Sopó
+  - codigo_nativo: "25769"
+    nombre: Subachoque
+  - codigo_nativo: "25772"
+    nombre: Suesca
+  - codigo_nativo: "25777"
+    nombre: Supatá
+  - codigo_nativo: "25779"
+    nombre: Susa
+  - codigo_nativo: "25781"
+    nombre: Sutatausa
+  - codigo_nativo: "25785"
+    nombre: Tabio
+  - codigo_nativo: "25793"
+    nombre: Tausa
+  - codigo_nativo: "25797"
+    nombre: Tena
+  - codigo_nativo: "25799"
+    nombre: Tenjo
+  - codigo_nativo: "25805"
+    nombre: Tibacuy
+  - codigo_nativo: "25807"
+    nombre: Tibirita
+  - codigo_nativo: "25815"
+    nombre: Tocaima
+  - codigo_nativo: "25817"
+    nombre: Tocancipá
+  - codigo_nativo: "25823"
+    nombre: Topaipí
+  - codigo_nativo: "25839"
+    nombre: Ubalá
+  - codigo_nativo: "25841"
+    nombre: Ubaque
+  - codigo_nativo: "25843"
+    nombre: Villa de San Diego de Ubaté
+  - codigo_nativo: "25845"
+    nombre: Une
+  - codigo_nativo: "25851"
+    nombre: Útica
+  - codigo_nativo: "25862"
+    nombre: Vergara
+  - codigo_nativo: "25867"
+    nombre: Vianí
+  - codigo_nativo: "25871"
+    nombre: Villagómez
+  - codigo_nativo: "25873"
+    nombre: Villapinzón
+  - codigo_nativo: "25875"
+    nombre: Villeta
+  - codigo_nativo: "25878"
+    nombre: Viotá
+  - codigo_nativo: "25885"
+    nombre: Yacopí
+  - codigo_nativo: "25898"
+    nombre: Zipacón
+  - codigo_nativo: "25899"
+    nombre: Zipaquirá
+- iso_3166_2: "CO-CHO"
+  codigo_nativo: "27"
+  nombre_es: Chocó
+  nombre_en: Chocó
+  municipios:
+  - codigo_nativo: "27001"
+    nombre: Quibdó
+  - codigo_nativo: "27006"
+    nombre: Acandí
+  - codigo_nativo: "27025"
+    nombre: Alto Baudó
+  - codigo_nativo: "27050"
+    nombre: Atrato
+  - codigo_nativo: "27073"
+    nombre: Bagadó
+  - codigo_nativo: "27075"
+    nombre: Bahía Solano
+  - codigo_nativo: "27077"
+    nombre: Bajo Baudó
+  - codigo_nativo: "27099"
+    nombre: Bojayá
+  - codigo_nativo: "27135"
+    nombre: El Cantón del San Pablo
+  - codigo_nativo: "27150"
+    nombre: Carmen del Darién
+  - codigo_nativo: "27160"
+    nombre: Cértegui
+  - codigo_nativo: "27205"
+    nombre: Condoto
+  - codigo_nativo: "27245"
+    nombre: El Carmen de Atrato
+  - codigo_nativo: "27250"
+    nombre: El Litoral del San Juan
+  - codigo_nativo: "27361"
+    nombre: Istmina
+  - codigo_nativo: "27372"
+    nombre: Juradó
+  - codigo_nativo: "27413"
+    nombre: Lloró
+  - codigo_nativo: "27425"
+    nombre: Medio Atrato
+  - codigo_nativo: "27430"
+    nombre: Medio Baudó
+  - codigo_nativo: "27450"
+    nombre: Medio San Juan
+  - codigo_nativo: "27491"
+    nombre: Nóvita
+  - codigo_nativo: "27493"
+    nombre: Nuevo Belén de Bajirá
+  - codigo_nativo: "27495"
+    nombre: Nuquí
+  - codigo_nativo: "27580"
+    nombre: Río Iró
+  - codigo_nativo: "27600"
+    nombre: Río Quito
+  - codigo_nativo: "27615"
+    nombre: Riosucio
+  - codigo_nativo: "27660"
+    nombre: San José del Palmar
+  - codigo_nativo: "27745"
+    nombre: Sipí
+  - codigo_nativo: "27787"
+    nombre: Tadó
+  - codigo_nativo: "27800"
+    nombre: Unguía
+  - codigo_nativo: "27810"
+    nombre: Unión Panamericana
+- iso_3166_2: "CO-HUI"
+  codigo_nativo: "41"
+  nombre_es: Huila
+  nombre_en: Huila
+  municipios:
+  - codigo_nativo: "41001"
+    nombre: Neiva
+  - codigo_nativo: "41006"
+    nombre: Acevedo
+  - codigo_nativo: "41013"
+    nombre: Agrado
+  - codigo_nativo: "41016"
+    nombre: Aipe
+  - codigo_nativo: "41020"
+    nombre: Algeciras
+  - codigo_nativo: "41026"
+    nombre: Altamira
+  - codigo_nativo: "41078"
+    nombre: Baraya
+  - codigo_nativo: "41132"
+    nombre: Campoalegre
+  - codigo_nativo: "41206"
+    nombre: Colombia
+  - codigo_nativo: "41244"
+    nombre: Elías
+  - codigo_nativo: "41298"
+    nombre: Garzón
+  - codigo_nativo: "41306"
+    nombre: Gigante
+  - codigo_nativo: "41319"
+    nombre: Guadalupe
+  - codigo_nativo: "41349"
+    nombre: Hobo
+  - codigo_nativo: "41357"
+    nombre: Íquira
+  - codigo_nativo: "41359"
+    nombre: Isnos
+  - codigo_nativo: "41378"
+    nombre: La Argentina
+  - codigo_nativo: "41396"
+    nombre: La Plata
+  - codigo_nativo: "41483"
+    nombre: Nátaga
+  - codigo_nativo: "41503"
+    nombre: Oporapa
+  - codigo_nativo: "41518"
+    nombre: Paicol
+  - codigo_nativo: "41524"
+    nombre: Palermo
+  - codigo_nativo: "41530"
+    nombre: Palestina
+  - codigo_nativo: "41548"
+    nombre: Pital
+  - codigo_nativo: "41551"
+    nombre: Pitalito
+  - codigo_nativo: "41615"
+    nombre: Rivera
+  - codigo_nativo: "41660"
+    nombre: Saladoblanco
+  - codigo_nativo: "41668"
+    nombre: San Agustín
+  - codigo_nativo: "41676"
+    nombre: Santa María
+  - codigo_nativo: "41770"
+    nombre: Suaza
+  - codigo_nativo: "41791"
+    nombre: Tarqui
+  - codigo_nativo: "41797"
+    nombre: Tesalia
+  - codigo_nativo: "41799"
+    nombre: Tello
+  - codigo_nativo: "41801"
+    nombre: Teruel
+  - codigo_nativo: "41807"
+    nombre: Timaná
+  - codigo_nativo: "41872"
+    nombre: Villavieja
+  - codigo_nativo: "41885"
+    nombre: Yaguará
+- iso_3166_2: "CO-LAG"
+  codigo_nativo: "44"
+  nombre_es: La Guajira
+  nombre_en: La Guajira
+  municipios:
+  - codigo_nativo: "44001"
+    nombre: Riohacha
+  - codigo_nativo: "44035"
+    nombre: Albania
+  - codigo_nativo: "44078"
+    nombre: Barrancas
+  - codigo_nativo: "44090"
+    nombre: Dibulla
+  - codigo_nativo: "44098"
+    nombre: Distracción
+  - codigo_nativo: "44110"
+    nombre: El Molino
+  - codigo_nativo: "44279"
+    nombre: Fonseca
+  - codigo_nativo: "44378"
+    nombre: Hatonuevo
+  - codigo_nativo: "44420"
+    nombre: La Jagua del Pilar
+  - codigo_nativo: "44430"
+    nombre: Maicao
+  - codigo_nativo: "44560"
+    nombre: Manaure
+  - codigo_nativo: "44650"
+    nombre: San Juan del Cesar
+  - codigo_nativo: "44847"
+    nombre: Uribia
+  - codigo_nativo: "44855"
+    nombre: Urumita
+  - codigo_nativo: "44874"
+    nombre: Villanueva
+- iso_3166_2: "CO-MAG"
+  codigo_nativo: "47"
+  nombre_es: Magdalena
+  nombre_en: Magdalena
+  municipios:
+  - codigo_nativo: "47001"
+    nombre: Santa Marta
+  - codigo_nativo: "47030"
+    nombre: Algarrobo
+  - codigo_nativo: "47053"
+    nombre: Aracataca
+  - codigo_nativo: "47058"
+    nombre: Ariguaní
+  - codigo_nativo: "47161"
+    nombre: Cerro de San Antonio
+  - codigo_nativo: "47170"
+    nombre: Chivolo
+  - codigo_nativo: "47189"
+    nombre: Ciénaga
+  - codigo_nativo: "47205"
+    nombre: Concordia
+  - codigo_nativo: "47245"
+    nombre: El Banco
+  - codigo_nativo: "47258"
+    nombre: El Piñón
+  - codigo_nativo: "47268"
+    nombre: El Retén
+  - codigo_nativo: "47288"
+    nombre: Fundación
+  - codigo_nativo: "47318"
+    nombre: Guamal
+  - codigo_nativo: "47460"
+    nombre: Nueva Granada
+  - codigo_nativo: "47541"
+    nombre: Pedraza
+  - codigo_nativo: "47545"
+    nombre: Pijiño del Carmen
+  - codigo_nativo: "47551"
+    nombre: Pivijay
+  - codigo_nativo: "47555"
+    nombre: Plato
+  - codigo_nativo: "47570"
+    nombre: Puebloviejo
+  - codigo_nativo: "47605"
+    nombre: Remolino
+  - codigo_nativo: "47660"
+    nombre: Sabanas de San Ángel
+  - codigo_nativo: "47675"
+    nombre: Salamina
+  - codigo_nativo: "47692"
+    nombre: San Sebastián de Buenavista
+  - codigo_nativo: "47703"
+    nombre: San Zenón
+  - codigo_nativo: "47707"
+    nombre: Santa Ana
+  - codigo_nativo: "47720"
+    nombre: Santa Bárbara de Pinto
+  - codigo_nativo: "47745"
+    nombre: Sitionuevo
+  - codigo_nativo: "47798"
+    nombre: Tenerife
+  - codigo_nativo: "47960"
+    nombre: Zapayán
+  - codigo_nativo: "47980"
+    nombre: Zona Bananera
+- iso_3166_2: "CO-MET"
+  codigo_nativo: "50"
+  nombre_es: Meta
+  nombre_en: Meta
+  municipios:
+  - codigo_nativo: "50001"
+    nombre: Villavicencio
+  - codigo_nativo: "50006"
+    nombre: Acacías
+  - codigo_nativo: "50110"
+    nombre: Barranca de Upía
+  - codigo_nativo: "50124"
+    nombre: Cabuyaro
+  - codigo_nativo: "50150"
+    nombre: Castilla la Nueva
+  - codigo_nativo: "50223"
+    nombre: Cubarral
+  - codigo_nativo: "50226"
+    nombre: Cumaral
+  - codigo_nativo: "50245"
+    nombre: El Calvario
+  - codigo_nativo: "50251"
+    nombre: El Castillo
+  - codigo_nativo: "50270"
+    nombre: El Dorado
+  - codigo_nativo: "50287"
+    nombre: Fuente de Oro
+  - codigo_nativo: "50313"
+    nombre: Granada
+  - codigo_nativo: "50318"
+    nombre: Guamal
+  - codigo_nativo: "50325"
+    nombre: Mapiripán
+  - codigo_nativo: "50330"
+    nombre: Mesetas
+  - codigo_nativo: "50350"
+    nombre: La Macarena
+  - codigo_nativo: "50370"
+    nombre: Uribe
+  - codigo_nativo: "50400"
+    nombre: Lejanías
+  - codigo_nativo: "50450"
+    nombre: Puerto Concordia
+  - codigo_nativo: "50568"
+    nombre: Puerto Gaitán
+  - codigo_nativo: "50573"
+    nombre: Puerto López
+  - codigo_nativo: "50577"
+    nombre: Puerto Lleras
+  - codigo_nativo: "50590"
+    nombre: Puerto Rico
+  - codigo_nativo: "50606"
+    nombre: Restrepo
+  - codigo_nativo: "50680"
+    nombre: San Carlos de Guaroa
+  - codigo_nativo: "50683"
+    nombre: San Juan de Arama
+  - codigo_nativo: "50686"
+    nombre: San Juanito
+  - codigo_nativo: "50689"
+    nombre: San Martín
+  - codigo_nativo: "50711"
+    nombre: Vistahermosa
+- iso_3166_2: "CO-NAR"
+  codigo_nativo: "52"
+  nombre_es: Nariño
+  nombre_en: Nariño
+  municipios:
+  - codigo_nativo: "52001"
+    nombre: Pasto
+  - codigo_nativo: "52019"
+    nombre: Albán
+  - codigo_nativo: "52022"
+    nombre: Aldana
+  - codigo_nativo: "52036"
+    nombre: Ancuya
+  - codigo_nativo: "52051"
+    nombre: Arboleda
+  - codigo_nativo: "52079"
+    nombre: Barbacoas
+  - codigo_nativo: "52083"
+    nombre: Belén
+  - codigo_nativo: "52110"
+    nombre: Buesaco
+  - codigo_nativo: "52203"
+    nombre: Colón
+  - codigo_nativo: "52207"
+    nombre: Consacá
+  - codigo_nativo: "52210"
+    nombre: Contadero
+  - codigo_nativo: "52215"
+    nombre: Córdoba
+  - codigo_nativo: "52224"
+    nombre: Cuaspud Carlosama
+  - codigo_nativo: "52227"
+    nombre: Cumbal
+  - codigo_nativo: "52233"
+    nombre: Cumbitara
+  - codigo_nativo: "52240"
+    nombre: Chachagüí
+  - codigo_nativo: "52250"
+    nombre: El Charco
+  - codigo_nativo: "52254"
+    nombre: El Peñol
+  - codigo_nativo: "52256"
+    nombre: El Rosario
+  - codigo_nativo: "52258"
+    nombre: El Tablón de Gómez
+  - codigo_nativo: "52260"
+    nombre: El Tambo
+  - codigo_nativo: "52287"
+    nombre: Funes
+  - codigo_nativo: "52317"
+    nombre: Guachucal
+  - codigo_nativo: "52320"
+    nombre: Guaitarilla
+  - codigo_nativo: "52323"
+    nombre: Gualmatán
+  - codigo_nativo: "52352"
+    nombre: Iles
+  - codigo_nativo: "52354"
+    nombre: Imués
+  - codigo_nativo: "52356"
+    nombre: Ipiales
+  - codigo_nativo: "52378"
+    nombre: La Cruz
+  - codigo_nativo: "52381"
+    nombre: La Florida
+  - codigo_nativo: "52385"
+    nombre: La Llanada
+  - codigo_nativo: "52390"
+    nombre: La Tola
+  - codigo_nativo: "52399"
+    nombre: La Unión
+  - codigo_nativo: "52405"
+    nombre: Leiva
+  - codigo_nativo: "52411"
+    nombre: Linares
+  - codigo_nativo: "52418"
+    nombre: Los Andes
+  - codigo_nativo: "52427"
+    nombre: Magüí
+  - codigo_nativo: "52435"
+    nombre: Mallama
+  - codigo_nativo: "52473"
+    nombre: Mosquera
+  - codigo_nativo: "52480"
+    nombre: Nariño
+  - codigo_nativo: "52490"
+    nombre: Olaya Herrera
+  - codigo_nativo: "52506"
+    nombre: Ospina
+  - codigo_nativo: "52520"
+    nombre: Francisco Pizarro
+  - codigo_nativo: "52540"
+    nombre: Policarpa
+  - codigo_nativo: "52560"
+    nombre: Potosí
+  - codigo_nativo: "52565"
+    nombre: Providencia
+  - codigo_nativo: "52573"
+    nombre: Puerres
+  - codigo_nativo: "52585"
+    nombre: Pupiales
+  - codigo_nativo: "52612"
+    nombre: Ricaurte
+  - codigo_nativo: "52621"
+    nombre: Roberto Payán
+  - codigo_nativo: "52678"
+    nombre: Samaniego
+  - codigo_nativo: "52683"
+    nombre: Sandoná
+  - codigo_nativo: "52685"
+    nombre: San Bernardo
+  - codigo_nativo: "52687"
+    nombre: San Lorenzo
+  - codigo_nativo: "52693"
+    nombre: San Pablo
+  - codigo_nativo: "52694"
+    nombre: San Pedro de Cartago
+  - codigo_nativo: "52696"
+    nombre: Santa Bárbara
+  - codigo_nativo: "52699"
+    nombre: Santacruz
+  - codigo_nativo: "52720"
+    nombre: Sapuyes
+  - codigo_nativo: "52786"
+    nombre: Taminango
+  - codigo_nativo: "52788"
+    nombre: Tangua
+  - codigo_nativo: "52835"
+    nombre: San Andrés de Tumaco
+  - codigo_nativo: "52838"
+    nombre: Túquerres
+  - codigo_nativo: "52885"
+    nombre: Yacuanquer
+- iso_3166_2: "CO-NSA"
+  codigo_nativo: "54"
+  nombre_es: Norte de Santander
+  nombre_en: Norte de Santander
+  municipios:
+  - codigo_nativo: "54001"
+    nombre: San José de Cúcuta
+  - codigo_nativo: "54003"
+    nombre: Ábrego
+  - codigo_nativo: "54051"
+    nombre: Arboledas
+  - codigo_nativo: "54099"
+    nombre: Bochalema
+  - codigo_nativo: "54109"
+    nombre: Bucarasica
+  - codigo_nativo: "54125"
+    nombre: Cácota
+  - codigo_nativo: "54128"
+    nombre: Cáchira
+  - codigo_nativo: "54172"
+    nombre: Chinácota
+  - codigo_nativo: "54174"
+    nombre: Chitagá
+  - codigo_nativo: "54206"
+    nombre: Convención
+  - codigo_nativo: "54223"
+    nombre: Cucutilla
+  - codigo_nativo: "54239"
+    nombre: Durania
+  - codigo_nativo: "54245"
+    nombre: El Carmen
+  - codigo_nativo: "54250"
+    nombre: El Tarra
+  - codigo_nativo: "54261"
+    nombre: El Zulia
+  - codigo_nativo: "54313"
+    nombre: Gramalote
+  - codigo_nativo: "54344"
+    nombre: Hacarí
+  - codigo_nativo: "54347"
+    nombre: Herrán
+  - codigo_nativo: "54377"
+    nombre: Labateca
+  - codigo_nativo: "54385"
+    nombre: La Esperanza
+  - codigo_nativo: "54398"
+    nombre: La Playa
+  - codigo_nativo: "54405"
+    nombre: Los Patios
+  - codigo_nativo: "54418"
+    nombre: Lourdes
+  - codigo_nativo: "54480"
+    nombre: Mutiscua
+  - codigo_nativo: "54498"
+    nombre: Ocaña
+  - codigo_nativo: "54518"
+    nombre: Pamplona
+  - codigo_nativo: "54520"
+    nombre: Pamplonita
+  - codigo_nativo: "54553"
+    nombre: Puerto Santander
+  - codigo_nativo: "54599"
+    nombre: Ragonvalia
+  - codigo_nativo: "54660"
+    nombre: Salazar
+  - codigo_nativo: "54670"
+    nombre: San Calixto
+  - codigo_nativo: "54673"
+    nombre: San Cayetano
+  - codigo_nativo: "54680"
+    nombre: Santiago
+  - codigo_nativo: "54720"
+    nombre: Sardinata
+  - codigo_nativo: "54743"
+    nombre: Silos
+  - codigo_nativo: "54800"
+    nombre: Teorama
+  - codigo_nativo: "54810"
+    nombre: Tibú
+  - codigo_nativo: "54820"
+    nombre: Toledo
+  - codigo_nativo: "54871"
+    nombre: Villa Caro
+  - codigo_nativo: "54874"
+    nombre: Villa del Rosario
+- iso_3166_2: "CO-QUI"
+  codigo_nativo: "63"
+  nombre_es: Quindío
+  nombre_en: Quindío
+  municipios:
+  - codigo_nativo: "63001"
+    nombre: Armenia
+  - codigo_nativo: "63111"
+    nombre: Buenavista
+  - codigo_nativo: "63130"
+    nombre: Calarcá
+  - codigo_nativo: "63190"
+    nombre: Circasia
+  - codigo_nativo: "63212"
+    nombre: Córdoba
+  - codigo_nativo: "63272"
+    nombre: Filandia
+  - codigo_nativo: "63302"
+    nombre: Génova
+  - codigo_nativo: "63401"
+    nombre: La Tebaida
+  - codigo_nativo: "63470"
+    nombre: Montenegro
+  - codigo_nativo: "63548"
+    nombre: Pijao
+  - codigo_nativo: "63594"
+    nombre: Quimbaya
+  - codigo_nativo: "63690"
+    nombre: Salento
+- iso_3166_2: "CO-RIS"
+  codigo_nativo: "66"
+  nombre_es: Risaralda
+  nombre_en: Risaralda
+  municipios:
+  - codigo_nativo: "66001"
+    nombre: Pereira
+  - codigo_nativo: "66045"
+    nombre: Apía
+  - codigo_nativo: "66075"
+    nombre: Balboa
+  - codigo_nativo: "66088"
+    nombre: Belén de Umbría
+  - codigo_nativo: "66170"
+    nombre: Dosquebradas
+  - codigo_nativo: "66318"
+    nombre: Guática
+  - codigo_nativo: "66383"
+    nombre: La Celia
+  - codigo_nativo: "66400"
+    nombre: La Virginia
+  - codigo_nativo: "66440"
+    nombre: Marsella
+  - codigo_nativo: "66456"
+    nombre: Mistrató
+  - codigo_nativo: "66572"
+    nombre: Pueblo Rico
+  - codigo_nativo: "66594"
+    nombre: Quinchía
+  - codigo_nativo: "66682"
+    nombre: Santa Rosa de Cabal
+  - codigo_nativo: "66687"
+    nombre: Santuario
+- iso_3166_2: "CO-SAN"
+  codigo_nativo: "68"
+  nombre_es: Santander
+  nombre_en: Santander
+  municipios:
+  - codigo_nativo: "68001"
+    nombre: Bucaramanga
+  - codigo_nativo: "68013"
+    nombre: Aguada
+  - codigo_nativo: "68020"
+    nombre: Albania
+  - codigo_nativo: "68051"
+    nombre: Aratoca
+  - codigo_nativo: "68077"
+    nombre: Barbosa
+  - codigo_nativo: "68079"
+    nombre: Barichara
+  - codigo_nativo: "68081"
+    nombre: Barrancabermeja
+  - codigo_nativo: "68092"
+    nombre: Betulia
+  - codigo_nativo: "68101"
+    nombre: Bolívar
+  - codigo_nativo: "68121"
+    nombre: Cabrera
+  - codigo_nativo: "68132"
+    nombre: California
+  - codigo_nativo: "68147"
+    nombre: Capitanejo
+  - codigo_nativo: "68152"
+    nombre: Carcasí
+  - codigo_nativo: "68160"
+    nombre: Cepitá
+  - codigo_nativo: "68162"
+    nombre: Cerrito
+  - codigo_nativo: "68167"
+    nombre: Charalá
+  - codigo_nativo: "68169"
+    nombre: Charta
+  - codigo_nativo: "68176"
+    nombre: Chima
+  - codigo_nativo: "68179"
+    nombre: Chipatá
+  - codigo_nativo: "68190"
+    nombre: Cimitarra
+  - codigo_nativo: "68207"
+    nombre: Concepción
+  - codigo_nativo: "68209"
+    nombre: Confines
+  - codigo_nativo: "68211"
+    nombre: Contratación
+  - codigo_nativo: "68217"
+    nombre: Coromoro
+  - codigo_nativo: "68229"
+    nombre: Curití
+  - codigo_nativo: "68235"
+    nombre: El Carmen de Chucurí
+  - codigo_nativo: "68245"
+    nombre: El Guacamayo
+  - codigo_nativo: "68250"
+    nombre: El Peñón
+  - codigo_nativo: "68255"
+    nombre: El Playón
+  - codigo_nativo: "68264"
+    nombre: Encino
+  - codigo_nativo: "68266"
+    nombre: Enciso
+  - codigo_nativo: "68271"
+    nombre: Florián
+  - codigo_nativo: "68276"
+    nombre: Floridablanca
+  - codigo_nativo: "68296"
+    nombre: Galán
+  - codigo_nativo: "68298"
+    nombre: Gámbita
+  - codigo_nativo: "68307"
+    nombre: Girón
+  - codigo_nativo: "68318"
+    nombre: Guaca
+  - codigo_nativo: "68320"
+    nombre: Guadalupe
+  - codigo_nativo: "68322"
+    nombre: Guapotá
+  - codigo_nativo: "68324"
+    nombre: Guavatá
+  - codigo_nativo: "68327"
+    nombre: Güepsa
+  - codigo_nativo: "68344"
+    nombre: Hato
+  - codigo_nativo: "68368"
+    nombre: Jesús María
+  - codigo_nativo: "68370"
+    nombre: Jordán
+  - codigo_nativo: "68377"
+    nombre: La Belleza
+  - codigo_nativo: "68385"
+    nombre: Landázuri
+  - codigo_nativo: "68397"
+    nombre: La Paz
+  - codigo_nativo: "68406"
+    nombre: Lebrija
+  - codigo_nativo: "68418"
+    nombre: Los Santos
+  - codigo_nativo: "68425"
+    nombre: Macaravita
+  - codigo_nativo: "68432"
+    nombre: Málaga
+  - codigo_nativo: "68444"
+    nombre: Matanza
+  - codigo_nativo: "68464"
+    nombre: Mogotes
+  - codigo_nativo: "68468"
+    nombre: Molagavita
+  - codigo_nativo: "68498"
+    nombre: Ocamonte
+  - codigo_nativo: "68500"
+    nombre: Oiba
+  - codigo_nativo: "68502"
+    nombre: Onzaga
+  - codigo_nativo: "68522"
+    nombre: Palmar
+  - codigo_nativo: "68524"
+    nombre: Palmas del Socorro
+  - codigo_nativo: "68533"
+    nombre: Páramo
+  - codigo_nativo: "68547"
+    nombre: Piedecuesta
+  - codigo_nativo: "68549"
+    nombre: Pinchote
+  - codigo_nativo: "68572"
+    nombre: Puente Nacional
+  - codigo_nativo: "68573"
+    nombre: Puerto Parra
+  - codigo_nativo: "68575"
+    nombre: Puerto Wilches
+  - codigo_nativo: "68615"
+    nombre: Rionegro
+  - codigo_nativo: "68655"
+    nombre: Sabana de Torres
+  - codigo_nativo: "68669"
+    nombre: San Andrés
+  - codigo_nativo: "68673"
+    nombre: San Benito
+  - codigo_nativo: "68679"
+    nombre: San Gil
+  - codigo_nativo: "68682"
+    nombre: San Joaquín
+  - codigo_nativo: "68684"
+    nombre: San José de Miranda
+  - codigo_nativo: "68686"
+    nombre: San Miguel
+  - codigo_nativo: "68689"
+    nombre: San Vicente de Chucurí
+  - codigo_nativo: "68705"
+    nombre: Santa Bárbara
+  - codigo_nativo: "68720"
+    nombre: Santa Helena del Opón
+  - codigo_nativo: "68745"
+    nombre: Simacota
+  - codigo_nativo: "68755"
+    nombre: Socorro
+  - codigo_nativo: "68770"
+    nombre: Suaita
+  - codigo_nativo: "68773"
+    nombre: Sucre
+  - codigo_nativo: "68780"
+    nombre: Suratá
+  - codigo_nativo: "68820"
+    nombre: Tona
+  - codigo_nativo: "68855"
+    nombre: Valle de San José
+  - codigo_nativo: "68861"
+    nombre: Vélez
+  - codigo_nativo: "68867"
+    nombre: Vetas
+  - codigo_nativo: "68872"
+    nombre: Villanueva
+  - codigo_nativo: "68895"
+    nombre: Zapatoca
+- iso_3166_2: "CO-SUC"
+  codigo_nativo: "70"
+  nombre_es: Sucre
+  nombre_en: Sucre
+  municipios:
+  - codigo_nativo: "70001"
+    nombre: Sincelejo
+  - codigo_nativo: "70110"
+    nombre: Buenavista
+  - codigo_nativo: "70124"
+    nombre: Caimito
+  - codigo_nativo: "70204"
+    nombre: Colosó
+  - codigo_nativo: "70215"
+    nombre: Corozal
+  - codigo_nativo: "70221"
+    nombre: Coveñas
+  - codigo_nativo: "70230"
+    nombre: Chalán
+  - codigo_nativo: "70233"
+    nombre: El Roble
+  - codigo_nativo: "70235"
+    nombre: Galeras
+  - codigo_nativo: "70265"
+    nombre: Guaranda
+  - codigo_nativo: "70400"
+    nombre: La Unión
+  - codigo_nativo: "70418"
+    nombre: Los Palmitos
+  - codigo_nativo: "70429"
+    nombre: Majagual
+  - codigo_nativo: "70473"
+    nombre: Morroa
+  - codigo_nativo: "70508"
+    nombre: Ovejas
+  - codigo_nativo: "70523"
+    nombre: Palmito
+  - codigo_nativo: "70670"
+    nombre: Sampués
+  - codigo_nativo: "70678"
+    nombre: San Benito Abad
+  - codigo_nativo: "70702"
+    nombre: San Juan de Betulia
+  - codigo_nativo: "70708"
+    nombre: San Marcos
+  - codigo_nativo: "70713"
+    nombre: San Onofre
+  - codigo_nativo: "70717"
+    nombre: San Pedro
+  - codigo_nativo: "70742"
+    nombre: San Luis de Sincé
+  - codigo_nativo: "70771"
+    nombre: Sucre
+  - codigo_nativo: "70820"
+    nombre: Santiago de Tolú
+  - codigo_nativo: "70823"
+    nombre: San José de Toluviejo
+- iso_3166_2: "CO-TOL"
+  codigo_nativo: "73"
+  nombre_es: Tolima
+  nombre_en: Tolima
+  municipios:
+  - codigo_nativo: "73001"
+    nombre: Ibagué
+  - codigo_nativo: "73024"
+    nombre: Alpujarra
+  - codigo_nativo: "73026"
+    nombre: Alvarado
+  - codigo_nativo: "73030"
+    nombre: Ambalema
+  - codigo_nativo: "73043"
+    nombre: Anzoátegui
+  - codigo_nativo: "73055"
+    nombre: Armero
+  - codigo_nativo: "73067"
+    nombre: Ataco
+  - codigo_nativo: "73124"
+    nombre: Cajamarca
+  - codigo_nativo: "73148"
+    nombre: Carmen de Apicalá
+  - codigo_nativo: "73152"
+    nombre: Casabianca
+  - codigo_nativo: "73168"
+    nombre: Chaparral
+  - codigo_nativo: "73200"
+    nombre: Coello
+  - codigo_nativo: "73217"
+    nombre: Coyaima
+  - codigo_nativo: "73226"
+    nombre: Cunday
+  - codigo_nativo: "73236"
+    nombre: Dolores
+  - codigo_nativo: "73268"
+    nombre: Espinal
+  - codigo_nativo: "73270"
+    nombre: Falan
+  - codigo_nativo: "73275"
+    nombre: Flandes
+  - codigo_nativo: "73283"
+    nombre: Fresno
+  - codigo_nativo: "73319"
+    nombre: Guamo
+  - codigo_nativo: "73347"
+    nombre: Herveo
+  - codigo_nativo: "73349"
+    nombre: Honda
+  - codigo_nativo: "73352"
+    nombre: Icononzo
+  - codigo_nativo: "73408"
+    nombre: Lérida
+  - codigo_nativo: "73411"
+    nombre: Líbano
+  - codigo_nativo: "73443"
+    nombre: San Sebastián de Mariquita
+  - codigo_nativo: "73449"
+    nombre: Melgar
+  - codigo_nativo: "73461"
+    nombre: Murillo
+  - codigo_nativo: "73483"
+    nombre: Natagaima
+  - codigo_nativo: "73504"
+    nombre: Ortega
+  - codigo_nativo: "73520"
+    nombre: Palocabildo
+  - codigo_nativo: "73547"
+    nombre: Piedras
+  - codigo_nativo: "73555"
+    nombre: Planadas
+  - codigo_nativo: "73563"
+    nombre: Prado
+  - codigo_nativo: "73585"
+    nombre: Purificación
+  - codigo_nativo: "73616"
+    nombre: Rioblanco
+  - codigo_nativo: "73622"
+    nombre: Roncesvalles
+  - codigo_nativo: "73624"
+    nombre: Rovira
+  - codigo_nativo: "73671"
+    nombre: Saldaña
+  - codigo_nativo: "73675"
+    nombre: San Antonio
+  - codigo_nativo: "73678"
+    nombre: San Luis
+  - codigo_nativo: "73686"
+    nombre: Santa Isabel
+  - codigo_nativo: "73770"
+    nombre: Suárez
+  - codigo_nativo: "73854"
+    nombre: Valle de San Juan
+  - codigo_nativo: "73861"
+    nombre: Venadillo
+  - codigo_nativo: "73870"
+    nombre: Villahermosa
+  - codigo_nativo: "73873"
+    nombre: Villarrica
+- iso_3166_2: "CO-VAC"
+  codigo_nativo: "76"
+  nombre_es: Valle del Cauca
+  nombre_en: Valle del Cauca
+  municipios:
+  - codigo_nativo: "76001"
+    nombre: Santiago de Cali
+  - codigo_nativo: "76020"
+    nombre: Alcalá
+  - codigo_nativo: "76036"
+    nombre: Andalucía
+  - codigo_nativo: "76041"
+    nombre: Ansermanuevo
+  - codigo_nativo: "76054"
+    nombre: Argelia
+  - codigo_nativo: "76100"
+    nombre: Bolívar
+  - codigo_nativo: "76109"
+    nombre: Buenaventura
+  - codigo_nativo: "76111"
+    nombre: Guadalajara de Buga
+  - codigo_nativo: "76113"
+    nombre: Bugalagrande
+  - codigo_nativo: "76122"
+    nombre: Caicedonia
+  - codigo_nativo: "76126"
+    nombre: Calima
+  - codigo_nativo: "76130"
+    nombre: Candelaria
+  - codigo_nativo: "76147"
+    nombre: Cartago
+  - codigo_nativo: "76233"
+    nombre: Dagua
+  - codigo_nativo: "76243"
+    nombre: El Águila
+  - codigo_nativo: "76246"
+    nombre: El Cairo
+  - codigo_nativo: "76248"
+    nombre: El Cerrito
+  - codigo_nativo: "76250"
+    nombre: El Dovio
+  - codigo_nativo: "76275"
+    nombre: Florida
+  - codigo_nativo: "76306"
+    nombre: Ginebra
+  - codigo_nativo: "76318"
+    nombre: Guacarí
+  - codigo_nativo: "76364"
+    nombre: Jamundí
+  - codigo_nativo: "76377"
+    nombre: La Cumbre
+  - codigo_nativo: "76400"
+    nombre: La Unión
+  - codigo_nativo: "76403"
+    nombre: La Victoria
+  - codigo_nativo: "76497"
+    nombre: Obando
+  - codigo_nativo: "76520"
+    nombre: Palmira
+  - codigo_nativo: "76563"
+    nombre: Pradera
+  - codigo_nativo: "76606"
+    nombre: Restrepo
+  - codigo_nativo: "76616"
+    nombre: Riofrío
+  - codigo_nativo: "76622"
+    nombre: Roldanillo
+  - codigo_nativo: "76670"
+    nombre: San Pedro
+  - codigo_nativo: "76736"
+    nombre: Sevilla
+  - codigo_nativo: "76823"
+    nombre: Toro
+  - codigo_nativo: "76828"
+    nombre: Trujillo
+  - codigo_nativo: "76834"
+    nombre: Tuluá
+  - codigo_nativo: "76845"
+    nombre: Ulloa
+  - codigo_nativo: "76863"
+    nombre: Versalles
+  - codigo_nativo: "76869"
+    nombre: Vijes
+  - codigo_nativo: "76890"
+    nombre: Yotoco
+  - codigo_nativo: "76892"
+    nombre: Yumbo
+  - codigo_nativo: "76895"
+    nombre: Zarzal
+- iso_3166_2: "CO-ARA"
+  codigo_nativo: "81"
+  nombre_es: Arauca
+  nombre_en: Arauca
+  municipios:
+  - codigo_nativo: "81001"
+    nombre: Arauca
+  - codigo_nativo: "81065"
+    nombre: Arauquita
+  - codigo_nativo: "81220"
+    nombre: Cravo Norte
+  - codigo_nativo: "81300"
+    nombre: Fortul
+  - codigo_nativo: "81591"
+    nombre: Puerto Rondón
+  - codigo_nativo: "81736"
+    nombre: Saravena
+  - codigo_nativo: "81794"
+    nombre: Tame
+- iso_3166_2: "CO-CAS"
+  codigo_nativo: "85"
+  nombre_es: Casanare
+  nombre_en: Casanare
+  municipios:
+  - codigo_nativo: "85001"
+    nombre: Yopal
+  - codigo_nativo: "85010"
+    nombre: Aguazul
+  - codigo_nativo: "85015"
+    nombre: Chámeza
+  - codigo_nativo: "85125"
+    nombre: Hato Corozal
+  - codigo_nativo: "85136"
+    nombre: La Salina
+  - codigo_nativo: "85139"
+    nombre: Maní
+  - codigo_nativo: "85162"
+    nombre: Monterrey
+  - codigo_nativo: "85225"
+    nombre: Nunchía
+  - codigo_nativo: "85230"
+    nombre: Orocué
+  - codigo_nativo: "85250"
+    nombre: Paz de Ariporo
+  - codigo_nativo: "85263"
+    nombre: Pore
+  - codigo_nativo: "85279"
+    nombre: Recetor
+  - codigo_nativo: "85300"
+    nombre: Sabanalarga
+  - codigo_nativo: "85315"
+    nombre: Sácama
+  - codigo_nativo: "85325"
+    nombre: San Luis de Palenque
+  - codigo_nativo: "85400"
+    nombre: Támara
+  - codigo_nativo: "85410"
+    nombre: Tauramena
+  - codigo_nativo: "85430"
+    nombre: Trinidad
+  - codigo_nativo: "85440"
+    nombre: Villanueva
+- iso_3166_2: "CO-PUT"
+  codigo_nativo: "86"
+  nombre_es: Putumayo
+  nombre_en: Putumayo
+  municipios:
+  - codigo_nativo: "86001"
+    nombre: Mocoa
+  - codigo_nativo: "86219"
+    nombre: Colón
+  - codigo_nativo: "86320"
+    nombre: Orito
+  - codigo_nativo: "86568"
+    nombre: Puerto Asís
+  - codigo_nativo: "86569"
+    nombre: Puerto Caicedo
+  - codigo_nativo: "86571"
+    nombre: Puerto Guzmán
+  - codigo_nativo: "86573"
+    nombre: Puerto Leguízamo
+  - codigo_nativo: "86749"
+    nombre: Sibundoy
+  - codigo_nativo: "86755"
+    nombre: San Francisco
+  - codigo_nativo: "86757"
+    nombre: San Miguel
+  - codigo_nativo: "86760"
+    nombre: Santiago
+  - codigo_nativo: "86865"
+    nombre: Valle del Guamuez
+  - codigo_nativo: "86885"
+    nombre: Villagarzón
+- iso_3166_2: "CO-SAP"
+  codigo_nativo: "88"
+  nombre_es: San Andrés y Providencia
+  nombre_en: San Andrés and Providencia
+  municipios:
+  - codigo_nativo: "88001"
+    nombre: San Andrés
+  - codigo_nativo: "88564"
+    nombre: Providencia
+- iso_3166_2: "CO-AMA"
+  codigo_nativo: "91"
+  nombre_es: Amazonas
+  nombre_en: Amazonas
+  municipios:
+  - codigo_nativo: "91001"
+    nombre: Leticia
+  - codigo_nativo: "91263"
+    nombre: El Encanto
+  - codigo_nativo: "91405"
+    nombre: La Chorrera
+  - codigo_nativo: "91407"
+    nombre: La Pedrera
+  - codigo_nativo: "91430"
+    nombre: La Victoria
+  - codigo_nativo: "91460"
+    nombre: Mirití - Paraná
+  - codigo_nativo: "91530"
+    nombre: Puerto Alegría
+  - codigo_nativo: "91536"
+    nombre: Puerto Arica
+  - codigo_nativo: "91540"
+    nombre: Puerto Nariño
+  - codigo_nativo: "91669"
+    nombre: Puerto Santander
+  - codigo_nativo: "91798"
+    nombre: Tarapacá
+- iso_3166_2: "CO-GUA"
+  codigo_nativo: "94"
+  nombre_es: Guainía
+  nombre_en: Guainía
+  municipios:
+  - codigo_nativo: "94001"
+    nombre: Inírida
+  - codigo_nativo: "94343"
+    nombre: Barrancominas
+  - codigo_nativo: "94883"
+    nombre: San Felipe
+  - codigo_nativo: "94884"
+    nombre: Puerto Colombia
+  - codigo_nativo: "94885"
+    nombre: La Guadalupe
+  - codigo_nativo: "94886"
+    nombre: Cacahual
+  - codigo_nativo: "94887"
+    nombre: Pana Pana
+  - codigo_nativo: "94888"
+    nombre: Morichal
+- iso_3166_2: "CO-GUV"
+  codigo_nativo: "95"
+  nombre_es: Guaviare
+  nombre_en: Guaviare
+  municipios:
+  - codigo_nativo: "95001"
+    nombre: San José del Guaviare
+  - codigo_nativo: "95015"
+    nombre: Calamar
+  - codigo_nativo: "95025"
+    nombre: El Retorno
+  - codigo_nativo: "95200"
+    nombre: Miraflores
+- iso_3166_2: "CO-VAU"
+  codigo_nativo: "97"
+  nombre_es: Vaupés
+  nombre_en: Vaupés
+  municipios:
+  - codigo_nativo: "97001"
+    nombre: Mitú
+  - codigo_nativo: "97161"
+    nombre: Carurú
+  - codigo_nativo: "97511"
+    nombre: Pacoa
+  - codigo_nativo: "97666"
+    nombre: Taraira
+  - codigo_nativo: "97777"
+    nombre: Papunahua
+  - codigo_nativo: "97889"
+    nombre: Yavaraté
+- iso_3166_2: "CO-VID"
+  codigo_nativo: "99"
+  nombre_es: Vichada
+  nombre_en: Vichada
+  municipios:
+  - codigo_nativo: "99001"
+    nombre: Puerto Carreño
+  - codigo_nativo: "99524"
+    nombre: La Primavera
+  - codigo_nativo: "99624"
+    nombre: Santa Rosalía
+  - codigo_nativo: "99773"
+    nombre: Cumaribo

@@ -1,6 +1,7 @@
 import json
 from collections.abc import Iterator
 from contextlib import contextmanager
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import Connection, Engine, text
@@ -9,7 +10,17 @@ from sqlalchemy.exc import DBAPIError
 from app.db import unidad_de_trabajo
 from app.modulos.descubrimiento.dominio.errores import ErrorPersistencia
 from app.modulos.descubrimiento.dominio.modelos import (
-    CriteriosICP, EmpresaCruda, Lead, LeadParaEnriquecer, ResultadoEnriquecimiento)
+    Borrador,
+    CriteriosICP,
+    EmpresaCruda,
+    AtribucionFuente,
+    Lead,
+    LeadParaEnriquecer,
+    LeadListado,
+    PaginaLeads,
+    ResultadoEnriquecimiento,
+    ResumenBusqueda,
+)
 from app.seguridad.cifrado import Cifrador
 
 _INSERT_LEAD = text(
@@ -35,6 +46,40 @@ _UPDATE_ENRIQUECIMIENTO = text(
     "WHERE id = :id"
 )
 
+
+# Lectura para la pantalla de leads. Departamento y ciudad de la búsqueda salen de los criterios guardados.
+_SQL_BUSQUEDAS = text("""
+    SELECT b.id, b.creado_en, b.estado, b.pais, b.criterios->>'departamento' AS departamento,
+           b.criterios->>'ciudad' AS ciudad,
+           (SELECT count(DISTINCT lf.lead_id) FROM lead_fuentes lf WHERE lf.busqueda_id = b.id) AS total_leads
+    FROM busquedas b ORDER BY b.creado_en DESC, b.id""")
+# Una sola consulta con tres alcances (una búsqueda, una fuente en todas las búsquedas, o todo): cambia solo el filtro.
+# Los filtros son constantes de este módulo, nunca texto del request; el valor viaja como parámetro.
+_FILTRO_BUSQUEDA = "lf.busqueda_id = :b"
+_FILTRO_FUENTE = "l.id IN (SELECT lead_id FROM lead_fuentes WHERE fuente = :f)"
+_FILTRO_TODOS = "TRUE"
+_DESDE = "FROM leads l JOIN lead_fuentes lf ON lf.lead_id = l.id WHERE "
+
+
+def _sql_total(filtro: str):
+    return text(f"SELECT count(DISTINCT l.id) {_DESDE}{filtro}")
+
+
+def _sql_leads(filtro: str):
+    return text(f"""
+    SELECT l.id, CASE WHEN l.tipo_titular = 'juridica' THEN l.nombre END AS nombre, l.tipo_titular, l.ciudad,
+           l.web IS NOT NULL AS tiene_web, array_agg(lf.fuente ORDER BY lf.fuente) AS fuentes,
+           array_agg(lf.licencia ORDER BY lf.fuente) AS licencias
+    {_DESDE}{filtro}
+    GROUP BY l.id ORDER BY l.creado_en, l.id LIMIT :limite OFFSET :desde""")
+
+
+def _sql_atribuciones(filtro: str):
+    return text(f"""
+    SELECT a.fuente, a.texto, a.url FROM v_atribuciones a
+    WHERE a.fuente IN (SELECT lf.fuente {_DESDE}{filtro}) ORDER BY a.orden""")
+
+
 class RepositorioLeadsPostgres:
     """Cada método abre su propia unidad de trabajo con el tenant fijado: RLS filtra todo lo que toca."""
 
@@ -50,6 +95,39 @@ class RepositorioLeadsPostgres:
                      "RETURNING id"),
                 {"t": self._tenant_id, "pais": criterios.pais, "criterios": json.dumps(dict(criterios.filtros))},
             ).scalar_one()
+
+    def crear_borrador(self, criterios: CriteriosICP, canal_preferido: str | None, tope_gasto_usd: Decimal,
+                       mensaje_base: str | None) -> UUID:
+        with self._uow() as c:
+            return c.execute(
+                text("INSERT INTO busquedas (tenant_id, pais, criterios, estado, canal_preferido, tope_gasto_usd, "
+                     "mensaje_base) VALUES (:t, :pais, CAST(:criterios AS jsonb), 'borrador', :canal, :tope, :mensaje) "
+                     "RETURNING id"),
+                {"t": self._tenant_id, "pais": criterios.pais, "criterios": json.dumps(dict(criterios.filtros)),
+                 "canal": canal_preferido, "tope": tope_gasto_usd, "mensaje": mensaje_base},
+            ).scalar_one()
+
+    def estado(self, busqueda_id: UUID) -> str | None:
+        with self._uow() as c:  # RLS: la de otro tenant no aparece
+            return c.execute(text("SELECT estado FROM busquedas WHERE id = :id"), {"id": busqueda_id}).scalar_one_or_none()
+
+    def obtener_borrador(self, busqueda_id: UUID) -> Borrador | None:
+        with self._uow() as c:
+            f = c.execute(
+                text("SELECT pais, criterios, canal_preferido, tope_gasto_usd, mensaje_base FROM busquedas "
+                     "WHERE id = :id AND estado = 'borrador'"), {"id": busqueda_id}).one_or_none()
+        if f is None:
+            return None
+        # JSON no distingue tupla de lista: las listas vuelven a ser tuplas (varios valores de un filtro).
+        filtros = {k: tuple(v) if isinstance(v, list) else v for k, v in f.criterios.items()}
+        return Borrador(id=busqueda_id, criterios=CriteriosICP(f.pais, filtros), canal_preferido=f.canal_preferido,
+                        tope_gasto_usd=Decimal(f.tope_gasto_usd), mensaje_base=f.mensaje_base)
+
+    def pasar_a_ejecutando(self, busqueda_id: UUID) -> bool:
+        with self._uow() as c:
+            return c.execute(
+                text("UPDATE busquedas SET estado = 'ejecutando' WHERE id = :id AND estado = 'borrador'"),
+                {"id": busqueda_id}).rowcount == 1
 
     @contextmanager
     def _uow(self) -> Iterator[Connection]:
@@ -159,3 +237,37 @@ class RepositorioLeadsPostgres:
                     "UPDATE cumplimiento SET solicitudes = solicitudes || jsonb_build_array(jsonb_build_object("
                     "'tipo', 'paso_a_claro', 'motivo', 'match_unico', 'fuente', 'croma_rues_co', 'ts', now())) "
                     "WHERE lead_id = :id"), {"id": lead_id})
+
+    def listar_busquedas(self) -> list[ResumenBusqueda]:
+        """Solo lectura; el tenant lo filtra la RLS (sin WHERE tenant_id a propósito: el test lo sabotea)."""
+        with self._uow() as c:
+            filas = c.execute(_SQL_BUSQUEDAS).all()
+        return [ResumenBusqueda(id=f.id, creada_en=f.creado_en, estado=f.estado, pais=f.pais, departamento=f.departamento,
+                                ciudad=f.ciudad, total_leads=f.total_leads) for f in filas]
+
+    def listar_leads(self, busqueda_id: UUID, pagina: int, tamano: int) -> PaginaLeads | None:
+        """None si la búsqueda no existe para este tenant."""
+        with self._uow() as c:
+            if c.execute(text("SELECT 1 FROM busquedas WHERE id = :id"), {"id": busqueda_id}).first() is None:
+                return None
+            return self._pagina(c, _FILTRO_BUSQUEDA, {"b": busqueda_id}, pagina, tamano)
+
+    def listar_leads_de_fuente(self, fuente: str | None, pagina: int, tamano: int) -> PaginaLeads:
+        """Leads de una fuente en todas las búsquedas del tenant; sin fuente, todos. Que la fuente exista lo valida la API."""
+        with self._uow() as c:
+            if fuente is None:
+                return self._pagina(c, _FILTRO_TODOS, {}, pagina, tamano)
+            return self._pagina(c, _FILTRO_FUENTE, {"f": fuente}, pagina, tamano)
+
+    @staticmethod
+    def _pagina(c: Connection, filtro: str, params: dict, pagina: int, tamano: int) -> PaginaLeads:
+        """Nunca lee las columnas cifradas ni descifra: el nombre sale solo de una jurídica (el CASE lo repite aunque el
+        CHECK ya lo garantice), y no hay dirección ni contacto. El tenant lo filtra la RLS."""
+        total = c.execute(_sql_total(filtro), params).scalar_one()
+        filas = c.execute(_sql_leads(filtro), {**params, "limite": tamano, "desde": (pagina - 1) * tamano}).all()
+        atribuciones = c.execute(_sql_atribuciones(filtro), params).all()
+        items = tuple(LeadListado(
+            id=f.id, nombre=f.nombre, tipo_titular=f.tipo_titular, fuentes=tuple(f.fuentes), licencias=tuple(f.licencias),
+            ciudad=f.ciudad, tiene_web=f.tiene_web) for f in filas)
+        return PaginaLeads(items=items, total=total, pagina=pagina, tamano=tamano, atribuciones=tuple(
+            AtribucionFuente(a.fuente, a.texto, a.url) for a in atribuciones))

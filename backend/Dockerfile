@@ -13,6 +13,8 @@ WORKDIR /app
 RUN pip uninstall -y pip && useradd --system --no-create-home app
 COPY --from=builder /app/.venv /app/.venv
 COPY app/ ./app/
+# El lifespan lee actividades, fuentes, tarifas, cámaras y geografía de /app/config.
+COPY config/ ./config/
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
 USER app
 # slim no trae curl.

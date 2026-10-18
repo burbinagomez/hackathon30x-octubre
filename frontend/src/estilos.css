@@ -12,9 +12,9 @@ select,
 textarea {
   min-height: 44px;
   font: inherit;
-  color: var(--color-oscuro);
-  background: var(--color-fondo);
-  border: 1px solid var(--color-gris);
+  color: var(--color-texto);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
   border-radius: 8px;
   padding: 8px 12px;
   max-width: 100%;
@@ -44,12 +44,12 @@ a {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  color: var(--color-oscuro);
+  color: var(--color-acento-texto);
   text-underline-offset: 3px;
 }
 
 :focus-visible {
-  outline: 3px solid var(--color-oscuro);
+  outline: 3px solid var(--color-foco);
   outline-offset: 2px;
 }
 
@@ -102,8 +102,8 @@ h2 {
 .tarjeta,
 .resultado,
 .metrica {
-  background: var(--color-fondo);
-  border: 1px solid var(--color-gris);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
   border-radius: 12px;
   padding: 16px;
 }
@@ -149,19 +149,20 @@ h2 {
 /* Lima solo de fondo, con el oscuro encima. */
 .boton-primario {
   background: var(--color-acento);
+  color: var(--color-sobre-acento);
   border-color: var(--color-oscuro);
 }
 
 .error {
   margin: 0;
   padding: 12px;
-  border: 1px solid var(--color-oscuro);
+  border: 1px solid var(--color-texto);
   border-left-width: 6px;
   border-radius: 8px;
 }
 
 .nota {
-  color: var(--color-oscuro);
+  color: var(--color-texto);
   font-size: 0.875rem;
 }
 
@@ -178,7 +179,7 @@ h2 {
 /* Tablero */
 .tabla-scroll {
   overflow-x: auto;
-  border: 1px solid var(--color-gris);
+  border: 1px solid var(--color-borde);
   border-radius: 12px;
 }
 
@@ -193,7 +194,7 @@ th,
 td {
   padding: 10px 12px;
   text-align: right;
-  border-bottom: 1px solid var(--color-gris);
+  border-bottom: 1px solid var(--color-borde);
 }
 
 th:first-child,
@@ -202,14 +203,16 @@ td:first-child {
 }
 
 thead th {
-  background: var(--color-oscuro);
-  color: var(--color-fondo);
+  background: var(--color-cabecera-fondo);
+  color: var(--color-cabecera-texto);
+  border-bottom: 2px solid var(--color-acento);
   font-weight: 500;
 }
 
 tr.total td {
   font-weight: 700;
   background: var(--color-acento);
+  color: var(--color-sobre-acento);
 }
 
 .metricas {
@@ -232,7 +235,115 @@ footer p {
   margin: 0;
 }
 
+.etiqueta-licencia {
+  font-weight: 500;
+}
+
+/* El enlace de la tabla ocupa la celda para que el objetivo táctil sea de 44 px. */
+table a {
+  min-height: 44px;
+}
+
+/* Lista de leads: tarjetas en móvil, tabla desde 48rem. */
+.lista-busquedas {
+  list-style: none;
+  margin: 16px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.lista-busquedas a {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-borde);
+  border-radius: 12px;
+}
+
+.paginacion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+table.tabla-leads {
+  min-width: 0;
+}
+
+.tabla-leads thead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.tabla-leads,
+.tabla-leads tbody,
+.tabla-leads tr,
+.tabla-leads td {
+  display: block;
+}
+
+.tabla-leads tr {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-borde);
+}
+
+.tabla-leads td {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 0;
+  padding: 4px 12px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.tabla-leads td::before {
+  content: attr(data-etiqueta);
+  font-weight: 500;
+  text-align: left;
+}
+
 @media (min-width: 48rem) {
+  table.tabla-leads {
+    min-width: 40rem;
+  }
+
+  .tabla-leads thead {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+  }
+
+  .tabla-leads {
+    display: table;
+  }
+
+  .tabla-leads tbody {
+    display: table-row-group;
+  }
+
+  .tabla-leads tr {
+    display: table-row;
+    padding: 0;
+  }
+
+  .tabla-leads td {
+    display: table-cell;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--color-borde);
+  }
+
+  .tabla-leads td::before {
+    content: none;
+  }
+
   .pantalla {
     padding: 32px;
   }

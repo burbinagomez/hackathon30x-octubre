@@ -1,5 +1,6 @@
 import re
 import time
+from dataclasses import replace
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -86,7 +87,9 @@ class DatosGovCoRues:
         self._camaras = camaras
         self._tarifas = tarifas
         self._lote_id = lote_id
-        self.meta = meta
+        # Peor caso de una búsqueda: 2 requests (filas y conteo de naturales) x 2 intentos x 30 s de cómputo.
+        self.meta = replace(meta, costo_maximo_llamada=2 * INTENTOS * Decimal(str(TIMEOUT_SEG))
+                            * Decimal(str(tarifas["computo_seg_usd"])))
         self._url = url
         self._app_token = app_token
 

@@ -1,6 +1,7 @@
 import json
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
 
@@ -80,6 +81,10 @@ def _buscar(rt, tenant, ruta_yaml, cifrador):
                     costos=costos, cache=None, camaras=cargar_camaras(CONFIG / "camaras_co.yaml"),
                     tarifas={"computo_seg_usd": 0.0000070}, lote_id=lote_id, meta=meta,
                 )
+            if meta.proveedor == "croma":  # con el YAML real también corre Croma: otra firma, sin red real
+                return clase(meta=meta, registro_costos=costos, transporte=transporte, costo_unitario=Decimal("0.00099"),
+                             lote_id=lote_id, api_key="clave-de-prueba",
+                             limites={"croma_requests_por_24h": 100, "croma_creditos_gratis_mes": 1500})
             return clase(meta=meta, registro_costos=costos, transporte=transporte, costo_unitario=0,
                          lote_id=lote_id, repo_url="https://example.invalid/repo")
         return armar

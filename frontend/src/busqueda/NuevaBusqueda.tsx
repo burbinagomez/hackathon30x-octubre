@@ -1,19 +1,18 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { navegar } from "../compartido/navegar";
-import { ejecutar, listarActividades, vistaPrevia } from "./api";
+import { divisionesDe, ejecutar, listarActividades, listarPaises, vistaPrevia } from "./api";
 import ResultadoVistaPrevia from "./ResultadoVistaPrevia";
-import type { Actividad, PedidoVistaPrevia, VistaPrevia } from "./tipos";
+import type { Actividad, Division, PedidoVistaPrevia, VistaPrevia } from "./tipos";
 
-const PAISES = ["CO", "MX", "BR", "PE"];
 const CANALES = ["email"];
 
 type Formulario = Record<
-  "pais" | "ciiu" | "departamento" | "ingresosMin" | "palabrasClave" | "exclusiones" | "canal" | "tope" | "mensaje",
+  "pais" | "ciiu" | "departamento" | "ciudad" | "ingresosMin" | "palabrasClave" | "exclusiones" | "canal" | "tope" | "mensaje",
   string
 >;
 const INICIAL: Formulario = {
-  pais: "CO", ciiu: "", departamento: "", ingresosMin: "", palabrasClave: "",
+  pais: "CO", ciiu: "", departamento: "", ciudad: "", ingresosMin: "", palabrasClave: "",
   exclusiones: "", canal: "email", tope: "", mensaje: "",
 };
 
@@ -23,7 +22,9 @@ function aPedido(f: Formulario): PedidoVistaPrevia {
   return {
     pais: f.pais,
     ciiu: f.ciiu,
+    // Códigos, no nombres. La ciudad solo viaja dentro de una división (el select de división lo garantiza).
     departamento: f.departamento || undefined,
+    ciudad: f.departamento && f.ciudad.trim() ? f.ciudad.trim() : undefined,
     ingresos_min: f.ingresosMin ? Number(f.ingresosMin) : undefined,
     palabras_clave: lista(f.palabrasClave),
     exclusiones: lista(f.exclusiones),
@@ -47,15 +48,31 @@ export default function NuevaBusqueda() {
   const [form, setForm] = useState<Formulario>(INICIAL);
   const [vista, setVista] = useState<VistaPrevia | null>(null);
   const [actividades, setActividades] = useState<Actividad[]>([]);
+  const [paises, setPaises] = useState<string[]>([]);
+  const [divisiones, setDivisiones] = useState<Division[]>([]);
   const [fallo, setFallo] = useState(false);
 
   useEffect(() => {
     listarActividades().then(setActividades).catch(() => undefined);
+    // Solo se ofrecen los países que tienen archivo de geografía.
+    listarPaises().then((r) => setPaises(r.paises)).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    let vigente = true;
+    setDivisiones([]);
+    divisionesDe(form.pais).then((r) => vigente && setDivisiones(r.divisiones)).catch(() => undefined);
+    return () => {
+      vigente = false;
+    };
+  }, [form.pais]);
 
   // Cualquier cambio invalida la vista previa: el borrador congeló otros criterios.
   function cambiar(campo: keyof Formulario, valor: string) {
-    setForm((f) => ({ ...f, [campo]: valor }));
+    // Cascada país -> división -> ciudad: cambiar un nivel suelta lo de abajo (sus códigos no valen en otro).
+    const sueltan: Partial<Formulario> =
+      campo === "pais" ? { departamento: "", ciudad: "" } : campo === "departamento" ? { ciudad: "" } : {};
+    setForm((f) => ({ ...f, [campo]: valor, ...sueltan }));
     setVista(null);
   }
 
@@ -74,13 +91,14 @@ export default function NuevaBusqueda() {
     </Campo>
   );
   // Fuera del JSX: la regla de literales mira los argumentos de una llamada dentro de él.
-  const departamento = entrada("departamento", t("busqueda.departamento"));
+  const division = divisiones.find((d) => d.codigo_nativo === form.departamento);
+  const etiquetaDivision = t(`geografia.division.${form.pais}`, { defaultValue: t("busqueda.departamento") });
   const ingresosMin = entrada("ingresosMin", t("busqueda.ingresos_min"), "number");
   const palabrasClave = entrada("palabrasClave", t("busqueda.palabras_clave"));
   const exclusiones = entrada("exclusiones", t("busqueda.exclusiones"));
   const tope = entrada("tope", t("busqueda.tope"), "number");
   const nombre = (a: Actividad) => (i18n.language === "en" ? a.nombre_en ?? a.nombre_es : a.nombre_es);
-  const puedeBuscar = vista !== null && vista.dentro_del_tope && vista.fuentes.length > 0;
+  const puedeBuscar = vista !== null && vista.dentro_del_tope !== false && vista.fuentes.length > 0;
 
   return (
     <main className="pantalla">
@@ -88,7 +106,7 @@ export default function NuevaBusqueda() {
       <div className="formulario formulario-ancho">
       <Campo id="pais" etiqueta={t("busqueda.pais")}>
         <select id="pais" value={form.pais} onChange={(e) => cambiar("pais", e.target.value)}>
-          {PAISES.map((p) => <option key={p} value={p}>{t(`paises.${p}`)}</option>)}
+          {paises.map((p) => <option key={p} value={p}>{t(`paises.${p}`)}</option>)}
         </select>
       </Campo>
       <Campo id="ciiu" etiqueta={t("busqueda.actividad")}>
@@ -97,7 +115,30 @@ export default function NuevaBusqueda() {
           {actividades.map((a) => <option key={a.codigo} value={a.codigo}>{nombre(a)}</option>)}
         </select>
       </Campo>
-      {departamento}
+      {divisiones.length > 0 && (
+        <Campo id="departamento" etiqueta={etiquetaDivision}>
+          <select id="departamento" value={form.departamento} onChange={(e) => cambiar("departamento", e.target.value)}>
+            <option value="">{t("busqueda.departamento_vacio")}</option>
+            {divisiones.map((d) => (
+              <option key={d.codigo_nativo} value={d.codigo_nativo}>{i18n.language === "en" ? d.nombre_en : d.nombre_es}</option>
+            ))}
+          </select>
+        </Campo>
+      )}
+      <Campo id="ciudad" etiqueta={t("busqueda.ciudad")}>
+        <input
+          id="ciudad"
+          type="text"
+          list="ciudades"
+          autoComplete="off"
+          disabled={!division || division.municipios.length === 0}
+          value={form.ciudad}
+          onChange={(e) => cambiar("ciudad", e.target.value)}
+        />
+        <datalist id="ciudades">
+          {(division?.municipios ?? []).map((m) => <option key={m.codigo_nativo} value={m.nombre} />)}
+        </datalist>
+      </Campo>
       {ingresosMin}
       {palabrasClave}
       {exclusiones}

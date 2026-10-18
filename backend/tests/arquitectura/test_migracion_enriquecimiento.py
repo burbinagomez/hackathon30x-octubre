@@ -1,9 +1,10 @@
-"""La 0007 es el DDL que Daniel aprobó (2026-10-18) en el plan de la 006: el archivo no difiere ni en un comentario."""
+"""La migración de enriquecimiento es el DDL que Daniel aprobó (2026-10-18) en el plan de la 006: el archivo no difiere ni en un comentario."""
 import re
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[3]
-ARCHIVO = RAIZ / "supabase" / "migrations" / "0007_enriquecimiento.sql"
+# Por patrón y no por número: al mergear main la migración se renumera al siguiente libre.
+MIGRACIONES = sorted((RAIZ / "supabase" / "migrations").glob("*_enriquecimiento.sql"))
 
 
 def _bloque_aprobado() -> str:
@@ -12,11 +13,11 @@ def _bloque_aprobado() -> str:
     return re.search(r"```sql\n(.*?)```", seccion, re.S).group(1)
 
 
-def test_la_0007_es_el_ddl_aprobado_de_plan_md():
+def test_la_migracion_es_el_ddl_aprobado_de_plan_md():
     bloque = _bloque_aprobado()
     assert "CHECK (email_canal IN ('sitio_web','osm_contacto'))" in bloque  # el aprobado, no la propuesta
-    assert ARCHIVO.exists()
-    assert ARCHIVO.read_text(encoding="utf-8") == bloque
+    assert len(MIGRACIONES) == 1, MIGRACIONES
+    assert MIGRACIONES[0].read_text(encoding="utf-8") == bloque
 
 
 def test_cada_vista_repite_security_invoker_y_no_toca_costos():

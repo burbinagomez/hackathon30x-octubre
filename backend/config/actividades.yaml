@@ -1,11 +1,90 @@
 # CIIU Rev. 4 A.C. (DANE) → equivalentes por sistema. Una fuente que filtra
 # por tipo_negocio sin mapeo para el CIIU del ICP se ignora y se reporta.
+# nombre_es: CIIU Rev. 4 A.C. (DANE). nombre_en: ISIC Rev. 4 (ONU); puede faltar y entonces la UI cae a nombre_es.
 "4711":
-  descripcion: "Comercio al por menor en establecimientos no especializados, surtido principalmente de alimentos"
+  nombre_es: "Comercio al por menor en establecimientos no especializados, con surtido compuesto principalmente de alimentos, bebidas o tabaco"
+  nombre_en: "Retail sale in non-specialized stores with food, beverages or tobacco predominating"
   osm: ["shop=supermarket", "shop=convenience"]
 "5611":
-  descripcion: "Expendio a la mesa de comidas preparadas"
+  nombre_es: "Expendio a la mesa de comidas preparadas"
+  nombre_en: "Restaurants and mobile food service activities"
   osm: ["amenity=restaurant"]
 "4752":
-  descripcion: "Comercio al por menor de artículos de ferretería, pinturas y vidrios"
+  nombre_es: "Comercio al por menor de artículos de ferretería, pinturas y productos de vidrio en establecimientos especializados"
+  nombre_en: "Retail sale of hardware, paints and glass in specialized stores"
   osm: ["shop=hardware"]
+
+# Ampliación (slice 005-mas-actividades). Sin `osm` = sin etiqueta OSM clara: OSM se ignora y se reporta para ese CIIU.
+"4771":
+  nombre_es: "Comercio al por menor de prendas de vestir y sus accesorios (incluye artículos de piel) en establecimientos especializados"
+  nombre_en: "Retail sale of clothing, footwear and leather articles in specialized stores"
+  osm: ["shop=clothes"]
+"4773":
+  nombre_es: "Comercio al por menor de productos farmacéuticos y medicinales, cosméticos y artículos de tocador en establecimientos especializados"
+  nombre_en: "Retail sale of pharmaceutical and medical goods, cosmetic and toilet articles in specialized stores"
+  osm: ["amenity=pharmacy"]
+"4774":
+  nombre_es: "Comercio al por menor de otros productos nuevos en establecimientos especializados"
+  nombre_en: "Other retail sale of new goods in specialized stores"
+  osm: ["shop=florist", "shop=optician"]
+"1081":
+  nombre_es: "Elaboración de productos de panadería"
+  nombre_en: "Manufacture of bakery products"
+  osm: ["shop=bakery"]
+"9602":
+  nombre_es: "Peluquería y otros tratamientos de belleza"
+  nombre_en: "Hairdressing and other beauty treatment"
+  osm: ["shop=hairdresser"]
+"4520":
+  nombre_es: "Mantenimiento y reparación de vehículos automotores"
+  nombre_en: "Maintenance and repair of motor vehicles"
+  osm: ["shop=car_repair"]
+"4530":
+  nombre_es: "Comercio de partes, piezas (autopartes) y accesorios (lujos) para vehículos automotores"
+  nombre_en: "Sale of motor vehicle parts and accessories"
+  osm: ["shop=car_parts"]
+"7500":
+  nombre_es: "Actividades veterinarias"
+  nombre_en: "Veterinary activities"
+  osm: ["amenity=veterinary"]
+"5511":
+  nombre_es: "Alojamiento en hoteles"
+  nombre_en: "Short term accommodation activities"
+  osm: ["tourism=hotel"]
+"8622":
+  nombre_es: "Actividades de la práctica odontológica"
+  nombre_en: "Medical and dental practice activities"
+  osm: ["amenity=dentist"]
+"9311":
+  nombre_es: "Gestión de instalaciones deportivas"
+  nombre_en: "Operation of sports facilities"
+  osm: ["leisure=fitness_centre"]
+"4111":
+  nombre_es: "Construcción de edificios residenciales"
+  nombre_en: "Construction of buildings"
+"4923":
+  nombre_es: "Transporte de carga por carretera"
+  nombre_en: "Freight transport by road"
+"6920":
+  nombre_es: "Actividades de contabilidad, teneduría de libros, auditoría financiera y asesoría tributaria"
+  nombre_en: "Accounting, bookkeeping and auditing activities; tax consultancy"
+  osm: ["office=accountant"]
+"6201":
+  nombre_es: "Actividades de desarrollo de sistemas informáticos (planificación, análisis, diseño, programación, pruebas)"
+  nombre_en: "Computer programming activities"
+  osm: ["office=it"]
+"7310":
+  nombre_es: "Publicidad"
+  nombre_en: "Advertising"
+  osm: ["office=advertising_agency"]
+"4631":
+  nombre_es: "Comercio al por mayor de productos alimenticios"
+  nombre_en: "Wholesale of food, beverages and tobacco"
+"4663":
+  nombre_es: "Comercio al por mayor de materiales de construcción, artículos de ferretería, pinturas, productos de vidrio, equipo y materiales de fontanería y calefacción"
+  nombre_en: "Wholesale of construction materials, hardware, plumbing and heating equipment and supplies"
+  osm: ["shop=doityourself"]
+"3110":
+  nombre_es: "Fabricación de muebles"
+  nombre_en: "Manufacture of furniture"
+  osm: ["shop=furniture", "craft=carpenter"]

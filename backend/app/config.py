@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     cifrado_key: SecretStr
     # SecretStr: no sale en repr ni en logs. Solo la CLI de búsqueda la usa.
     croma_api_key: SecretStr | None = None
+    # Croma: None = la constante del adaptador. Para apuntar a un stub en local (nunca a otra cuenta).
+    croma_base_url: str | None = None
     # Credencial de jev (TypeSafe). Solo la usa JevClasificador.
     typesafe_api_key: SecretStr | None = None
     # Endpoint de jev: sin documentar (P8). Sin URL o sin key no se clasifica y encaje queda NULL.
