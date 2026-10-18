@@ -15,6 +15,7 @@ Fixture calculada a mano, tenant A (usa `tenants` + `TABLAS_DE_TENANT` del conft
 - 1 `dapta_llamada` (fuente NULL): 0.999 (3 min * 0.333). Va a la fila `sin_atribuir` (0 calificados, CPQL NULL),
   como en el tablero: el costo que no cruza con una fuente no desaparece del CPQL.
 - 1 costo `evals` (0.70): no entra en ninguna fila, como en el tablero.
+- lead2 también encontrado por `sitio_web`, sin costos de esa fuente -> 1 calificado, costo NULL -> CPQL NULL.
 
 TOTAL: costo_lista = 0.50+0.35+0.50+0.999 = 2.349; costo_real = 0.40+0.30+0.50+0.999 = 2.199; calificados = 2
 (lead1 y lead2, una vez cada uno aunque lead1 esté en 2 fuentes y osm solo tenga 2 calificados propios).
@@ -65,6 +66,7 @@ def fixture_cpql(admin, tenants):
         c.execute(_INSERT_LEAD_FUENTE, {"t": tenant, "l": lead1, "b": busqueda, "f": DATOS_GOV})
         c.execute(_INSERT_LEAD_FUENTE, {"t": tenant, "l": lead2, "b": busqueda, "f": OSM})
         c.execute(_INSERT_LEAD_FUENTE, {"t": tenant, "l": lead3, "b": busqueda, "f": OSM})
+        c.execute(_INSERT_LEAD_FUENTE, {"t": tenant, "l": lead2, "b": busqueda, "f": "sitio_web"})
 
         c.execute(_INSERT_COSTO, {"t": tenant, "tipo": "overpass_query", "u": 1, "cu": "0.10", "p": "osm",
                                   "f": OSM, "g": True})
@@ -145,3 +147,10 @@ def test_la_suma_de_las_filas_es_el_libro_de_costos(rt, fixture_cpql):
 
     assert sum(f.costo_lista for f in filas if f.costo_lista is not None) == libro.lista == cpql["TOTAL"].costo_lista
     assert sum(f.costo_real for f in filas if f.costo_real is not None) == libro.real == cpql["TOTAL"].costo_real
+
+
+def test_calificados_sin_costo_de_la_fuente_cpql_es_null(rt, fixture_cpql):
+    web = _cpql(rt, fixture_cpql)["sitio_web"]
+
+    assert web.calificados == 1
+    assert web.costo_lista is None and web.cpql_lista is None and web.cpql_real is None  # sin dato, no 0

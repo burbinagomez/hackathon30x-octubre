@@ -52,11 +52,11 @@ La 008 mínima entrega:
 4. En una sola transacción:
    - INSERT en `calificaciones`;
    - si entró, INSERT `dapta_llamada` con `unidades = minutos`, `costo_unitario = tarifa`, `lead_id`, `fuente = NULL`, `canal = NULL`, `ts = fecha`.
-5. Si el lead ya estaba: con el mismo `calificado` es `duplicada` (no-op); con otro es `conflicto`, que no cambia nada.
+5. Si el lead ya estaba: con el mismo (`calificado`, `minutos`) es `duplicada` (no-op); con otro es `conflicto`, que no cambia nada.
 
 **Tarifa.** `dapta.usd_por_minuto: 0.333` (docs.dapta.ai, "Billing and credits": 1.000 créditos = US$1; aprobado por Daniel, 2026-10-18) — minuto **contestado**, redondeado hacia arriba al minuto entero: `costo = ceil(minutos) * Decimal("0.333")`. Si la tarifa falta (`null`) → **`TarifaPendiente`**: el import no escribe nada. Ver P1.
 
-El CSV del mínimo (`lead_id, calificado, fecha, minutos`) no distingue el resultado de la llamada: buzón de voz (0.075 USD por llamada) y no contestada (0.045 USD por llamada) son tarifas reales de Dapta pero no se implementan ahora porque no hay columna que las identifique. Quedan pendientes para cuando el CSV traiga esa columna (spec completa, fuera del mínimo — ver "Fuera del mínimo").
+El CSV del mínimo (`lead_id, calificado, fecha, minutos`) no distingue el resultado de la llamada: buzón de voz (0.075 USD por llamada) y no contestada (0.045 USD por llamada) son tarifas reales de Dapta pero no se implementan ahora porque no hay columna que las identifique. Quedan pendientes para cuando el CSV traiga esa columna (spec completa, fuera del mínimo — ver "Fuera del mínimo"). Mientras tanto, `sin_atribuir` y `TOTAL` **subestiman** el costo de Dapta: no cuentan buzones ni no contestadas.
 
 **CPQL** (`v_cpql`), por fuente `f`:
 - `costo_lista` = Σ `unidades × costo_unitario` de `costos` con `fuente = f` (incluye `gratis`);

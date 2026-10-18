@@ -221,3 +221,9 @@ def test_contacto_no_queda_en_claro_en_columnas_no_catalogadas(rt, admin, tenant
     assert len(filas) == len([e for e in FIXTURE["elements"] if e["tags"].get("name")])
     assert {(nombre, direccion) for nombre, direccion, *_ in filas} == {(None, None)}
     assert [f for f in filas if any(n in str(f) for n in _sensibles_de_la_fixture())] == []
+
+
+def test_el_repo_de_calificaciones_no_lee_nombre_ni_direccion():
+    """Está en PERMITIDOS porque toca `leads`, pero solo para filtrar juridica + cumplimiento: nunca el contacto."""
+    sql = CALIFICACIONES.read_text()
+    assert "nombre" not in sql and "direccion" not in sql
