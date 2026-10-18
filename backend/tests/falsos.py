@@ -1,14 +1,17 @@
 """Falsos en memoria de los puertos. Mismo contrato que Postgres: dedup por (pais, id_fiscal), ON CONFLICT en lead_fuentes."""
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from decimal import Decimal
 from uuid import UUID, uuid4
 
 from app.modulos.costos.dominio.modelos import OperacionCosto
+from app.modulos.descubrimiento.dominio.errores import ErrorPersistencia
 from app.modulos.descubrimiento.dominio.modelos import Borrador, CriteriosICP, EmpresaCruda, MetaFuente, PaginaEmpresas
 
 
 class RepositorioLeadsFalso:
-    def __init__(self):
+    def __init__(self, falla_si=None):
+        self._falla_si = falla_si  # empresa -> bool: si es True, guardarla lanza ErrorPersistencia (la base la rechazó)
         self.busquedas: dict[UUID, str] = {}  # id -> estado
         self.leads: dict[tuple[str, str | None], UUID] = {}  # (pais, id_fiscal) -> id
         self.cumplimiento: dict[UUID, tuple] = {}  # lead_id -> (fuente, licencia, url_origen, as_of)
@@ -44,7 +47,23 @@ class RepositorioLeadsFalso:
         self.busquedas[busqueda_id] = "ejecutando"
         return True
 
+    @contextmanager
+    def transaccion(self) -> Iterator[None]:
+        yield
+
+    @contextmanager
+    def savepoint(self) -> Iterator[None]:
+        """Como el de Postgres: si lo de adentro lanza, se deshace todo lo que se escribió ahí y la excepción sigue."""
+        antes = (dict(self.leads), dict(self.cumplimiento), set(self.lead_fuentes), dict(self.licencia_lead_fuente))
+        try:
+            yield
+        except BaseException:
+            self.leads, self.cumplimiento, self.lead_fuentes, self.licencia_lead_fuente = antes
+            raise
+
     def obtener_o_crear_lead(self, e: EmpresaCruda, licencia: str) -> tuple[UUID, bool]:
+        if self._falla_si is not None and self._falla_si(e):
+            raise ErrorPersistencia("la base rechazó la operación")
         clave = (e.pais, e.id_fiscal)
         if e.id_fiscal is not None and clave in self.leads:
             return self.leads[clave], False

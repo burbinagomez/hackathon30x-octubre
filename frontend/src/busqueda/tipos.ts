@@ -47,3 +47,15 @@ export type VistaPrevia = {
   requests_restantes_24h: number | null;
   dentro_del_tope: boolean | null;
 };
+
+/** Estados por fuente de POST /busquedas/{id}/ejecutar (spec 015). Códigos; el texto lo pone el front. */
+export type EstadoFuente =
+  | "con_resultados"
+  | "sin_resultados"
+  | "no_disponible"
+  | "no_soporta_criterio"
+  | "limite_agotado"
+  | "omitida_por_tope";
+export type ResultadoFuente = { estado: string; encontrados: number }; // `string`: un estado nuevo del back no rompe el front
+export type PorFuente = Record<string, ResultadoFuente>;
+export type ResultadoEjecucion = { busqueda_id: string; estado: string; por_fuente: PorFuente };
