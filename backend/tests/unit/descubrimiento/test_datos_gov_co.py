@@ -34,6 +34,7 @@ WHERE_FILAS = (
     " AND cod_ciiu_act_econ_pri = '4711'"
     " AND codigo_camara in('04')"
     " AND nit IS NOT NULL"
+    " AND upper(razon_social) not like '%LIQUIDACI%'"  # QA 2026-10-18: activas pero en liquidación no son leads
 )
 CUERPO_SECRETO = "CUERPO-SECRETO"
 COLUMNAS_DE_PERSONAS = (

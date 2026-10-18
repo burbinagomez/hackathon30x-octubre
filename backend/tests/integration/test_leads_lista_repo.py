@@ -225,3 +225,14 @@ def test_fuente_sin_leads_es_pagina_vacia(mundo):
     p = mundo["repo"].listar_leads_de_fuente("croma_siem_mx", 1, 25)
 
     assert (p.total, p.items, p.atribuciones) == (0, (), ())
+
+
+def test_la_misma_fuente_en_dos_busquedas_sale_una_vez(mundo):
+    # QA 2026-10-18: "RUES (datos.gov.co), RUES (datos.gov.co)" cuando el lead vino en dos búsquedas.
+    r = mundo["repo"]
+    e = _empresa("Beta SAS", CS, "900000003")
+    r.agregar_lead_fuente(mundo["j2"], mundo["b2"], e, "lic-" + CS)
+
+    j2 = _por_id(r.listar_leads_de_fuente(CS, 1, 25))[mundo["j2"]]
+
+    assert (j2.fuentes, j2.licencias) == ((CS,), ("lic-" + CS,))

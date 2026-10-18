@@ -156,6 +156,8 @@ class DatosGovCoRues:
             f" AND cod_ciiu_act_econ_pri = '{ciiu}'"
             f" AND codigo_camara in({enlista})"
             " AND nit IS NOT NULL"
+            # Activas pero "EN LIQUIDACION": la matrícula sigue, el negocio no. No son leads.
+            " AND upper(razon_social) not like '%LIQUIDACI%'"
         )
         respuesta = self._pedir(
             {"$select": SELECT_FILAS, "$where": where, "$limit": str(self._limite_filas)}

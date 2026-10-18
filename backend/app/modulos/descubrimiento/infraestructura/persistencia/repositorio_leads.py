@@ -86,6 +86,11 @@ def _sql_leads(filtro: str):
     GROUP BY l.id ORDER BY l.creado_en, l.id LIMIT :limite OFFSET :desde""")
 
 
+def _unicas(fuentes, licencias) -> dict[str, str]:
+    """Una entrada por fuente (un lead pudo venir de la misma fuente en varias búsquedas), alineada con su licencia."""
+    return dict(zip(fuentes, licencias))
+
+
 def _sql_atribuciones(filtro: str):
     return text(f"""
     SELECT a.fuente, a.texto, a.url FROM v_atribuciones a
@@ -325,7 +330,8 @@ class RepositorioLeadsPostgres:
         filas = c.execute(_sql_leads(filtro), {**params, "limite": tamano, "desde": (pagina - 1) * tamano}).all()
         atribuciones = c.execute(_sql_atribuciones(filtro), params).all()
         items = tuple(LeadListado(
-            id=f.id, nombre=f.nombre, tipo_titular=f.tipo_titular, fuentes=tuple(f.fuentes), licencias=tuple(f.licencias),
+            id=f.id, nombre=f.nombre, tipo_titular=f.tipo_titular, fuentes=tuple(_unicas(f.fuentes, f.licencias)),
+            licencias=tuple(_unicas(f.fuentes, f.licencias).values()),
             ciudad=f.ciudad, tiene_web=f.tiene_web,
             tiene_telefono=f.tiene_telefono, tiene_email=f.tiene_email) for f in filas)
         return PaginaLeads(items=items, total=total, pagina=pagina, tamano=tamano, atribuciones=tuple(
