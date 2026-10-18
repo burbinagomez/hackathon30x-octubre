@@ -9,5 +9,7 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}", "tests/**/*.test.{ts,tsx}"],
     // e2e/ es de Playwright.
     exclude: ["e2e/**", "node_modules/**"],
+    // Sin esto, vitest vacía todo CSS y un `?raw` de tokens.css llega como "".
+    css: { include: [/\?raw/] },
   },
 });

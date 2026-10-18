@@ -24,7 +24,7 @@ def _meta(paises):
     ({"CO"}, CriteriosICP("CO", {"ciiu": "4711"}), True),
     ({"CO"}, CriteriosICP("MX", {"ciiu": "4711"}), False),
     ({"*"}, CriteriosICP("BR", {"departamento": "11"}), True),
-    ({"CO"}, CriteriosICP("CO", {"ciiu": "4711", "partida_arancelaria": "0901"}), False),
-], ids=["pais", "otro_pais", "comodin", "filtro_fuera"])
+    ({"CO"}, CriteriosICP("CO", {"ciiu": "4711", "partida_arancelaria": "0901"}), True),
+], ids=["pais", "otro_pais", "comodin", "filtro_fuera_no_importa"])
 def test_cubre(paises, criterios, esperado):
     assert cubre(_meta(paises), criterios) is esperado
