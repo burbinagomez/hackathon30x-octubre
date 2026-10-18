@@ -74,6 +74,7 @@ class LeadParaEnriquecer:
     pais: str  # el verificador de titular solo cubre CO
     telefono: Contacto | None = None
     email: Contacto | None = None
+    id_fiscal: str | None = None  # NIT sin dígito de verificación; el buscador de sitio web lo usa para verificar
 
 
 @dataclass(frozen=True)
@@ -102,6 +103,8 @@ class ResultadoEnriquecimiento:
     razon_no_contactable: str | None
     encaje: str | None = None  # None = sin clasificar
     constancia_titular: ConstanciaTitular | None = None  # None = no se verificó (el titular ya venía del registro)
+    web: str | None = None  # dominio hallado por el buscador de sitio web; None = el lead conserva la que tenía
+    evidencia_web: "EvidenciaSitioWeb | None" = None  # su evidencia, para `cumplimiento`
 
 
 @dataclass(frozen=True)
@@ -170,3 +173,12 @@ class MetaFuente:  # sale de la entrada de fuentes.yaml, no de la clase
 
 def cubre(meta: MetaFuente, criterios: CriteriosICP) -> bool:
     return criterios.pais in meta.paises or "*" in meta.paises
+
+
+@dataclass(frozen=True)
+class EvidenciaSitioWeb:
+    """Por qué se aceptó el sitio de un lead (006, buscador de sitio web): dónde se verificó y con qué.
+    Es la evidencia para `cumplimiento.solicitudes`: url de la empresa y motivo (`nit` | `razon_social`), nunca contacto."""
+    dominio: str
+    url: str
+    motivo: str

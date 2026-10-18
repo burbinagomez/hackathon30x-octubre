@@ -4,7 +4,7 @@ from typing import Literal, Protocol, runtime_checkable
 from uuid import UUID
 
 from app.modulos.costos.dominio.modelos import ContextoCosto
-from app.modulos.descubrimiento.dominio.modelos import ConstanciaTitular
+from app.modulos.descubrimiento.dominio.modelos import ConstanciaTitular, EvidenciaSitioWeb
 from app.modulos.enriquecimiento.dominio.canal import CanalPublicado
 
 
@@ -31,6 +31,13 @@ class Encaje:
 
 class EnriquecedorContacto(Protocol):  # sitio_web
     def enriquecer(self, lead_id: UUID, dominio: str) -> ContactoPublicado: ...
+
+
+class BuscadorSitioWeb(Protocol):  # dominio_por_razon_social
+    def buscar(self, lead_id: UUID, razon_social: str, nit: str | None) -> EvidenciaSitioWeb | None:
+        """El sitio de la empresa si se pudo VERIFICAR que es suyo (NIT o razón social en la página); si no, None.
+        Quien lo cumple escribe el costo de cada request con `lead_id`, antes de devolver."""
+        ...
 
 
 class VerificadorTitular(Protocol):  # rues_datos_gov_co (real) o croma_rues_co (stub que siempre dice desconocido)

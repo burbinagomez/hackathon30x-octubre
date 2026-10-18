@@ -38,6 +38,8 @@ _INSERT_CUMPLIMIENTO = text(
 _UPDATE_ENRIQUECIMIENTO = text(
     "UPDATE leads SET tipo_titular = :tipo_titular, contactable = :contactable, razon_no_contactable = :razon, "
     "encaje = :encaje, enriquecido_en = now(), "
+    # COALESCE: la web que ya traía el lead (OSM) nunca se pisa; solo se llena la que halló el buscador.
+    "web = COALESCE(web, :web), "
     # COALESCE: un contacto ya guardado (p. ej. el de OSM, T040p) nunca se pisa con NULL.
     "telefono_cifrado = COALESCE(:telefono, telefono_cifrado), telefono_canal = COALESCE(:telefono_canal, telefono_canal), "
     "email_cifrado = COALESCE(:email, email_cifrado), email_canal = COALESCE(:email_canal, email_canal), "
@@ -245,13 +247,13 @@ class RepositorioLeadsPostgres:
         with self._uow() as c:
             filas = c.execute(text(
                 "SELECT DISTINCT l.id, l.pais, l.tipo_titular, l.nombre, l.nombre_cifrado, l.ciudad, l.web, l.actividad_codigo, "
-                "l.telefono_cifrado, l.telefono_canal, l.email_cifrado, l.email_canal, b.descripcion_icp, l.creado_en FROM leads l "
+                "l.telefono_cifrado, l.telefono_canal, l.email_cifrado, l.email_canal, b.descripcion_icp, l.creado_en, l.id_fiscal FROM leads l "
                 "JOIN lead_fuentes lf ON lf.lead_id = l.id JOIN busquedas b ON b.id = lf.busqueda_id "
                 "WHERE lf.busqueda_id = :b AND l.enriquecido_en IS NULL ORDER BY l.creado_en, l.id"),
                 {"b": busqueda_id}).all()
         return [LeadParaEnriquecer(
             id=f.id, pais=f.pais, tipo_titular=f.tipo_titular, ciudad=f.ciudad, web=f.web, actividad=f.actividad_codigo,
-            descripcion_icp=f.descripcion_icp,
+            descripcion_icp=f.descripcion_icp, id_fiscal=f.id_fiscal,
             telefono=contacto("telefono_cifrado", f.telefono_cifrado, f.telefono_canal, f.id),
             email=contacto("email_cifrado", f.email_cifrado, f.email_canal, f.id),
             nombre=f.nombre if f.nombre is not None else self._cifrador.descifrar(
@@ -271,7 +273,7 @@ class RepositorioLeadsPostgres:
                 None if not claro or blob is None else self._cifrador.descifrar(columna, bytes(blob), self._tenant_id, lead_id))
             c.execute(_UPDATE_ENRIQUECIMIENTO, {
                 "id": lead_id, "tipo_titular": r.tipo_titular, "contactable": r.contactable,
-                "razon": r.razon_no_contactable, "encaje": r.encaje, "claro": claro,
+                "razon": r.razon_no_contactable, "encaje": r.encaje, "claro": claro, "web": r.web,
                 "nombre": descifrar("nombre_cifrado", f.nombre_cifrado),
                 "direccion": descifrar("direccion_cifrada", f.direccion_cifrada),
                 "telefono": cifrar("telefono_cifrado", r.telefono), "telefono_canal": r.telefono and r.telefono[1],
@@ -280,6 +282,10 @@ class RepositorioLeadsPostgres:
             entrada = self._constancia(r, claro)
             if entrada is not None:
                 c.execute(_AGREGAR_SOLICITUD, {"id": lead_id, "entrada": json.dumps(entrada)})
+            if r.evidencia_web is not None:  # sitio hallado por razón social: url y motivo de la verificación, nunca contacto
+                c.execute(_AGREGAR_SOLICITUD, {"id": lead_id, "entrada": json.dumps({
+                    "tipo": "sitio_web_encontrado", "fuente": "dominio_por_razon_social",
+                    "url": r.evidencia_web.url, "motivo": r.evidencia_web.motivo})})
 
     @staticmethod
     def _constancia(r: ResultadoEnriquecimiento, claro: bool) -> dict | None:

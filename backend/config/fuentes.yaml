@@ -52,7 +52,8 @@ fuentes_descubrimiento:                 # puerto: FuenteDescubrimiento · orden 
     trae: [nombre_comercial, estado, camara]   # detalle: tel, email, web, dirección
     nota: "requiere nombre (substring); descubrimiento parcial"
 
-# OJO: de esta sección solo se lee `rues_datos_gov_co.habilitado` (composicion.verificador_titular). El resto es documental:
+# OJO: de esta sección solo se leen `rues_datos_gov_co.habilitado` (composicion.verificador_titular) y
+# `dominio_por_razon_social.habilitado` (composicion.buscador_sitio_web). El resto es documental:
 # composicion.py arma los demás enriquecedores en código y cambiar su `habilitado` NO conecta ni desconecta nada.
 enriquecedores:                          # puerto: Enriquecedor
   rues_datos_gov_co:                     # puerto: VerificadorTitular (006, enmienda 2026-10-18)
@@ -85,6 +86,15 @@ enriquecedores:                          # puerto: Enriquecedor
     habilitado: false
     paises: [MX]
     trae: [telefono, email, web, direccion, empleados]
+  dominio_por_razon_social:              # puerto: BuscadorSitioWeb (006, enmienda 2026-10-18 "buscador de sitio web")
+    habilitado: true                     # un flag lo apaga: false y un lead sin web se queda sin web (composicion.buscador_sitio_web)
+    puerto: BuscadorSitioWeb
+    adaptador: app.modulos.enriquecimiento.infraestructura.adaptadores.dominio_por_razon_social.DominioPorRazonSocial
+    paises: [CO]
+    solo_juridicas: true
+    regla: "candidatos desde la razon social (max 6); DNS primero; se acepta solo si la pagina trae el NIT o la razon social completa"
+    trae: [sitio_web]                    # el contacto lo saca despues sitio_web
+    reglas: [dns_primero, sin_ips_privadas, timeout_4s, verificacion_obligatoria, evidencia_en_cumplimiento]
   sitio_web:
     habilitado: true
     adaptador: app.modulos.enriquecimiento.infraestructura.adaptadores.sitio_web.SitioWeb
