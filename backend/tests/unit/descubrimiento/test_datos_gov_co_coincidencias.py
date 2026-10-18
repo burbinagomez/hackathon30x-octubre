@@ -139,3 +139,65 @@ def test_nombre_vacio_o_solo_comodines_no_consulta():
 def test_cumple_buscador_razon_social():
     a, _, _ = _adaptador([])
     assert isinstance(a, BuscadorRazonSocial)
+
+
+def test_contar_naturales_es_un_count_con_el_mismo_like_y_la_camara():
+    a, pedidas, costos = _adaptador([(200, [{"count": "3"}])])
+    ctx = ContextoCosto(None, None, uuid4())
+
+    n = a.contar_naturales("juan perez", ["04", "58"], ctx)
+
+    assert n == 3
+    p = pedidas[0].url.params
+    assert p["$select"] == "count(*)"
+    assert "upper(razon_social) like '%JUAN PEREZ%'" in p["$where"]
+    assert "organizacion_juridica = 'PERSONA NATURAL'" in p["$where"]
+    assert "codigo_camara in('04','58')" in p["$where"]
+    assert [(c.tipo, c.lead_id, c.lote_id) for c in costos.filas] == [("socrata_descarga", ctx.lead_id, None)]
+
+
+@pytest.mark.parametrize("cuerpo", [[], [{"count": "no"}], [{"otra": "1"}], {"count": "1"}, [{"count": "-1"}]])
+def test_contar_naturales_con_respuesta_ilegible_es_fuente_no_disponible(cuerpo):
+    a, _, _ = _adaptador([(200, cuerpo)])
+
+    with pytest.raises(FuenteNoDisponible):
+        a.contar_naturales("juan perez", ["04"], ContextoCosto(None, None, uuid4()))
+
+
+def test_contar_naturales_sin_camaras_o_con_comodines_no_consulta():
+    a, pedidas, _ = _adaptador([(200, [{"count": "9"}])])
+    ctx = ContextoCosto(None, None, uuid4())
+
+    assert a.contar_naturales("juan perez", [], ctx) == 0
+    assert a.contar_naturales("%_", ["04"], ctx) == 0
+    assert pedidas == []
+
+
+def test_contar_naturales_no_deja_pasar_codigos_de_camara_raros():
+    a, pedidas, _ = _adaptador([(200, [{"count": "1"}])])
+
+    a.contar_naturales("juan perez", ["04", "x' OR 1=1 --"], ContextoCosto(None, None, uuid4()))
+
+    assert "codigo_camara in('04')" in pedidas[0].url.params["$where"] and "OR" not in pedidas[0].url.params["$where"]
+
+
+def test_buscar_homonimas_marca_truncada_sobre_las_filas_crudas():
+    from app.modulos.descubrimiento.infraestructura.adaptadores.datos_gov_co_rues import LIMITE_COINCIDENCIAS
+
+    filas = [_fila(f"9001{i:05d}") for i in range(LIMITE_COINCIDENCIAS - 1)] + [_fila("12345")]  # una inválida
+    a, _, _ = _adaptador([(200, filas), (200, filas[:-1])])
+    ctx = ContextoCosto(None, None, uuid4())
+
+    lleno = a.buscar_homonimas("empresa ficticia", ctx)
+    justo_debajo = a.buscar_homonimas("empresa ficticia", ctx)
+
+    assert (len(lleno.coincidencias), lleno.truncada) == (LIMITE_COINCIDENCIAS - 1, True)
+    assert (len(justo_debajo.coincidencias), justo_debajo.truncada) == (LIMITE_COINCIDENCIAS - 1, False)
+
+
+def test_las_coincidencias_traen_la_organizacion_juridica():
+    a, _, _ = _adaptador([(200, [_fila("900000001")])])
+
+    (c,) = a.buscar_coincidencias("empresa ficticia", ContextoCosto("intake", uuid4()))
+
+    assert c.organizacion_juridica == "SOCIEDADES POR ACCIONES SIMPLIFICADAS SAS"

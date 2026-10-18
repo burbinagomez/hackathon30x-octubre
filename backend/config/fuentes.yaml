@@ -52,11 +52,23 @@ fuentes_descubrimiento:                 # puerto: FuenteDescubrimiento
     trae: [nit, nombre, ciiu, ciudad_camara]
     licencia: CC-BY-SA-4.0
 
-# OJO: esta sección es documental. Nadie la lee: composicion.py arma los enriquecedores en código.
-# Cambiar un `habilitado` de acá NO conecta ni desconecta nada.
+# OJO: de esta sección solo se lee `rues_datos_gov_co.habilitado` (composicion.verificador_titular). El resto es documental:
+# composicion.py arma los demás enriquecedores en código y cambiar su `habilitado` NO conecta ni desconecta nada.
 enriquecedores:                          # puerto: Enriquecedor
+  rues_datos_gov_co:                     # puerto: VerificadorTitular (006, enmienda 2026-10-18)
+    habilitado: true                     # un flag la desconecta: false y vuelve el stub que siempre dice desconocido
+    puerto: VerificadorTitular
+    adaptador: app.modulos.enriquecimiento.infraestructura.adaptadores.rues_datos_gov.RuesDatosGov
+    proveedor: datos.gov.co
+    dataset: c82u-588k
+    tipo: dataset
+    paises: [CO]
+    regla: "nombre normalizado exacto + misma ciudad + un solo NIT; cualquier otra cosa es desconocido"
+    trae: [tipo_titular]
+    licencia: CC-BY-SA-4.0
   croma_rues_co:
-    habilitado: true                     # hoy NO verifica: el adaptador es un stub que falla cerrado y devuelve "desconocido"
+    habilitado: false                    # reemplazado por rues_datos_gov_co: el endpoint busca por NIT, no por nombre
+    puerto: VerificadorTitular
     adaptador: app.modulos.enriquecimiento.infraestructura.adaptadores.croma_rues.CromaRues
     endpoint: /co/rues/entity-by-nit/v1
     tipo: live

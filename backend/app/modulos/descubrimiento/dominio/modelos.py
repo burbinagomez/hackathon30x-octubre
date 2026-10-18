@@ -71,8 +71,26 @@ class LeadParaEnriquecer:
     web: str | None
     actividad: str | None
     descripcion_icp: str | None  # de la búsqueda; None = no se clasifica
+    pais: str  # el verificador de titular solo cubre CO
     telefono: Contacto | None = None
     email: Contacto | None = None
+
+
+@dataclass(frozen=True)
+class ConstanciaTitular:
+    """Evidencia de una verificación de titular contra un registro público, para `cumplimiento.solicitudes`.
+    Datos de la empresa (NIT, razón social, cámara, organización y estado de la matrícula), nunca contacto ni el nombre con que llegó el lead."""
+    motivo: str
+    fuente: str
+    dataset: str
+    nit: str | None = None
+    razon_social: str | None = None
+    municipio_sede_camara: str | None = None  # el RUES no trae municipio: es la sede de la cámara de la matrícula
+    codigo_camara: str | None = None
+    organizacion_juridica: str | None = None
+    estado_matricula: str | None = None
+    candidatos: int | None = None  # solo si fue ambiguo: cuántos NIT cumplían
+    naturales_homonimas: int | None = None  # solo si una persona natural con ese nombre vuelve ambiguo el match
 
 
 @dataclass(frozen=True)
@@ -83,6 +101,7 @@ class ResultadoEnriquecimiento:
     contactable: bool
     razon_no_contactable: str | None
     encaje: str | None = None  # None = sin clasificar
+    constancia_titular: ConstanciaTitular | None = None  # None = no se verificó (el titular ya venía del registro)
 
 
 @dataclass(frozen=True)

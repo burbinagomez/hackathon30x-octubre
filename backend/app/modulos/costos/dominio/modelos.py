@@ -23,5 +23,6 @@ class OperacionCosto:  # skill libro-costos + gratis
 class ContextoCosto:
     """A quién se le atribuye el costo de una consulta que no pertenece a una búsqueda (p. ej. `fuente='intake'`)."""
 
-    fuente: str
-    lote_id: UUID
+    fuente: str | None
+    lote_id: UUID | None
+    lead_id: UUID | None = None  # costo de un lead (enriquecimiento) en vez de uno de lote
