@@ -54,7 +54,7 @@ export default function LeadsDeBusqueda({ id, cadaMs = CADA_MS }: { id: string; 
   );
 
   return (
-    <ListaLeads clave={`busqueda:${id}:${version}`} titulo={t("leads.titulo_leads")} cargar={(p, c) => listarLeads(id, p, c)}
+    <ListaLeads clave={`busqueda:${id}:${version}`} titulo={t("leads.titulo_leads")} cargar={(p, c, i) => listarLeads(id, p, c, i)}
       progreso={progreso || undefined} />
   );
 }

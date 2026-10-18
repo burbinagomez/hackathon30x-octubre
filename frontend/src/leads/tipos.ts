@@ -23,6 +23,8 @@ export type LeadListado = {
   telefono?: string | null;
   email?: string | null;
   web?: string | null;
+  // Clasificación contra el ICP: solo de una jurídica; null = natural o sin clasificar.
+  encaje?: "encaja" | "no_encaja" | "ninguna" | null;
 };
 
 export type PaginaLeads = {

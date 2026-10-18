@@ -43,6 +43,7 @@ class EmpresaCruda:
     ciudad: str | None = None
     direccion: str | None = None
     web: str | None = None
+    encaje: str | None = None  # 'encaja' | 'no_encaja' | 'ninguna'; None = sin clasificar o no jurídica
 
 
 @dataclass(frozen=True)
@@ -135,6 +136,7 @@ class LeadListado:
     telefono: str | None = None
     email: str | None = None
     web: str | None = None
+    encaje: str | None = None  # 'encaja' | 'no_encaja' | 'ninguna'; None = sin clasificar o no jurídica
 
 
 @dataclass(frozen=True)

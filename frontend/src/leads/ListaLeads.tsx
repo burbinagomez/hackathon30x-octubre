@@ -8,28 +8,29 @@ import Atribuciones from "../compartido/Atribuciones";
 import { entero } from "../compartido/formato";
 import type { PaginaLeads } from "./tipos";
 
-type Campo = "nombre" | "tipo" | "fuentes" | "ciudad" | "web" | "telefono" | "email" | "licencia";
+type Campo = "nombre" | "tipo" | "fuentes" | "ciudad" | "web" | "telefono" | "email" | "encaje" | "licencia";
 
 /** Lista paginada de leads: la misma para una búsqueda y para una fuente. `clave` cambia cuando cambia lo que se lista. */
 export default function ListaLeads({ clave, titulo, cargar, progreso }: {
   clave: string;
   progreso?: ReactNode; // línea chica junto al conteo (p. ej. el avance de la búsqueda de contactos)
   titulo: string;
-  cargar: (pagina: number, conContacto: boolean) => Promise<PaginaLeads>;
+  cargar: (pagina: number, conContacto: boolean, soloIcp: boolean) => Promise<PaginaLeads>;
 }) {
   const { t } = useTranslation();
   const [pagina, setPagina] = useState(1);
   const [conContacto, setConContacto] = useState(false);
+  const [soloIcp, setSoloIcp] = useState(false);
   const [datos, setDatos] = useState<PaginaLeads | null>(null);
   const [fallo, setFallo] = useState<"no_encontrada" | "error_leads" | null>(null);
 
   useEffect(() => {
     setFallo(null);
-    cargar(pagina, conContacto)
+    cargar(pagina, conContacto, soloIcp)
       .then(setDatos)
       .catch((e) => setFallo(e instanceof ErrorApi && e.estado === 404 ? "no_encontrada" : "error_leads"));
     // `cargar` es nuevo en cada render: lo que dispara la recarga es la clave, la página y el filtro.
-  }, [clave, pagina, conContacto]);
+  }, [clave, pagina, conContacto, soloIcp]);
 
   const cabecera = (
     <>
@@ -44,6 +45,11 @@ export default function ListaLeads({ clave, titulo, cargar, progreso }: {
           <input type="checkbox" checked={conContacto}
             onChange={(e) => { setPagina(1); setConContacto(e.target.checked); }} />
           {t("leads.solo_con_contacto")}
+        </label>
+        <label className="filtro-contacto">
+          <input type="checkbox" checked={soloIcp}
+            onChange={(e) => { setPagina(1); setSoloIcp(e.target.checked); }} />
+          {t("leads.solo_icp")}
         </label>
       </div>
       {fallo && <p role="alert" className="error">{t(`leads.${fallo}`)}</p>}
@@ -62,6 +68,7 @@ export default function ListaLeads({ clave, titulo, cargar, progreso }: {
   const campos: Campo[] = ["nombre", "tipo", "fuentes", "ciudad", "web"];
   if (hay("tiene_telefono")) campos.push("telefono");
   if (hay("tiene_email")) campos.push("email");
+  if (datos.items.some((i) => i.encaje != null)) campos.push("encaje");
   campos.push("licencia");
 
   return (
@@ -87,6 +94,7 @@ export default function ListaLeads({ clave, titulo, cargar, progreso }: {
                     telefono: l.telefono
                       ? <a href={`tel:${l.telefono.replace(/[^\d+]/g, "")}`}>{l.telefono}</a> : siOGuion(l.tiene_telefono),
                     email: l.email ? <a href={`mailto:${l.email}`}>{l.email}</a> : siOGuion(l.tiene_email),
+                                    encaje: l.encaje === "encaja" ? t("leads.si") : l.encaje === "no_encaja" ? t("leads.no") : "—",
                     licencia: [...new Set(l.licencias)].join(", "),
                   };
                   return (
