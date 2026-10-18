@@ -24,3 +24,27 @@ ALTER TABLE public.leads
     (tipo_titular <> 'juridica' AND direccion IS NULL
        AND (direccion_cifrada IS NULL OR octet_length(direccion_cifrada) > 28))
   ) NOT VALID;
+
+-- Intenta convalidar. En una base vacía (CI, local, prod nueva) no hay filas y los CHECK quedan
+-- convalidated = true. Con filas viejas en claro falla con check_violation: se avisa (sin datos) y
+-- queda NOT VALID hasta el backfill (T056) y la migración de validación. Un bloque por CHECK: si el
+-- segundo falla, el primero no se deshace.
+DO $$
+BEGIN
+  ALTER TABLE public.leads VALIDATE CONSTRAINT leads_nombre_segun_titular_ck;
+EXCEPTION WHEN check_violation THEN
+  RAISE NOTICE 'leads_nombre_segun_titular_ck queda NOT VALID: hay leads no juridicos en claro; correr el backfill y la migracion de validacion';
+END
+$$;
+
+DO $$
+BEGIN
+  ALTER TABLE public.leads VALIDATE CONSTRAINT leads_direccion_segun_titular_ck;
+EXCEPTION WHEN check_violation THEN
+  RAISE NOTICE 'leads_direccion_segun_titular_ck queda NOT VALID: hay leads no juridicos en claro; correr el backfill y la migracion de validacion';
+END
+$$;
+
+-- Sin GRANT/REVOKE nuevos: app_rt ya tiene SELECT, INSERT, UPDATE, DELETE sobre public.leads (0002) y los
+-- privilegios de tabla cubren las columnas nuevas. RLS no cambia: leads ya tiene ENABLE ROW LEVEL SECURITY
+-- y la política tenant_aislado (0002); no hay tabla nueva.

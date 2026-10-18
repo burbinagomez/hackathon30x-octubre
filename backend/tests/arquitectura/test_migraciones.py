@@ -167,7 +167,8 @@ def _base_con_un_lead_en_claro_y_la_0003(base_vacia, tmp_path):
     assert _migrar(base_vacia, tmp_path).returncode == 0
     tenant = uuid4()
     _ejecutar(base_vacia, "INSERT INTO tenants (id, nombre) VALUES (:t, 'T')", t=tenant)
-    _ejecutar(base_vacia, "INSERT INTO leads (tenant_id, pais, nombre) VALUES (:t, 'CO', 'Tienda sintetica')", t=tenant)
+    _ejecutar(base_vacia, "INSERT INTO leads (tenant_id, pais, nombre, direccion) "
+                       "VALUES (:t, 'CO', 'Tienda sintetica', 'Calle sintetica 1')", t=tenant)
     _con(tmp_path, "0003")
     return _migrar(base_vacia, tmp_path)
 
@@ -179,7 +180,7 @@ def test_0003_con_leads_en_claro_queda_not_valid_y_avisa(base_vacia, tmp_path):
     assert _convalidados(base_vacia) == {nombre: False for nombre in CHECKS_DE_TITULAR}
     for nombre in CHECKS_DE_TITULAR:
         assert f"{nombre} queda NOT VALID" in r.stderr
-    assert "Tienda sintetica" not in r.stderr  # el aviso no imprime datos
+    assert "Tienda sintetica" not in r.stderr and "Calle sintetica" not in r.stderr  # el aviso no imprime datos
 
 
 def test_0005_falla_si_queda_un_lead_en_claro_y_no_se_registra(base_vacia, tmp_path):
