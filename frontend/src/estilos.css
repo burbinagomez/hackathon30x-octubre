@@ -535,3 +535,4 @@ table.tabla-leads {
   border-color: var(--color-acento);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
+.panel-enriquecer { margin-bottom: 1.5rem; }

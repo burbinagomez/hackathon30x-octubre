@@ -21,6 +21,7 @@ class ResumenEnriquecimiento:
     clasificados: int
     sin_clasificar: int  # encaje NULL: no jurídica, sin ICP, jev apagado o jev falló; candidatos a reclasificar
     cortado: bool
+    pendientes: int = 0  # los que quedaron sin enriquecer por el límite de la tanda (o por el corte)
 
 
 class EnriquecerLead:
@@ -33,18 +34,23 @@ class EnriquecerLead:
         self._enriquecedor = enriquecedor
         self._clasificador = clasificador
 
-    def ejecutar(self, busqueda_id: UUID) -> ResumenEnriquecimiento:
+    def ejecutar(self, busqueda_id: UUID, limite: int | None = None) -> ResumenEnriquecimiento:
+        """`limite`: cuántos leads como máximo en esta corrida (la API corre por tandas); None = todos."""
+        leads = self._repo.sin_enriquecer(busqueda_id)
+        tanda = leads if limite is None else leads[:limite]
         procesados = contactables = clasificados = 0
-        for lead in self._repo.sin_enriquecer(busqueda_id):
+        for lead in tanda:
             try:
                 r = self._enriquecer(lead)
             except LimiteFuenteAgotado:  # recurso de la cuenta: seguir solo gastaría en el resto
-                return ResumenEnriquecimiento(procesados, contactables, clasificados, procesados - clasificados, True)
+                return ResumenEnriquecimiento(procesados, contactables, clasificados, procesados - clasificados, True,
+                                              len(leads) - procesados)
             self._repo.guardar_enriquecimiento(lead.id, r)
             procesados += 1
             contactables += r.contactable
             clasificados += r.encaje is not None
-        return ResumenEnriquecimiento(procesados, contactables, clasificados, procesados - clasificados, False)
+        return ResumenEnriquecimiento(procesados, contactables, clasificados, procesados - clasificados, False,
+                                      len(leads) - procesados)
 
     def _enriquecer(self, lead: LeadParaEnriquecer) -> ResultadoEnriquecimiento:
         tipo = lead.tipo_titular
