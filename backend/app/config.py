@@ -63,6 +63,12 @@ class SettingsApi(Settings):
     auth_jwks_url: str = Field(min_length=1)
     auth_issuer: str = Field(min_length=1)
 
+    # Puerta B de intake (frase -> ICP): proveedor Anthropic. Opcionales: sin key, sin modelo o con un modelo sin tarifa
+    # en config/tarifas.yaml la API arranca igual y la ruta responde 503 ia_no_disponible (sin tarifa no hay costo que
+    # registrar, principio VIII). Solo backend, nunca VITE_.
+    ia_api_key: SecretStr | None = None
+    ia_modelo: str | None = None
+
 
 class SecretProhibido(RuntimeError):
     pass
