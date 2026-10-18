@@ -166,3 +166,13 @@ El dueño pidió avanzar con las dos puertas esta noche. Lo de arriba se escribi
 4. **Se corta para esta noche (pasa a Pulido):** el eval `frase_a_icp` con su `dataset.json` y baseline; la migración `v_costo_intake` (sin DDL nuevo: `GET /tablero/fuentes` suma `costo_intake` con SQL inline en `repositorio_tablero.py`, igual que `costo_evals`); mover `CriteriosICP` del front a `compartido/` (solo si hace falta para el prellenado).
 5. **Dos ramas en paralelo, sin pisarse:** `feature/010-frase` (Puerta B) es dueña de `intake/dominio/sugerencia.py`, `intake/dominio/puertos.py`, `app/api/intake.py` y `GET /intake/estado`. `feature/010-lookalike` (Puerta A) crea solo sus archivos (`intake/dominio/agregar_distribucion.py`, `intake/aplicacion/resolver_lookalike.py`, el método nuevo de `datos_gov_co_rues.py`) y su ruta en `app/api/intake_lookalike.py`; si necesita `Sugerencia` antes de que la otra rama entre a `main`, la copia tal cual la define el punto 1 y el merge la unifica.
 6. **Front:** el formulario de Nueva búsqueda gana una fila de tres pestañas: "Ya me compran" (A), "En una frase" (B), "Filtros" (C, la de hoy, por defecto). A y B prellenan los campos y saltan a "Filtros" para que el usuario revise antes de la vista previa. Textos en es y en.
+
+## Enmienda 2026-10-18 (madrugada) — la Puerta B conversa (decisión del dueño)
+El dueño pidió que "En una frase" funcione como el chat de Dapta: si algo no queda claro, la IA pregunta en el mismo
+cuadro, y la búsqueda se arma y se lanza desde ahí, sin pasar obligado por Filtros. Reemplaza "un turno, sin chat".
+- La herramienta suma `pregunta` (una pregunta corta o null) y `explicacion` (una línea: qué busca y por qué).
+- Prompt v2: el ICP describe al COMPRADOR, nunca a la pyme ni a su competencia. Si solo se sabe qué vende, pregunta.
+- `POST /intake/frase` acepta `historial` (hasta 6 turnos `usuario|asistente`, ≤500 caracteres c/u) y devuelve
+  `pregunta` y `explicacion` junto a la sugerencia. La conversación viaja como un solo dato delimitado (anti-injection).
+- Front: chat en la pestaña; con la sugerencia, tarjeta "qué voy a buscar" + Vista previa y Buscar en el mismo lugar,
+  con tope editable; "Editar en Filtros" queda como opción.

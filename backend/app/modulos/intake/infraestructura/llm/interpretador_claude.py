@@ -20,7 +20,7 @@ VERSION_API = "2023-06-01"
 MAX_TOKENS = 512
 # Margen sobre los ~346 tokens del system prompt de tool use que la API suma sin que viajen en el body.
 TOKENS_OCULTOS = 1024
-PROMPT = Path(__file__).with_name("frase_a_icp_v1.md")
+PROMPT = Path(__file__).with_name("frase_a_icp_v2.md")
 # Fallas de transporte en que el request nunca salió: sin fila de costo.
 NO_ENVIADO = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
 _PALABRAS = {"type": "array", "items": {"type": "string", "maxLength": 40}, "maxItems": 10}
@@ -37,8 +37,11 @@ HERRAMIENTA = {
             "ingresos_min": {"type": ["integer", "null"], "minimum": 0},
             "palabras_clave": _PALABRAS,
             "exclusiones": _PALABRAS,
+            "pregunta": {"type": ["string", "null"], "maxLength": 240},
+            "explicacion": {"type": ["string", "null"], "maxLength": 240},
         },
-        "required": ["pais", "ciiu", "departamento", "ciudad", "ingresos_min", "palabras_clave", "exclusiones"],
+        "required": ["pais", "ciiu", "departamento", "ciudad", "ingresos_min", "palabras_clave", "exclusiones",
+                     "pregunta", "explicacion"],
     },
 }
 

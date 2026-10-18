@@ -63,7 +63,7 @@ def test_el_request_fuerza_la_herramienta_con_bearer_y_el_modelo_del_proveedor()
     assert cuerpo["model"] == MODELO and cuerpo["temperature"] == 0
     assert cuerpo["tool_choice"] == {"type": "function", "function": {"name": "sugerir_icp"}}
     assert cuerpo["tools"][0]["function"]["parameters"]["properties"]["pais"]["enum"] == ["CO", "MX", "PE", "BR"]
-    assert cuerpo["messages"][0]["role"] == "system" and "frase_a_icp_v1" in cuerpo["messages"][0]["content"]
+    assert cuerpo["messages"][0]["role"] == "system" and "frase_a_icp_v2" in cuerpo["messages"][0]["content"]
     assert "<frase>" in cuerpo["messages"][1]["content"]
     assert cabeceras[0]["authorization"] == f"Bearer {CLAVE}"
     assert "x-api-key" not in cabeceras[0]
