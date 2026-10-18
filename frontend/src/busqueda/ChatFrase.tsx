@@ -73,7 +73,7 @@ export default function ChatFrase({ chat, busqueda, actividades, alEditarEnFiltr
   function alTeclear(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      chat.enviar();
+      void chat.enviar();
     }
   }
 

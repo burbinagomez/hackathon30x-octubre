@@ -2,6 +2,7 @@
 import email
 from email import policy
 import logging
+import ssl
 from decimal import Decimal
 from uuid import uuid4
 
@@ -11,6 +12,7 @@ from pydantic import ValidationError
 from app.config import SettingsEmail
 from app.modulos.contacto.dominio.errores import CanalNoDisponible, DestinatarioInvalido
 from app.modulos.contacto.dominio.modelos import LeadContactable, MensajeSaliente
+from app.modulos.contacto.infraestructura import smtp_email
 from app.modulos.contacto.infraestructura.smtp_email import SmtpEmail
 from tests.falsos import RegistroCostosFalso
 from tests.smtp_falso import CLAVE_FALSA, USUARIO, SmtpFalso
@@ -170,10 +172,16 @@ def test_falla_en_quit_despues_de_aceptado_cuenta_como_enviado():
 
 def test_sobre_sale_de_la_direccion_y_no_del_encabezado_to(monkeypatch):
     """Segunda defensa: aunque la validación dejara pasar una coma, el sobre lleva un solo RCPT."""
-    from app.modulos.contacto.infraestructura import smtp_email
     monkeypatch.setattr(smtp_email, "getaddresses", lambda d: [("", d[0])])
     monkeypatch.setattr(smtp_email, "_CASILLA", type("Todo", (), {"fullmatch": staticmethod(lambda d: True)}))
     with SmtpFalso() as falso:
         _enviar(falso, _mensaje(f"{DESTINO}, otro@atacante.test"))
     [recibido] = falso.mensajes
     assert len(recibido.destinos) == 1 and "otro@atacante.test" not in recibido.destinos
+
+
+def test_tls_valida_certificado_y_nombre_del_servidor():
+    # Sonar pide verlo explícito: el contexto exige certificado, verifica el host y no baja de TLS 1.2.
+    ctx = smtp_email._contexto_tls()
+    assert ctx.verify_mode == ssl.CERT_REQUIRED and ctx.check_hostname
+    assert ctx.minimum_version >= ssl.TLSVersion.TLSv1_2

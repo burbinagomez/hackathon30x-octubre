@@ -10,7 +10,7 @@ para entrar. Sirve para validar cuando el deploy no está disponible. Prod no se
 2. Desde la raíz del repo:
    `docker compose -f local/docker-compose.yml --env-file local/.env up --build`
 3. Abrí **http://localhost:8080** y entrá con ese email y contraseña. La api está en **http://localhost:8000/docs**
-   y Postgres en `localhost:5433` (usuario `postgres`, clave `postgres-local`).
+   y Postgres en `localhost:5433` (usuario `postgres`, clave `POSTGRES_PASSWORD` de tu `local/.env`).
 
 Cómo funciona el login: `auth-local` imita lo mínimo de Supabase Auth (login, refresco y JWKS) con tu único usuario;
 firma tokens ES256 con una clave que nace en cada arranque (si lo reiniciás, volvés a entrar). La api los verifica

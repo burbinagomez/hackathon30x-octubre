@@ -9,7 +9,7 @@ services:
   db:
     image: postgres:16
     environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres-local}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en local/.env}
     ports: ["5433:5432"]
     volumes: [db:/var/lib/postgresql/data]
     healthcheck:
@@ -23,8 +23,8 @@ services:
     depends_on:
       db: {condition: service_healthy}
     environment:
-      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres-local}
-      APP_RT_PASSWORD: ${APP_RT_PASSWORD:-app-rt-local}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en local/.env}
+      APP_RT_PASSWORD: ${APP_RT_PASSWORD:?falta APP_RT_PASSWORD en local/.env}
       LOCAL_AUTH_USER_ID: ${LOCAL_AUTH_USER_ID:-11111111-1111-4111-8111-111111111111}
       LOCAL_TENANT_ID: ${LOCAL_TENANT_ID:-00000000-0000-4000-8000-000000000001}
     volumes:
@@ -54,7 +54,7 @@ services:
     # Lista explícita, sin env_file: la api corta el arranque si ve una key de front (sb_publishable_) o del CLI.
     environment:
       PORT: "8000"
-      DATABASE_URL: postgresql+psycopg://app_rt:${APP_RT_PASSWORD:-app-rt-local}@db:5432/postgres
+      DATABASE_URL: postgresql+psycopg://app_rt:${APP_RT_PASSWORD:?falta APP_RT_PASSWORD en local/.env}@db:5432/postgres
       CIFRADO_KEY: ${CIFRADO_KEY:?falta CIFRADO_KEY en local/.env}
       AUTH_JWKS_URL: http://auth-local:9999/auth/v1/.well-known/jwks.json
       AUTH_ISSUER: http://localhost:9999/auth/v1
