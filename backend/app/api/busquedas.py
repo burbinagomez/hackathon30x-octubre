@@ -24,6 +24,7 @@ from app.modulos.descubrimiento.dominio.errores import (
     CriterioNoSoportado,
     FuenteNoDisponible,
     LimiteFuenteAgotado,
+    TopeExcedido,
 )
 from app.modulos.descubrimiento.dominio.modelos import CriteriosICP
 from app.modulos.descubrimiento.infraestructura.persistencia.repositorio_leads import RepositorioLeadsPostgres
@@ -90,7 +91,7 @@ def _fabrica(request: Request, tenant_id: UUID):
     estado = request.app.state
     return fabrica_de_fuentes(
         estado.registro, ajustes=lambda: estado.settings, costos=PostgresCostos(estado.engine, tenant_id),
-        tarifas=estado.tarifas, limites={}, api_key=None, camaras_yaml=lambda: request.app.state.camaras_yaml,
+        tarifas=estado.tarifas, limites=estado.limites, api_key=estado.settings.croma_api_key, camaras_yaml=lambda: request.app.state.camaras_yaml,
         transporte=lambda: request.app.state.transporte_http,  # se lee al armar cada fuente, en cada request
     )
 
@@ -107,14 +108,14 @@ def vista_previa(pedido: PedidoVistaPrevia, request: Request, tenant_id: UUID = 
                        actividades_de(request.app.state.actividades_yaml),
                        PostgresCostos(request.app.state.engine, tenant_id))
     r = caso.ejecutar(_criterios(pedido), pedido.canal_preferido, pedido.tope_gasto_usd, pedido.mensaje_base)
-    # [MIN]: sin `contar` no hay conteo ni costo, y el tope no se aplica: todo eso va null, nunca 0 ni true.
+    # Sin `contar` (Pulido) no hay conteo ni estimado: null, nunca 0. El costo máximo y el veredicto del tope sí se calculan.
     return {
         "busqueda_id": str(r.busqueda_id),
         "fuentes": [{"fuente": f.clave, "conteo": None, "motivo": "sin_conteo", "ignorados": list(f.ignorados),
                      "truncado": False} for f in r.fuentes],
         "descartadas": [{"fuente": clave, "motivo": motivo} for clave, motivo in r.descartadas.items()],
-        "costo_vista_previa_usd": None, "costo_estimado_usd": None, "costo_maximo_usd": None,
-        "creditos_restantes_mes": None, "requests_restantes_24h": None, "dentro_del_tope": None,
+        "costo_vista_previa_usd": None, "costo_estimado_usd": None, "costo_maximo_usd": str(r.costo_maximo_usd),
+        "creditos_restantes_mes": None, "requests_restantes_24h": None, "dentro_del_tope": r.dentro_del_tope,
     }
 
 
@@ -133,10 +134,13 @@ def ejecutar(busqueda_id: UUID, request: Request, tenant_id: UUID = Depends(tena
         raise HTTPException(status_code=404, detail="no_encontrada") from None
     except BusquedaYaEjecutada:
         raise HTTPException(status_code=409, detail="ya_ejecutada") from None
+    except TopeExcedido:  # el peor caso no cabe en el tope: no se llamó a nadie y sigue en borrador
+        raise HTTPException(status_code=409, detail="tope_excedido") from None
     return {
         "busqueda_id": str(r.busqueda_id),
         "estado": repo.estado(r.busqueda_id),
         "encontrados": r.encontrados, "unicos": r.unicos, "nuevos": r.nuevos,
+        "omitidas_por_tope": list(r.omitidas_por_tope),
         "errores": [{"fuente": clave, "motivo": _MOTIVO_DE_ERROR.get(type(e), "error")} for clave, e in r.errores.items()],
         "sin_fuente_para": None if r.sin_fuente_para is None else {
             "pais": r.sin_fuente_para[0], "filtros": {k: list(v) if isinstance(v, tuple) else v

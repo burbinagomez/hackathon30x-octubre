@@ -36,7 +36,7 @@ ESPERADO = {
 def _armar(clave):
     registro = cargar_registro(FUENTES_YAML, catalogo)
     clase, meta = registro.fuentes[clave]
-    ajustes = SimpleNamespace(datos_gov_co_url=None, datos_gov_co_app_token=None, overpass_url=None, repo_url="https://x.test")
+    ajustes = SimpleNamespace(datos_gov_co_url=None, datos_gov_co_app_token=None, overpass_url=None, croma_base_url=None, repo_url="https://x.test")
     armar = armador_de_fuente(
         clase, meta, ajustes=lambda: ajustes, costos=RegistroCostosFalso(), tarifas=cargar_tarifas(),
         limites={"croma_requests_por_24h": 100, "croma_creditos_gratis_mes": 1500}, api_key=SecretStr("clave-de-prueba"),

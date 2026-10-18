@@ -1,5 +1,6 @@
 import time
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
@@ -60,7 +61,8 @@ class OsmOverpass:
         reloj: Callable[[], float] = time.monotonic,
     ):
         self._reloj = reloj
-        self.meta = meta
+        # Peor caso: 2 intentos x 30 s (el timeout del cliente) de cómputo, a valor de lista.
+        self.meta = replace(meta, costo_maximo_llamada=2 * Decimal(TIMEOUT_HTTP_S) * costo_unitario)
         self._costos = registro_costos
         self._costo_unitario = costo_unitario
         self._lote_id = lote_id

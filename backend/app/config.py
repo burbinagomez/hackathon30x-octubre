@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     cifrado_key: SecretStr
     # SecretStr: no sale en repr ni en logs. Solo la CLI de búsqueda la usa.
     croma_api_key: SecretStr | None = None
+    # Croma: None = la constante del adaptador. Para apuntar a un stub en local (nunca a otra cuenta).
+    croma_base_url: str | None = None
     # Overpass: None = la constante del adaptador. repo_url va en el User-Agent (política de Overpass).
     overpass_url: str | None = None
     # datos.gov.co: None = la constante del adaptador / sin token (SODA limita por IP).

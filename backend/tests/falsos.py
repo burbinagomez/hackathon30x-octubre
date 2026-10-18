@@ -62,19 +62,21 @@ class RepositorioLeadsFalso:
 
 
 class RegistroCostosFalso:
-    def __init__(self, requests_24h: int = 0, creditos_mes: Decimal = Decimal(0)):
+    def __init__(self, requests_24h: int = 0, creditos_mes: Decimal = Decimal(0), proveedor: str = "croma"):
+        """Los contadores son POR PROVEEDOR, como en Postgres: el límite de Croma es de la cuenta, compartido por todos sus
+        endpoints. Un adaptador que consulte otra clave (p. ej. su `meta.clave`) ve 0 y no frena nunca."""
         self.filas: list[OperacionCosto] = []
-        self._requests_24h = requests_24h
-        self._creditos_mes = creditos_mes
+        self._requests_24h = {proveedor: requests_24h}
+        self._creditos_mes = {proveedor: creditos_mes}
 
     def registrar(self, op: OperacionCosto) -> None:
         self.filas.append(op)
 
     def requests_24h(self, proveedor: str) -> int:
-        return self._requests_24h
+        return self._requests_24h.get(proveedor, 0)
 
     def creditos_mes(self, proveedor: str) -> Decimal:
-        return self._creditos_mes
+        return self._creditos_mes.get(proveedor, Decimal(0))
 
     def gasto_busqueda(self, busqueda_id: UUID) -> Decimal:
         return sum((op.unidades * op.costo_unitario for op in self.filas if op.lote_id == busqueda_id), Decimal(0))

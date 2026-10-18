@@ -177,6 +177,56 @@ def test_tope_justo_para_el_costo_maximo_ejecuta(api, admin, usuarios):
     assert len(api.pedidas) > 0
 
 
+def _con_croma(api):
+    """Lo que arma el lifespan cuando hay CROMA_API_KEY: Croma en el registro, la key en Settings y los límites del YAML."""
+    from pydantic import SecretStr
+
+    from app.composicion import registro_api
+    from app.modulos.descubrimiento.infraestructura.adaptadores import catalogo
+
+    estado = api.app.state
+    estado.settings = estado.settings.model_copy(update={"croma_api_key": SecretStr("clave-de-prueba")})
+    estado.registro = registro_api(BACKEND / "config" / "fuentes.yaml", catalogo)
+    estado.limites = yaml.safe_load((BACKEND / "config" / "fuentes.yaml").read_text())["limites"]
+    previo = estado.transporte_http
+
+    def responder(request):
+        if request.url.host == "api.croma.run":
+            api.pedidas.append(request)
+            return httpx.Response(200, json={"total": 1, "data": [
+                {"nit": "900.555.444-3", "name": "EMPRESA SINTETICA S.A.S.", "city": "BOGOTÁ", "ciiu_code": "4711"}]})
+        return previo.handle_request(request)
+
+    estado.transporte_http = httpx.MockTransport(responder)
+
+
+def test_con_croma_el_tope_corta_antes_de_gastar_un_credito(api, admin, usuarios):
+    _con_croma(api)
+    r = _vista_previa(api, usuarios["a"], tope_gasto_usd="0.0013")  # OSM + datos.gov.co (0.00126) caben; con Croma (0.00225) no
+    assert r.json()["dentro_del_tope"] is False and Decimal(r.json()["costo_maximo_usd"]) == Decimal("0.00225")
+
+    ejecutada = _ejecutar_o_500(api, usuarios["a"], r.json()["busqueda_id"])
+
+    assert (ejecutada.status_code, ejecutada.json()) == (409, {"detail": "tope_excedido"})
+    assert api.pedidas == []
+    assert _contar(admin, "SELECT count(*) FROM costos WHERE tenant_id = :a", a=usuarios["tenant_a"]) == 0
+
+
+def test_con_croma_y_tope_suficiente_deja_fila_croma_consulta_del_lote_y_lead_juridico(api, admin, usuarios):
+    _con_croma(api)
+    busqueda_id = _crear(api, usuarios["a"])  # tope 5
+
+    r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert r.status_code == 200
+    assert _contar(admin, "SELECT count(*) FROM costos WHERE tenant_id = :a AND tipo = 'croma_consulta' AND proveedor = 'croma' "
+                          "AND lote_id = :l AND unidades = 1", a=usuarios["tenant_a"], l=busqueda_id) == 1
+    assert _contar(admin, "SELECT tipo_titular FROM leads WHERE tenant_id = :a AND id_fiscal = '900555444'",
+                   a=usuarios["tenant_a"]) == "juridica"
+    assert _contar(admin, "SELECT count(*) FROM cumplimiento WHERE tenant_id = :a AND fuente = 'croma_supersociedades_co' "
+                          "AND licencia LIKE '%Croma%' AND url_origen LIKE '%?nit=900555444'", a=usuarios["tenant_a"]) == 1
+
+
 # --- validación -----------------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("cambios, campo", [
