@@ -98,9 +98,29 @@ Nota de proceso: T049 nació verde porque T016b se hizo antes (el orden de esta 
 
 ---
 
+## Fase 6b: nombre y dirección cifrados para titulares no jurídicos (enmienda 2026-10-18)
+
+Decisión del dueño: `tipo_titular != 'juridica'` guarda `nombre` y `direccion` cifrados; hoy `repositorio_leads.py` los guarda en claro (los leads OSM del [MIN]). Es [MIN] porque el principio VI no admite persistir el nombre y el domicilio de un posible comerciante en claro. **Arrastra del Pulido solo lo mínimo para cifrar** (T002, T003, T017, T018: dependencias, import-linter y `Cifrador`); `telefono`/`email` y el resto de P1 siguen en Pulido. **Frena:** la migración (T056b) no se escribe sin el OK del dueño al DDL de `plan.md`.
+
+- [ ] T002 [MIN] y T003 [MIN] (suben de P1 sin cambios): `cryptography` en `pyproject.toml` + `uv.lock` con `pip-audit` limpio, y `import-linter` con `cryptography` fuera del dominio. — ya
+- [ ] T017 [MIN] [P] [Paso 3] **Rojo:** `backend/tests/unit/seguridad/test_cifrador.py` (sube de P1 sin cambios: ida y vuelta, nonce distinto, AAD de otra columna, HMAC, falla sin `cifrado_key`) + `::test_aad_de_nombre_y_direccion_no_se_intercambian` (un valor cifrado para `leads.nombre_cifrado` no descifra como `leads.direccion_cifrada`, ni al revés). El rojo es un `assert`/`pytest.raises(InvalidTag)`, no un `ImportError`: se crea primero un `cifrado.py` vacío con la firma y los asserts fallan. — ya
+- [ ] T018 [MIN] [Paso 3] **Verde:** `app/seguridad/cifrado.py` (AES-256-GCM, AAD `tabla.columna`, HKDF), `catalogo_sensibles.py` (con `CIFRADAS` y `CONDICIONALES`), `cifrado_key` en `Settings` y `ConfigInvalida`. `CIFRADO_KEY` en `.env.example` y en la doc de variables. — T017
+- [ ] T056a [MIN] [Paso 4] **Rojo (INSERT crudo):** `test_dedup_repo.py::test_check_nombre_segun_tipo_titular` (casos de la spec; nace rojo por assert: sin `CHECK`, el `INSERT` de un `desconocido` con `nombre` en claro no falla, y `nombre_cifrado` no existe: se agrega primero la migración **sin** `CHECK` como preparación, igual que T023a). Además, se actualizan los `INSERT` crudos que hoy dejan `desconocido` con `nombre` claro y romperían: `test_leads_repo.py:49`, `test_rls.py:46` y `:69` (pasan a `tipo_titular='juridica'`), y `test_leads_repo.py:91` y `test_busqueda_osm.py:82` leen por el repositorio, no por SQL, en la lectura de `nombre`. — T018
+- [ ] T056b [MIN] [Paso 4] **Migración (frena hasta el OK del dueño al DDL de `plan.md`):** `supabase/migrations/0003_leads_cifrado_nombre_direccion.sql` con `nombre` nullable, `nombre_cifrado`, `direccion_cifrada` y los dos `CHECK ... NOT VALID`; `app/modelos.py` al día (drift vacío). Verde de T056a. `migrar_local.sh` dos veces desde vacío (`test_migrar_local_desde_vacio_dos_veces_sin_drift`). — T056a
+- [ ] T056c [MIN] [Paso 4] **Rojo:** `test_cifrado.py::test_nombre_y_direccion_de_no_juridica_van_cifrados` (lead `desconocido` y `natural`, con control `juridica`), `::test_nombre_y_direccion_en_claro_solo_para_juridicas` y `::test_nombre_solo_se_lee_por_el_repositorio`. Rojo por assert contra el repositorio que sigue guardando en claro (`nombre IS NULL` falla). Sabotajes con nombre: `nombre_en_claro_si_desconocido`, `select_suelto_de_nombre`. — T056b
+- [ ] T056d [MIN] [Paso 4] **Advisor** revisa T056a y T056c **antes del verde** (los `CHECK`, el AAD por columna, el paso a claro al subir a jurídica y que el rojo es por `assert`, no por columna inexistente). Revisión de juicio: cifrado y RLS (agente `lead.md`). — T056c
+- [ ] T056e [MIN] [Paso 4] **Verde:** `repositorio_leads.py`: `obtener_o_crear_lead` cifra `nombre` y `direccion` (AAD de su columna) si `tipo_titular != 'juridica'`; la lectura de `Lead` descifra. `aplicar_fusion` con la regla (a)/(b)/(c) de la spec llega con el dedup (T036); hasta entonces, T056e solo cubre creación y lectura. — T056d
+- [ ] T056f [MIN] [Paso 9] **Rojo:** `test_cifrado.py::test_contacto_no_aparece_en_logs` ampliado (nombre y dirección sintéticos de la fixture, `capsys`, errores forzados) y `::test_contacto_no_queda_en_claro_en_columnas_no_catalogadas` con `leads.nombre`/`leads.direccion` `NULL` para OSM. Rojo por `assert` con el repositorio todavía sin cifrar (si T056e ya está, se corre con el sabotaje `log_del_nombre`: un `logging.debug` con el nombre en `EjecutarBusqueda`, visto fallar y revertido). — T056e
+- [ ] T056g [MIN] [Paso 9] **Verde:** `EjecutarBusqueda`/CLI sin nombre ni dirección en logs, trazas, `capsys` ni mensajes de error; si T056f ya pasó con el sabotaje, esta tarea es la reversión documentada. — T056f
+- [ ] T056 [MIN] **Backfill:** `backend/scripts/cifrar_leads_existentes.py` (corre con `CIFRADO_KEY`, no imprime datos) cifra `nombre`/`direccion` de los leads no jurídicos en claro y deja `nombre`/`direccion` en `NULL`; después, `ALTER TABLE leads VALIDATE CONSTRAINT` (migración de osm_dedup o paso manual del dueño). **Rojo primero:** `test_cifrar_leads_existentes.py` siembra un `desconocido` en claro (con el `CHECK` aún `NOT VALID`), corre el script y verifica por SQL que quedó cifrado; ya sin filas en claro, `VALIDATE` pasa. — T056b, T056e
+
+**Checkpoint**: `test_cifrador.py`, `test_cifrado.py` (los tres nuevos), `test_dedup_repo.py::test_check_nombre_segun_tipo_titular` y la suite completa verdes; `migrar_local.sh` dos veces desde vacío.
+
+---
+
 ## Fase 7: Cierre del mínimo
 
-- [ ] T055 [MIN] Cierre: `uv run pytest -q`, `uv run lint-imports`, `scripts/migrar_local.sh` dos veces desde vacío. PR del [MIN], con la lista de Pulido como deuda. Se repite al cerrar Pulido. — ya
+- [ ] T055 [MIN] Cierre (incluye la Fase 6b): `uv run pytest -q`, `uv run lint-imports`, `scripts/migrar_local.sh` dos veces desde vacío. PR del [MIN], con la lista de Pulido como deuda. Se repite al cerrar Pulido. — ya
 
 ---
 
@@ -110,17 +130,16 @@ Va después del [MIN], en este orden de bloques. **El bloque P1 entra entero o n
 
 ### P1: contacto cifrado (Pasos 1, 3, 4 y 7)
 
-- [ ] T002 [P] `phonenumbers` y `cryptography` en `backend/pyproject.toml` + `uv.lock`; `pip-audit` limpio.
-- [ ] T003 [P] Contrato de import-linter: `phonenumbers` permitida en `descubrimiento.dominio`; `cryptography` y `httpx` siguen fuera del dominio.
+- [ ] T002 [P] `phonenumbers` en `backend/pyproject.toml` + `uv.lock`; `pip-audit` limpio. (`cryptography` ya entró en el [MIN], Fase 6b.)
+- [ ] T003 [P] Contrato de import-linter: `phonenumbers` permitida en `descubrimiento.dominio`. (`cryptography` y `httpx` fuera del dominio: Fase 6b.)
 - [ ] T008 [Paso 1] **Rojo:** `test_normalizacion.py::test_telefono_a_e164`, `::test_mismo_numero_con_y_sin_indicativo_da_el_mismo_e164`.
 - [ ] T009 [Paso 1] **Verde:** `a_e164(valor, region)` con `phonenumbers.parse` + `is_valid_number`.
-- [ ] T017 [P] [Paso 3] **Rojo:** `backend/tests/unit/seguridad/test_cifrador.py` (ida y vuelta, nonce distinto, AAD de otra columna, HMAC determinista y con subclave propia, mismo número con y sin indicativo, falla sin `cifrado_key`). La clave de prueba se genera en el test.
-- [ ] T018 [Paso 3] **Verde:** `backend/app/seguridad/cifrado.py` (AES-256-GCM, AAD `tabla.columna`, dos subclaves HKDF-SHA256, `hmac_telefono`), `catalogo_sensibles.py`, `cifrado_key` en `Settings` y `ConfigInvalida`.
+- T017 y T018: pasaron al [MIN] (Fase 6b). Lo que queda para Pulido de ellas: los tests de HMAC (`test_hmac_es_determinista_y_distinto_de_la_clave_de_cifrado`, `test_mismo_numero_con_y_sin_indicativo_da_el_mismo_hmac`) y `hmac_telefono`, que se suman a `test_cifrador.py` y `cifrado.py` junto con T008/T009.
 - [ ] T023a [Paso 4] **Preparación:** `supabase/migrations/0003_osm_dedup.sql` (a mano) con las columnas nuevas de `leads` **sin** `CHECK`; btree no únicos `(tenant_id, dominio)` y `(tenant_id, telefono_hmac)`. No toca `costos` (002 plan:210).
 - [ ] T023 [Paso 4] **Rojo:** `test_dedup_repo.py::test_canal_null_si_y_solo_si_dato_null` y `::test_check_de_canales` (INSERT crudo).
 - [ ] T024 [Paso 4] **Verde:** los `CHECK` de canal y de dato ⇔ canal.
 - [ ] T025 [Paso 4] **Rojo:** `test_cifrado.py::test_columnas_sensibles_cifradas` (no nulos y sin el texto en claro) y `::test_ninguna_columna_de_contacto_fuera_del_catalogo` (con el sabotaje `leads.telefono text`).
-- [ ] T026 [Paso 4] **Verde:** `repositorio_leads.py` cifra con AAD de su columna, calcula `telefono_hmac` y descifra al leer.
+- [ ] T026 [Paso 4] **Verde:** `repositorio_leads.py` cifra `telefono` y `email` con AAD de su columna, calcula `telefono_hmac` y descifra al leer (nombre y dirección ya los cifra T056e).
 - [ ] T027 [Paso 4] **Advisor** revisa T023 y T025 (más T021 si P2 ya lo trajo).
 - [ ] T039p [Paso 7] **Rojo:** `::test_telefono_invalido_queda_nulo`, `::test_web_en_host_compartido_no_se_guarda` (necesita T006/T007), `::test_web_wa_me_pasa_a_telefono`; la fixture suma `phone` inválido, `wa.me` y host compartido.
 - [ ] T040p [Paso 7] **Verde:** `EmpresaCruda` suma `telefono`, `email`, `telefono_canal`, `email_canal` con default (enmienda §Puertos); mapeo con `a_e164` y `normalizar_dominio`; `wa.me` a `telefono` con `whatsapp_osm`, nunca en `web`.
@@ -148,6 +167,8 @@ Va después del [MIN], en este orden de bloques. **El bloque P1 entra entero o n
 - [ ] T034 [Paso 5] **Verde:** `Geo`, `Lead`, `CambiosLead`, `fusionar` y su aplicación contra el puerto.
 - [ ] T035 [Paso 6] **Rojo:** `test_dedup_repo.py` contra `pg_trgm` real, incluido `test_aplicar_fusion_simple_no_pisa_y_par_que_sube_reemplaza`.
 - [ ] T036 [Paso 6] **Verde:** consultas de dedup y `aplicar_fusion` en `repositorio_leads.py`, con el sabotaje `coalesce` sobre el par.
+- [ ] T035b [Paso 6] **Rojo** (advisor antes del verde): `test_dedup_repo.py::test_candidatos_por_nombre_incluye_no_juridicas_descifrando`, `::test_fusion_que_sube_a_juridica_pasa_nombre_y_direccion_a_claro` y `::test_similitud_python_coincide_con_pg_trgm`; `test_busqueda_dos_fuentes.py::test_osm_primero_y_supersociedades_despues_fusiona_con_nombre_cifrado`; unitario `test_normalizacion.py::test_similitud_trigramas` (idénticos 1.0, plural largo ≥ 0,92, plural corto en [0,85; 0,92), distintos < 0,85). Sabotajes con nombre: `solo_pg_trgm` (la regla 4 ignora los cifrados → el test de orden OSM-primero falla), `fusion_sin_pasar_a_claro` (viola el `CHECK`). — T056e
+- [ ] T036b [Paso 6] **Verde:** `similitud_trigramas` en `dominio/normalizacion.py`; `candidatos_por_nombre` une `pg_trgm` (jurídicos) y descifrado por ciudad con tope 2000 (no jurídicos); `aplicar_fusion` con las reglas (a)/(b)/(c) de "Nombre y dirección cifrados". La migración de osm_dedup suma `CHECK (tipo_titular = 'juridica' OR nombre_normalizado IS NULL)` (con su rojo en `test_dedup_repo.py`). — T035b
 - [ ] T049p [Paso 9] **Rojo:** `test_busqueda_dos_fuentes.py` (los 4 tests de la versión anterior, con el assert de `cumplimiento` y el sabotaje de re-lanzar). Espera a Croma (002 T031).
 - [ ] T051p [Paso 9] **Verde:** `ejecutar_busqueda` normaliza, llama a `resolver_duplicado` y aplica fusión/revisión/nuevo; resumen con `truncado` y `descartados_sin_nombre`.
 
@@ -190,7 +211,8 @@ Va después del [MIN], en este orden de bloques. **El bloque P1 entra entero o n
   - `test_costos_repo.py` (T042 y 002 T024/T026/T032): T042 suma un test al archivo de la 002, no lo crea.
   - `test_cli.py` (T052 y 002 T040): T052 suma un test.
 - **Pulido:**
-  - P1 entra entero, y T040p necesita T007 de P2 para el host compartido.
+  - P1 entra entero (menos lo que ya subió a la Fase 6b), y T040p necesita T007 de P2 para el host compartido.
+  - Fase 6b: T056a → T056b (frena hasta el OK del dueño al DDL) → T056c → T056d (advisor) → T056e → T056f → T056g; T056 al final. T035b/T036b esperan T056e y la regla 4 de P2.
   - En P2, T021a–T022, T019–T020 y T023a (P1) van en la misma `0003`: una migración en el PR de Pulido.
   - T049p y P4 esperan a Croma (002 T030/T031).
 
