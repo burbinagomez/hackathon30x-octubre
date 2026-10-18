@@ -213,7 +213,7 @@ Va después del [MIN], en este orden de bloques. **El bloque P1 entra entero o n
   - `test_cli.py` (T052 y 002 T040): T052 suma un test.
 - **Pulido:**
   - P1 entra entero (menos lo que ya subió a la Fase 6b), y T040p necesita T007 de P2 para el host compartido.
-  - Fase 6b: T056a → T056b (frena hasta el OK del dueño al DDL) → T056c → T056d (advisor) → T056e → T056f → T056g; T056e2 (`hide_parameters`) antes de T056f; T056 al final. **Orden obligatorio:** `0003` → (el dueño borra a mano los leads de prueba en claro, si hay) → `0005` (T056) → recién ahí `aplicar_fusion` (T036/T036b). T035b/T036b esperan T056e, T056 y la regla 4 de P2.
+  - Fase 6b: T056a → T056b (DDL aprobado 2026-10-18) → T056c → T056d (advisor) → T056e → T056f → T056g; T056e2 (`hide_parameters`) antes de T056f; T056 al final. **Orden obligatorio:** `0003` → (el dueño borra a mano los leads de prueba en claro, si hay) → `0005` (T056) → recién ahí `aplicar_fusion` (T036/T036b). T035b/T036b esperan T056e, T056 y la regla 4 de P2.
   - En P2, T021a–T022, T019–T020 y T023a (P1) van en la misma `0003`: una migración en el PR de Pulido.
   - T049p y P4 esperan a Croma (002 T030/T031).
 
