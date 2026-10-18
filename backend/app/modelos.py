@@ -81,6 +81,8 @@ leads = Table(
     Column("email_cifrado", LargeBinary),
     Column("telefono_canal", Text),
     Column("email_canal", Text),
+    # Absorbido por otro lead (cola de dedup). FK simple en el SQL; la compuesta es de T011.
+    Column("fusionado_en", UUID(as_uuid=True), ForeignKey("leads.id")),
     UniqueConstraint("tenant_id", "pais", "id_fiscal", name="leads_tenant_pais_id_fiscal_key"),
     UniqueConstraint("tenant_id", "id", name="leads_tenant_id_id_key"),
     # Los CHECK de titular (leads_nombre_segun_titular_ck, leads_direccion_segun_titular_ck) viven solo en el SQL de la 0003:
