@@ -4,7 +4,8 @@ from uuid import UUID
 from sqlalchemy import Engine, text
 
 from app.db import unidad_de_trabajo
-from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, EmpresaCruda
+from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, EmpresaCruda, Lead
+from app.seguridad.cifrado import Cifrador
 
 _INSERT_LEAD = text(
     "INSERT INTO leads (tenant_id, pais, id_fiscal, nombre, tipo_titular, ciudad, direccion, "
@@ -21,9 +22,10 @@ _INSERT_CUMPLIMIENTO = text(
 class RepositorioLeadsPostgres:
     """Cada método abre su propia unidad de trabajo con el tenant fijado: RLS filtra todo lo que toca."""
 
-    def __init__(self, engine: Engine, tenant_id: UUID):
+    def __init__(self, engine: Engine, tenant_id: UUID, cifrador: Cifrador):
         self._engine = engine
         self._tenant_id = tenant_id
+        self._cifrador = cifrador
 
     def crear_busqueda(self, criterios: CriteriosICP) -> UUID:
         with unidad_de_trabajo(self._engine, self._tenant_id) as c:
@@ -62,6 +64,9 @@ class RepositorioLeadsPostgres:
                 {"t": self._tenant_id, "lead_id": lead_id, "busqueda_id": busqueda_id, "fuente": e.fuente,
                  "url_origen": e.url_origen, "licencia": licencia},
             )
+
+    def obtener_lead(self, lead_id: UUID) -> Lead | None:
+        return None
 
     def cerrar_busqueda(self, busqueda_id: UUID, estado: str) -> None:
         with unidad_de_trabajo(self._engine, self._tenant_id) as c:
