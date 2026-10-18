@@ -61,7 +61,10 @@ Corrección (T011): cuando se escribió este plan la 002 no estaba en `main`; ho
 
 ### Puerto y jueces
 - `jueces/puerto.py`: `Juez` (Protocol) con `juzgar(tarea, caso) -> Veredicto`; `Veredicto(probabilidad: float, razon: str)` frozen; excepción `SalidaJuezInvalida`.
-- `jueces/__init__.py`: `CATALOGO = {"claude": JuezClaude, "falso": JuezFalso}`. Es el único lugar que conoce clases concretas, igual que el catálogo de adaptadores del 002. `jev` se suma en la 006.
+- `jueces/catalogo.py`: `CATALOGO = {"claude": JuezClaude, "falso": JuezFalso}`. Es el único lugar que conoce clases concretas, igual que el catálogo de adaptadores del 002. `jev` se suma en la 006. **No va en `jueces/__init__.py`** (regla del coordinador, Fase 3): `run.py` importa `evals.jueces.puerto` y eso ejecuta el `__init__`, así que cualquier import de `JuezClaude`/`anthropic` ahí se cargaría en cada corrida, también en los tests del runner. `__init__.py` queda vacío; `catalogo.py` se importa solo en la rama por defecto de `run.py` (T019).
+- Tarifa del juez (T014, decisión para el advisor en T017): el mapeo de `tarifas.yaml` `llm.<modelo>` tal cual, `{"in_usd_por_M": Decimal, "out_usd_por_M": Decimal}`; el juez divide por 1 000 000 al escribir `costo_unitario`. La resuelve la composición (T019).
+- Key de Anthropic (decisión para el advisor en T017): los tests inyectan un `httpx.Client` con `base_url` y `x-api-key` falsa en los headers, y no tocan el entorno. Si T018 usa el SDK, tiene que poder tomar ese cliente sin leer `ANTHROPIC_API_KEY`; si no, `JuezClaude` habla httpx directo contra `POST /v1/messages`. La key real la pone la composición (T019) desde el entorno.
+- Fixture compartida de la Messages API falsa: `backend/tests/anthropic_falso.py` (T014–T016): `httpx.MockTransport` que captura cuerpos de `POST /v1/messages` y responde `tool_use` con `usage` 120/30.
 - `JuezFalso`: devuelve una secuencia programada por caso y cuenta llamadas por `id`. Sin red, sin `RegistroCostos` (exclusión cerrada del test de arquitectura).
 - `JuezClaude(registro_costos, tarifa, modelo, prompt, lote_id, http_client)`: SDK `anthropic`, `tool_choice` forzado con `input_schema {probabilidad: number, razon: string}`, temperatura 0. Escribe las 2 filas de costo con `usage` **antes** de validar la salida; después valida y, si no cumple, lanza `SalidaJuezInvalida`.
 - `determinista_si_se_demuestra` vive en **un solo lugar**: es atributo de clase del juez (`False` en `JuezClaude` y en `JuezFalso`). El runner lo lee del juez que devuelve `fabrica_juez(nombre_eval, lote_id)`, nunca del `CATALOGO`: el catálogo existe recién en T018 y los tests del runner son de la Fase 2. El test de k=1 usa una subclase de `JuezFalso` con el atributo en `True`.
@@ -75,7 +78,7 @@ Corrección (T011): cuando se escribió este plan la 002 no estaba en `main`; ho
 - `main(argv, entorno, fabrica_juez=None, registro_costos=None) -> int`. Los tests inyectan juez y registro falsos. Solo en la rama por defecto (`fabrica_juez is None`) `run.py` importa `evals.jueces` y arma los reales (D2, D3). El entorno se lee del mapeo inyectado (default `os.environ`), nunca se imprime.
 - Orden, tal cual la spec (Flujo principal §3): validar entorno, `evals.yaml` y datasets (si falla, sale **2** sin llamar a `fabrica_juez`) → fingerprint por eval → `fabrica_juez` por eval → regla de k (usa el baseline del mismo fingerprint; si falla, **2** sin ningún `juzgar`) → por caso: forma primero, juez k veces solo si la forma pasa → PASS^k → `agregado`, `determinacion`, `fallidos` → comparar con baseline → reporte JSON por stdout → código 0/1/2.
 - `--config <ruta a evals.yaml>` (default `backend/evals/evals.yaml`); `casos`, `prompt` y `baseline.json` se resuelven relativos a su carpeta. Lo agregó T010 para correr el runner en `tmp_path`; la spec no fijaba cómo se ubica `evals.yaml`.
-- `lote_id` = un `uuid4` por corrida, el mismo para todas las filas de costo, y va en el reporte.
+- `lote_id` = un `uuid4` por corrida, el mismo para todas las filas de costo, y va en el reporte (como texto). A `fabrica_juez` llega como `UUID`, no `str`: `OperacionCosto.lote_id` es `UUID | None` (lo fija `test_lote_id_es_un_uuid_por_corrida`).
 - `fabrica_juez(nombre_eval, lote_id) -> Juez` (decisión T011, la revisa el advisor): el argumento es el **nombre del eval**, no la clave `juez`, porque la fábrica por defecto necesita también `modelo` y `prompt` de ese eval. Se llama una vez por eval, después de validar entorno, `evals.yaml` y datasets, y antes de cualquier `juzgar`. El `lote_id` llega al juez por constructor: `JuezClaude(registro_costos, tarifa, modelo, prompt, lote_id, http_client)`.
 - La regla de k se valida **después** de `fabrica_juez` (necesita `determinista_si_se_demuestra` del juez devuelto) y **antes** de cualquier `juzgar`: k inválido sale 2 con 0 llamadas.
 - Qué recibe el juez: `tarea` = nombre del eval; `caso` = el caso **sin** `etiqueta`/`pertinente` (el juez no ve la respuesta), y en `encaje_icp` con el ICP del dataset bajo la clave `icp`. Una `etiqueta`/`pertinente` ausente o nula es `ConfigInvalida` → 2.
@@ -104,12 +107,13 @@ backend/
 │   ├── run.py                      # reemplaza el placeholder
 │   ├── config.py · fingerprint.py · esquema.py · exportar_candidatos.py
 │   ├── scorers/forma.py
-│   ├── jueces/{__init__.py, puerto.py, claude.py, falso.py, encaje_v1.md, mensaje_v1.md}
+│   ├── jueces/{__init__.py (vacío), puerto.py, catalogo.py, claude.py, falso.py, encaje_v1.md, mensaje_v1.md}
 │   ├── dataset.json · casos/calibracion_mensajes.json · baseline.json · evals.yaml · LICENCIA.md
 └── tests/
     ├── unit/evals/{test_dataset.py, test_scorers_forma.py, test_juez_claude.py, test_runner.py, test_exportar_candidatos.py}
     ├── contratos/test_juez.py
-    ├── arquitectura/{test_import_linter.py, test_costos_por_adaptador.py}   # se les suma un test
+    ├── anthropic_falso.py                                                   # Messages API falsa (T014–T016)
+    ├── arquitectura/{test_import_linter.py, test_costos_por_adaptador.py}   # al primero se le suma un test; el segundo no existía en main y lo crea T013
     └── integration/test_costos_repo.py                                      # se le suma un test
 .gitignore                          # + backend/evals/dataset.candidatos.json
 docs/{arquitectura-backend.md, decisiones.md}
@@ -117,7 +121,7 @@ docs/{arquitectura-backend.md, decisiones.md}
 
 **Gotcha de pytest:** `tests/unit/evals/` va **sin** `__init__.py`. Con uno, pytest lo importa como paquete `evals` y tapa al `backend/evals/` real.
 
-**Structure Decision**: la de la spec (Decisiones técnicas, "Ubicación"). Lo único que suma el plan es `jueces/__init__.py` (catálogo).
+**Structure Decision**: la de la spec (Decisiones técnicas, "Ubicación"). Lo único que suma el plan es `jueces/catalogo.py` (catálogo; `jueces/__init__.py` queda vacío) y `tests/anthropic_falso.py` (fixture compartida).
 
 ## Orden de tareas (TDD)
 
