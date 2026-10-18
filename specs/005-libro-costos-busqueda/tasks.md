@@ -29,18 +29,20 @@
   - `VistaPrevia` y `EjecutarBusqueda` → resultados vacíos;
   - los routers registrados, que devuelven `501`.
 
-  *Hecho (parte [MIN]):* `FabricaFuentes`, `hmac_email`, `VistaPrevia` y los routers `auth`, `busquedas`, `tablero` y `actividades` en 501. *Falta:* el esqueleto de `EjecutarBusqueda`, que se diseña en T026 junto con su signature (`ejecutar(busqueda_id)`): hoy la clase es la de la 003, con `ejecutar(criterios)` y tests propios.
+  *Hecho (parte [MIN]), verificado 2026-10-18:* `FabricaFuentes`, `VerificadorToken` y `TokenInvalido` (`acceso/dominio/`), `VistaPrevia` y los routers `busquedas`, `tablero` y `actividades` en 501 (el de `auth` ya no existe: Supabase Auth; `hmac_email` se borró en T013). *Falta:* el esqueleto de `EjecutarBusqueda`, que se diseña en T026 junto con su signature (`ejecutar(busqueda_id)`): hoy la clase es la de la 003, con `ejecutar(criterios)` y tests propios.
 
 ## Fase 2: Migración y vistas (Paso 1)
 
-- [ ] T005 [MIN] [Paso 1] **Esqueleto de la migración** `supabase/migrations/NNNN_libro_costos_busqueda.sql`: *(hecho: esqueleto de las dos vistas y el `CHECK`; falta `usuarios` y `tenant_de_usuario`, pausado)*
+- [x] T005 [MIN] [Paso 1] **Esqueleto de la migración** `supabase/migrations/NNNN_libro_costos_busqueda.sql`: *(hecho: esqueleto de las dos vistas y el `CHECK`; falta `usuarios` y `tenant_de_usuario`, pausado)*
   - las columnas e índices de plan §Migración. `leads.fusionado_en` va con FK **simple** `REFERENCES leads(id)`; la compuesta entra en T011, después del rojo;
   - `usuarios` con sus columnas (`auth_user_id uuid PRIMARY KEY`, `tenant_id`, `idioma`, `creado_en`; sin email), **sin** `CHECK` y **sin** RLS;
   - `tenant_de_usuario` (y `fijar_idioma`, Pulido) como stubs `… WHERE false`, **sin** `SECURITY DEFINER` ni `REVOKE`;
   - las 9 vistas con sus columnas finales, `WHERE false` y **sin** `security_invoker`.
 
   `app/modelos.py` se actualiza a la par.
-- [ ] T006 [MIN] [Paso 1] `backend/tests/arquitectura/test_migraciones.py::test_migrar_local_desde_vacio_dos_veces_sin_drift` (de la 002) sigue verde con la migración nueva. Se confirma que `compare_metadata` no reporta las vistas. **Mutación:** borrar `fusionado_en` de `modelos.py` → drift.
+  *Verificado 2026-10-18 (parte [MIN]): el esqueleto lo reemplazó la 0006 final (T013); `usuarios`, `tenant_de_usuario` y las dos vistas están, `modelos.py` a la par. `fusionado_en` y las 7 vistas de costo son Pulido.*
+- [x] T006 [MIN] [Paso 1] `backend/tests/arquitectura/test_migraciones.py::test_migrar_local_desde_vacio_dos_veces_sin_drift` (de la 002) sigue verde con la migración nueva. Se confirma que `compare_metadata` no reporta las vistas. **Mutación:** borrar `fusionado_en` de `modelos.py` → drift.
+  *Verificado: verde en la suite; sabotaje `usuarios.auth_user_id` fuera de `modelos.py` -> rojo en `test_migrar_local_desde_vacio_dos_veces_sin_drift` y `test_drift_mira_solo_public...`.*
 - [x] T007 [MIN] [Paso 1] **Rojo (advisor):** `backend/tests/integration/test_vistas_costos.py`, con el fixture de spec:77-112, sembrado con `postgres` y leído como `app_rt`. Cada test, con su mutación: *(parte [MIN] hecha)*
   - `::test_cpl_por_fuente_fixture_10_leads`: la tabla exacta, con `type is Decimal`. **Mutación:** `unicos = count(*)` en lugar de `count(DISTINCT lead_id)` → osm 8 ≠ 7. **Segunda mutación:** `::float8` en `cpl_lista` → rojo por el tipo.
   - `::test_costo_por_lead_conserva_el_total`. **Mutación:** `v_costo_por_lead` sin el costo directo (`lead_id IS NOT NULL`) → Σ cs se queda corto por 0.05.
@@ -54,27 +56,31 @@
   - `::test_fila_con_lote_y_lead_va_al_lead`: B = 0.25/0.15 y Σ parte (L1, cs) = 0.80/0.40. **Mutación:** el prorrateo filtra `lote_id IS NOT NULL` en lugar de `lead_id IS NULL` → Σ parte 0.85.
   - `::test_lead_fusionado_no_cuenta`: únicos 6, encontrados 7, prorrateo L2 `Decimal("0.20")`. **Mutación:** `v_leads_icp` sin `fusionado_en IS NULL` → 7 y 0.16.
 - [x] T008 [MIN] [Paso 1] **Verde:** los cuerpos de las 9 vistas de spec:313-335, el `GRANT SELECT` a `app_rt` y el `CHECK` de `estado` (P1). **Sin `security_invoker`:** esa opción entra solo en T011, para que T009 nazca rojo.
-- [ ] T009 [MIN] [Paso 1] **Rojo (advisor, RLS):** `backend/tests/integration/test_rls.py`: *(hecho: `[vista]` sobre las dos vistas [MIN] y `test_toda_vista_es_security_invoker`; falta `test_usuarios_tiene_rls`, pausado por Supabase Auth)*
+- [x] T009 [MIN] [Paso 1] **Rojo (advisor, RLS):** `backend/tests/integration/test_rls.py`: *(hecho: `[vista]` sobre las dos vistas [MIN] y `test_toda_vista_es_security_invoker`; falta `test_usuarios_tiene_rls`, pausado por Supabase Auth)*
   - `::test_tenant_b_no_accede_a_datos_de_a[vista]`, sobre cada `v_*`: control positivo de A ≥ 1 fila, B ve 0 filas y 0 filas `TOTAL`. La siembra de A trae una `lead_fuentes` de `osm_overpass`. Rojo hoy: las vistas sin `security_invoker` corren como `postgres`. **Mutación tras el verde:** quitar `security_invoker` de una vista, o quitar `HAVING count(*) > 0` → B ve una fila `TOTAL`.
   - `::test_toda_vista_es_security_invoker`, desde `pg_class`. **Mutación:** una vista sin la opción.
   - `::test_usuarios_tiene_rls`. **Mutación:** sin `ENABLE ROW LEVEL SECURITY`, o sin la política.
   - `::test_tenant_b_no_fusiona_con_lead_de_a`: como `app_rt` con el tenant B, un `UPDATE` de un lead de B con `fusionado_en` = id de un lead de A lanza `ForeignKeyViolation` (sqlstate `23503`). Rojo hoy, porque la FK simple de T005 no pasa por RLS y el `UPDATE` funciona. Control positivo: el mismo `UPDATE` hacia otro lead de B funciona. **Mutación:** FK simple.
+  *Verificado (parte [MIN]): `test_usuarios_tiene_rls` existe; sabotaje `DISABLE ROW LEVEL SECURITY` -> rojo; sabotaje `security_invoker=false` en `v_atribuciones` -> rojo en `[v_atribuciones]` y en `test_toda_vista_es_security_invoker`.*
 - [x] T010 [MIN] [P] [Paso 1] **Rojo (advisor):** `backend/tests/integration/test_privilegios_supabase.py::test_anon_y_authenticated_sin_privilegios` (de la 002) suma `pg_views`, con el assert previo de que esté `v_tablero_fuentes`. **Mutación:** sacar `pg_views` de la unión (falla el assert previo), o `GRANT SELECT ON v_tablero_fuentes TO anon`.
   - **LOW (security):** `::test_anon_y_authenticated_sin_execute_en_funciones_de_public`: recorre `pg_proc` de `public` y falla si `anon` o `authenticated` pueden ejecutar **cualquier** función (hoy `tenant_de_usuario` y las que vengan). **Mutación:** sacar el `REVOKE` de una función.
-- [ ] T011 [MIN] [Paso 1] **Verde:** *(hecho: `security_invoker`; falta la RLS de `usuarios`, pausado por Supabase Auth)*
+- [x] T011 [MIN] [Paso 1] **Verde:** *(hecho: `security_invoker`; falta la RLS de `usuarios`, pausado por Supabase Auth)*
   - `security_invoker = true` en las 9 vistas;
   - la RLS de `usuarios`;
   - `FOREIGN KEY (tenant_id, fusionado_en) REFERENCES leads (tenant_id, id)`, que se apoya en `leads_tenant_id_id_key` (002 migración:41).
-- [ ] T012 [MIN] [Paso 1] **Rojo (security, RLS):** `backend/tests/integration/test_usuarios_repo.py`:
+  *Verificado (parte [MIN]): `security_invoker` en las vistas [MIN] y RLS de `usuarios` en la 0006. La FK compuesta de `fusionado_en` es Pulido.*
+- [x] T012 [MIN] [Paso 1] **Rojo (security, RLS):** `backend/tests/integration/test_usuarios_repo.py`:
   - `::test_app_rt_no_lee_usuarios_directo`. **Nace verde:** `app_rt` nunca tuvo `SELECT` sobre `usuarios`. Es una guarda. **Sabotaje:** `GRANT SELECT ON usuarios TO app_rt` → rojo, y se revierte. **LOW (security):** el test fija `app.tenant_id` del tenant dueño de la fila y exige sqlstate `42501` (privilegio insuficiente), para que no pase por un error de `current_setting`.
   - `::test_tenant_de_usuario_devuelve_solo_ese_usuario`. Con usuarios de 2 tenants, `tenant_de_usuario(<auth_user_id de A>)` devuelve 1 fila (tenant de A, `idioma_usuario`, `idioma_tenant`) y un uuid inexistente devuelve 0. Rojo hoy: el stub `WHERE false` devuelve 0 filas. **Mutación:** sin el `WHERE u.auth_user_id = p_auth_user_id` → 2 filas.
   - `::test_fijar_idioma_no_cruza_tenants` **(Pulido)**. Control positivo con el tenant de A: `fijar_idioma(<uid de A>, 'en')` modifica 1 fila. Rojo hoy: el stub modifica 0. Después, con el tenant de B sobre el usuario de A, modifica 0. **Mutación:** sin `AND tenant_id = current_setting(...)` → B modifica 1 fila.
   - `::test_funcion_es_security_definer_con_search_path[tenant_de_usuario|fijar_idioma]`, con el `ALTER DEFAULT PRIVILEGES` en `supabase_simulado.sql` (ya está). **Mutación:** sin el `REVOKE` → `anon` tiene `EXECUTE`.
-- [ ] T012b [MIN] [P] [Paso 1] **Rojo (security):** `backend/tests/unit/acceso/test_verificar_token.py`, sin red: el test genera un par EC P-256 y le pasa al verificador un JWKS local.
+  *Verificado (parte [MIN]): sabotaje `GRANT SELECT ON usuarios TO app_rt` -> rojo; `tenant_de_usuario` sin `WHERE` -> rojo en `test_tenant_de_usuario_devuelve_solo_ese_usuario`. `fijar_idioma` es Pulido.*
+- [x] T012b [MIN] [P] [Paso 1] **Rojo (security):** `backend/tests/unit/acceso/test_verificar_token.py`, sin red: el test genera un par EC P-256 y le pasa al verificador un JWKS local.
   - `::test_token_valido_devuelve_sub`: devuelve el `sub` (uuid). Rojo hoy: el esqueleto devuelve un `sub` fijo distinto.
   - `::test_token_invalido_lanza[caso]` → `TokenInvalido`: vencido, sin `exp`, sin `sub`, `aud` distinto, `iss` distinto, firmado con otra clave, `alg=none`, HS256 firmado con la clave pública como secreto (confusión de algoritmo) y `kid` ausente del JWKS y `alg=RS256` con el `kid` de la clave EC. Rojo hoy: el esqueleto no lanza (falla el `pytest.raises`). **Mutaciones:** sin `audience`; sin `issuer`; sin `require`; `clave.key` en vez del `PyJWK` entero (muere `alg_rs256_con_kid_ec`); sin el `except` de `PyJWKClientConnectionError` (muere `test_jwks_inaccesible_no_es_token_invalido`); `timeout` distinto de 5. `algorithms` con `HS256`, `algorithms` tomado del header o sin `algorithms` (las mata `::test_clave_simetrica_en_el_jwks_no_valida_tokens_hs256`: JWKS envenenado con una clave `oct`/HS256 y un token HS256 firmado con ella; con el `PyJWK` entero el `alg` del token coincide con el de la clave, así que solo la lista `algorithms` lo rechaza). Caso `nbf_futuro` (muere sin `verify_nbf`).
   - **LOW (security):** `::test_sub_que_no_es_uuid_lanza[caso]` (`sub` ausente de forma de uuid, vacío, numérico): `TokenInvalido`, nunca un `ValueError` sin capturar. **Mutación:** `UUID(sub)` fuera del `try`.
-- [ ] T013 [MIN] [Paso 1] **Verde:**
+  *Verificado: `test_verificar_token.py` verde con los casos de la tarea (incluye JWKS inaccesible, timeout 5 s y clave simétrica).*
+- [x] T013 [MIN] [Paso 1] **Verde:**
   - `tenant_de_usuario` real (`SECURITY DEFINER` con `search_path`), el `REVOKE`/`GRANT` y el `DO` con el guard de `pg_roles`;
   - `acceso/infraestructura/verificador_jwks.py` (`PyJWKClient`, el `PyJWK` entero a `jwt.decode`, `algorithms=["ES256","RS256"]`, `audience`, `issuer`, `require`; `PyJWKClientConnectionError` → `JwksInaccesible`); `pyjwt[crypto]` en `pyproject.toml`; **LOW:** `PyJWKClient(..., timeout=5)` (~5 s): un JWKS colgado no deja colgada la API.
   - `AUTH_JWKS_URL` y `AUTH_ISSUER` en `Settings`, `.env.example` y `docs/referencia-configuracion.md` si existe;
@@ -84,7 +90,7 @@
   - **Procedimiento de baja** (LOW): se borra la fila de `usuarios` (la cuenta de Supabase se deshabilita aparte, paso humano); queda escrito en `docs/arquitectura-backend.md` (T049) y en el docstring de `crear_usuario.py`.
 
 **Checkpoint**: vistas, RLS, privilegios y usuarios verdes.
-
+  *Verificado (parte [MIN]): `tenant_de_usuario`, verificador JWKS, `AUTH_*` en `SettingsApi` y `.env.example`, `crear_usuario.py` con `getpass` y procedimiento de baja en el docstring, `hmac_email` borrado (guarda `test_sin_login_propio.py`), `test_migracion_0006.py`. La baja en `docs/arquitectura-backend.md` queda en T049.*
 ## Fase 3: `gasto_busqueda` y lote (Paso 2)
 
 - [ ] T014 [Pulido] [Paso 2] **Rojo (advisor, costos):** `backend/tests/integration/test_costos_repo.py::test_gasto_busqueda_suma_lista_del_lote`, con montos no enteros (`0.40` gratis y `0.07`) y filas de otro lote; espera `Decimal("0.47")`. **Mutación:** sumar `monto_real` → 0.07, o sin el filtro de `lote_id` → incluye el otro lote.
