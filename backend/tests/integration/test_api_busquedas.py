@@ -10,6 +10,7 @@ Sin red: los dos hosts (Overpass y datos.gov.co) los atiende un MockTransport. D
 import json
 from decimal import Decimal
 import re
+from decimal import Decimal
 from types import SimpleNamespace
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -147,6 +148,86 @@ def test_ejecutar_dos_veces_da_409_y_no_vuelve_a_llamar_ni_a_cobrar(api, admin, 
     assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=busqueda_id) == "completada"
 
 
+# --- tope de gasto (advisor, costos) --------------------------------------------------------------------------
+
+def test_ejecutar_con_costo_maximo_sobre_tope_da_409(api, admin, usuarios):
+    # OSM (0.00042) + datos.gov.co (0.00084) = 0.00126 de peor caso: el tope de 0.0001 no alcanza ni para una.
+    r = _vista_previa(api, usuarios["a"], tope_gasto_usd="0.0001")
+    assert r.status_code == 201
+    assert r.json()["dentro_del_tope"] is False
+    assert r.json()["costo_maximo_usd"] is not None and Decimal(r.json()["costo_maximo_usd"]) == Decimal("0.00126")
+    busqueda_id = r.json()["busqueda_id"]
+    filas_antes = _contar(admin, "SELECT count(*) FROM costos WHERE tenant_id = :a", a=usuarios["tenant_a"])
+
+    ejecutada = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert ejecutada.status_code == 409
+    assert ejecutada.json() == {"detail": "tope_excedido"}  # un código; distinto de "ya_ejecutada"
+    assert api.pedidas == []  # 0 requests a las fuentes
+    assert _contar(admin, "SELECT count(*) FROM costos WHERE tenant_id = :a", a=usuarios["tenant_a"]) == filas_antes
+    assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=busqueda_id) == "borrador"
+    assert _contar(admin, "SELECT count(*) FROM leads WHERE tenant_id = :a", a=usuarios["tenant_a"]) == 0
+
+
+def test_tope_justo_para_el_costo_maximo_ejecuta(api, admin, usuarios):
+    busqueda_id = _crear(api, usuarios["a"], tope_gasto_usd="0.00126")
+
+    r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert r.status_code == 200 and r.json()["estado"] == "completada"
+    assert len(api.pedidas) > 0
+
+
+def _con_croma(api):
+    """Lo que arma el lifespan cuando hay CROMA_API_KEY: Croma en el registro, la key en Settings y los límites del YAML."""
+    from pydantic import SecretStr
+
+    from app.composicion import registro_api
+    from app.modulos.descubrimiento.infraestructura.adaptadores import catalogo
+
+    estado = api.app.state
+    estado.settings = estado.settings.model_copy(update={"croma_api_key": SecretStr("clave-de-prueba")})
+    estado.registro = registro_api(BACKEND / "config" / "fuentes.yaml", catalogo)
+    estado.limites = yaml.safe_load((BACKEND / "config" / "fuentes.yaml").read_text())["limites"]
+    previo = estado.transporte_http
+
+    def responder(request):
+        if request.url.host == "api.croma.run":
+            api.pedidas.append(request)
+            return httpx.Response(200, json={"total": 1, "data": [
+                {"nit": "900.555.444-3", "name": "EMPRESA SINTETICA S.A.S.", "city": "BOGOTÁ", "ciiu_code": "4711"}]})
+        return previo.handle_request(request)
+
+    estado.transporte_http = httpx.MockTransport(responder)
+
+
+def test_con_croma_el_tope_corta_antes_de_gastar_un_credito(api, admin, usuarios):
+    _con_croma(api)
+    r = _vista_previa(api, usuarios["a"], tope_gasto_usd="0.0013")  # OSM + datos.gov.co (0.00126) caben; con Croma (0.00225) no
+    assert r.json()["dentro_del_tope"] is False and Decimal(r.json()["costo_maximo_usd"]) == Decimal("0.00225")
+
+    ejecutada = _ejecutar_o_500(api, usuarios["a"], r.json()["busqueda_id"])
+
+    assert (ejecutada.status_code, ejecutada.json()) == (409, {"detail": "tope_excedido"})
+    assert api.pedidas == []
+    assert _contar(admin, "SELECT count(*) FROM costos WHERE tenant_id = :a", a=usuarios["tenant_a"]) == 0
+
+
+def test_con_croma_y_tope_suficiente_deja_fila_croma_consulta_del_lote_y_lead_juridico(api, admin, usuarios):
+    _con_croma(api)
+    busqueda_id = _crear(api, usuarios["a"])  # tope 5
+
+    r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert r.status_code == 200
+    assert _contar(admin, "SELECT count(*) FROM costos WHERE tenant_id = :a AND tipo = 'croma_consulta' AND proveedor = 'croma' "
+                          "AND lote_id = :l AND unidades = 1", a=usuarios["tenant_a"], l=busqueda_id) == 1
+    assert _contar(admin, "SELECT tipo_titular FROM leads WHERE tenant_id = :a AND id_fiscal = '900555444'",
+                   a=usuarios["tenant_a"]) == "juridica"
+    assert _contar(admin, "SELECT count(*) FROM cumplimiento WHERE tenant_id = :a AND fuente = 'croma_supersociedades_co' "
+                          "AND licencia LIKE '%Croma%' AND url_origen LIKE '%?nit=900555444'", a=usuarios["tenant_a"]) == 1
+
+
 # --- validación -----------------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("cambios, campo", [
@@ -186,12 +267,14 @@ def test_vista_previa_devuelve_motivos_como_codigo(api, admin, usuarios):
     UUID(cuerpo["busqueda_id"])
     assert [f["fuente"] for f in cuerpo["fuentes"]] == ["datos_gov_co_rues"]
     assert cuerpo["descartadas"] == [{"fuente": "osm_overpass", "motivo": "sin_mapeo_actividad"}]
-    # [MIN]: sin `contar` no hay conteo ni costos, y la API no inventa números: null, nunca 0.
+    # Sin `contar` (Pulido) no hay conteo ni estimado: null, nunca 0. El tope sí se aplica: costo máximo y veredicto.
     assert cuerpo["fuentes"][0] == {"fuente": "datos_gov_co_rues", "conteo": None, "motivo": "sin_conteo",
                                     "ignorados": ["ciudad"], "truncado": False}
-    for clave in ("costo_vista_previa_usd", "costo_estimado_usd", "costo_maximo_usd", "creditos_restantes_mes",
-                  "requests_restantes_24h", "dentro_del_tope"):
-        assert cuerpo[clave] is None, clave  # el tope no se aplica todavía: no se declara "dentro" ni "fuera"
+    for clave in ("costo_vista_previa_usd", "costo_estimado_usd", "creditos_restantes_mes", "requests_restantes_24h"):
+        assert cuerpo[clave] is None, clave
+    assert cuerpo["costo_maximo_usd"] is not None
+    assert Decimal(cuerpo["costo_maximo_usd"]) == Decimal("0.00084")  # solo datos.gov.co: 2 x 2 x 30 s x 0.0000070
+    assert cuerpo["dentro_del_tope"] is True  # tope 5
     assert api.pedidas == []  # la vista previa del [MIN] no sale a ninguna fuente
     assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=cuerpo["busqueda_id"]) == "borrador"
 

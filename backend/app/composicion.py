@@ -30,14 +30,10 @@ def cargar_tarifas() -> dict[str, Decimal]:
 
 
 def registro_api(ruta_yaml: Path, catalogo: dict[str, type]) -> Registro:
-    """El registro que arma la API: las fuentes habilitadas y gratuitas.
-
-    Croma (de pago) queda afuera mientras el tope de gasto no esté verde (Pulido: T014-T020, T026b): la API no
-    aplica `tope_gasto_usd` todavía, así que no puede gastar crédito. Aunque alguien sume Croma al catálogo, acá no entra.
-    """
-    registro = cargar_registro(ruta_yaml, catalogo)
-    gratuitas = {clave: (clase, meta) for clave, (clase, meta) in registro.fuentes.items() if meta.proveedor != "croma"}
-    return Registro(gratuitas, registro.sin_implementacion)
+    """El registro que arma la API. Croma (de pago) entra porque el tope de gasto está aplicado: `EjecutarBorrador` corta
+    con `TopeExcedido` antes de la llamada que lo pasaría (guardas en tests/unit/api/test_composicion.py). Sin
+    CROMA_API_KEY, `app.main` no lo pone en el catálogo y queda como `sin_implementacion`."""
+    return cargar_registro(ruta_yaml, catalogo)
 
 
 def armador_de_fuente(
@@ -68,6 +64,8 @@ def armador_de_fuente(
                 kwargs["url"] = ajustes().overpass_url
         elif meta.proveedor == "croma":
             kwargs.update(api_key=api_key.get_secret_value(), limites=limites)
+            if ajustes().croma_base_url:
+                kwargs["url"] = ajustes().croma_base_url
         return clase(**kwargs)
     return armar
 

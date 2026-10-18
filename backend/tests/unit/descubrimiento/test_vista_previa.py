@@ -9,21 +9,24 @@ from tests.falsos import FabricaFalsa, RegistroCostosFalso, RepositorioLeadsFals
 ACTIVIDADES = {"4711": ("shop=supermarket", "shop=convenience")}
 
 
-def _meta(clave, paises, filtros):
+def _meta(clave, paises, filtros, costo_maximo_llamada=Decimal("0")):
     return MetaFuente(clave=clave, proveedor=clave.split("_")[0], paises=frozenset(paises), filtros=frozenset(filtros),
-                      trae=frozenset({"nombre"}), tipo="live", licencia=f"lic_{clave}")
+                      trae=frozenset({"nombre"}), tipo="live", licencia=f"lic_{clave}",
+                      costo_maximo_llamada=costo_maximo_llamada)
 
 
 METAS = {
-    "croma_supersociedades_co": _meta("croma_supersociedades_co", {"CO"}, {"ciiu", "departamento", "ingresos_min"}),
-    "osm_overpass": _meta("osm_overpass", {"CO", "PE"}, {"tipo_negocio", "ciudad"}),
+    "croma_supersociedades_co": _meta("croma_supersociedades_co", {"CO"}, {"ciiu", "departamento", "ingresos_min"},
+                                      Decimal("0.00099")),
+    "osm_overpass": _meta("osm_overpass", {"CO", "PE"}, {"tipo_negocio", "ciudad"}, Decimal("0.00042")),
 }
+RUES = _meta("datos_gov_co_rues", {"CO"}, {"ciiu", "departamento"}, Decimal("0.00084"))
 
 
-def _caso():
-    repo, costos = RepositorioLeadsFalso(), RegistroCostosFalso()
-    fabrica = FabricaFalsa(costos, METAS)
-    return VistaPrevia(repo, fabrica, ACTIVIDADES), repo, fabrica
+def _caso(metas=METAS, costos=None):
+    repo, costos = RepositorioLeadsFalso(), costos or RegistroCostosFalso()
+    fabrica = FabricaFalsa(costos, metas)
+    return VistaPrevia(repo, fabrica, ACTIVIDADES, costos), repo, fabrica
 
 
 def test_conteo_por_fuente_y_motivo_de_las_descartadas():
@@ -66,3 +69,66 @@ def test_crea_busqueda_en_borrador_con_criterios():
     assert type(guardado[2]) is Decimal
     # lote = búsqueda: las fuentes se piden una vez y con el id del borrador, que ya existe.
     assert fabrica.llamadas == [r.busqueda_id]
+
+
+# --- costo máximo y tope (advisor, costos) --------------------------------------------------------------------
+
+CO = CriteriosICP(pais="CO", filtros={"ciiu": "4711", "ciudad": "Bogotá", "departamento": "Cundinamarca"})
+
+
+def test_costo_maximo_suma_costo_maximo_llamada_de_cada_fuente():
+    caso, _, _ = _caso()
+
+    r = caso.ejecutar(CO, "email", Decimal("5.00"), None)
+
+    assert type(r.costo_maximo_usd) is Decimal
+    assert r.costo_maximo_usd == Decimal("0.00141")  # 0.00099 + 0.00042; el libro del lote nuevo está vacío
+
+
+def test_costo_maximo_incluye_datos_gov_co_rues():
+    # Si el cálculo iterara un subconjunto fijo de claves, el tope se calcularía sin este adaptador y nadie lo notaría.
+    caso, _, _ = _caso({**METAS, "datos_gov_co_rues": RUES})
+
+    r = caso.ejecutar(CO, "email", Decimal("5.00"), None)
+
+    assert r.costo_maximo_usd == Decimal("0.00225")  # + 2 requests x 2 intentos x 30 s x 0.0000070
+
+
+def test_costo_maximo_suma_solo_las_fuentes_seleccionadas():
+    caso, _, _ = _caso()
+    pe = CriteriosICP(pais="PE", filtros={"ciiu": "4711", "ciudad": "Lima"})  # Croma no cubre PE
+
+    r = caso.ejecutar(pe, "email", Decimal("5.00"), None)
+
+    assert r.costo_maximo_usd == Decimal("0.00042")
+
+
+def test_costo_maximo_incluye_lo_ya_gastado_en_el_lote():
+    class LibroConGasto(RegistroCostosFalso):
+        def gasto_busqueda(self, busqueda_id):
+            return Decimal("0.00113")
+
+    caso, _, _ = _caso(costos=LibroConGasto())
+
+    r = caso.ejecutar(CO, "email", Decimal("5.00"), None)
+
+    assert r.costo_maximo_usd == Decimal("0.00254")  # 0.00113 + 0.00141
+
+
+def test_dentro_del_tope_es_inclusivo_en_el_borde():
+    caso, _, _ = _caso()
+
+    justo = caso.ejecutar(CO, "email", Decimal("0.00141"), None)
+    corto = caso.ejecutar(CO, "email", Decimal("0.00140"), None)
+
+    assert justo.dentro_del_tope is True  # <=, no <
+    assert corto.dentro_del_tope is False
+    assert corto.busqueda_id is not None  # fuera del tope igual crea el borrador: el usuario ajusta y vuelve a pedir
+
+
+def test_dentro_del_tope_nunca_es_none_con_tope_y_fuentes():
+    caso, _, _ = _caso()
+
+    r = caso.ejecutar(CO, "email", Decimal("5.00"), None)
+
+    assert r.dentro_del_tope is True  # null = "no se aplica"; ya se aplica

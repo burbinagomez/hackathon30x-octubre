@@ -117,6 +117,9 @@ class MetaFuente:  # sale de la entrada de fuentes.yaml, no de la clase
     licencia: str
     endpoint: str | None = None
     tipo_titular_implicito: TipoTitular | None = None
+    # Cota alta de lo que puede costar UNA llamada a `buscar`, a valor de lista. La fija cada adaptador al armarse
+    # (dataclasses.replace) con su tarifa; el tope de gasto la usa. 0 = "no declarado": la suite de contrato lo rechaza.
+    costo_maximo_llamada: Decimal = Decimal("0")
 
 
 def cubre(meta: MetaFuente, criterios: CriteriosICP) -> bool:
