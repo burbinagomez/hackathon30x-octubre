@@ -538,3 +538,15 @@ test("el_aviso_de_la_sugerencia_no_cambia_el_ancho_de_ningun_campo", async () =>
   await waitFor(() => expect(screen.queryByRole("status")).toHaveTextContent(es.busqueda.frase.revisar));
   expect(clases()).toEqual(antes);
 });
+
+test("despues_de_la_primera_respuesta_no_vuelve_a_preguntar_a_quien_le_vendes", async () => {
+  // QA 2026-10-18: la pregunta grande encima de la tarjeta parecía que la IA no había escuchado.
+  await montar();
+  escribirYSugerir();
+  await verTarjeta();
+
+  expect(screen.getByText(es.busqueda.frase.etiqueta)).toHaveClass("solo-lector");  // accesible, no visible
+  expect(screen.getByLabelText(es.busqueda.frase.etiqueta)).toHaveAttribute("placeholder", es.busqueda.frase.ajustar);
+  expect(screen.getByLabelText(es.busqueda.frase.etiqueta)).toHaveAttribute("rows", "1");
+  expect(en.busqueda.frase.ajustar).toBeTruthy();
+});

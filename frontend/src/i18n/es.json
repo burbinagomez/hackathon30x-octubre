@@ -54,6 +54,7 @@
       "filtros": "Filtros"
     },
     "frase": {
+      "ajustar": "¿Querés ajustar algo?",
       "etiqueta": "¿A quién le vendés y qué ofrecés?",
       "ayuda": "Contame a quién le vendés y qué ofrecés, en una o dos frases. Por ejemplo: vendo software contable a ferreterías medianas en Antioquia.",
       "pensando": "Pensando…",

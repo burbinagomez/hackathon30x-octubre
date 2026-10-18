@@ -78,6 +78,7 @@ export default function ChatFrase({ chat, busqueda, actividades, alEditarEnFiltr
   }
 
   const bloqueado = chat.pensando || chat.limite;
+  const enCurso = chat.mensajes.length > 0;
   const pedido = sugerencia ? aPedido({ ...conSugerencia(INICIAL, sugerencia), tope: chat.tope }) : null;
 
   return (
@@ -96,8 +97,11 @@ export default function ChatFrase({ chat, busqueda, actividades, alEditarEnFiltr
       {chat.limite && <p role="status" className="aviso-ancho">{t("busqueda.frase.limite_turnos")}</p>}
 
       <div className="chat-entrada">
-        <label htmlFor="frase">{t("busqueda.frase.etiqueta")}</label>
+        {/* Después de la primera respuesta la pregunta ya está contestada: queda solo para lectores de pantalla. */}
+        <label htmlFor="frase" className={enCurso ? "solo-lector" : undefined}>{t("busqueda.frase.etiqueta")}</label>
         <textarea id="frase" maxLength={MAX_MENSAJE} value={chat.texto} disabled={chat.limite}
+          rows={enCurso ? 1 : undefined} placeholder={enCurso ? t("busqueda.frase.ajustar") : undefined}
+          className={enCurso ? "chat-entrada-corta" : undefined}
           onChange={(e) => chat.setTexto(e.target.value)} onKeyDown={alTeclear} />
         <div className="acciones acciones-fin">
           {chat.mensajes.length > 0 && (
