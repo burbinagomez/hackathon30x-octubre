@@ -15,6 +15,9 @@ class ResultadoBusqueda:
     busqueda_id: UUID
     sin_fuente_para: tuple[str, Mapping] | None = None  # (pais, filtros) si ninguna fuente cubre el ICP
     errores: Mapping[str, Exception] = field(default_factory=dict)  # clave de fuente -> error, sin tragar
+    encontrados: int = 0  # empresas devueltas por las fuentes
+    unicos: int = 0  # leads distintos entre ellas
+    nuevos: int = 0  # leads creados en esta búsqueda
 
 
 class EjecutarBusqueda:
@@ -30,6 +33,7 @@ class EjecutarBusqueda:
             return ResultadoBusqueda(busqueda_id, sin_fuente_para=(criterios.pais, criterios.filtros))
 
         errores: dict[str, Exception] = {}
+        encontrados, nuevos, leads = 0, 0, set()
         for clave, (meta, fabrica) in cubren.items():
             try:
                 # lote_id = busqueda_id: el CPL de la 005 agrupa los costos por búsqueda.
@@ -41,8 +45,11 @@ class EjecutarBusqueda:
             for empresa in pagina.empresas:
                 if empresa.id_fiscal is not None:
                     empresa = replace(empresa, id_fiscal=normalizar_nit(empresa.id_fiscal))
-                lead_id, _ = self._repo.obtener_o_crear_lead(empresa, meta.licencia)
+                lead_id, nuevo = self._repo.obtener_o_crear_lead(empresa, meta.licencia)
+                encontrados += 1
+                nuevos += nuevo
+                leads.add(lead_id)
                 self._repo.agregar_lead_fuente(lead_id, busqueda_id, empresa, meta.licencia)
 
         self._repo.cerrar_busqueda(busqueda_id, "con_errores" if errores else "terminada")
-        return ResultadoBusqueda(busqueda_id, errores=errores)
+        return ResultadoBusqueda(busqueda_id, errores=errores, encontrados=encontrados, unicos=len(leads), nuevos=nuevos)
