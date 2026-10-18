@@ -8,12 +8,12 @@ from app.modulos.descubrimiento.dominio.modelos import Actividad, CriteriosICP, 
 from tests.falsos import FuenteFalsa, RegistroCostosFalso, RepositorioLeadsFalso
 
 AS_OF = datetime(2026, 10, 1, tzinfo=UTC)
-ICP_CO = CriteriosICP(pais="CO", filtros={"ciiu": "4711"})
-ICP_PE = CriteriosICP(pais="PE", filtros={"ciiu": "4711"})
+ICP_CO = CriteriosICP(pais="CO", filtros={"ciiu": "4711", "ciudad": "Bogotá"})
+ICP_PE = CriteriosICP(pais="PE", filtros={"ciiu": "4711", "ciudad": "Lima"})
 
 
 def _meta(clave, paises=frozenset({"CO"})):
-    return MetaFuente(clave=clave, proveedor=f"prov_{clave}", paises=paises, filtros=frozenset({"ciiu"}),
+    return MetaFuente(clave=clave, proveedor=f"prov_{clave}", paises=paises, filtros=frozenset({"ciiu", "ciudad"}),
                       trae=frozenset({"id_fiscal"}), tipo="live", licencia=f"lic_{clave}")
 
 

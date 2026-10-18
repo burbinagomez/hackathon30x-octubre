@@ -3,9 +3,10 @@ from dataclasses import dataclass, field, replace
 from uuid import UUID
 
 from app.modulos.descubrimiento.dominio.errores import FuenteNoDisponible, LimiteFuenteAgotado
-from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, MetaFuente, cubre
+from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, MetaFuente
 from app.modulos.descubrimiento.dominio.nit import normalizar_nit
 from app.modulos.descubrimiento.dominio.puertos import FuenteDescubrimiento, RepositorioLeads
+from app.modulos.descubrimiento.dominio.seleccion import seleccionar_fuentes
 
 FabricaFuente = Callable[[UUID], FuenteDescubrimiento]  # lote_id -> fuente armada para esa búsqueda
 
@@ -21,24 +22,31 @@ class ResultadoBusqueda:
 
 
 class EjecutarBusqueda:
-    def __init__(self, repo: RepositorioLeads, fuentes: Mapping[str, tuple[MetaFuente, FabricaFuente]]):
+    def __init__(
+        self,
+        repo: RepositorioLeads,
+        fuentes: Mapping[str, tuple[MetaFuente, FabricaFuente]],
+        actividades: Mapping[str, tuple[str, ...]] | None = None,
+    ):
         self._repo = repo
         self._fuentes = fuentes
+        self._actividades = actividades or {}
 
     def ejecutar(self, criterios: CriteriosICP) -> ResultadoBusqueda:
         busqueda_id = self._repo.crear_busqueda(criterios)
-        cubren = {clave: par for clave, par in self._fuentes.items() if cubre(par[0], criterios)}
-        if not cubren:
+        seleccionadas, _ = seleccionar_fuentes([m for m, _ in self._fuentes.values()], criterios, self._actividades)
+        if not seleccionadas:
             self._repo.cerrar_busqueda(busqueda_id, "terminada")
             return ResultadoBusqueda(busqueda_id, sin_fuente_para=(criterios.pais, criterios.filtros))
 
         errores: dict[str, Exception] = {}
         encontrados, nuevos, leads = 0, 0, set()
-        for clave, (meta, fabrica) in cubren.items():
+        for clave, criterios_fuente in seleccionadas.items():
+            meta, fabrica = self._fuentes[clave]
             try:
                 # lote_id = busqueda_id: el CPL de la 005 agrupa los costos por búsqueda.
                 # ponytail: solo página 1; paginar cuando una fuente real devuelva más de una.
-                pagina = fabrica(busqueda_id).buscar(criterios, 1)
+                pagina = fabrica(busqueda_id).buscar(criterios_fuente, 1)
             except (LimiteFuenteAgotado, FuenteNoDisponible) as error:
                 errores[clave] = error
                 continue
