@@ -6,9 +6,14 @@
 -- Todas con `security_invoker = true` (spec:334): sin la opción corren como su dueño (postgres, superusuario) y un tenant
 -- vería los datos del otro. Es el aislamiento del principio III; la prueba de cada vista es de T009.
 
--- `fusionado_en`: el lead absorbido apunta al que lo absorbió (cola de dedup). FK simple acá; la compuesta
--- `(tenant_id, fusionado_en) → leads (tenant_id, id)` es de T011, después de su rojo.
-ALTER TABLE public.leads ADD COLUMN fusionado_en uuid NULL REFERENCES public.leads(id);
+-- `fusionado_en`: el lead absorbido apunta al que lo absorbió (cola de dedup). FK **compuesta** (T011):
+-- `(tenant_id, fusionado_en) → leads (tenant_id, id)`, sobre `leads_tenant_id_id_key` (002:41), como las de la 002.
+-- Una FK simple no pasa por RLS —el chequeo de integridad corre como el dueño de la tabla— y el tenant B podría
+-- colgar su lead del lead de A; lo prueba `test_rls.py::test_tenant_b_no_fusiona_con_lead_de_a`. Va en dos
+-- sentencias porque `REFERENCES` en línea es de una sola columna.
+ALTER TABLE public.leads ADD COLUMN fusionado_en uuid NULL;
+ALTER TABLE public.leads ADD CONSTRAINT leads_tenant_id_fusionado_en_fkey
+  FOREIGN KEY (tenant_id, fusionado_en) REFERENCES public.leads (tenant_id, id);
 
 -- v_costos: la única definición del filtro de evals (desarrollo). Las demás vistas de costo salen de acá.
 -- `fuente_ef` = la fuente de la fila, con la fuente nula como `sin_atribuir` (spec:335).
