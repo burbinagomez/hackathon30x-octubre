@@ -12,7 +12,11 @@ from app import db
 EXCLUIDAS = {"fuente_cache", "usuarios"}
 # usuarios queda fuera: app_rt no tiene privilegios sobre ella (entra solo por tenant_de_usuario), así que el test de
 # tablas daría permission denied y no probaría RLS. Su aislamiento lo prueban test_usuarios_tiene_rls y test_usuarios_repo.
-TABLAS = ["tenants", "busquedas", "leads", "lead_fuentes", "cumplimiento", "costos"]
+TABLAS = ["tenants", "busquedas", "leads", "lead_fuentes", "cumplimiento", "costos", "calificaciones"]
+# calificaciones no tiene id: su fila se identifica por lead_id.
+COLUMNA_ID = {"calificaciones": "lead_id"}
+# app_rt solo tiene SELECT (tenants) o SELECT e INSERT (calificaciones): UPDATE y DELETE fallan por privilegio.
+SIN_UPDATE_NI_DELETE = {"tenants", "calificaciones"}
 
 PRIVILEGIO_INSUFICIENTE = "42501"  # también es el sqlstate de una violación de política RLS
 FK_VIOLADA = "23503"
@@ -54,10 +58,13 @@ def datos():
                            "VALUES (:cumplimiento, :a, :leads, 'f', 'l', 'u', now())"), ids)
             c.execute(text("INSERT INTO costos (id, tenant_id, tipo, unidades, costo_unitario, moneda, proveedor, gratis) "
                            "VALUES (:costos, :a, 'croma_consulta', 1, 0, 'USD', 'croma', true)"), ids)
+            c.execute(text("INSERT INTO calificaciones (tenant_id, lead_id, calificado, calificado_en, minutos) "
+                           "VALUES (:a, :leads, true, now(), 1)"), ids)
+        ids["calificaciones"] = ids["leads"]
         yield ids
     finally:
         with admin.begin() as c:
-            for t in ["lead_fuentes", "cumplimiento", "costos", "leads", "busquedas"]:
+            for t in ["calificaciones", "lead_fuentes", "cumplimiento", "costos", "leads", "busquedas"]:
                 c.execute(text(f"DELETE FROM {t} WHERE tenant_id IN (:a, :b)"), ids)
             c.execute(text("DELETE FROM tenants WHERE id IN (:a, :b)"), ids)
         admin.dispose()
@@ -75,6 +82,8 @@ INSERT_CON_TENANT_DE_A = {
                     "VALUES (:a, :lead_sin_cumplimiento, 'f', 'l', 'u', now())",
     "costos": "INSERT INTO costos (tenant_id, tipo, unidades, costo_unitario, moneda, proveedor, gratis) "
               "VALUES (:a, 'croma_consulta', 1, 0, 'USD', 'croma', true)",
+    "calificaciones": "INSERT INTO calificaciones (tenant_id, lead_id, calificado, calificado_en, minutos) "
+                      "VALUES (:a, :lead_sin_cumplimiento, true, now(), 1)",
 }
 
 
@@ -97,12 +106,12 @@ def test_la_lista_cubre_todas_las_tablas_de_public(rt):
 
 @pytest.mark.parametrize("tabla", TABLAS)
 def test_tenant_b_no_accede_a_datos_de_a(rt, datos, tabla):
-    fila_de_a = f"WHERE id = '{datos[tabla]}'"
-    assert _como_b(rt, datos, f"SELECT id FROM {tabla} {fila_de_a}").all() == []
+    fila_de_a = f"WHERE {COLUMNA_ID.get(tabla, 'id')} = '{datos[tabla]}'"
+    assert _como_b(rt, datos, f"SELECT * FROM {tabla} {fila_de_a}").all() == []
 
-    if tabla == "tenants":
-        # app_rt solo tiene SELECT en tenants: la siembra corre con postgres.
-        for sql in (f"UPDATE tenants SET nombre = nombre {fila_de_a}", f"DELETE FROM tenants {fila_de_a}"):
+    if tabla in SIN_UPDATE_NI_DELETE:
+        # La siembra corre con postgres.
+        for sql in (f"UPDATE {tabla} SET tenant_id = tenant_id {fila_de_a}", f"DELETE FROM {tabla} {fila_de_a}"):
             _rechazado(rt, datos, sql, PRIVILEGIO_INSUFICIENTE)
     else:
         assert _como_b(rt, datos, f"UPDATE {tabla} SET id = id {fila_de_a}").rowcount == 0
@@ -126,6 +135,8 @@ COLGAR_DE_LEAD_DE_A = {
                     "VALUES (:b, :lead_sin_cumplimiento, 'f', 'l', 'u', now())",
     "lead_fuentes_busqueda": "INSERT INTO lead_fuentes (tenant_id, lead_id, busqueda_id, fuente, url_origen, licencia) "
                              "VALUES (:b, :lead_b, :busquedas, 'f', 'u', 'l')",
+    "calificaciones": "INSERT INTO calificaciones (tenant_id, lead_id, calificado, calificado_en, minutos) "
+                      "VALUES (:b, :lead_sin_cumplimiento, true, now(), 1)",
 }
 
 
@@ -135,7 +146,7 @@ def test_tenant_b_no_cuelga_filas_de_un_lead_de_a(rt, datos, tabla):
 
 
 # Vistas del libro. Con datos solo de A (la siembra trae costos, un lead y una lead_fuentes de osm_overpass).
-VISTAS = ["v_tablero_fuentes", "v_atribuciones"]
+VISTAS = ["v_tablero_fuentes", "v_atribuciones", "v_cpql"]
 
 
 def _filas_de_la_vista(rt, tenant, vista):
@@ -147,7 +158,7 @@ def _filas_de_la_vista(rt, tenant, vista):
 def test_tenant_b_no_accede_a_datos_de_a_en_vistas(rt, datos, vista):
     # Control positivo: sin él, el 0 de B no probaría nada.
     assert len(_filas_de_la_vista(rt, datos["a"], vista)) >= 1
-    # También la fila TOTAL de v_tablero_fuentes: solo existe si hay datos (HAVING count(*) > 0).
+    # También la fila TOTAL de v_tablero_fuentes y de v_cpql: solo existe si el tenant tiene datos.
     assert _filas_de_la_vista(rt, datos["b"], vista) == []
 
 

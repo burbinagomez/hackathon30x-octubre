@@ -69,6 +69,7 @@ def test_anon_y_authenticated_sin_privilegios(admin, rol):
                                      "UNION SELECT viewname FROM pg_views WHERE schemaname = 'public'")).scalars())
     assert "leads" in tablas  # una lista vacía dejaría el test verde sin probar nada
     assert "v_tablero_fuentes" in tablas  # y sin las vistas el test no vería un GRANT a anon sobre ellas
+    assert {"calificaciones", "v_cpql"} <= set(tablas)  # 008: la tabla y la vista nuevas entran al barrido
     assert _concedidos(admin, rol, tablas) == []
 
 
