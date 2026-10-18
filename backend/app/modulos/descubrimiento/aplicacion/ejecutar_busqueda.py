@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from uuid import UUID
@@ -12,12 +13,30 @@ from app.modulos.descubrimiento.dominio.errores import (
     LimiteFuenteAgotado,
     TopeExcedido,
 )
-from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, MetaFuente
+from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, MetaFuente, PaginaEmpresas
 from app.modulos.descubrimiento.dominio.nit import normalizar_nit
 from app.modulos.descubrimiento.dominio.puertos import FabricaFuentes, FuenteDescubrimiento, RepositorioLeads
 from app.modulos.descubrimiento.dominio.seleccion import seleccionar_fuentes
 
 FabricaFuente = Callable[[UUID], FuenteDescubrimiento]  # lote_id -> fuente armada para esa búsqueda
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ResultadoFuente:
+    """Qué pasó con una fuente en esta ejecución (spec 015). `estado` es un código; el texto es del front.
+    con_resultados | sin_resultados | no_disponible | no_soporta_criterio | limite_agotado | omitida_por_tope"""
+    estado: str
+    encontrados: int = 0
+
+
+def _estado_de_error(error: Exception) -> str:
+    if isinstance(error, CriterioNoSoportado):
+        return "no_soporta_criterio"
+    if isinstance(error, LimiteFuenteAgotado):
+        return "limite_agotado"
+    return "no_disponible"  # FuenteNoDisponible y todo lo que nadie previó: la fuente no pudo darnos nada
 
 
 @dataclass(frozen=True)
@@ -29,6 +48,7 @@ class ResultadoBusqueda:
     unicos: int = 0  # leads distintos entre ellas
     nuevos: int = 0  # leads creados en esta búsqueda
     omitidas_por_tope: tuple[str, ...] = ()  # fuentes que no se llamaron porque la llamada pasaba el tope
+    por_fuente: Mapping[str, ResultadoFuente] = field(default_factory=dict)  # una entrada por fuente seleccionada
 
 
 def _correr_fuentes(
@@ -52,7 +72,9 @@ def _correr_fuentes(
 
     errores: dict[str, Exception] = {}
     omitidas: list[str] = []
-    encontrados, nuevos, leads = 0, 0, set()
+    paginas: dict[str, PaginaEmpresas] = {}
+    # 1) Salir a las fuentes. Cualquier excepción queda en SU fuente: las demás siguen (spec 015). Sin transacción
+    #    abierta: una llamada de red de 30 s no retiene una conexión de la base.
     for clave, criterios_fuente in seleccionadas.items():
         meta = metas[clave]
         if puede_llamar is not None and not puede_llamar(meta):
@@ -60,22 +82,52 @@ def _correr_fuentes(
             continue
         try:
             # ponytail: solo página 1; paginar cuando una fuente real devuelva más de una.
-            pagina = armar(clave).buscar(criterios_fuente, 1)
-        except (LimiteFuenteAgotado, FuenteNoDisponible, CriterioNoSoportado) as error:  # una fuente caída o que no entiende el ICP no tumba a las demás
+            paginas[clave] = armar(clave).buscar(criterios_fuente, 1)
+        except Exception as error:  # noqa: BLE001 - aislamiento por fuente a propósito
             errores[clave] = error
-            continue
-        for empresa in pagina.empresas:
-            if empresa.id_fiscal is not None:
-                empresa = replace(empresa, id_fiscal=normalizar_nit(empresa.id_fiscal))
-            lead_id, nuevo = repo.obtener_o_crear_lead(empresa, meta.licencia)
-            encontrados += 1
-            nuevos += nuevo
-            leads.add(lead_id)
-            repo.agregar_lead_fuente(lead_id, busqueda_id, empresa, meta.licencia)
+            _loguear_caida(clave, error)
+
+    # 2) Guardar. Una transacción para todo, un savepoint por fuente: si guardar lo de una falla, se deshace solo eso.
+    resultados: dict[str, ResultadoFuente] = {}
+    encontrados, nuevos, leads = 0, 0, set()
+    with repo.transaccion():
+        for clave, pagina in paginas.items():
+            meta = metas[clave]
+            n_fuente, n_nuevos, ids = 0, 0, set()
+            try:
+                with repo.savepoint():
+                    for empresa in pagina.empresas:
+                        if empresa.id_fiscal is not None:
+                            empresa = replace(empresa, id_fiscal=normalizar_nit(empresa.id_fiscal))
+                        lead_id, nuevo = repo.obtener_o_crear_lead(empresa, meta.licencia)
+                        n_fuente += 1
+                        n_nuevos += nuevo
+                        ids.add(lead_id)
+                        repo.agregar_lead_fuente(lead_id, busqueda_id, empresa, meta.licencia)
+            except Exception as error:  # noqa: BLE001 - lo de esta fuente ya se deshizo; las demás siguen
+                errores[clave] = error
+                _loguear_caida(clave, error)
+                continue
+            encontrados, nuevos, leads = encontrados + n_fuente, nuevos + n_nuevos, leads | ids
+            resultados[clave] = ResultadoFuente("con_resultados" if n_fuente else "sin_resultados", n_fuente)
+
+    por_fuente = {}
+    for clave in seleccionadas:  # en el orden de la selección
+        if clave in errores:
+            por_fuente[clave] = ResultadoFuente(_estado_de_error(errores[clave]))
+        elif clave in omitidas:
+            por_fuente[clave] = ResultadoFuente("omitida_por_tope")
+        else:
+            por_fuente[clave] = resultados[clave]
 
     repo.cerrar_busqueda(busqueda_id, estado_final(errores, len(seleccionadas), tuple(omitidas)))
     return ResultadoBusqueda(busqueda_id, errores=errores, encontrados=encontrados, unicos=len(leads), nuevos=nuevos,
-                             omitidas_por_tope=tuple(omitidas))
+                             omitidas_por_tope=tuple(omitidas), por_fuente=por_fuente)
+
+
+def _loguear_caida(clave: str, error: Exception) -> None:
+    """Solo la clave de la fuente y la clase de la excepción: el mensaje y el traceback pueden traer nombres, NIT o URLs."""
+    logger.warning("fuente_caida fuente=%s error=%s", clave, type(error).__name__)
 
 
 class EjecutarBusqueda:

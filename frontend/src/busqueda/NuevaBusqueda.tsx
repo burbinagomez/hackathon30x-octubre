@@ -2,8 +2,9 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { navegar } from "../compartido/navegar";
 import { divisionesDe, ejecutar, listarActividades, listarPaises, vistaPrevia } from "./api";
+import ResultadoPorFuente from "./ResultadoPorFuente";
 import ResultadoVistaPrevia from "./ResultadoVistaPrevia";
-import type { Actividad, Division, PedidoVistaPrevia, VistaPrevia } from "./tipos";
+import type { Actividad, Division, PedidoVistaPrevia, ResultadoEjecucion, VistaPrevia } from "./tipos";
 
 const CANALES = ["email"];
 
@@ -51,6 +52,7 @@ export default function NuevaBusqueda() {
   const [paises, setPaises] = useState<string[]>([]);
   const [divisiones, setDivisiones] = useState<Division[]>([]);
   const [fallo, setFallo] = useState(false);
+  const [resultado, setResultado] = useState<ResultadoEjecucion | null>(null);
 
   useEffect(() => {
     listarActividades().then(setActividades).catch(() => undefined);
@@ -74,6 +76,7 @@ export default function NuevaBusqueda() {
       campo === "pais" ? { departamento: "", ciudad: "" } : campo === "departamento" ? { ciudad: "" } : {};
     setForm((f) => ({ ...f, [campo]: valor, ...sueltan }));
     setVista(null);
+    setResultado(null);
   }
 
   async function intentar(accion: () => Promise<void>) {
@@ -98,7 +101,7 @@ export default function NuevaBusqueda() {
   const exclusiones = entrada("exclusiones", t("busqueda.exclusiones"));
   const tope = entrada("tope", t("busqueda.tope"), "number");
   const nombre = (a: Actividad) => (i18n.language === "en" ? a.nombre_en ?? a.nombre_es : a.nombre_es);
-  const puedeBuscar = vista !== null && vista.dentro_del_tope !== false && vista.fuentes.length > 0;
+  const puedeBuscar = resultado === null && vista !== null && vista.dentro_del_tope !== false && vista.fuentes.length > 0;
 
   return (
     <main className="pantalla">
@@ -170,14 +173,25 @@ export default function NuevaBusqueda() {
         disabled={!puedeBuscar}
         onClick={() =>
           intentar(async () => {
-            await ejecutar(vista!.busqueda_id);
-            navegar("/tablero");
+            // Se queda en la pantalla: primero se lee qué pasó con cada fuente; el tablero es un clic aparte.
+            setResultado(await ejecutar(vista!.busqueda_id));
           })
         }
       >
         {t("busqueda.buscar")}
       </button>
       </div>
+      {resultado && (
+        <>
+          <ResultadoPorFuente porFuente={resultado.por_fuente} />
+          {resultado.estado === "error" && <p role="status">{t("ejecucion.ninguna_respondio")}</p>}
+          <div className="acciones">
+            <button type="button" className="boton" onClick={() => navegar("/tablero")}>
+              {t("ejecucion.ver_tablero")}
+            </button>
+          </div>
+        </>
+      )}
       {fallo && <p role="alert" className="error">{t("busqueda.error")}</p>}
       </div>
     </main>

@@ -150,5 +150,19 @@
     },
     "titulo_de_fuente": "Leads de {{fuente}}",
     "titulo_todos": "Todos los leads"
+  },
+  "ejecucion": {
+    "titulo": "Resultado por fuente",
+    "estado": {
+      "con_resultados_one": "{{n}} empresa",
+      "con_resultados_other": "{{n}} empresas",
+      "sin_resultados": "sin resultados para este filtro",
+      "no_disponible": "no disponible ahora",
+      "no_soporta_criterio": "no admite este criterio de búsqueda",
+      "limite_agotado": "límite de la fuente alcanzado",
+      "omitida_por_tope": "no se consultó, pasaría el tope de gasto"
+    },
+    "ninguna_respondio": "Ninguna fuente respondió. Probá de nuevo más tarde.",
+    "ver_tablero": "Ver el tablero"
   }
 }
