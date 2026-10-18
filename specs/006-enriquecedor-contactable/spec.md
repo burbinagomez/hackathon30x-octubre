@@ -210,3 +210,28 @@ Este slice corre `uv run python -m evals.run --eval encaje_icp` con el `jev` rea
 **Riesgo para decidir por Daniel (no resuelto por código).** Una persona natural **sin matrícula mercantil** en el RUES cuyo nombre coincide con una SAS de la misma ciudad (p. ej. el comerciante informal "Juan Pérez" y la sociedad "JUAN PEREZ SAS") es indistinguible de la SAS con estos datos: el conteo de naturales solo ve a las matriculadas. Con la regla "nombre + ciudad" ese lead sube a `juridica` y se contacta, y el contacto sería de una persona natural (SIC 17-96489). El código no puede cerrarlo sin otro dato (dirección, CIIU, dominio del sitio contra la sociedad). Decisión pendiente: aceptar el riesgo residual, exigir un segundo dato (p. ej. dominio web) o limitar la regla a nombres que no parezcan de persona.
 
 **Fuera del alcance:** ampliar `camaras_co.yaml` a las 58 cámaras (T054 de la 011); países distintos de CO (el verificador los deja `pais_no_soportado`); desambiguar por CIIU o dirección.
+
+## Enmienda 2026-10-18: buscador de sitio web (`dominio_por_razon_social`)
+
+**Por qué.** Las empresas que vienen del RUES (datos.gov.co) son jurídicas pero no traen teléfono, email ni web, así que `sitio_web` no tiene nada que leer y no se las puede contactar; OSM, que sí trae web y teléfono, está caído.
+
+**Decisión del dueño (Daniel Mejía, 2026-10-18), textual:** "me parece crucial porque de qué otra manera los podemos contactar si no es así".
+
+**Regla.** Para un lead `juridica` sin web se prueban dominios armados con su razón social y se acepta uno **solo si la página prueba que es de esa empresa**; después el enriquecimiento normal (`sitio_web`) saca el contacto de esa web. Solo canal publicado por la propia empresa (cumplimiento-datos); el sitio web del lead es fuente permitida (fuentes-publicas).
+- **Candidatos (dominio puro):** razón social sin tildes, en minúsculas, sin sufijos societarios (`SAS`, `S.A.S.`, `LTDA`, `S.A.`, `EU`, `SCA`, `SCS`), sin `EN LIQUIDACION` / `EN REORGANIZACION` ni puntuación. Variantes: palabras juntas y con guion; con más de 3 palabras, además las 2 primeras juntas. TLD: `.com.co`, `.com`, `.co`. Máximo 6 por lead. Un candidato hecho solo de palabras genéricas (`comercial`, `grupo`, `inversiones`, `servicios`...) se descarta.
+- **DNS primero:** el que no resuelve se descarta sin HTTP. El que resuelve a IP no pública, o redirige a una, no se pide.
+- **Verificación obligatoria:** GET de la portada (4 s, mismo User-Agent y misma guarda SSRF que `sitio_web`; redirecciones solo dentro del dominio). Se acepta si el HTML trae el NIT (sin DV, con o sin puntos; al menos 7 dígitos, como número entero, no parte de uno más largo) o la razón social normalizada completa, sin sufijo, como palabras enteras. Si no, se descarta. Gana el primer candidato verificado.
+- **Costos:** cada request escribe `web_fetch` (`proveedor='web'`, `fuente=NULL`, `lead_id` del lead) antes de enviarse, igual que `sitio_web`.
+- **Evidencia en `cumplimiento`:** cada dominio aceptado agrega a `cumplimiento.solicitudes` `{tipo: sitio_web_encontrado, fuente: dominio_por_razon_social, url, motivo: nit|razon_social, ts}`. Nunca contacto. Sin DDL: se guarda en `leads.web` (la columna que ya usa OSM), que nunca pisa una web existente.
+- **Tiempo:** `POST /busquedas/{id}/enriquecer` pasa por Cloudflare (corta a los 100 s). Los leads de una tanda corren en paralelo (máximo 8 hilos) con un presupuesto total de 60 s; los que no terminan quedan pendientes ("Seguir con los que quedan"). Plazo de 12 s por lead para el buscador.
+- **Config:** `enriquecedores.dominio_por_razon_social.habilitado` en `fuentes.yaml`; `false` lo apaga y el lead sin web se queda sin web.
+
+**Terminado cuando (tests que hoy fallan):** `tests/unit/enriquecimiento/test_dominios.py`, `test_dominio_por_razon_social.py`, `test_enriquecer_lead_sitio.py`, `tests/unit/test_composicion_buscador.py` y `tests/integration/test_buscar_sitio_web.py` (lead del RUES sin web, con transporte falso que sirve su NIT y un teléfono: queda con web, teléfono cifrado, contactable y sale en `GET /calificaciones/exportar`).
+
+**Riesgos conscientes (para Daniel).**
+- Falso positivo: una página que cita el NIT o el nombre de otra empresa (un directorio, un cliente) se aceptaría. El NIT es más fuerte que el nombre; una razón social de una sola palabra corriente es el caso más débil.
+- El mismo riesgo residual de persona natural de la enmienda anterior sigue: el sitio solo se busca para `juridica`.
+- No se consulta `robots.txt` para la portada de verificación (no se extrae contacto de ahí); `sitio_web` sí lo respeta al leer el contacto.
+- Un hilo que pasa del presupuesto no se cancela: termina en segundo plano y su costo queda escrito, pero su lead no se guarda y se rehace en la próxima tanda.
+
+**Fuera del alcance:** buscar en buscadores o directorios; dominios de otros países (CO primero); `.net`/`.org`; reintentar candidatos por `http://`.
