@@ -1,14 +1,20 @@
 import ast
+import logging
 import re
+import traceback
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 from sqlalchemy import text
 
+from app.cli import Persistencia, main
+from app.modulos.descubrimiento.dominio.errores import ErrorPersistencia
 from app.modulos.descubrimiento.dominio.modelos import Actividad, EmpresaCruda
 from app.modulos.descubrimiento.infraestructura.persistencia.repositorio_leads import RepositorioLeadsPostgres
 from app.seguridad.catalogo_sensibles import CIFRADAS, CONDICIONALES
+from tests.falsos import FuenteFalsa, RegistroCostosFalso
+from tests.integration.ayudas_osm import FIXTURE, buscar_osm
 
 BACKEND = Path(__file__).resolve().parents[2]
 APP = BACKEND / "app"
@@ -149,3 +155,63 @@ def test_nombre_solo_se_lee_por_el_repositorio():
     sueltos = [str(f.relative_to(BACKEND)) for carpeta in ("app", "evals", "scripts") for f in (BACKEND / carpeta).rglob("*.py")
                if f not in PERMITIDOS and menciona_la_tabla_leads(f.read_text())]
     assert sueltos == []
+
+
+class _FuenteConNombre(FuenteFalsa):
+    """Para correr la CLI: una fuente que devuelve un desconocido con nombre y dirección."""
+
+    def __init__(self, *, meta, registro_costos, lote_id, **kwargs):
+        super().__init__(meta, registro_costos, lote_id, (_empresa("desconocido"),))
+
+
+def _sensibles_de_la_fixture():
+    tags = [e["tags"] for e in FIXTURE["elements"]]
+    return [t["name"] for t in tags if "name" in t] + [t["addr:street"] for t in tags if "addr:street" in t] \
+        + [t["addr:housenumber"] for t in tags if "addr:housenumber" in t]
+
+
+def test_contacto_no_aparece_en_logs(rt, tenants, cifrador, caplog, capsys, monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://app_rt@localhost/sin_uso")  # la CLI lee repo_url de Settings
+    caplog.set_level(logging.DEBUG)  # raíz: incluye httpx, sqlalchemy y psycopg
+    sensibles = [*_sensibles_de_la_fixture(), NOMBRE, DIRECCION]
+    assert len(sensibles) > 4  # la fixture sí trae nombres y direcciones que buscar
+
+    buscar_osm(rt, tenants["a"], cifrador)
+    persistencia = Persistencia(RepositorioLeadsPostgres(rt, tenants["a"], cifrador), RegistroCostosFalso())
+    assert main(["buscar", "--tenant", str(tenants["a"]), "--pais", "CO", "--ciiu", "4711", "--ciudad", "Bogotá"],
+                catalogo={"osm_overpass": _FuenteConNombre}, persistencia=persistencia) == 0
+
+    captura = capsys.readouterr()
+    volcado = caplog.text + captura.out + captura.err
+    assert volcado  # el resumen de la CLI sí imprime algo
+    assert [s for s in sensibles if s in volcado] == []
+
+
+def _identidad_en_claro(self, e, lead_id):
+    return {"nombre": e.nombre, "direccion": e.direccion, "nombre_cifrado": None, "direccion_cifrada": None}
+
+
+def test_una_violacion_de_check_no_filtra_nombre_ni_direccion(rt, tenants, cifrador, monkeypatch, caplog, capsys):
+    caplog.set_level(logging.DEBUG)
+    # Un bug que guarde en claro a un desconocido: el CHECK lo frena y Postgres pone la fila entera en el DETAIL.
+    monkeypatch.setattr(RepositorioLeadsPostgres, "_identidad", _identidad_en_claro)
+
+    with pytest.raises(Exception) as exc:
+        _crear(rt, tenants["a"], cifrador, "desconocido")
+
+    captura = capsys.readouterr()
+    volcado = "".join(traceback.format_exception(exc.value)) + caplog.text + captura.out + captura.err
+    assert type(exc.value) is ErrorPersistencia
+    assert exc.value.__cause__ is None and exc.value.__suppress_context__  # from None
+    assert NOMBRE not in volcado and DIRECCION not in volcado
+
+
+def test_contacto_no_queda_en_claro_en_columnas_no_catalogadas(rt, admin, tenants, cifrador):
+    buscar_osm(rt, tenants["a"], cifrador)
+
+    with admin.connect() as c:
+        filas = c.execute(text("SELECT nombre, direccion, web, ciudad FROM leads WHERE tenant_id = :t"),
+                          {"t": tenants["a"]}).all()
+    assert len(filas) == len([e for e in FIXTURE["elements"] if e["tags"].get("name")])
+    assert {(nombre, direccion) for nombre, direccion, *_ in filas} == {(None, None)}
+    assert [f for f in filas if any(n in str(f) for n in _sensibles_de_la_fixture())] == []

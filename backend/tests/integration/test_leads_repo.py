@@ -4,8 +4,8 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
 
+from app.modulos.descubrimiento.dominio.errores import ErrorPersistencia
 from app.modulos.descubrimiento.dominio.modelos import Actividad, CriteriosICP, EmpresaCruda
 from app.modulos.descubrimiento.infraestructura.persistencia.repositorio_leads import RepositorioLeadsPostgres
 
@@ -77,7 +77,7 @@ def test_lead_persistido_conserva_tipo_titular(rt, admin, tenants, cifrador, tip
 
 def test_lead_nuevo_y_cumplimiento_en_una_transaccion(rt, admin, tenants, cifrador):
     # licencia NULL: el INSERT del lead pasa y el de cumplimiento viola NOT NULL.
-    with pytest.raises(IntegrityError):
+    with pytest.raises(ErrorPersistencia):
         RepositorioLeadsPostgres(rt, tenants["a"], cifrador).obtener_o_crear_lead(EMPRESA, None)
     assert _contar(admin, "SELECT count(*) FROM leads WHERE tenant_id = :t AND id_fiscal = :f",
                    t=tenants["a"], f=EMPRESA.id_fiscal) == 0
