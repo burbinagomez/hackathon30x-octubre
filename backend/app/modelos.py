@@ -1,11 +1,13 @@
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     Computed,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
+    LargeBinary,
     MetaData,
     Numeric,
     Table,
@@ -57,10 +59,12 @@ leads = Table(
     _id(), _tenant(),
     Column("pais", Text, nullable=False),
     Column("id_fiscal", Text),
-    Column("nombre", Text, nullable=False),
+    Column("nombre", Text),  # NULL para no jurídicos: su nombre vive en nombre_cifrado
     Column("tipo_titular", Text, nullable=False, server_default=text("'desconocido'::text")),
     Column("ciudad", Text),
     Column("direccion", Text),
+    Column("nombre_cifrado", LargeBinary),
+    Column("direccion_cifrada", LargeBinary),
     Column("actividad_codigo", Text),
     Column("actividad_sistema", Text),
     Column("web", Text),
@@ -71,6 +75,15 @@ leads = Table(
     Column("creado_en", DateTime(timezone=True), nullable=False, server_default=_AHORA),
     UniqueConstraint("tenant_id", "pais", "id_fiscal", name="leads_tenant_pais_id_fiscal_key"),
     UniqueConstraint("tenant_id", "id", name="leads_tenant_id_id_key"),
+    # Espejo del SQL (alembic no compara CHECK): la fuente de verdad es la migración 0003.
+    CheckConstraint(
+        "(tipo_titular = 'juridica' AND nombre IS NOT NULL AND nombre_cifrado IS NULL) OR "
+        "(tipo_titular <> 'juridica' AND nombre IS NULL AND nombre_cifrado IS NOT NULL AND octet_length(nombre_cifrado) > 28)",
+        name="leads_nombre_segun_titular_ck"),
+    CheckConstraint(
+        "(tipo_titular = 'juridica' AND direccion_cifrada IS NULL) OR "
+        "(tipo_titular <> 'juridica' AND direccion IS NULL AND (direccion_cifrada IS NULL OR octet_length(direccion_cifrada) > 28))",
+        name="leads_direccion_segun_titular_ck"),
 )
 
 lead_fuentes = Table(
