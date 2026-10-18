@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from app.modulos.descubrimiento.aplicacion.camaras import camaras_de, cargar_camaras
+from app.modulos.enriquecimiento.dominio.normalizar_titular import normalizar_ciudad
 
 CAMARAS_YAML = Path(__file__).resolve().parents[3] / "config" / "camaras_co.yaml"
 
@@ -17,7 +18,7 @@ def _geografia_co():
 
     datos = yaml.safe_load((CAMARAS_YAML.parent / "geografia" / "co.yaml").read_text())
     divisiones = {d["codigo_nativo"] for d in datos["divisiones"]}
-    municipios = {m["nombre"] for d in datos["divisiones"] for m in d["municipios"]}
+    municipios = {normalizar_ciudad(m["nombre"]) for d in datos["divisiones"] for m in d["municipios"]}
     return divisiones, municipios
 
 
@@ -27,7 +28,7 @@ def test_toda_camara_tiene_municipio_y_departamento_validos_en_la_geografia():
 
     assert camaras
     for c in camaras.values():
-        assert c.municipio_sede in municipios, c.codigo
+        assert normalizar_ciudad(c.municipio_sede) in municipios, c.codigo
         assert c.departamentos and c.departamentos <= divisiones, c.codigo
 
 
