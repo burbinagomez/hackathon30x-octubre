@@ -37,10 +37,12 @@ test("es_y_en_tienen_las_mismas_claves", () => {
   expect(vacios).toEqual([]);
 });
 
+// OJO: eslint-plugin-i18next da por válido todo el scope de un `const MAYUSCULAS = ...`;
+// por eso los canarios usan function declarations con nombre en CamelCase.
 test("detecta_texto_literal_en_jsx", async () => {
   const r = await lintearEnTmp(
     "src/busqueda/Literal.tsx",
-    "export const A = () => <p>Hola</p>;\n",
+    "export function Literal() {\n  return <p>Hola</p>;\n}\n",
   );
   expect(reglaLiteral(r).length).toBeGreaterThanOrEqual(1);
 });
@@ -48,7 +50,7 @@ test("detecta_texto_literal_en_jsx", async () => {
 test("detecta_texto_literal_en_atributo", async () => {
   const r = await lintearEnTmp(
     "src/busqueda/Literal.tsx",
-    'export const A = () => <input placeholder="Buscar" />;\n',
+    'export function Literal() {\n  return <input placeholder="Buscar" />;\n}\n',
   );
   expect(reglaLiteral(r).length).toBeGreaterThanOrEqual(1);
 });
@@ -56,7 +58,7 @@ test("detecta_texto_literal_en_atributo", async () => {
 test("permite_texto_traducido", async () => {
   const r = await lintearEnTmp(
     "src/busqueda/Traducido.tsx",
-    "const t = (k: string) => k;\nexport const A = () => <p>{t('acceso.ingresar')}</p>;\n",
+    "const t = (k: string) => k;\nexport function Traducido() {\n  return <p>{t('acceso.ingresar')}</p>;\n}\n",
   );
   expect(r.messages.filter((m) => m.severity === 2)).toEqual([]);
   expect(reglaLiteral(r)).toEqual([]);

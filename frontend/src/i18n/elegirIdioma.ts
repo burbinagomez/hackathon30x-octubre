@@ -1,10 +1,20 @@
 export type Idioma = "es" | "en";
 
-// Esqueleto (T034): devuelve un valor equivocado para que los rojos sean por aserción.
+const SOPORTADOS: readonly string[] = ["es", "en"];
+
+/**
+ * Idioma de la UI: la elección guardada, el primer idioma del navegador que esté en {es, en}
+ * (cortado al código base), el del tenant, y es.
+ */
 export function elegirIdioma(
-  _languages: readonly string[],
-  _idiomaUsuario: Idioma | null,
-  _idiomaTenant: Idioma | null,
+  languages: readonly string[],
+  idiomaUsuario: Idioma | null,
+  idiomaTenant: Idioma | null,
 ): Idioma {
-  return "xx" as Idioma;
+  if (idiomaUsuario) return idiomaUsuario;
+  for (const l of languages) {
+    const base = l.split("-")[0].toLowerCase();
+    if (SOPORTADOS.includes(base)) return base as Idioma;
+  }
+  return idiomaTenant ?? "es";
 }

@@ -1,1 +1,11 @@
-{}
+{
+  "acceso": {
+    "ingresar": "Sign in"
+  },
+  "motivos": {
+    "sin_mapeo_actividad": "The activity has no equivalent in this source"
+  },
+  "salud": {
+    "estado": "API: {{api}} · DB: {{db}}"
+  }
+}

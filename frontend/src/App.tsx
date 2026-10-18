@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 type Estado = { api: "…" | "ok" | "error"; db: "…" | "ok" | "error" };
 
 export default function App() {
+  const { t } = useTranslation();
   // Arranca sin "ok": si no, el e2e pasa antes de que /health conteste.
   const [estado, setEstado] = useState<Estado>({ api: "…", db: "…" });
 
@@ -15,8 +17,6 @@ export default function App() {
   }, []);
 
   return (
-    <div>
-      API: {estado.api} · DB: {estado.db}
-    </div>
+    <div>{t("salud.estado", { api: estado.api, db: estado.db })}</div>
   );
 }

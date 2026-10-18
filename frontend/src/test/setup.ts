@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll } from "vitest";
+import "../i18n";
 import { server } from "./servidor";
 
 // Sin globals de vitest, Testing Library no limpia solo: los renders se acumulan entre tests.
