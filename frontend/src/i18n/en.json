@@ -224,5 +224,13 @@
   },
   "comun": {
     "cargando": "Loading…"
+  },
+  "enriquecer": {
+    "boton": "Find phone and email",
+    "seguir": "Continue with the rest",
+    "ayuda": "Looks for the public contact (phone and email) on each company's website. Companies only: individuals are never contacted.",
+    "trabajando": "Looking for contact on websites",
+    "resumen": "{{procesados}} processed · {{contactables}} with contact · {{pendientes}} left",
+    "error": "Could not complete. Try again."
   }
 }

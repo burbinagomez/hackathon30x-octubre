@@ -2,6 +2,7 @@
 
 Es el único lugar (junto con `app.cli` y `app.main`) que une descubrimiento con la infraestructura de costos.
 """
+import socket
 import time
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
@@ -148,3 +149,22 @@ def calificador_api(ruta_yaml: Path):
     """`DaptaCSV` si `calificadores.dapta_csv.habilitado` en fuentes.yaml; si no, None (el import responde 503)."""
     calificadores = (yaml.safe_load(ruta_yaml.read_text()) or {}).get("calificadores") or {}
     return DaptaCSV() if (calificadores.get("dapta_csv") or {}).get("habilitado") else None
+
+
+def _resolver_dns(host: str) -> list[str]:
+    return [info[4][0] for info in socket.getaddrinfo(host, None)]
+
+
+def adaptadores_enriquecer(ajustes, costos: RegistroCostos, tarifas: Mapping, transporte: httpx.BaseTransport,
+                           resolver=_resolver_dns):
+    """Croma RUES, sitio web y jev (006), los mismos para la CLI y la API. Sin TYPESAFE_API_KEY o TYPESAFE_URL no hay
+    clasificador: encaje queda NULL. `resolver` lo usa la guarda SSRF del sitio web; los tests lo reemplazan."""
+    from app.modulos.enriquecimiento.infraestructura.adaptadores.croma_rues import CromaRues
+    from app.modulos.enriquecimiento.infraestructura.adaptadores.jev_clasificador import JevClasificador
+    from app.modulos.enriquecimiento.infraestructura.adaptadores.sitio_web import SitioWeb
+
+    clasificador = None
+    if ajustes.typesafe_api_key and ajustes.typesafe_url:
+        clasificador = JevClasificador(costos, transporte, ajustes.typesafe_url, ajustes.typesafe_api_key,
+                                       tarifas["jev_in_por_M"])
+    return CromaRues(), SitioWeb(costos, transporte, resolver, tarifas["web_fetch"]), clasificador
