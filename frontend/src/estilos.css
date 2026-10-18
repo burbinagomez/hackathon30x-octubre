@@ -43,13 +43,62 @@ input[type="checkbox"] {
   cursor: pointer;
 }
 
+/* Fila de herramientas de la lista: conteo y progreso a la izquierda, filtro a la derecha; en 360 px se parte en dos líneas. */
+.lista-herramientas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 8px 0 12px;
+}
+
+.lista-herramientas .nota {
+  margin: 0;
+}
+
+.lista-herramientas .estado-contactos {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
+  font-size: 0.8125rem;
+  color: var(--color-texto);
+}
+
+.lista-herramientas .estado-contactos .anillo-chico {
+  margin-right: 0;
+}
+
+.lista-herramientas .enlace-reintentar {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-decoration: underline;
+  font-size: inherit;
+}
+
 .filtro-contacto {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 44px;
+  min-height: 0;
   cursor: pointer;
-  margin: 8px 0;
+  margin: 0 0 0 auto;
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+
+/* Más específico que `input` y `.campo input`: ningún ancho de campo de texto estira el checkbox. */
+.filtro-contacto input[type="checkbox"] {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
 }
 
 button {
@@ -802,7 +851,6 @@ table.tabla-leads {
   border-radius: 0.4rem;
   background: var(--color-superficie);
 }
-.panel-enriquecer { margin-bottom: 1.5rem; }
 
 /* Importar resultados de Dapta: el archivo se parte en líneas en pantallas angostas. */
 .importar-dapta label {

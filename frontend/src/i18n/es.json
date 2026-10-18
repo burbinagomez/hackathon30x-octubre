@@ -283,11 +283,9 @@
     "cargando": "Cargando…"
   },
   "enriquecer": {
-    "boton": "Buscar teléfono y email",
-    "seguir": "Seguir con los que quedan",
-    "ayuda": "Busca el contacto público (teléfono y email) en el sitio web de cada empresa. Solo empresas: las personas naturales no se contactan.",
-    "trabajando": "Buscando contacto en los sitios web",
-    "resumen": "{{procesados}} procesados · {{contactables}} con contacto · quedan {{pendientes}}",
-    "error": "No se pudo completar. Probá de nuevo."
+    "buscando": "Buscando contactos… {{procesados}} de {{total}}",
+    "listo": "{{contactables}} con contacto",
+    "error": "No pudimos terminar de buscar contactos",
+    "reintentar": "Reintentar"
   }
 }

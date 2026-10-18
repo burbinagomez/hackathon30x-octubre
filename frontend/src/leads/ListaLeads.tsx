@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ErrorApi } from "../api/cliente";
 import Enlace from "../compartido/Enlace";
@@ -11,8 +11,9 @@ import type { PaginaLeads } from "./tipos";
 type Campo = "nombre" | "tipo" | "fuentes" | "ciudad" | "web" | "telefono" | "email" | "licencia";
 
 /** Lista paginada de leads: la misma para una búsqueda y para una fuente. `clave` cambia cuando cambia lo que se lista. */
-export default function ListaLeads({ clave, titulo, cargar }: {
+export default function ListaLeads({ clave, titulo, cargar, progreso }: {
   clave: string;
+  progreso?: ReactNode; // línea chica junto al conteo (p. ej. el avance de la búsqueda de contactos)
   titulo: string;
   cargar: (pagina: number, conContacto: boolean) => Promise<PaginaLeads>;
 }) {
@@ -34,11 +35,17 @@ export default function ListaLeads({ clave, titulo, cargar }: {
     <>
       <Enlace a={RUTA_BUSQUEDAS}>{t("leads.volver")}</Enlace>
       <h1>{titulo}</h1>
-      <label className="filtro-contacto">
-        <input type="checkbox" checked={conContacto}
-          onChange={(e) => { setPagina(1); setConContacto(e.target.checked); }} />
-        {" "}{t("leads.solo_con_contacto")}
-      </label>
+      <div className="lista-herramientas">
+        <p className="nota">
+          {datos ? t("leads.total", { total: entero(datos.total) }) : ""}
+          {progreso}
+        </p>
+        <label className="filtro-contacto">
+          <input type="checkbox" checked={conContacto}
+            onChange={(e) => { setPagina(1); setConContacto(e.target.checked); }} />
+          {t("leads.solo_con_contacto")}
+        </label>
+      </div>
       {fallo && <p role="alert" className="error">{t(`leads.${fallo}`)}</p>}
     </>
   );
@@ -61,7 +68,6 @@ export default function ListaLeads({ clave, titulo, cargar }: {
       {datos.items.length === 0 && <p>{t("leads.sin_leads")}</p>}
       {datos.items.length > 0 && (
         <>
-          <p className="nota">{t("leads.total", { total: entero(datos.total) })}</p>
           <div className="tabla-scroll">
             <table className="tabla-leads">
               <thead>
