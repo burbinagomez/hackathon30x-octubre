@@ -111,3 +111,9 @@ def test_datos_gov_co_rues_del_yaml_real_se_carga():
     assert entrada["dataset"] == "c82u-588k"
     assert entrada["filtros"] == ["ciiu", "departamento"]
     assert entrada["licencia"] == "CC-BY-SA-4.0"
+
+
+def test_toda_fuente_habilitada_del_yaml_real_tiene_adaptador():
+    # Un flag en true sin adaptador afirma algo falso al jurado: o hay clase o el flag va en false.
+    registro = cargar_registro(FUENTES_YAML, catalogo)
+    assert registro.sin_implementacion == frozenset()
