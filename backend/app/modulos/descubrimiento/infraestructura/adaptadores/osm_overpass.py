@@ -1,3 +1,5 @@
+import time
+from collections.abc import Callable
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
@@ -54,7 +56,9 @@ class OsmOverpass:
         lote_id: UUID,
         repo_url: str,
         url: str = OVERPASS_URL,
+        reloj: Callable[[], float] = time.monotonic,
     ):
+        self._reloj = reloj
         self.meta = meta
         self._costos = registro_costos
         self._costo_unitario = costo_unitario

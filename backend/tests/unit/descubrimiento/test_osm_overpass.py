@@ -10,7 +10,7 @@ import pytest
 
 from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.descubrimiento.aplicacion.registro import cargar_registro
-from app.modulos.descubrimiento.dominio.errores import CriterioNoSoportado
+from app.modulos.descubrimiento.dominio.errores import CriterioNoSoportado, FuenteNoDisponible
 from app.modulos.descubrimiento.dominio.modelos import CriteriosICP
 from app.modulos.descubrimiento.infraestructura.adaptadores.osm_overpass import OsmOverpass
 
@@ -129,6 +129,69 @@ def test_elemento_sin_nombre_se_descarta(adaptador):
     assert len(pagina.empresas) == 2
     assert all(e.nombre for e in pagina.empresas)
     assert "https://www.openstreetmap.org/node/789" not in {e.url_origen for e in pagina.empresas}
+
+
+class RelojFalso:
+    def __init__(self):
+        self.ahora = 1000.0
+
+    def __call__(self) -> float:
+        return self.ahora
+
+
+def _adaptador_con_reloj(meta, respuesta: httpx.Response, segundos: float):
+    """El transporte avanza el reloj `segundos` durante el request, como un request real."""
+    reloj, costos, lote_id = RelojFalso(), RegistroCostosFalso(), uuid4()
+
+    def responder(request: httpx.Request) -> httpx.Response:
+        reloj.ahora += segundos
+        return respuesta
+
+    adaptador = OsmOverpass(
+        meta=meta,
+        registro_costos=costos,
+        transporte=httpx.MockTransport(responder),
+        costo_unitario=Decimal("0.0000070"),
+        lote_id=lote_id,
+        repo_url=REPO_URL,
+        reloj=reloj,
+    )
+    return adaptador, costos, lote_id
+
+
+def test_registra_segundos_de_cada_intento(meta):
+    ok = httpx.Response(200, json=json.loads(FIXTURE.read_text()))
+    adaptador, costos, lote_id = _adaptador_con_reloj(meta, ok, segundos=2)
+
+    adaptador.buscar(ICP_BOGOTA, 1)
+
+    assert costos.filas == [
+        OperacionCosto(
+            tipo="overpass_query",
+            unidades=Decimal(2),
+            costo_unitario=Decimal("0.0000070"),
+            moneda="USD",
+            proveedor="osm",
+            fuente="osm_overpass",
+            canal=None,
+            lead_id=None,
+            lote_id=lote_id,
+            gratis=False,
+        )
+    ]
+    assert isinstance(costos.filas[0].unidades, Decimal)
+
+
+def test_fallo_se_reporta_sin_tragarlo(meta):
+    caido = httpx.Response(500, text="CUERPO-INTERNO-DEL-SERVIDOR")
+    adaptador, costos, _ = _adaptador_con_reloj(meta, caido, segundos=3)
+
+    with pytest.raises(Exception) as error:
+        adaptador.buscar(ICP_BOGOTA, 1)
+
+    assert [(f.tipo, f.unidades) for f in costos.filas] == [("overpass_query", Decimal(3))]
+    assert isinstance(error.value, FuenteNoDisponible)
+    assert "CUERPO-INTERNO-DEL-SERVIDOR" not in str(error.value)
 
 
 def test_rechaza_criterio_no_soportado_sin_request(adaptador, enviados):
