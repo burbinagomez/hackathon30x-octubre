@@ -57,8 +57,10 @@ def admin():
 # cada (tabla, privilegio) concedido. Parametrizar por tabla exigiría consultar la base al colectar.
 @pytest.mark.parametrize("rol", ROLES_SUPABASE)
 def test_anon_y_authenticated_sin_privilegios(admin, rol):
-    tablas = list(admin.execute(text("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")).scalars())
+    tablas = list(admin.execute(text("SELECT tablename FROM pg_tables WHERE schemaname = 'public' "
+                                     "UNION SELECT viewname FROM pg_views WHERE schemaname = 'public'")).scalars())
     assert "leads" in tablas  # una lista vacía dejaría el test verde sin probar nada
+    assert "v_tablero_fuentes" in tablas  # y sin las vistas el test no vería un GRANT a anon sobre ellas
     assert _concedidos(admin, rol, tablas) == []
 
 

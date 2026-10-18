@@ -47,7 +47,7 @@ def datos():
                            "(:leads, :a, 'CO', 'A1', 'juridica'), (:lead_sin_cumplimiento, :a, 'CO', 'A2', 'juridica'), "
                            "(:lead_b, :b, 'CO', 'B1', 'juridica')"), ids)
             c.execute(text("INSERT INTO lead_fuentes (id, tenant_id, lead_id, busqueda_id, fuente, url_origen, licencia) "
-                           "VALUES (:lead_fuentes, :a, :leads, :busquedas, 'f', 'u', 'l')"), ids)
+                           "VALUES (:lead_fuentes, :a, :leads, :busquedas, 'osm_overpass', 'u', 'l')"), ids)
             c.execute(text("INSERT INTO cumplimiento (id, tenant_id, lead_id, fuente, licencia, url_origen, as_of) "
                            "VALUES (:cumplimiento, :a, :leads, 'f', 'l', 'u', now())"), ids)
             c.execute(text("INSERT INTO costos (id, tenant_id, tipo, unidades, costo_unitario, moneda, proveedor, gratis) "
@@ -130,3 +130,30 @@ COLGAR_DE_LEAD_DE_A = {
 @pytest.mark.parametrize("tabla", sorted(COLGAR_DE_LEAD_DE_A))
 def test_tenant_b_no_cuelga_filas_de_un_lead_de_a(rt, datos, tabla):
     _rechazado(rt, datos, COLGAR_DE_LEAD_DE_A[tabla], FK_VIOLADA)
+
+
+# Vistas del libro. Con datos solo de A (la siembra trae costos, un lead y una lead_fuentes de osm_overpass).
+VISTAS = ["v_tablero_fuentes", "v_atribuciones"]
+
+
+def _filas_de_la_vista(rt, tenant, vista):
+    with db.unidad_de_trabajo(rt, tenant) as c:
+        return c.execute(text(f"SELECT * FROM {vista}")).all()
+
+
+@pytest.mark.parametrize("vista", VISTAS)
+def test_tenant_b_no_accede_a_datos_de_a_en_vistas(rt, datos, vista):
+    # Control positivo: sin él, el 0 de B no probaría nada.
+    assert len(_filas_de_la_vista(rt, datos["a"], vista)) >= 1
+    # También la fila TOTAL de v_tablero_fuentes: solo existe si hay datos (HAVING count(*) > 0).
+    assert _filas_de_la_vista(rt, datos["b"], vista) == []
+
+
+def test_toda_vista_es_security_invoker(rt):
+    with rt.connect() as c:
+        vistas = dict(c.execute(text(
+            "SELECT c.relname, coalesce(c.reloptions, '{}') FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "WHERE n.nspname = 'public' AND c.relkind = 'v'")).all())
+    assert set(VISTAS) <= set(vistas)  # una lista vacía dejaría el test verde sin probar nada
+    sin_la_opcion = sorted(v for v, opciones in vistas.items() if "security_invoker=true" not in opciones)
+    assert sin_la_opcion == []
