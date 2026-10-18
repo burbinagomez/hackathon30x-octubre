@@ -19,15 +19,35 @@ function archivos(dir: string): string[] {
   });
 }
 
+// Keys legacy de Supabase: JWT cuyo claim `role` es anon o service_role. Ambas están prohibidas en web
+// (constitución 2.0.0: solo la publishable). Misma lógica que backend/app/config.py::_rol_jwt.
+const ROLES_PROHIBIDOS = ["anon", "service_role"];
+const JWT = /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g;
+
+function rolDelJwt(jwt: string): unknown {
+  try {
+    const payload = JSON.parse(Buffer.from(jwt.split(".")[1], "base64url").toString("utf8"));
+    return payload !== null && typeof payload === "object" ? payload.role : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const tieneJwtLegacy = (texto: string) =>
+  (texto.match(JWT) ?? []).some((j) => ROLES_PROHIBIDOS.includes(rolDelJwt(j) as string));
+
 /** Archivos de `dir` que contienen un secreto; la ruta es relativa a `dir`. */
 function conSecretos(dir: string): string[] {
   return archivos(dir)
     .filter((f) => {
       const texto = fs.readFileSync(f, "utf8");
-      return SECRETOS.some((re) => re.test(texto));
+      return SECRETOS.some((re) => re.test(texto)) || tieneJwtLegacy(texto);
     })
     .map((f) => path.relative(dir, f));
 }
+
+const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
+const jwtSintetico = (role: string) => `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ role })}.firma-falsa`;
 
 test("el_detector_encuentra_un_secreto_plantado", () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "zenlo-secretos-"));
@@ -43,6 +63,20 @@ test("el_detector_encuentra_un_secreto_plantado", () => {
   }
 });
 
+test("el_detector_encuentra_jwt_legacy_de_anon_y_service_role", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "zenlo-jwt-"));
+  try {
+    fs.writeFileSync(path.join(tmp, "anon.ts"), `export const k = "${jwtSintetico("anon")}";\n`);
+    fs.writeFileSync(path.join(tmp, "servicio.js"), `var k="${jwtSintetico("service_role")}";\n`);
+    // Controles negativos: el JWT de un usuario, y algo que empieza con eyJ pero no es un JWT.
+    fs.writeFileSync(path.join(tmp, "usuario.ts"), `export const k = "${jwtSintetico("authenticated")}";\n`);
+    fs.writeFileSync(path.join(tmp, "ruido.js"), 'var x="eyJ!!.no-base64.zzz", y="eyJhbGci.e30.firma";\n');
+    expect(conSecretos(tmp).sort()).toEqual(["anon.ts", "servicio.js"]);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 test("src_no_contiene_secretos", () => {
   const src = path.join(raiz, "src");
   // Sin esto, un src vacío o mal resuelto pasaría.
@@ -52,8 +86,12 @@ test("src_no_contiene_secretos", () => {
 
 test("el_build_no_contiene_secretos", () => {
   const dist = path.join(raiz, "dist");
-  // dist/ existe solo tras `npm run build`; CI lo corre antes de los tests de este archivo.
-  if (!fs.existsSync(dist)) return;
+  // En local dist/ puede no existir (no se corrió el build). En CI el build va antes de los tests:
+  // si falta, el test falla en lugar de pasar vacío.
+  if (!fs.existsSync(dist)) {
+    expect(process.env.CI, "en CI el build tiene que correr antes que los tests").toBeFalsy();
+    return;
+  }
   expect(conSecretos(dist)).toEqual([]);
 });
 

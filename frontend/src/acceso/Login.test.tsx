@@ -67,6 +67,20 @@ test("credenciales_invalidas_muestran_error_y_no_piden_usuarios_me", async () =>
   expect(location.pathname).toBe("/");
 });
 
+test("usuario_sin_fila_cierra_sesion", async () => {
+  // Autenticado en Supabase pero sin fila en usuarios: la API da 403 y no puede quedar una sesión a medias.
+  server.use(http.get("*/usuarios/me", () => new HttpResponse(null, { status: 403 })));
+  render(<Login />);
+
+  enviar("ana@ejemplo.test", "clave-de-prueba");
+
+  await waitFor(() =>
+    expect(screen.queryByRole("alert")).toHaveTextContent("No se pudo ingresar. Probá de nuevo."),
+  );
+  expect(auth.signOut).toHaveBeenCalled();
+  expect(estado.sesion).toBeNull();
+});
+
 test("un_fallo_del_servidor_no_se_presenta_como_clave_mala", async () => {
   server.use(http.get("*/usuarios/me", () => new HttpResponse(null, { status: 500 })));
   render(<Login />);
