@@ -73,7 +73,8 @@
       "detalle_fuente_sin_conteo": "{{fuente}}: no prior count",
       "detalle_ignora": "does not filter by: {{campos}}",
       "detalle_costo": "Maximum cost {{maximo}} · cap {{tope}}"
-    }
+    },
+    "revisar_clientes": "We prefilled the filters from your customers. Review and adjust them before the preview."
   },
   "fuentes": {
     "croma_supersociedades_co": "Supersociedades (Croma)",
@@ -188,14 +189,15 @@
       "ejemplo": "Use example",
       "sugerir": "Suggest filters",
       "enviando": "Searching…",
-      "resueltos": "{{n}} companies found",
       "explicacion": "Why these filters",
       "ciiu": "Activity (CIIU)",
       "departamento": "Department",
       "no_resueltos": "We could not identify these companies (they are left out of the suggestion)",
       "rango": "Paste between 5 and 50 companies, one per line.",
       "no_disponible": "Company lookup is not available right now. Try again or use the filters.",
-      "error": "We could not suggest filters. Try again or use the filters."
+      "error": "We could not suggest filters. Try again or use the filters.",
+      "resueltos_one": "{{n}} company found",
+      "resueltos_other": "{{n}} companies found"
     }
   },
   "ejecucion": {

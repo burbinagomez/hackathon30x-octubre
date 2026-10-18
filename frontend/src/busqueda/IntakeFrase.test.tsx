@@ -203,7 +203,7 @@ test("ya_me_compran_prellena_los_filtros_y_muestra_la_explicacion", async () => 
   fireEvent.change(screen.getByRole("textbox"), { target: { value: "A\nB\nC\nD\nE" } });
   fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === es.intake.lookalike.sugerir)!);
 
-  await waitFor(() => expect(screen.queryByRole("status")).toHaveTextContent(es.busqueda.frase.revisar));
+  await waitFor(() => expect(screen.queryByRole("status")).toHaveTextContent(es.busqueda.revisar_clientes));
   fireEvent.click(pestana(es.busqueda.pestanas.filtros)!);
   expect(campo("Actividad")).toHaveValue("4631");
   await waitFor(() => expect(campo("Departamento")).toHaveValue("05"));
