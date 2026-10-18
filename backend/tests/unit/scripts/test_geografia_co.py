@@ -78,3 +78,9 @@ def test_el_co_yaml_versionado_sale_de_la_tabla_del_script():
         sorted(geografia_co.DEPARTAMENTOS)
     encabezado = "\n".join(l for l in ruta.read_text().splitlines() if l.startswith("#"))
     assert "DANE" in encabezado and "DIVIPOLA" in encabezado and re.search(r"20\d\d-\d\d-\d\d", encabezado)
+
+
+def test_los_codigos_que_el_dataset_trae_sin_cero_a_la_izquierda_se_completan():
+    datos = _cargar(geografia_co.construir([{"cod_dpto": "5", "cod_mpio": "5001", "nom_mpio": "MEDELLÍN"}], "2026-10-18", "x"))
+    antioquia = next(d for d in datos["divisiones"] if d["codigo_nativo"] == "05")
+    assert antioquia["municipios"] == [{"codigo_nativo": "05001", "nombre": "Medellín"}]

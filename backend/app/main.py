@@ -35,7 +35,8 @@ async def lifespan(app: FastAPI):
     app.state.registro = registro_api(CONFIG / "fuentes.yaml", catalogo)
     app.state.canales_contacto = (yaml.safe_load((CONFIG / "fuentes.yaml").read_text()) or {}).get("canales_contacto") or {}
     app.state.tarifas = cargar_tarifas()
-    app.state.departamentos_yaml = {"CO": yaml.safe_load((CONFIG / "departamentos_co.yaml").read_text()) or {}}
+    # Un archivo por país en config/geografia/: la estructura admite MX/PE/BR sin tocar código; sin archivo, no se ofrece.
+    app.state.geografia = {a["pais"]: a for a in (yaml.safe_load(f.read_text()) for f in sorted((CONFIG / "geografia").glob("*.yaml")))}
     app.state.camaras_yaml = CONFIG / "camaras_co.yaml"
     yield
 

@@ -4,7 +4,7 @@ Repo y libro de costos se arman por request con el tenant del token; el transpor
 `app.state` en cada request, no al arrancar.
 """
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -36,7 +36,7 @@ Palabra = Annotated[str, StringConstraints(min_length=1, max_length=40)]
 class PedidoVistaPrevia(BaseModel):
     model_config = ConfigDict(extra="forbid")  # un tenant_id en el body es un 422, no un campo ignorado
 
-    pais: Literal["CO", "MX", "PE", "BR"]
+    pais: Annotated[str, StringConstraints(pattern=r"^[A-Z]{2}$")]  # que exista su geografía lo valida la ruta
     ciiu: Annotated[str, StringConstraints(pattern=r"^\d{4}$")]
     departamento: Annotated[str, StringConstraints(max_length=80)] | None = None
     ciudad: Annotated[str, StringConstraints(max_length=80)] | None = None
@@ -63,6 +63,24 @@ def _criterios(p: PedidoVistaPrevia) -> CriteriosICP:
     return CriteriosICP(p.pais, filtros)
 
 
+def _errores_de_geografia(pedido: PedidoVistaPrevia, geografia: dict) -> list[dict]:
+    """País con archivo; división = código nativo de ese archivo; ciudad = municipio de esa división (y exige división)."""
+    pais = geografia.get(pedido.pais)
+    if pais is None:
+        return [{"campo": "pais", "codigo": "desconocido"}]
+    division = None
+    if pedido.departamento is not None:
+        division = next((d for d in pais["divisiones"] if str(d["codigo_nativo"]) == pedido.departamento), None)
+        if division is None:
+            return [{"campo": "departamento", "codigo": "desconocido"}]
+    if pedido.ciudad is not None:
+        if division is None:
+            return [{"campo": "departamento", "codigo": "requerido"}]  # la ciudad solo se elige dentro de una división
+        if pedido.ciudad not in {m["nombre"] for m in division["municipios"]}:
+            return [{"campo": "ciudad", "codigo": "desconocido"}]
+    return []
+
+
 def _repo(request: Request, tenant_id: UUID) -> RepositorioLeadsPostgres:
     estado = request.app.state
     return RepositorioLeadsPostgres(estado.engine, tenant_id, estado.cifrador)
@@ -80,8 +98,7 @@ def _fabrica(request: Request, tenant_id: UUID):
 @router.post("/busquedas/vista-previa", status_code=201)
 def vista_previa(pedido: PedidoVistaPrevia, request: Request, tenant_id: UUID = Depends(tenant_actual)):
     errores = []
-    if pedido.departamento is not None and pedido.departamento not in request.app.state.departamentos_yaml.get(pedido.pais, {}):
-        errores.append({"campo": "departamento", "codigo": "desconocido"})  # no es un código DIVIPOLA de ese país
+    errores.extend(_errores_de_geografia(pedido, request.app.state.geografia))
     if not canal_habilitado(pedido.canal_preferido, request.app.state.canales_contacto):
         errores.append({"campo": "canal_preferido", "codigo": "canal_no_habilitado"})
     if errores:
