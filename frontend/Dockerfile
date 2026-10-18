@@ -17,7 +17,7 @@ RUN npm run build
 FROM caddy:2.11.7-alpine AS caddy
 RUN apk add --no-cache libcap && setcap -r /usr/bin/caddy
 
-FROM alpine:3.23.6
+FROM alpine:3.24.2
 RUN apk add --no-cache ca-certificates \
     && adduser -D -H web && mkdir -p /data /config && chown web:web /data /config
 COPY --from=caddy /usr/bin/caddy /usr/bin/caddy
