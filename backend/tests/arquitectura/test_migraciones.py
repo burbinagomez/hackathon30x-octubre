@@ -1,6 +1,8 @@
 import os
+import shutil
 import subprocess
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from alembic.autogenerate import compare_metadata
@@ -131,3 +133,74 @@ def test_drift_mira_solo_public_aunque_cambie_search_path(base_vacia):
 
         c.execute(text("CREATE TABLE public.extra (id int)"))
         assert _drift(base_vacia, "-c search_path=ajeno,public") != []
+
+
+CHECKS_DE_TITULAR = ("leads_nombre_segun_titular_ck", "leads_direccion_segun_titular_ck")
+
+
+def _convalidados(url):
+    with create_engine(url.replace("postgresql://", "postgresql+psycopg://", 1)).connect() as c:
+        return dict(c.execute(text("SELECT conname, convalidated FROM pg_constraint WHERE conname = ANY(:n)"),
+                              {"n": list(CHECKS_DE_TITULAR)}).all())
+
+
+def _ejecutar(url, sql, **params):
+    with create_engine(url.replace("postgresql://", "postgresql+psycopg://", 1)).begin() as c:
+        c.execute(text(sql), params)
+
+
+def _con(tmp_path, *versiones):
+    # Copia al directorio temporal solo las migraciones pedidas ("0003"), como si el repo estuviera en ese punto.
+    for version in versiones:
+        for archivo in MIGRACIONES.glob(f"{version}_*.sql"):
+            shutil.copy(archivo, tmp_path)
+
+
+def test_checks_de_titular_quedan_convalidados_desde_vacio(base_vacia):
+    assert _migrar(base_vacia).returncode == 0
+    assert _convalidados(base_vacia) == {nombre: True for nombre in CHECKS_DE_TITULAR}
+
+
+def _base_con_un_lead_en_claro_y_la_0003(base_vacia, tmp_path):
+    """Una base de antes de la 0003 con un lead no jurídico en claro (todavía no hay CHECK), y después la 0003."""
+    _con(tmp_path, "0001", "0002")
+    assert _migrar(base_vacia, tmp_path).returncode == 0
+    tenant = uuid4()
+    _ejecutar(base_vacia, "INSERT INTO tenants (id, nombre) VALUES (:t, 'T')", t=tenant)
+    _ejecutar(base_vacia, "INSERT INTO leads (tenant_id, pais, nombre) VALUES (:t, 'CO', 'Tienda sintetica')", t=tenant)
+    _con(tmp_path, "0003")
+    return _migrar(base_vacia, tmp_path)
+
+
+def test_0003_con_leads_en_claro_queda_not_valid_y_avisa(base_vacia, tmp_path):
+    r = _base_con_un_lead_en_claro_y_la_0003(base_vacia, tmp_path)
+
+    assert r.returncode == 0, r.stderr
+    assert _convalidados(base_vacia) == {nombre: False for nombre in CHECKS_DE_TITULAR}
+    for nombre in CHECKS_DE_TITULAR:
+        assert f"{nombre} queda NOT VALID" in r.stderr
+    assert "Tienda sintetica" not in r.stderr  # el aviso no imprime datos
+
+
+def test_0005_falla_si_queda_un_lead_en_claro_y_no_se_registra(base_vacia, tmp_path):
+    assert _base_con_un_lead_en_claro_y_la_0003(base_vacia, tmp_path).returncode == 0
+    _con(tmp_path, "0005")
+
+    r = _migrar(base_vacia, tmp_path)
+
+    assert r.returncode != 0
+    assert "0005_validar_checks_leads.sql" in r.stderr
+    assert _aplicadas(base_vacia) == "0001,0002,0003"
+    assert _convalidados(base_vacia) == {nombre: False for nombre in CHECKS_DE_TITULAR}
+
+
+def test_0005_convalida_cuando_el_dueno_borro_los_leads_en_claro(base_vacia, tmp_path):
+    assert _base_con_un_lead_en_claro_y_la_0003(base_vacia, tmp_path).returncode == 0
+    _ejecutar(base_vacia, "DELETE FROM leads")  # el borrado a mano de los leads de prueba
+    _con(tmp_path, "0005")
+
+    r = _migrar(base_vacia, tmp_path)
+
+    assert r.returncode == 0, r.stderr
+    assert _aplicadas(base_vacia) == "0001,0002,0003,0005"
+    assert _convalidados(base_vacia) == {nombre: True for nombre in CHECKS_DE_TITULAR}
