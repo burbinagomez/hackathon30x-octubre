@@ -12,7 +12,9 @@ Fixture calculada a mano, tenant A (usa `tenants` + `TABLAS_DE_TENANT` del conft
 - costos `osm_overpass`: 1 fila gratis (lista 0.10) + 1 fila pagada (lista y real 0.40) -> lista 0.50, real 0.40.
 - costos `datos_gov_co_rues`: 1 fila gratis (lista 0.05) + 1 fila pagada (lista y real 0.30) -> lista 0.35, real 0.30.
 - costos `croma`: 1 fila pagada (lista y real 0.50), sin lead_fuentes para `croma` -> 0 calificados -> CPQL NULL.
-- 1 `dapta_llamada` (fuente NULL): 0.999 (3 min * 0.333), solo entra en TOTAL.
+- 1 `dapta_llamada` (fuente NULL): 0.999 (3 min * 0.333). Va a la fila `sin_atribuir` (0 calificados, CPQL NULL),
+  como en el tablero: el costo que no cruza con una fuente no desaparece del CPQL.
+- 1 costo `evals` (0.70): no entra en ninguna fila, como en el tablero.
 
 TOTAL: costo_lista = 0.50+0.35+0.50+0.999 = 2.349; costo_real = 0.40+0.30+0.50+0.999 = 2.199; calificados = 2
 (lead1 y lead2, una vez cada uno aunque lead1 esté en 2 fuentes y osm solo tenga 2 calificados propios).
@@ -75,6 +77,8 @@ def fixture_cpql(admin, tenants):
         c.execute(_INSERT_COSTO, {"t": tenant, "tipo": "croma_consulta", "u": 1, "cu": "0.50", "p": "croma",
                                   "f": CROMA, "g": False})
         c.execute(_INSERT_DAPTA, {"t": tenant, "l": lead1})
+        c.execute(_INSERT_COSTO, {"t": tenant, "tipo": "llm_tokens_in", "u": 1, "cu": "0.70", "p": "anthropic",
+                                  "f": "evals", "g": False})
     return tenant
 
 
@@ -116,3 +120,28 @@ def test_total_incluye_dapta_y_cuenta_leads_distintos(rt, fixture_cpql):
     assert total.costo_lista == Decimal("2.349")  # 0.50 + 0.35 + 0.50 + 0.999 (dapta), fuente NULL incluido
     assert total.costo_real == Decimal("2.199")  # 0.40 + 0.30 + 0.50 + 0.999
     assert total.cpql_lista == Decimal("1.1745") and total.cpql_real == Decimal("1.0995")
+
+
+def test_sin_atribuir_lleva_el_costo_de_dapta_sin_cpql_propio(rt, fixture_cpql):
+    cpql = _cpql(rt, fixture_cpql)
+
+    assert "sin_atribuir" in cpql
+    sin_atribuir = cpql["sin_atribuir"]
+    assert (sin_atribuir.costo_lista, sin_atribuir.costo_real) == (Decimal("0.999"), Decimal("0.999"))
+    assert sin_atribuir.calificados == 0
+    assert sin_atribuir.cpql_lista is None and sin_atribuir.cpql_real is None
+    assert "evals" not in cpql
+
+
+def test_la_suma_de_las_filas_es_el_libro_de_costos(rt, fixture_cpql):
+    """Ningún costo desaparece del CPQL: Σ filas (sin TOTAL) = Σ `costos` del tenant (sin evals) = TOTAL."""
+    cpql = _cpql(rt, fixture_cpql)
+    with unidad_de_trabajo(rt, fixture_cpql) as c:
+        libro = c.execute(text(
+            "SELECT sum(unidades * costo_unitario) AS lista, "
+            "sum(CASE WHEN gratis THEN 0 ELSE unidades * costo_unitario END) AS real "
+            "FROM costos WHERE fuente IS DISTINCT FROM 'evals'")).one()
+    filas = [f for fuente, f in cpql.items() if fuente != "TOTAL"]
+
+    assert sum(f.costo_lista for f in filas if f.costo_lista is not None) == libro.lista == cpql["TOTAL"].costo_lista
+    assert sum(f.costo_real for f in filas if f.costo_real is not None) == libro.real == cpql["TOTAL"].costo_real
