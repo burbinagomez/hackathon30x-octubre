@@ -9,6 +9,7 @@ from tests.falsos import FuenteFalsa, RegistroCostosFalso, RepositorioLeadsFalso
 
 AS_OF = datetime(2026, 10, 1, tzinfo=UTC)
 ICP_CO = CriteriosICP(pais="CO", filtros={"ciiu": "4711"})
+ICP_PE = CriteriosICP(pais="PE", filtros={"ciiu": "4711"})
 
 
 def _meta(clave, paises=frozenset({"CO"})):
@@ -21,18 +22,20 @@ def _empresa(fuente, nit="900123456", pais="CO"):
                         as_of=AS_OF, actividad=Actividad("4711", "CIIU"), id_fiscal=nit, tipo_titular="juridica")
 
 
-def _caso(repo, costos, por_fuente, errores=None, paises=frozenset({"CO"})):
-    """por_fuente: clave -> empresas. Devuelve el caso de uso y la lista de lote_id con que se armó cada fuente."""
-    errores = errores or {}
+def _caso(repo, costos, por_fuente, errores=None, paises=None):
+    """por_fuente: clave -> empresas; paises: clave -> países (por defecto CO).
+    Devuelve el caso de uso y la lista de (clave, lote_id) con que se armó cada fuente."""
+    errores, paises = errores or {}, paises or {}
+    metas = {clave: _meta(clave, paises.get(clave, frozenset({"CO"}))) for clave in por_fuente}
     armadas = []
 
     def fabrica(clave):
         def armar(lote_id):
             armadas.append((clave, lote_id))
-            return FuenteFalsa(_meta(clave, paises), costos, lote_id, tuple(por_fuente[clave]), errores.get(clave))
+            return FuenteFalsa(metas[clave], costos, lote_id, tuple(por_fuente[clave]), errores.get(clave))
         return armar
 
-    fuentes = {clave: (_meta(clave, paises), fabrica(clave)) for clave in por_fuente}
+    fuentes = {clave: (metas[clave], fabrica(clave)) for clave in por_fuente}
     return EjecutarBusqueda(repo, fuentes), armadas
 
 
@@ -62,9 +65,10 @@ def test_nit_con_y_sin_formato_es_el_mismo_lead():
 
 def test_mismo_nit_distinto_pais_son_dos_leads():
     repo = RepositorioLeadsFalso()
-    caso, _ = _caso(repo, RegistroCostosFalso(),
-                    {"f1": [_empresa("f1", pais="CO"), _empresa("f1", pais="PE")]}, paises=frozenset({"*"}))
+    caso, _ = _caso(repo, RegistroCostosFalso(), {"f1": [_empresa("f1", pais="CO"), _empresa("f1", pais="PE")]},
+                    paises={"f1": frozenset({"CO", "PE"})})
     caso.ejecutar(ICP_CO)
+    caso.ejecutar(ICP_PE)
     assert set(repo.leads) == {("CO", "900123456"), ("PE", "900123456")}
 
 
@@ -101,10 +105,20 @@ def test_cada_fuente_se_arma_con_lote_id_igual_a_busqueda_id():
     repo, costos = RepositorioLeadsFalso(), RegistroCostosFalso()
     caso, armadas = _caso(repo, costos, {"f1": [_empresa("f1")], "f2": [_empresa("f2", nit="800111222")]})
     resultado = caso.ejecutar(ICP_CO)
-    assert set(repo.busquedas) == {resultado.busqueda_id}
+    assert repo.busquedas == {resultado.busqueda_id: "terminada"}
     assert sorted(armadas) == [("f1", resultado.busqueda_id), ("f2", resultado.busqueda_id)]
     assert len(costos.filas) == 2
     assert {f.lote_id for f in costos.filas} == {resultado.busqueda_id}
+
+
+def test_solo_se_arman_las_fuentes_que_cubren_el_icp():
+    repo, costos = RepositorioLeadsFalso(), RegistroCostosFalso()
+    caso, armadas = _caso(repo, costos, {"f1": [_empresa("f1")], "f2": [_empresa("f2", pais="PE")]},
+                          paises={"f2": frozenset({"PE"})})
+    resultado = caso.ejecutar(ICP_CO)
+    assert armadas == [("f1", resultado.busqueda_id)]
+    assert len(costos.filas) == 1
+    assert resultado.sin_fuente_para is None
 
 
 @pytest.mark.parametrize("error", [LimiteFuenteAgotado("cupo"), FuenteNoDisponible("502")], ids=lambda e: type(e).__name__)

@@ -51,7 +51,7 @@ class RegistroCostosFalso:
 
 
 class FuenteFalsa:
-    """Escribe 1 fila de costos con su lote_id y devuelve sus empresas en la página 1, o lanza `error`."""
+    """Escribe 1 fila de costos con su lote_id y devuelve sus empresas del país pedido en la página 1, o lanza `error`."""
 
     def __init__(self, meta: MetaFuente, costos: RegistroCostosFalso, lote_id: UUID,
                  empresas: tuple[EmpresaCruda, ...] = (), error: Exception | None = None):
@@ -68,5 +68,5 @@ class FuenteFalsa:
             lote_id=self._lote_id, gratis=True))
         if self._error is not None:
             raise self._error
-        empresas = self._empresas if pagina == 1 else ()
-        return PaginaEmpresas(empresas=empresas, total=len(self._empresas))
+        del_pais = tuple(e for e in self._empresas if e.pais == criterios.pais)
+        return PaginaEmpresas(empresas=del_pais if pagina == 1 else (), total=len(del_pais))
