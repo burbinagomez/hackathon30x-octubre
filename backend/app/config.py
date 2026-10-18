@@ -25,6 +25,10 @@ class SecretProhibido(RuntimeError):
     pass
 
 
+class ConfigInvalida(RuntimeError):
+    """Configuración que impide arrancar. El mensaje nombra la variable, nunca su valor."""
+
+
 def _rol_jwt(valor: str) -> str | None:
     # Sin verificar firma: solo importa el claim role de las keys legacy de Supabase.
     partes = valor.split(".")
