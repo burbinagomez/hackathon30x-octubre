@@ -22,11 +22,13 @@ REPOSITORIO = APP / "modulos" / "descubrimiento" / "infraestructura" / "persiste
 # PostgresCalificaciones (008) lee leads para el chequeo juridica+cumplimiento antes de importar: solo
 # tipo_titular e id, nunca nombre/direccion/nombre_cifrado/direccion_cifrada.
 CALIFICACIONES = APP / "modulos" / "calificacion" / "infraestructura" / "persistencia" / "postgres_calificaciones.py"
+# El tablero cuenta leads (embudo) en SQL inline: solo IS NOT NULL / count, nunca selecciona contacto.
+TABLERO = APP / "modulos" / "tablero" / "infraestructura" / "persistencia" / "repositorio_tablero.py"
 # El export para Dapta (008) lee leads de jurídicas y descifra solo telefono_cifrado: nunca nombre_cifrado,
 # direccion_cifrada ni email_cifrado (lo ata test_export_dapta_solo_descifra_el_telefono).
 ELEGIBLES_DAPTA = APP / "modulos" / "calificacion" / "infraestructura" / "persistencia" / "elegibles_dapta.py"
 # modelos.py y el catálogo nombran columnas, no ejecutan SQL sobre ellas.
-PERMITIDOS = (REPOSITORIO, CALIFICACIONES, ELEGIBLES_DAPTA, APP / "modelos.py", APP / "seguridad" / "catalogo_sensibles.py")
+PERMITIDOS = (REPOSITORIO, CALIFICACIONES, TABLERO, ELEGIBLES_DAPTA, APP / "modelos.py", APP / "seguridad" / "catalogo_sensibles.py")
 NOMBRE = "Tienda Doña Rosa"  # sintéticos
 DIRECCION = "Calle 10 # 5-20"
 TELEFONO = "+57 601 555 0199"
@@ -235,6 +237,14 @@ def test_el_repo_de_calificaciones_no_lee_nombre_ni_direccion():
     """Está en PERMITIDOS porque toca `leads`, pero solo para filtrar juridica + cumplimiento: nunca el contacto."""
     sql = CALIFICACIONES.read_text()
     assert "nombre" not in sql and "direccion" not in sql
+
+
+def test_el_repo_del_tablero_solo_cuenta_y_no_selecciona_contacto():
+    """Está en PERMITIDOS porque el embudo cuenta sobre `leads`: telefono_cifrado solo aparece como IS NOT NULL."""
+    sql = TABLERO.read_text()
+    for columna in ("nombre", "direccion", "nombre_cifrado", "direccion_cifrada", "email_cifrado"):
+        assert columna not in sql, columna
+    assert sql.count("telefono_cifrado") == sql.count("telefono_cifrado IS NOT NULL")
 
 
 def test_export_dapta_solo_descifra_el_telefono():

@@ -123,6 +123,12 @@
     "calificados": "Qualified",
     "pct_calificados": "% qualified (of unique)",
     "cpql": "CPQL (list)",
+    "embudo": "Funnel by source",
+    "embudo_enriquecidos": "Enriched",
+    "embudo_contactables": "Contactable",
+    "embudo_con_telefono": "With phone",
+    "embudo_calificados": "Qualified",
+    "embudo_ayuda": "Each bar is measured against the source's unique leads.",
     "exportar_dapta": "Export for Dapta (CSV)",
     "error_exportar": "Export failed. Try again."
   },

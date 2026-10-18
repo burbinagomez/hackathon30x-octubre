@@ -20,3 +20,11 @@
 
 ## Lista de leads: contacto como booleano (005, enmienda)
 `GET /leads` y `GET /busquedas/{id}/leads` devuelven `tiene_telefono`/`tiene_email` calculados en SQL con `IS NOT NULL` sobre las columnas cifradas (nunca se leen ni descifran), solo para jurídicas; natural o desconocido van `null`. El filtro `con_contacto=true` (jurídica con teléfono o correo) se agrega con `AND` al filtro de alcance en `RepositorioLeadsPostgres._pagina`.
+
+## Tablero: embudo por fuente (spec 005)
+
+`GET /tablero/fuentes` suma por fuente y en `total` cuatro conteos de leads únicos: `enriquecidos` (`enriquecido_en` no nulo), `contactables`,
+`con_telefono` (jurídicas con `telefono_cifrado` no nulo) y `calificados` (`calificaciones.calificado`). SQL inline en
+`tablero/.../repositorio_tablero.py`, sin DDL, bajo la RLS de la sesión. Un lead de dos fuentes cuenta en las dos; el total no duplica.
+`sin_atribuir` (costo sin lead) devuelve `null` en los cuatro; una fuente con leads y sin enriquecimiento devuelve 0 real. Solo `count`: el
+repositorio nunca selecciona nombre, dirección ni contacto (lo vigila `test_cifrado.py`).

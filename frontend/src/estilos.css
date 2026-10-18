@@ -108,8 +108,14 @@ h2 {
   padding: 16px;
 }
 
+/* Tarjeta de las puertas, como las de Dapti: borde sutil, esquinas redondeadas, acciones agrupadas a la derecha. */
 .tarjeta {
-  border-top: 6px solid var(--color-acento);
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 0.75rem;
+  background: var(--color-superficie);
 }
 
 .selector-idioma {
@@ -612,15 +618,65 @@ table.tabla-leads {
     gap: 0.5rem;
   }
 }
-/* Tarjeta de las puertas, como las de Dapti: borde sutil, esquinas redondeadas, acciones agrupadas a la derecha. */
-.tarjeta {
-  display: grid;
-  gap: 1rem;
-  padding: 1.25rem 1.5rem;
-  border: 1px solid var(--color-borde);
-  border-radius: 0.75rem;
-  background: var(--color-superficie);
+
+/* Embudo por fuente: barras proporcionales a los únicos. La pista es gris, la barra lima; el número y el % van en texto. */
+.embudo {
+  margin: 24px 0;
 }
+
+.embudo-ayuda {
+  margin: 4px 0 12px;
+  font-size: 0.875rem;
+}
+
+.embudo-fuente {
+  margin-bottom: 16px;
+}
+
+.embudo-pasos {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.embudo-paso {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 2px 12px;
+  align-items: baseline;
+  padding: 4px 0;
+}
+
+.embudo-valor,
+.embudo-pct {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.embudo-pista {
+  grid-column: 1 / -1;
+  height: 10px;
+  overflow: hidden;
+  background: var(--color-pista);
+  border-radius: 5px;
+}
+
+.embudo-barra {
+  display: block;
+  height: 100%;
+  background: var(--color-acento);
+}
+
+@media (min-width: 40rem) {
+  .embudo-paso {
+    grid-template-columns: 10rem 5rem 5rem 1fr;
+  }
+
+  .embudo-pista {
+    grid-column: auto;
+  }
+}
+
 .tarjeta h2 { margin: 0; }
 .tarjeta .ayuda { margin: 0; }
 .campo-cabecera {
