@@ -168,15 +168,28 @@ def _validar(ruta: Path) -> int:
     """Costo cero (job `evals` del CI): evals.yaml carga, cada prompt existe y cada modelo tiene tarifa.
     No lee datasets (dataset.json lo etiqueta un humano, T023) ni el entorno."""
     try:
-        evals, tarifas = cargar(ruta), _tarifas_llm()
+        evals = cargar(ruta)
+        _componibles(evals)
+        for nombre, ev in evals.items():
+            if not (ruta.parent / ev["prompt"]).is_file():
+                raise ConfigInvalida(f"{nombre}: falta el prompt")
     except ConfigInvalida as e:
         return _error(f"config_invalida: {e}")
-    for nombre, ev in evals.items():
-        if not (ruta.parent / ev["prompt"]).is_file():
-            return _error(f"config_invalida: {nombre}: falta el prompt")
-        if ev["modelo"] not in tarifas:
-            return _error(f"config_invalida: {nombre}: sin tarifa llm para {ev['modelo']}")
     return 0
+
+
+def _componibles(evals) -> dict[str, dict[str, Decimal]]:
+    """Cada eval tiene juez JuezClaude del CATALOGO y tarifa para su modelo. Devuelve las tarifas."""
+    from evals.jueces.catalogo import CATALOGO
+    from evals.jueces.claude import JuezClaude
+
+    tarifas = _tarifas_llm()
+    for nombre, ev in evals.items():
+        if CATALOGO.get(ev["juez"]) is not JuezClaude:
+            raise ConfigInvalida(f"{nombre}: juez {ev['juez']} no se compone desde evals.yaml")
+        if ev["modelo"] not in tarifas:
+            raise ConfigInvalida(f"{nombre}: sin tarifa llm para {ev['modelo']}")
+    return tarifas
 
 
 def componer(entorno, transporte=None, *, tenant, evals, carpeta, registro_costos=None):
@@ -185,19 +198,13 @@ def componer(entorno, transporte=None, *, tenant, evals, carpeta, registro_costo
     `transporte` es la costura de los tests (httpx.MockTransport); en producción, None = red real.
     La key sale del mapeo `entorno`, nunca del entorno del proceso. Lanza ConfigInvalida antes de cualquier request.
     """
-    from evals.jueces.catalogo import CATALOGO
     from evals.jueces.claude import JuezClaude
 
     try:
         tenant_id = uuid.UUID(tenant)
     except ValueError as e:
         raise ConfigInvalida("--tenant no es un uuid") from e
-    tarifas = _tarifas_llm()
-    for nombre, ev in evals.items():
-        if CATALOGO.get(ev["juez"]) is not JuezClaude:
-            raise ConfigInvalida(f"{nombre}: juez {ev['juez']} no se compone desde evals.yaml")
-        if ev["modelo"] not in tarifas:
-            raise ConfigInvalida(f"{nombre}: sin tarifa llm para {ev['modelo']}")
+    tarifas = _componibles(evals)
     if registro_costos is None:
         from app.db import crear_engine
         from app.modulos.costos.infraestructura.postgres_costos import PostgresCostos

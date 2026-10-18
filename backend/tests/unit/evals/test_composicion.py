@@ -85,12 +85,13 @@ def test_falla_del_juez_sale_2_sin_key_ni_costos(tmp_path, capsys, http):
 
 @pytest.mark.parametrize("ruta, esperado", [
     (None, 0),  # el evals.yaml versionado: lo que corre el job `evals` del CI
-    ("sin_tarifa", 2),
-], ids=["evals_yaml_real", "modelo_sin_tarifa"])
+    (("claude-sin-tarifa", "claude"), 2),
+    (("claude-sonnet-5-5", "falso"), 2),  # JuezFalso no se compone desde evals.yaml
+], ids=["evals_yaml_real", "modelo_sin_tarifa", "juez_no_componible"])
 def test_validar_sale_sin_key_ni_requests(tmp_path, capsys, ruta, esperado):
     # Costo cero: sin ANTHROPIC_API_KEY, sin --tenant, sin DATABASE_URL; el transporte no recibe nada.
     capturados = []
-    argv = ["--validar"] + ([] if ruta is None else ["--config", str(config(tmp_path, "claude-sin-tarifa"))])
+    argv = ["--validar"] + ([] if ruta is None else ["--config", str(config(tmp_path, *ruta))])
     codigo = run.main(argv, entorno={}, transporte=transporte(capturados))
     out, err = capsys.readouterr()
 
