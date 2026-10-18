@@ -150,5 +150,23 @@
     },
     "titulo_de_fuente": "Leads from {{fuente}}",
     "titulo_todos": "All leads"
+  },
+  "intake": {
+    "lookalike": {
+      "titulo": "They already buy from me",
+      "ayuda": "Paste one company per line (5 to 50) and we will suggest filters to find similar ones.",
+      "nombres": "Companies that already buy from you",
+      "ejemplo": "Use example",
+      "sugerir": "Suggest filters",
+      "enviando": "Searching…",
+      "resueltos": "{{n}} companies found",
+      "explicacion": "Why these filters",
+      "ciiu": "Activity (CIIU)",
+      "departamento": "Department (code)",
+      "no_resueltos": "We could not identify these companies (they are left out of the suggestion)",
+      "rango": "Paste between 5 and 50 companies, one per line.",
+      "no_disponible": "Company lookup is not available right now. Try again or use the filters.",
+      "error": "We could not suggest filters. Try again or use the filters."
+    }
   }
 }
