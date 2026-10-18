@@ -43,7 +43,16 @@ test("todas_las_rutas_llevan_las_cabeceras_de_seguridad", () => {
     "referrer-policy": "no-referrer",
     "permissions-policy": "camera=(), microphone=(), geolocation=()",
     "cross-origin-opener-policy": "same-origin",
+    "x-frame-options": "DENY",
   });
+});
+
+// Vercel aplica todos los bloques que matchean: una segunda CSP en otro bloque se suma a la nuestra.
+test("ningun_otro_bloque_define_una_csp", () => {
+  const conCsp = (vercel.headers ?? []).filter((b) =>
+    b.headers.some((h) => h.key.toLowerCase() === "content-security-policy"),
+  );
+  expect(conCsp.map((b) => b.source)).toEqual(["/(.*)"]);
 });
 
 test("el_rewrite_de_la_spa_sigue_igual", () => {
