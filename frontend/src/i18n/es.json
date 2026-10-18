@@ -123,7 +123,21 @@
     "embudo_calificados": "Calificados",
     "embudo_ayuda": "Cada barra se mide contra los leads únicos de la fuente.",
     "exportar_dapta": "Exportar para Dapta (CSV)",
-    "error_exportar": "No se pudo exportar. Probá de nuevo."
+    "error_exportar": "No se pudo exportar. Probá de nuevo.",
+    "importar_dapta": "Importar resultados de Dapta (CSV)",
+    "importando": "Importando los resultados de Dapta…",
+    "importar_listo_one": "Listo: importamos {{count}} resultado de Dapta.",
+    "importar_listo_other": "Listo: importamos {{count}} resultados de Dapta.",
+    "importar_repetidas_one": "{{count}} ya estaba cargado.",
+    "importar_repetidas_other": "{{count}} ya estaban cargados.",
+    "importar_omitidas_one": "{{count}} fila no se importó: revisá el archivo y volvé a subirlo.",
+    "importar_omitidas_other": "{{count}} filas no se importaron: revisá el archivo y volvé a subirlo.",
+    "error_importar_422": "No pudimos leer el archivo. Subí el CSV que descargaste de Dapta, sin modificarlo.",
+    "error_importar_415": "El archivo no es un CSV. Subí el CSV que descargaste de Dapta.",
+    "error_importar_413": "El archivo es muy grande (el máximo es 1 MB). Dividilo en partes y subilas una por una.",
+    "error_importar_409": "Todavía falta cargar la tarifa de Dapta, así que no podemos calcular el costo. Avisale al equipo y volvé a probar.",
+    "error_importar_503": "La importación de Dapta está apagada en este momento. Avisale al equipo.",
+    "error_importar": "No se pudo importar el archivo. Probá de nuevo."
   },
   "idioma": {
     "etiqueta": "Idioma",
