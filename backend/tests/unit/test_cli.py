@@ -95,3 +95,16 @@ def test_tarifa_croma_es_decimal_exacto(persistencia, entorno):
     main(BUSCAR, catalogo={"croma_supersociedades_co": FuenteQueCaptura}, persistencia=persistencia)
     assert recibidos == [Decimal("0.00099")]
     assert isinstance(recibidos[0], Decimal)
+
+
+def test_ciudad_llega_a_los_criterios(persistencia, entorno):
+    recibidos = []
+
+    class FuenteQueCaptura(FuenteDelCLI):
+        def buscar(self, criterios, pagina):
+            recibidos.append(criterios)
+            return super().buscar(criterios, pagina)
+
+    argv = ["buscar", "--tenant", str(uuid4()), "--pais", "CO", "--ciiu", "4711", "--ciudad", "Bogotá"]
+    assert main(argv, catalogo={"osm_overpass": FuenteQueCaptura}, persistencia=persistencia) == 0
+    assert [c.filtros["ciudad"] for c in recibidos] == ["Bogotá"]
