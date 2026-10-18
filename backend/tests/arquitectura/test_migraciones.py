@@ -15,7 +15,6 @@ BACKEND = Path(__file__).resolve().parents[2]
 MIGRAR = BACKEND / "scripts" / "migrar_local.sh"
 ROLES = BACKEND / "scripts" / "roles.sql"
 MIGRACIONES = BACKEND.parent / "supabase" / "migrations"
-BASE = "migraciones_t017"
 
 
 def _url(nombre):
@@ -48,6 +47,8 @@ def admin():
 @pytest.fixture
 def base_vacia(admin):
     # Base nueva por test: "desde vacío" de verdad, sin tocar la base que usan los demás tests.
+    # El nombre sale de la base de ESTA rama: dos worktrees en el mismo Postgres no se pisan.
+    BASE = f"migraciones_{make_url(_url('TEST_ADMIN_DATABASE_URL')).database}"
     admin.execute(text(f"DROP DATABASE IF EXISTS {BASE} WITH (FORCE)"))
     admin.execute(text(f"CREATE DATABASE {BASE}"))
     url = make_url(_url("TEST_ADMIN_DATABASE_URL")).set(drivername="postgresql", database=BASE)
@@ -161,25 +162,31 @@ def test_checks_de_titular_quedan_convalidados_desde_vacio(base_vacia):
     assert _convalidados(base_vacia) == {nombre: True for nombre in CHECKS_DE_TITULAR}
 
 
-def _base_con_un_lead_en_claro_y_la_0003(base_vacia, tmp_path):
+def _base_con_un_lead_en_claro_y_la_0003(base_vacia, tmp_path, direccion="Calle sintetica 1"):
     """Una base de antes de la 0003 con un lead no jurídico en claro (todavía no hay CHECK), y después la 0003."""
     _con(tmp_path, "0001", "0002")
     assert _migrar(base_vacia, tmp_path).returncode == 0
     tenant = uuid4()
     _ejecutar(base_vacia, "INSERT INTO tenants (id, nombre) VALUES (:t, 'T')", t=tenant)
     _ejecutar(base_vacia, "INSERT INTO leads (tenant_id, pais, nombre, direccion) "
-                       "VALUES (:t, 'CO', 'Tienda sintetica', 'Calle sintetica 1')", t=tenant)
+                       "VALUES (:t, 'CO', 'Tienda sintetica', :d)", t=tenant, d=direccion)
     _con(tmp_path, "0003")
     return _migrar(base_vacia, tmp_path)
 
 
-def test_0003_con_leads_en_claro_queda_not_valid_y_avisa(base_vacia, tmp_path):
-    r = _base_con_un_lead_en_claro_y_la_0003(base_vacia, tmp_path)
+@pytest.mark.parametrize("direccion, sin_convalidar", [
+    ("Calle sintetica 1", {"leads_nombre_segun_titular_ck", "leads_direccion_segun_titular_ck"}),
+    # Solo el nombre en claro: el segundo CHECK sí se convalida. Con un único bloque DO, el fallo del primero
+    # deshace el bloque entero y el segundo quedaría sin convalidar.
+    (None, {"leads_nombre_segun_titular_ck"}),
+], ids=["nombre_y_direccion_en_claro", "solo_nombre_en_claro"])
+def test_0003_con_leads_en_claro_queda_not_valid_y_avisa(base_vacia, tmp_path, direccion, sin_convalidar):
+    r = _base_con_un_lead_en_claro_y_la_0003(base_vacia, tmp_path, direccion)
 
     assert r.returncode == 0, r.stderr
-    assert _convalidados(base_vacia) == {nombre: False for nombre in CHECKS_DE_TITULAR}
+    assert _convalidados(base_vacia) == {nombre: nombre not in sin_convalidar for nombre in CHECKS_DE_TITULAR}
     for nombre in CHECKS_DE_TITULAR:
-        assert f"{nombre} queda NOT VALID" in r.stderr
+        assert (f"{nombre} queda NOT VALID" in r.stderr) == (nombre in sin_convalidar)
     assert "Tienda sintetica" not in r.stderr and "Calle sintetica" not in r.stderr  # el aviso no imprime datos
 
 
