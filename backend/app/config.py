@@ -4,8 +4,10 @@ import json
 import os
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Annotated, Literal
+
+from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # sbp_: access token del CLI. `migrar` ya no lo usa (usa SUPABASE_DB_URL), pero en la api sigue prohibido.
 PREFIJOS_PROHIBIDOS = ("sb_publishable_", "sb_secret_", "sbp_")
@@ -61,6 +63,37 @@ class SettingsApi(Settings):
     auth_jwks_url: str = Field(min_length=1)
     auth_issuer: str = Field(min_length=1)
 
+
+
+class SettingsEmail(Settings):
+    """Lo que solo `enviar` y la baja necesitan: la CLI de búsqueda y la api siguen sin SMTP."""
+
+    smtp_host: str = Field(min_length=1)
+    smtp_port: int = 465
+    smtp_usuario: str = Field(min_length=1)
+    smtp_clave: SecretStr
+    # ninguna: solo contra el SMTP falso de los tests (localhost); nunca credenciales en claro por la red.
+    smtp_seguridad: Literal["ssl", "starttls", "ninguna"] = "ssl"
+    remitente: str = Field(min_length=1)
+    baja_secret: SecretStr = Field(min_length=32)
+    api_base_url: str = Field(min_length=1)
+    # prueba: solo se manda a email_prueba_destinos. "real" lo cambia solo Daniel en Railway (P1).
+    email_modo: Literal["prueba", "real"] = "prueba"
+    # NoDecode: en Railway va "a@x.co,b@x.co", no JSON.
+    email_prueba_destinos: Annotated[list[str], NoDecode] = []
+
+    @field_validator("email_prueba_destinos", mode="before")
+    @classmethod
+    def _destinos_por_coma(cls, valor: object) -> object:
+        if isinstance(valor, str):
+            return [d.strip() for d in valor.split(",") if d.strip()]
+        return valor
+
+    @model_validator(mode="after")
+    def _sin_tls_solo_local(self) -> "SettingsEmail":
+        if self.smtp_seguridad == "ninguna" and self.smtp_host not in ("localhost", "127.0.0.1"):
+            raise ValueError("SMTP_SEGURIDAD=ninguna solo con SMTP_HOST local")
+        return self
 
 class SecretProhibido(RuntimeError):
     pass
