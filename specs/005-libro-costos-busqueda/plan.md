@@ -158,9 +158,9 @@ Va un único archivo, `supabase/migrations/NNNN_libro_costos_busqueda.sql` (el n
 
 `app/modelos.py` suma las columnas y `usuarios`.
 
-### DDL de la 0004 v2 (security OK, pendiente de aprobación del dueño)
+### DDL de la 0004 v2 (APROBADO 2026-10-18)
 
-Reemplaza al "PROPUESTO" anterior. Basado en el aprobado: mismo `CHECK` de estados, mismas vistas y `REVOKE`; cambia `usuarios` (`auth_user_id`, sin FK) y la función de acceso `tenant_de_usuario(uuid)`, y suma el `REVOKE` global de `EXECUTE` a `PUBLIC` en funciones nuevas. **No está en `supabase/migrations/`** hasta el OK del dueño y las enmiendas. Cuando se apruebe, `test_migracion_0004.py` compara el archivo con este bloque.
+Es el contenido exacto de `supabase/migrations/0004_libro_costos_busqueda.sql`. Basado en el v1 (que queda abajo como superseded): mismo `CHECK` de estados, vistas y `REVOKE`; cambia `usuarios` (`auth_user_id`, sin FK) y la función de acceso `tenant_de_usuario(uuid)`, y suma el `REVOKE` global de `EXECUTE` a `PUBLIC` en funciones nuevas. El dueño lo aprobó tal cual (2026-10-18, con security OK). `backend/tests/arquitectura/test_migracion_0004.py` compara el archivo con este bloque byte a byte.
 
 ```sql
 -- 0004: libro de costos y búsqueda [MIN]. SQL a mano. Corre como postgres (dueño). Va después de la 0003.
@@ -450,10 +450,10 @@ Ninguna se resuelve en este plan. Cada fila dice qué tareas bloquea.
 | P12 | **Costo de `contar` de Croma.** Si la página 1 queda en caché, `buscar` no vuelve a cobrar. ¿La fila `croma_consulta` de `contar` es la misma que la de `buscar` (1 crédito en total)? | T017 | Sí: `contar` hace la request y escribe la fila, y `buscar(1)` es cache hit y no escribe nada. Es lo que prueba `test_contar_y_buscar_hacen_una_sola_request`. |
 | P13 | ~~Email de `usuarios` (`email_hmac`)~~ | — | **Reemplazada por Supabase Auth (2026-10-18):** el email vive en `auth.users`, `usuarios` no lo guarda. |
 | P14 | **Costo de `contar` de OSM en la vista previa de un ICP de BR o PE** (estimado de OSM como cota baja, spec:341). Sin pregunta de diseño, pero se registra para la Fase 12. | — | Se mide en la corrida real. |
-| P15 | **Método de login con Supabase Auth.** Email + contraseña, o magic link (OTP por email). | T039, T042 (front), T043 | **Email + contraseña.** El magic link depende del SMTP por defecto de Supabase (límite bajo de correos por hora, entregabilidad incierta) y un login fallido en la demo sale caro. El dueño crea los usuarios en el panel de Supabase (paso humano) y no hay registro abierto. **Decisión pendiente del dueño.** |
-| P16 | **¿FK de `usuarios.auth_user_id` a `auth.users(id)`?** En CI y local no existe el esquema `auth`. | 0004 | **Sin FK.** Una FK condicional (`DO` con `to_regclass('auth.users')`) deja el esquema de prod distinto del de CI sin que el drift check lo vea. La autoridad es la fila de `usuarios`, así que un `auth_user_id` huérfano no da acceso a nadie. Costo: limpiar a mano filas de usuarios borrados en Supabase. Alternativa: crear un `auth.users` mínimo en `supabase_simulado.sql` y poner la FK con `ON DELETE CASCADE` en las dos bases. **Decide el dueño.** |
-| P17 | **¿El proyecto Supabase tiene claves de firma asimétricas (JWKS)?** Los proyectos nuevos las traen; los viejos firman con un secreto compartido HS256. | T013, T029 | **JWKS** (`https://<ref>.supabase.co/auth/v1/.well-known/jwks.json`, ES256). La api solo tiene claves públicas, ningún secreto capaz de acuñar tokens. Si el proyecto es viejo y solo tiene el secreto HS256, habría que migrar las claves en el panel (paso humano) y **no** poner el secreto en la api. **El dueño confirma cuál es el proyecto.** |
-| P18 | **Enmiendas a CLAUDE.md y a la constitución** por usar Supabase Auth. | merge de T013 | Ver "Conflictos con la constitución y CLAUDE.md". **Las decide el dueño; este plan no las edita.** |
+| P15 | Método de login con Supabase Auth. | — | **DECIDIDA (dueño, 2026-10-18): email y contraseña.** |
+| P16 | ¿FK de `usuarios.auth_user_id` a `auth.users(id)`? | — | **DECIDIDA: sin FK.** Procedimiento de baja: borrar la fila en `usuarios` (T013, T049). |
+| P17 | ¿Claves de firma asimétricas (JWKS) en el proyecto Supabase? | T013, T029 | **DECIDIDA: JWKS.** **Pendiente humano (Brayan):** verificar en el panel que el proyecto firma con claves asimétricas y que la Data API no expone `public`. Hasta entonces, la verificación se prueba solo con JWKS local. |
+| P18 | Enmiendas a CLAUDE.md y a la constitución. | — | **APROBADA y aplicada** (2026-10-18): `CLAUDE.md:23` y constitución 2.0.0 (V). El chequeo de la enmienda es `frontend/tests/arquitectura/sin_secretos.test.ts` (T039). |
 
 ## Complexity Tracking
 
