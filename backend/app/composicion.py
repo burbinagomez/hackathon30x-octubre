@@ -209,7 +209,10 @@ def verificador_titular(ajustes, costos: RegistroCostos, tarifas: Mapping, trans
 def adaptadores_enriquecer(ajustes, costos: RegistroCostos, tarifas: Mapping, transporte: httpx.BaseTransport,
                            resolver=_resolver_dns, ruta_yaml: Path = CONFIG / "fuentes.yaml"):
     """Verificador de titular, sitio web y jev (006), los mismos para la CLI y la API. Sin TYPESAFE_API_KEY o TYPESAFE_URL
-    no hay clasificador: encaje queda NULL. `resolver` lo usa la guarda SSRF del sitio web; los tests lo reemplazan."""
+    clasifica OpenRouter si la IA está configurada; si no, no hay clasificador: encaje queda NULL. `resolver` lo usa la guarda SSRF del sitio web; los tests lo reemplazan."""
+    from app.modulos.enriquecimiento.infraestructura.adaptadores.clasificador_openrouter import (
+        ClasificadorOpenRouter,
+    )
     from app.modulos.enriquecimiento.infraestructura.adaptadores.jev_clasificador import (
         JevClasificador,
     )
@@ -221,6 +224,13 @@ def adaptadores_enriquecer(ajustes, costos: RegistroCostos, tarifas: Mapping, tr
     if ajustes.typesafe_api_key and ajustes.typesafe_url:
         clasificador = JevClasificador(costos, transporte, ajustes.typesafe_url, ajustes.typesafe_api_key,
                                        tarifas["jev_in_por_M"])
+    elif _proveedor(ajustes) == "openrouter" and ia_configurada(ajustes, tarifas_llm := cargar_tarifas_llm()):
+        # Sin TypeSafe (solo hay key, no URL): el encaje lo clasifica OpenRouter con la misma IA de la Puerta B (006, 2026-10-18).
+        modelo = ajustes.ia_modelo.strip()
+        nombre = (getattr(ajustes, "ia_modelo_proveedor", None) or modelo).strip()
+        clasificador = ClasificadorOpenRouter(
+            costos, dict(tarifas_llm[modelo]), nombre, ajustes.ia_api_key.get_secret_value(),
+            httpx.Client(base_url=URL_OPENROUTER, transport=transporte, timeout=10))
     return verificador_titular(ajustes, costos, tarifas, transporte, ruta_yaml), SitioWeb(costos, transporte, resolver, tarifas["web_fetch"]), clasificador
 
 
