@@ -112,10 +112,16 @@ def main(argv=None, *, catalogo=catalogo, persistencia=None) -> int:
     def fabrica(clase, meta):
         def armar(lote_id: UUID):
             if meta.proveedor == "datos.gov.co":
+                extra = {}
+                if ajustes().datos_gov_co_url:
+                    extra["url"] = ajustes().datos_gov_co_url
+                token = ajustes().datos_gov_co_app_token
                 return clase(
-                    transporte=httpx.HTTPTransport(), reloj=lambda: datetime.now(UTC), dormir=time.sleep,
-                    costos=costos, cache=None, camaras=cargar_camaras(CONFIG / "camaras_co.yaml"),
+                    transporte=httpx.HTTPTransport(), reloj=lambda: datetime.now(UTC), monotonico=time.monotonic,
+                    dormir=time.sleep, costos=costos, cache=None,
+                    camaras=cargar_camaras(CONFIG / "camaras_co.yaml"),
                     tarifas={"computo_seg_usd": tarifas["datos.gov.co"]}, lote_id=lote_id, meta=meta,
+                    app_token=token.get_secret_value() if token else None, **extra,
                 )
             kwargs = {"meta": meta, "registro_costos": costos, "transporte": httpx.HTTPTransport(), "lote_id": lote_id}
             if meta.proveedor in tarifas:

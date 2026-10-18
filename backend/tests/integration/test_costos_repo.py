@@ -126,7 +126,8 @@ def test_overpass_query_escribe_fila_en_costos(rt, admin, tenant):
 
 def test_socrata_descarga_escribe_fila_en_costos(rt, admin, tenant):
     """datos.gov.co real contra el libro real: 1 request deja 1 fila `socrata_descarga` del tenant (rol app_rt)."""
-    reloj = [datetime(2026, 10, 17, 12, 0, tzinfo=UTC)]
+    inicio = datetime(2026, 10, 17, 12, 0, tzinfo=UTC)
+    reloj = [inicio]
 
     def responder(request):
         reloj[0] += timedelta(seconds=2)  # el request "dura" 2 s
@@ -136,7 +137,8 @@ def test_socrata_descarga_escribe_fila_en_costos(rt, admin, tenant):
                       filtros=frozenset({"ciiu", "departamento"}), trae=frozenset({"nit", "nombre", "ciiu", "ciudad_camara"}),
                       tipo="dataset", licencia="CC-BY-SA-4.0")
     lote = uuid4()
-    adaptador = DatosGovCoRues(transporte=httpx.MockTransport(responder), reloj=lambda: reloj[0], dormir=lambda _s: None,
+    adaptador = DatosGovCoRues(transporte=httpx.MockTransport(responder), reloj=lambda: reloj[0],
+                               monotonico=lambda: (reloj[0] - inicio).total_seconds(), dormir=lambda _s: None,
                                costos=PostgresCostos(rt, tenant), cache=None,
                                camaras=cargar_camaras(BACKEND / "config" / "camaras_co.yaml"),
                                tarifas={"computo_seg_usd": 0.0000070}, lote_id=lote, meta=meta)

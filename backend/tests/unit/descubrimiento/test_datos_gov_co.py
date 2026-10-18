@@ -72,6 +72,7 @@ AHORA = datetime(2026, 10, 17, 12, 0, tzinfo=UTC)
 class RelojFalso:
     def __init__(self) -> None:
         self.t = AHORA
+        self.m = 0.0  # monotónico: solo avanza
         self.dormidas: list[float] = []
 
     def __call__(self) -> datetime:
@@ -79,6 +80,10 @@ class RelojFalso:
 
     def avanzar(self, segundos: float) -> None:
         self.t += timedelta(seconds=segundos)
+        self.m += segundos
+
+    def monotonico(self) -> float:
+        return self.m
 
     def dormir(self, segundos: float) -> None:
         # Registra y avanza el reloj: una espera medida como cómputo se vería en `unidades`.
@@ -113,6 +118,17 @@ def _transporte_guionado(
         reloj.avanzar(segundos)
         if estado == "timeout":
             raise httpx.ReadTimeout("timeout", request=request)
+        if estado == "conexion":
+            raise httpx.ConnectError("sin ruta", request=request)
+        if estado == "protocolo":
+            raise httpx.RemoteProtocolError(CUERPO_SECRETO, request=request)
+        if estado == "salto_pared":
+            reloj.t -= timedelta(hours=1)  # NTP: la pared retrocede durante el request
+            return httpx.Response(200, json=_cargar("filas.json"))
+        if estado == "no_json":
+            return httpx.Response(200, text=CUERPO_SECRETO)
+        if estado == "objeto":
+            return httpx.Response(200, json={"error": CUERPO_SECRETO})
         if estado != 200:
             return httpx.Response(int(estado), text=CUERPO_SECRETO)
         return httpx.Response(200, json=_cargar("filas.json"))
@@ -137,6 +153,7 @@ def _adaptador(
     adaptador = DatosGovCoRues(
         transporte=transporte,
         reloj=reloj,
+        monotonico=reloj.monotonico,
         dormir=reloj.dormir,
         costos=CostosEnMemoria(),
         cache=None,
@@ -262,6 +279,7 @@ def _criterios(**filtros: str | tuple[str, ...]) -> CriteriosICP:
         _criterios(ciiu="47' OR '1'='1"),  # inyección SoQL
         _criterios(ciiu="471"),
         _criterios(ciiu="47111"),
+        _criterios(ciiu="٤٧١١"),  # dígitos árabe-índicos: \d de Unicode los aceptaría
         _criterios(ciiu=("4711", "4712")),  # tupla: varios valores no se soportan
         CriteriosICP(pais="CO", filtros={"ciiu": "4711"}),  # departamento obligatorio
     ],
@@ -269,8 +287,9 @@ def _criterios(**filtros: str | tuple[str, ...]) -> CriteriosICP:
 def test_criterio_invalido_lanza_sin_requests(criterios):
     adaptador, capturadas = _adaptador()
 
-    with pytest.raises(CriterioNoSoportado):
-        adaptador.buscar(criterios, 1)
+    error = _buscar_sin_propagar(adaptador, criterios)
+
+    assert isinstance(error, CriterioNoSoportado)
 
     assert capturadas == []
 
@@ -328,16 +347,22 @@ def test_pagina_2_vacia_sin_request():
     assert adaptador._costos.filas == []
 
 
+LECTURA_ROTA = (ValueError, TypeError, AttributeError, KeyError)
 LOTE = UUID("00000000-0000-4000-8000-000000000011")
 
 
 def _buscar_sin_propagar(
-    adaptador: DatosGovCoRues,
-) -> httpx.HTTPError | FuenteNoDisponible | None:
+    adaptador: DatosGovCoRues, criterios: CriteriosICP = CRITERIOS
+) -> Exception | None:
     """Devuelve la excepción en vez de propagarla: así el rojo es un assert y no un error de la fuente."""
     try:
-        adaptador.buscar(CRITERIOS, 1)
-    except (httpx.HTTPError, FuenteNoDisponible) as exc:
+        adaptador.buscar(criterios, 1)
+    except (
+        httpx.HTTPError,
+        FuenteNoDisponible,
+        CriterioNoSoportado,
+        *LECTURA_ROTA,
+    ) as exc:
         return exc
     return None
 
@@ -366,7 +391,7 @@ def test_registra_segundos_de_cada_intento():
     # La tercera fila (conteo de naturales, 1 s) se suma en T021 (Pulido).
 
 
-@pytest.mark.parametrize("fallo", [502, 503, 504, "timeout"])
+@pytest.mark.parametrize("fallo", [502, 503, 504, "timeout", "conexion"])
 def test_segundo_fallo_lanza_fuente_no_disponible(fallo):
     adaptador, capturadas = _adaptador(pasos=[(fallo, 2), (fallo, 3)])
 
@@ -378,6 +403,40 @@ def test_segundo_fallo_lanza_fuente_no_disponible(fallo):
     assert (
         len(capturadas) == 2
     )  # ninguna request de conteo (T021 suma el assert propio)
+
+
+def test_error_de_transporte_no_reintentable_corta_sin_cuerpo():
+    adaptador, capturadas = _adaptador(pasos=[("protocolo", 2), (200, 3)])
+
+    error = _buscar_sin_propagar(adaptador)
+
+    assert isinstance(error, FuenteNoDisponible)
+    assert "RemoteProtocolError" in str(error)
+    assert CUERPO_SECRETO not in str(error)
+    assert [f.unidades for f in adaptador._costos.filas] == [Decimal(2)]
+    assert len(capturadas) == 1
+
+
+@pytest.mark.parametrize("ilegible", ["no_json", "objeto"])
+def test_200_ilegible_es_fuente_no_disponible_y_cobra_el_intento(ilegible):
+    adaptador, capturadas = _adaptador(pasos=[(ilegible, 2), (200, 3)])
+
+    error = _buscar_sin_propagar(adaptador)
+
+    assert isinstance(error, FuenteNoDisponible)
+    assert "respuesta ilegible" in str(error)
+    assert CUERPO_SECRETO not in str(error)
+    assert [f.unidades for f in adaptador._costos.filas] == [Decimal(2)]
+    assert len(capturadas) == 1
+
+
+def test_duracion_cobrada_no_depende_del_reloj_de_pared():
+    """El reloj de pared salta hacia atrás (NTP) durante el request: la duración cobrada no puede ser negativa."""
+    adaptador, _ = _adaptador(pasos=[("salto_pared", 2)])
+
+    adaptador.buscar(CRITERIOS, 1)
+
+    assert [f.unidades for f in adaptador._costos.filas] == [Decimal(2)]
 
 
 def test_status_no_reintentable_corta_en_el_primer_intento():
@@ -394,7 +453,7 @@ def test_status_no_reintentable_corta_en_el_primer_intento():
 
 @pytest.mark.parametrize(
     ("nit", "valido"),
-    [("999000001", True), ("712345678", False)],
+    [("999000001", True), ("712345678", False), ("9٠٠٠٠٠٠٠١", False)],
 )
 def test_nit_exige_prefijo_8_o_9(nit, valido):
     fila = {**_cargar("filas.json")[0], "nit": nit}

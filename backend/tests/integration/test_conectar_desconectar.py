@@ -75,7 +75,8 @@ def _buscar(rt, tenant, ruta_yaml):
             transporte = httpx.MockTransport(responder)
             if clave == CLAVE:
                 return clase(
-                    transporte=transporte, reloj=lambda: INICIO + timedelta(seconds=reloj[0]), dormir=lambda _s: None,
+                    transporte=transporte, reloj=lambda: INICIO + timedelta(seconds=reloj[0]),
+                    monotonico=lambda: reloj[0], dormir=lambda _s: None,
                     costos=costos, cache=None, camaras=cargar_camaras(CONFIG / "camaras_co.yaml"),
                     tarifas={"computo_seg_usd": 0.0000070}, lote_id=lote_id, meta=meta,
                 )
