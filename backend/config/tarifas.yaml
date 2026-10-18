@@ -27,7 +27,7 @@ whatsapp:
   usd_por_plantilla_co: null        # [VALIDAR] tarifa Meta Colombia de la cuenta que se use; null = canal no disponible
 
 dapta:
-  usd_por_minuto: null              # [MENTORES] costo del agente de voz en el entorno de prueba
+  usd_por_minuto: 0.333             # minuto contestado (docs.dapta.ai, "Billing and credits": 1.000 créditos = US$1); aprobado por Daniel, 2026-10-18
 
 humano:
   usd_por_minuto: 0.25              # configurable; tarifa de referencia para revisión manual

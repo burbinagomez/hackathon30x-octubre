@@ -54,7 +54,9 @@ La 008 mínima entrega:
    - si entró, INSERT `dapta_llamada` con `unidades = minutos`, `costo_unitario = tarifa`, `lead_id`, `fuente = NULL`, `canal = NULL`, `ts = fecha`.
 5. Si el lead ya estaba: con el mismo `calificado` es `duplicada` (no-op); con otro es `conflicto`, que no cambia nada.
 
-**Tarifa.** `dapta.usd_por_minuto: null` → **`TarifaPendiente`**: el import no escribe nada (spec). Para la demo hay que cargar la tarifa en `tarifas.yaml`. Ver P1.
+**Tarifa.** `dapta.usd_por_minuto: 0.333` (docs.dapta.ai, "Billing and credits": 1.000 créditos = US$1; aprobado por Daniel, 2026-10-18) — minuto **contestado**, redondeado hacia arriba al minuto entero: `costo = ceil(minutos) * Decimal("0.333")`. Si la tarifa falta (`null`) → **`TarifaPendiente`**: el import no escribe nada. Ver P1.
+
+El CSV del mínimo (`lead_id, calificado, fecha, minutos`) no distingue el resultado de la llamada: buzón de voz (0.075 USD/min) y no contestada (0.045 USD/min) son tarifas reales de Dapta pero no se implementan ahora porque no hay columna que las identifique. Quedan pendientes para cuando el CSV traiga esa columna (spec completa, fuera del mínimo — ver "Fuera del mínimo").
 
 **CPQL** (`v_cpql`), por fuente `f`:
 - `costo_lista` = Σ `unidades × costo_unitario` de `costos` con `fuente = f` (incluye `gratis`);
@@ -80,7 +82,7 @@ La tabla no tiene UPDATE ni DELETE porque un conflicto lo resuelve un humano. El
 
 ## Preguntas abiertas
 
-- **P1. Tarifa de Dapta para la demo.** Daniel decidió un valor provisional en `tarifas.yaml`, marcado `[PROVISIONAL]`. Con `null` sigue siendo `TarifaPendiente`.
+- **P1. Tarifa de Dapta para la demo.** Resuelta: Daniel dio el valor real, `0.333` USD/min contestado (docs.dapta.ai), ya cargado en `tarifas.yaml`. Buzón de voz y no contestada quedan pendientes (ver sección "Tarifa").
 - **P2. Costo de Dapta en el CPQL por fuente.** Pediste costo de la fuente / calificados: el `dapta_llamada` no tiene fuente, así que entra solo en `TOTAL`. El reparto en partes iguales entre las fuentes del lead (spec, Decisiones) queda fuera del mínimo. Revisión del advisor de costos.
 - **P3. Moneda.** Todo `costos` está en USD hoy (`tarifas.yaml`). La vista no filtra por `moneda`. Revisión del advisor de costos.
 
@@ -88,6 +90,7 @@ La tabla no tiene UPDATE ni DELETE porque un conflicto lo resuelve un humano. El
 
 Quedan para cuando lleguen esas dos:
 - el export y `v_elegibles_dapta`;
+- tarifas de buzón de voz (0.075 USD/min) y no contestada (0.045 USD/min), cuando el CSV traiga una columna de resultado de la llamada;
 - `resultado` con cinco valores y `score`;
 - la baja por `pide_no_contacto`;
 - CPQL por canal;
