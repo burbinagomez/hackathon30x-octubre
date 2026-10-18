@@ -1,5 +1,6 @@
 """CLI `buscar`: sin red y sin Postgres. Los falsos viven en tests/, nunca en app/."""
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import uuid4
 
 import pytest
@@ -81,3 +82,16 @@ def test_croma_sin_key_falla_sin_secretos(persistencia, monkeypatch, capsys):
     assert codigo != 0
     assert "CROMA_API_KEY" in captura.err
     assert "clave-db-falsa-7c1d" not in captura.out + captura.err
+
+
+def test_tarifa_croma_es_decimal_exacto(persistencia, entorno):
+    recibidos = []
+
+    class FuenteQueCaptura(FuenteDelCLI):
+        def __init__(self, **kwargs):
+            recibidos.append(kwargs.get("costo_unitario"))
+            super().__init__(**kwargs)
+
+    main(BUSCAR, catalogo={"croma_supersociedades_co": FuenteQueCaptura}, persistencia=persistencia)
+    assert recibidos == [Decimal("0.00099")]
+    assert isinstance(recibidos[0], Decimal)
