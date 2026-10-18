@@ -1,12 +1,17 @@
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from uuid import UUID
 
 import httpx
+import pytest
 
 from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.descubrimiento.aplicacion.camaras import cargar_camaras
+from app.modulos.descubrimiento.dominio.errores import (
+    CriterioNoSoportado,
+)
 from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, MetaFuente
 from app.modulos.descubrimiento.infraestructura.adaptadores.datos_gov_co_rues import (
     DatosGovCoRues,
@@ -27,6 +32,7 @@ WHERE_FILAS = (
     " AND codigo_camara in('04')"
     " AND nit IS NOT NULL"
 )
+CUERPO_SECRETO = "CUERPO-SECRETO"
 COLUMNAS_DE_PERSONAS = (
     "numero_identificacion",
     "primer_nombre",
@@ -57,25 +63,75 @@ def _cargar(nombre: str) -> list[dict]:
     return json.loads((FIXTURES / nombre).read_text())
 
 
-def _adaptador(fixture_filas: str) -> tuple[DatosGovCoRues, list[httpx.Request]]:
-    capturadas: list[httpx.Request] = []
-    filas = _cargar(fixture_filas)
+AHORA = datetime(2026, 10, 17, 12, 0, tzinfo=UTC)
+
+
+class RelojFalso:
+    def __init__(self) -> None:
+        self.t = AHORA
+
+    def __call__(self) -> datetime:
+        return self.t
+
+    def avanzar(self, segundos: float) -> None:
+        self.t += timedelta(seconds=segundos)
+
+
+def _transporte_fijo(
+    filas: list[dict], cabeceras: dict[str, str] | None, capturadas: list[httpx.Request]
+) -> httpx.MockTransport:
     conteo = _cargar("conteo_naturales.json")
 
     def responder(request: httpx.Request) -> httpx.Response:
         capturadas.append(request)
         cuerpo = conteo if request.url.params.get("$select") == "count(*)" else filas
-        return httpx.Response(200, json=cuerpo)
+        return httpx.Response(200, json=cuerpo, headers=cabeceras)
+
+    return httpx.MockTransport(responder)
+
+
+def _transporte_guionado(
+    reloj: RelojFalso, pasos: list[tuple[int | str, float]], capturadas: list[httpx.Request]
+) -> httpx.MockTransport:
+    """Cada paso es (status | "timeout", segundos que tarda la request según el reloj)."""
+    restantes = list(pasos)
+
+    def responder(request: httpx.Request) -> httpx.Response:
+        capturadas.append(request)
+        estado, segundos = restantes.pop(0)
+        reloj.avanzar(segundos)
+        if estado == "timeout":
+            raise httpx.ReadTimeout("timeout", request=request)
+        if estado != 200:
+            return httpx.Response(int(estado), text=CUERPO_SECRETO)
+        return httpx.Response(200, json=_cargar("filas.json"))
+
+    return httpx.MockTransport(responder)
+
+
+def _adaptador(
+    fixture_filas: str = "filas.json",
+    *,
+    cabeceras: dict[str, str] | None = None,
+    pasos: list[tuple[int | str, float]] | None = None,
+    lote_id: UUID | None = None,
+) -> tuple[DatosGovCoRues, list[httpx.Request]]:
+    capturadas: list[httpx.Request] = []
+    reloj = RelojFalso()
+    if pasos is None:
+        transporte = _transporte_fijo(_cargar(fixture_filas), cabeceras, capturadas)
+    else:
+        transporte = _transporte_guionado(reloj, pasos, capturadas)
 
     adaptador = DatosGovCoRues(
-        transporte=httpx.MockTransport(responder),
-        reloj=lambda: datetime(2026, 10, 17, 12, 0, tzinfo=UTC),
+        transporte=transporte,
+        reloj=reloj,
         dormir=lambda _s: None,
         costos=CostosEnMemoria(),
         cache=None,
         camaras=CAMARAS,
         tarifas={"computo_seg_usd": 0.000007},
-        lote_id=None,
+        lote_id=lote_id,
         meta=MetaFuente(
             clave="datos_gov_co_rues",
             proveedor="datos.gov.co",
@@ -171,3 +227,80 @@ def test_descartados_no_se_loguean(caplog):
         texto = record.getMessage() + repr(vars(record))
         for secreto in secretos:
             assert secreto not in texto, record.name
+
+
+def _criterios(**filtros: str | tuple[str, ...]) -> CriteriosICP:
+    return CriteriosICP(pais="CO", filtros={"ciiu": "4711", "departamento": "11", **filtros})
+
+
+def test_departamento_25_se_traduce_a_cuatro_camaras():
+    adaptador, capturadas = _adaptador()
+
+    adaptador.buscar(_criterios(departamento="25"), 1)
+
+    where = _requests_de_filas(capturadas)[0].url.params["$where"]
+    assert "codigo_camara in('04','14','47','58')" in where
+
+
+@pytest.mark.parametrize(
+    "filtros",
+    [
+        {"departamento": "99"},  # fuera del YAML
+        {"ciiu": "47' OR '1'='1"},  # inyección SoQL
+        {"ciiu": "471"},
+        {"ciiu": "47111"},
+        {"ciiu": ("4711", "4712")},  # tupla: varios valores no se soportan
+    ],
+)
+def test_criterio_invalido_lanza_sin_requests(filtros):
+    adaptador, capturadas = _adaptador()
+
+    with pytest.raises(CriterioNoSoportado):
+        adaptador.buscar(_criterios(**filtros), 1)
+
+    assert capturadas == []
+
+
+def test_mapea_fila_a_empresa_cruda():
+    adaptador, _ = _adaptador()
+
+    pagina = adaptador.buscar(CRITERIOS, 1)
+
+    alfa = next(e for e in pagina.empresas if e.id_fiscal == "999000001")
+    assert alfa.nombre == "EJEMPLO FICTICIO ALFA S.A.S."
+    assert alfa.pais == "CO"
+    assert alfa.ciudad == "Bogotá"
+    assert alfa.actividad == ("4711", "CIIU")
+    assert alfa.tipo_titular == "juridica"
+    assert alfa.fuente == "datos_gov_co_rues"
+    assert alfa.url_origen == "https://www.datos.gov.co/resource/c82u-588k.json?nit=999000001"
+    assert alfa.direccion is None
+    assert alfa.web is None
+    assert adaptador.meta.licencia == "CC-BY-SA-4.0"  # la licencia va en meta, no en EmpresaCruda (D4)
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="rojo T025; verde en T028")
+def test_as_of_sale_del_header():
+    adaptador, _ = _adaptador(cabeceras={"X-SODA2-Truth-Last-Modified": "Fri, 02 Oct 2026 21:39:26 GMT"})
+
+    pagina = adaptador.buscar(CRITERIOS, 1)
+
+    assert {e.as_of for e in pagina.empresas} == {datetime(2026, 10, 2, 21, 39, 26, tzinfo=UTC)}
+
+
+def test_as_of_sin_header_es_la_hora_del_reloj():
+    adaptador, _ = _adaptador()
+
+    pagina = adaptador.buscar(CRITERIOS, 1)
+
+    assert {e.as_of for e in pagina.empresas} == {AHORA}
+
+
+def test_pagina_2_vacia_sin_request():
+    adaptador, capturadas = _adaptador()
+
+    pagina = adaptador.buscar(CRITERIOS, 2)
+
+    assert pagina.empresas == ()
+    assert capturadas == []
+    assert adaptador._costos.filas == []
