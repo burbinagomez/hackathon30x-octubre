@@ -45,6 +45,16 @@ export const actividades = [
   { codigo: "4631", nombre_es: "Comercio al por mayor de alimentos", nombre_en: null },
 ];
 
+/** GET /geografia: solo un pedazo de los 33; el código es DIVIPOLA y es lo que viaja en el pedido. */
+export const geografia = {
+  CO: [
+    { codigo: "05", nombre_es: "Antioquia", nombre_en: "Antioquia" },
+    { codigo: "11", nombre_es: "Bogotá, D.C.", nombre_en: "Bogotá, D.C." },
+    { codigo: "73", nombre_es: "Tolima", nombre_en: "Tolima" },
+    { codigo: "88", nombre_es: "San Andrés y Providencia", nombre_en: "San Andrés and Providencia" },
+  ],
+};
+
 export function respuestaVistaPrevia(cambios: Record<string, unknown> = {}) {
   return {
     busqueda_id: "b-1",

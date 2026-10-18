@@ -11,6 +11,7 @@ import {
   boton,
   campo,
   espiarFijarIdioma,
+  geografia,
   iniciarSesion,
   monto,
   respuestaVistaPrevia,
@@ -26,10 +27,12 @@ async function previsualizar(
   vista: Record<string, unknown> = respuestaVistaPrevia(),
   tope = "5",
   Pantalla: ComponentType = NuevaBusqueda,
+  antes: () => void | Promise<void> = () => undefined,
 ) {
   const pedidos: unknown[] = [];
   server.use(
     http.get("*/actividades", () => HttpResponse.json(actividades)),
+    http.get("*/geografia", () => HttpResponse.json(geografia)),
     http.post("*/busquedas/vista-previa", async ({ request }) => {
       pedidos.push(await request.json());
       return HttpResponse.json(vista);
@@ -43,6 +46,7 @@ async function previsualizar(
   fireEvent.change(campo("Actividad"), { target: { value: "1081" } });
   fireEvent.change(campo("Palabras clave (separadas por coma)"), { target: { value: "pan, harina" } });
   fireEvent.change(campo("Tope de gasto (USD)"), { target: { value: tope } });
+  await antes();
   fireEvent.click(boton("Vista previa"));
   await waitFor(() => expect(pedidos).toHaveLength(1));
   return { pedidos, vistaMontada };
@@ -175,14 +179,20 @@ test("cambia_idioma", async () => {
   // i18next es un singleton: sin esto seguiría en en por inercia y simularía una carga en frío.
   vistaMontada.unmount();
   await i18n.changeLanguage("es");
-  server.use(http.get("*/actividades", () => HttpResponse.json(actividades)));
+  server.use(
+    http.get("*/actividades", () => HttpResponse.json(actividades)),
+    http.get("*/geografia", () => HttpResponse.json(geografia)),
+  );
   render(<App />);
   await waitFor(() => expect(boton(en.busqueda.buscar)).toBeInTheDocument());
   expect(patches).toHaveLength(1);
 });
 
 test("vista_previa_exige_actividad_y_tope", async () => {
-  server.use(http.get("*/actividades", () => HttpResponse.json(actividades)));
+  server.use(
+    http.get("*/actividades", () => HttpResponse.json(actividades)),
+    http.get("*/geografia", () => HttpResponse.json(geografia)),
+  );
   render(<NuevaBusqueda />);
   await waitFor(() => expect(screen.queryByRole("option", { name: actividades[0].nombre_es })).toBeInTheDocument());
   expect(boton("Vista previa")).toBeDisabled();
@@ -207,6 +217,7 @@ test("un_error_de_la_api_se_avisa_y_no_deja_la_busqueda_a_medias", async () => {
 test("un_error_en_la_vista_previa_se_avisa", async () => {
   server.use(
     http.get("*/actividades", () => HttpResponse.json(actividades)),
+    http.get("*/geografia", () => HttpResponse.json(geografia)),
     http.post("*/busquedas/vista-previa", () => new HttpResponse(null, { status: 422 })),
   );
   render(<NuevaBusqueda />);
@@ -240,4 +251,59 @@ test("los_ignorados_de_palabras_clave_exclusiones_y_ciudad_salen_con_su_nombre",
   expect(fila("OpenStreetMap")).toHaveTextContent("Palabras clave, Exclusiones");
   expect(fila("RUES")).toHaveTextContent("Ciudad");
   expect(en.criterios.palabras_clave && en.criterios.exclusiones && en.criterios.ciudad).toBeTruthy();
+});
+
+const opcion = (nombre: string) => screen.queryByRole("option", { name: nombre });
+
+test("departamento_es_un_select_que_manda_el_codigo_divipola_no_el_nombre", async () => {
+  const { pedidos } = await previsualizar(respuestaVistaPrevia(), "5", NuevaBusqueda, async () => {
+    await waitFor(() => expect(opcion("Tolima")).toBeInTheDocument());
+    expect(campo("Departamento").tagName).toBe("SELECT");  // no texto libre: "Tolima" escrito a mano no es un código
+    fireEvent.change(campo("Departamento"), { target: { value: "73" } });
+  });
+
+  expect((pedidos[0] as { departamento?: string }).departamento).toBe("73");  // el código, nunca "Tolima"
+  expect(opcion("Bogotá, D.C.")).toBeInTheDocument();
+});
+
+test("departamento_vacio_no_se_envia", async () => {
+  const { pedidos } = await previsualizar(respuestaVistaPrevia(), "5", NuevaBusqueda, async () => {
+    await waitFor(() => expect(opcion("Tolima")).toBeInTheDocument());
+  });
+  expect(pedidos[0]).not.toHaveProperty("departamento");
+});
+
+test("ciudad_es_un_campo_de_texto_opcional_que_se_envia_como_ciudad", async () => {
+  const { pedidos } = await previsualizar(respuestaVistaPrevia(), "5", NuevaBusqueda, () => {
+    expect(campo("Ciudad").tagName).toBe("INPUT");
+    fireEvent.change(campo("Ciudad"), { target: { value: "Ibagué" } });
+  });
+  expect((pedidos[0] as { ciudad?: string }).ciudad).toBe("Ibagué");
+});
+
+test("ciudad_vacia_no_se_envia", async () => {
+  const { pedidos } = await previsualizar();
+  expect(pedidos[0]).not.toHaveProperty("ciudad");
+});
+
+test("los_nombres_de_departamento_salen_en_el_idioma_activo", async () => {
+  await i18n.changeLanguage("en");
+  server.use(
+    http.get("*/actividades", () => HttpResponse.json(actividades)),
+    http.get("*/geografia", () => HttpResponse.json(geografia)),
+  );
+  render(<NuevaBusqueda />);
+  await waitFor(() => expect(opcion("San Andrés and Providencia")).toBeInTheDocument());
+  expect(opcion("San Andrés y Providencia")).not.toBeInTheDocument();
+  expect(campo(en.busqueda.ciudad)).toBeInTheDocument();
+});
+
+test("solo_colombia_tiene_departamentos_en_la_lista", async () => {
+  const { pedidos } = await previsualizar(respuestaVistaPrevia(), "5", NuevaBusqueda, async () => {
+    await waitFor(() => expect(opcion("Tolima")).toBeInTheDocument());
+    fireEvent.change(campo("Departamento"), { target: { value: "73" } });
+    fireEvent.change(campo("País"), { target: { value: "PE" } });
+    expect(screen.queryByLabelText("Departamento")).not.toBeInTheDocument();  // los códigos DIVIPOLA son de Colombia
+  });
+  expect(pedidos[0]).not.toHaveProperty("departamento");  // y el que quedó elegido no viaja a otro país
 });

@@ -8,7 +8,12 @@ from uuid import uuid4
 import pytest
 
 from app.modulos.descubrimiento.aplicacion.ejecutar_busqueda import EjecutarBorrador
-from app.modulos.descubrimiento.dominio.errores import BusquedaNoEncontrada, BusquedaYaEjecutada, FuenteNoDisponible
+from app.modulos.descubrimiento.dominio.errores import (
+    BusquedaNoEncontrada,
+    BusquedaYaEjecutada,
+    CriterioNoSoportado,
+    FuenteNoDisponible,
+)
 from app.modulos.descubrimiento.dominio.modelos import Actividad, CriteriosICP, EmpresaCruda, MetaFuente
 from tests.falsos import FabricaFalsa, RegistroCostosFalso, RepositorioLeadsFalso
 
@@ -159,3 +164,18 @@ def test_error_inesperado_deja_la_busqueda_en_error_y_no_se_traga():
         caso.ejecutar(borrador_id)
 
     assert repo.busquedas[borrador_id] == "error"  # no se queda en `ejecutando` para siempre
+
+
+def test_criterio_no_soportado_por_una_fuente_no_tumba_la_busqueda():
+    # Pasa de verdad: datos.gov.co sin cámaras para el departamento pedido lanza CriterioNoSoportado antes de cualquier request.
+    caso, repo, costos, _, borrador_id = _caso(errores={"osm_overpass": CriterioNoSoportado("sin cámaras")})
+
+    try:
+        r = caso.ejecutar(borrador_id)
+    except CriterioNoSoportado as error:  # el bug: una fuente que no entiende el criterio tumba a las que sí corren
+        r = error
+    assert not isinstance(r, CriterioNoSoportado), "CriterioNoSoportado se propagó y la búsqueda quedó en error"
+
+    assert repo.busquedas[borrador_id] == "completada"
+    assert set(r.errores) == {"osm_overpass"} and isinstance(r.errores["osm_overpass"], CriterioNoSoportado)
+    assert r.encontrados == 1

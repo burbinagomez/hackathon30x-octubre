@@ -9,6 +9,7 @@ Sin red: los dos hosts (Overpass y datos.gov.co) los atiende un MockTransport. D
 """
 import json
 import re
+from types import SimpleNamespace
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -69,6 +70,14 @@ def _tablero(api, quien) -> dict:
 
 def _ejecutar(api, quien, busqueda_id):
     return api.post(f"/busquedas/{busqueda_id}/ejecutar", headers=_bearer(quien))
+
+
+def _ejecutar_o_500(api, quien, busqueda_id):
+    """Como _ejecutar, pero una excepción sin atrapar en la API se ve como un 500 (el TestClient la relanzaría)."""
+    try:
+        return _ejecutar(api, quien, busqueda_id)
+    except Exception:  # noqa: BLE001
+        return SimpleNamespace(status_code=500, json=lambda: {})
 
 
 def _contar(admin, sql, **params):
@@ -396,3 +405,64 @@ def test_sin_palabras_clave_ni_exclusiones_no_hay_nada_que_ignorar(api, usuarios
     assert r.status_code == 201
     for fuente in r.json()["fuentes"]:
         assert not {"palabras_clave", "exclusiones"} & set(fuente["ignorados"])
+
+
+# --- geografía: el departamento es un código DIVIPOLA, no texto libre --------------------------------------------
+
+def test_geografia_lista_los_33_departamentos_de_colombia_con_codigo_y_nombres(api, usuarios):
+    r = api.get("/geografia", headers=_bearer(usuarios["a"]))
+
+    assert r.status_code == 200
+    co = r.json()["CO"]
+    assert len(co) == 33 and len({d["codigo"] for d in co}) == 33  # 32 departamentos + Bogotá D.C.
+    assert all(re.fullmatch(r"\d{2}", d["codigo"]) and d["nombre_es"] and d["nombre_en"] for d in co)
+    por_codigo = {d["codigo"]: d for d in co}
+    assert por_codigo["73"]["nombre_es"] == "Tolima" and por_codigo["11"]["nombre_es"] == "Bogotá, D.C."
+    assert [d["codigo"] for d in co] == sorted(por_codigo)  # estable: por código
+
+
+@pytest.mark.parametrize("cambios", [
+    pytest.param({"departamento": "Tolima"}, id="nombre_en_vez_de_codigo"),
+    pytest.param({"departamento": "00"}, id="codigo_que_no_existe"),
+    pytest.param({"departamento": "11", "pais": "PE"}, id="departamento_de_colombia_en_otro_pais"),
+])
+def test_departamento_desconocido_da_422_con_codigo(api, admin, usuarios, cambios):
+    r = _vista_previa(api, usuarios["a"], **cambios)
+
+    assert r.status_code == 422
+    assert r.json() == {"errores": [{"campo": "departamento", "codigo": "desconocido"}]}
+    assert _contar(admin, "SELECT count(*) FROM busquedas WHERE tenant_id = :a", a=usuarios["tenant_a"]) == 0
+
+
+def _cuerpo(request):
+    return request.content.decode() + str(request.url)
+
+
+def test_tolima_e_ibague_llegan_a_datos_gov_con_sus_camaras_y_a_osm_con_la_ciudad(api, tmp_path, usuarios):
+    # Cámara SINTÉTICA "99" que cubre el departamento 73: el dato real de Tolima no está en camaras_co.yaml (no se inventa).
+    camaras = tmp_path / "camaras.yaml"
+    camaras.write_text('"99": {nombre: "Ficticia", municipio_sede: "Ibagué", departamentos: ["73"]}\n')
+    api.app.state.camaras_yaml = camaras
+
+    busqueda_id = _crear(api, usuarios["a"], departamento="73", ciudad="Ibagué")
+    r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert r.status_code == 200 and r.json()["estado"] == "completada" and r.json()["errores"] == []
+    datos = [q for q in api.pedidas if q.url.host == "www.datos.gov.co"]
+    osm = [q for q in api.pedidas if q.url.host != "www.datos.gov.co"]
+    assert len(datos) == 1 and len(osm) == 1
+    from urllib.parse import unquote_plus
+    assert "codigo_camara in('99')" in unquote_plus(_cuerpo(datos[0])).replace('"', "'")
+    assert "Ibagu" in unquote_plus(_cuerpo(osm[0]))
+
+
+def test_tolima_con_el_yaml_real_no_tumba_la_busqueda_porque_no_hay_camaras_de_73(api, admin, usuarios):
+    busqueda_id = _crear(api, usuarios["a"], departamento="73", ciudad="Ibagué")
+
+    r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert r.status_code == 200  # no un 500 por CriterioNoSoportado
+    cuerpo = r.json()
+    assert cuerpo["estado"] == "completada"  # OSM sí corrió, con la ciudad
+    assert cuerpo["errores"] == [{"fuente": "datos_gov_co_rues", "motivo": "criterio_no_soportado"}]
+    assert not [q for q in api.pedidas if q.url.host == "www.datos.gov.co"]  # falló antes de cualquier request
