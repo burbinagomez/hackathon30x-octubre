@@ -716,3 +716,17 @@ table.tabla-leads {
   background: var(--color-superficie);
 }
 .panel-enriquecer { margin-bottom: 1.5rem; }
+
+/* Importar resultados de Dapta: el archivo se parte en líneas en pantallas angostas. */
+.importar-dapta label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  font-weight: 700;
+}
+
+.importar-dapta input[type="file"] {
+  max-width: 100%;
+  min-width: 0;
+}

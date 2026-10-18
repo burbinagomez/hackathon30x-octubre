@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
 import Atribuciones from "../compartido/Atribuciones";
 import Esqueleto from "../compartido/Esqueleto";
+import Trabajando from "../compartido/Trabajando";
+import { ErrorApi } from "../api/cliente";
 import Enlace from "../compartido/Enlace";
 import { RUTA_BUSQUEDAS, RUTA_LEADS } from "../compartido/rutas";
 import { entero, moneda, monedaFina, porcentaje } from "../compartido/formato";
-import { obtenerCpql, exportarParaDapta, obtenerTablero } from "./api";
-import type { Cpql, FilaCpql, FilaTablero, Tablero as DatosTablero } from "./tipos";
+import { obtenerCpql, exportarParaDapta, importarDeDapta, obtenerTablero } from "./api";
+import type { Cpql, FilaCpql, FilaTablero, ResumenImportacion, Tablero as DatosTablero } from "./tipos";
 
 type Columna =
   | "costo_lista" | "costo_real" | "desperdicio_lista" | "desperdicio_real" | "cpl_lista" | "cpl_real" | "naturales"
@@ -120,18 +122,47 @@ function Embudo({ datos }: { datos: DatosTablero }) {
   );
 }
 
+/** Filas que quedaron afuera por cualquier motivo: a la persona le importa que hay que revisar el archivo. */
+const omitidas = (r: ResumenImportacion) => r.rechazadas.length + r.conflictos + r.no_cumple + r.ref_desconocida;
+
+const ERRORES_IMPORTAR = [409, 413, 415, 422, 503];
+
 export default function Tablero() {
   const { t } = useTranslation();
   const [datos, setDatos] = useState<DatosTablero | null>(null);
   const [fallo, setFallo] = useState(false);
   const [cpql, setCpql] = useState<Cpql | null>(null);
   const [falloExport, setFalloExport] = useState(false);
+  const [importando, setImportando] = useState(false);
+  const [resumen, setResumen] = useState<ResumenImportacion | null>(null);
+  const [falloImportar, setFalloImportar] = useState<string | null>(null);
+
+  const cargarCpql = () => obtenerCpql().then(setCpql).catch(() => setCpql(null));
 
   useEffect(() => {
     obtenerTablero().then(setDatos).catch(() => setFallo(true));
     // El CPQL es un agregado: si falla, el tablero se ve como sin él (sin columnas nuevas, sin error).
-    obtenerCpql().then(setCpql).catch(() => setCpql(null));
+    cargarCpql();
   }, []);
+
+  const importar = async (e: ChangeEvent<HTMLInputElement>) => {
+    const entrada = e.target;
+    const archivo = entrada.files?.[0];
+    if (!archivo) return;
+    setResumen(null);
+    setFalloImportar(null);
+    setImportando(true);
+    try {
+      setResumen(await importarDeDapta(archivo));
+      await Promise.all([obtenerTablero().then(setDatos).catch(() => undefined), cargarCpql()]);
+    } catch (error) {
+      const estado = error instanceof ErrorApi ? error.estado : 0;
+      setFalloImportar(ERRORES_IMPORTAR.includes(estado) ? `error_importar_${estado}` : "error_importar");
+    } finally {
+      setImportando(false);
+      entrada.value = "";  // para poder subir de nuevo el mismo archivo
+    }
+  };
 
   if (!datos) {
     return (
@@ -156,6 +187,21 @@ export default function Tablero() {
           {t("tablero.exportar_dapta")}
         </button>
       </div>
+      <div className="importar-dapta">
+        <label>
+          {t("tablero.importar_dapta")}
+          <input type="file" accept=".csv,text/csv" disabled={importando} onChange={importar} />
+        </label>
+      </div>
+      {importando && <Trabajando texto={t("tablero.importando")} />}
+      {resumen && (
+        <p role="status" className="aviso importar-resumen">
+          {t("tablero.importar_listo", { count: resumen.importadas })}
+          {resumen.duplicadas > 0 && ` ${t("tablero.importar_repetidas", { count: resumen.duplicadas })}`}
+          {omitidas(resumen) > 0 && ` ${t("tablero.importar_omitidas", { count: omitidas(resumen) })}`}
+        </p>
+      )}
+      {falloImportar && <p role="alert" className="error">{t(`tablero.${falloImportar}`)}</p>}
       {falloExport && <p role="alert" className="error">{t("tablero.error_exportar")}</p>}
       <div className="tabla-scroll">
       <table>

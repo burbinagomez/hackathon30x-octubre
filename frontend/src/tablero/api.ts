@@ -1,5 +1,5 @@
 import { descargar, pedir } from "../api/cliente";
-import type { Cpql, Tablero } from "./tipos";
+import type { Cpql, ResumenImportacion, Tablero } from "./tipos";
 
 export const obtenerTablero = () => pedir<Tablero>("/tablero/fuentes");
 export const obtenerCpql = () => pedir<Cpql>("/calificaciones/cpql");
@@ -13,3 +13,7 @@ export async function exportarParaDapta(): Promise<void> {
   enlace.click();
   URL.revokeObjectURL(url);
 }
+
+/** Sube el CSV de resultados de Dapta (cuerpo crudo text/csv, como lo pide el endpoint). */
+export const importarDeDapta = (archivo: File) =>
+  pedir<ResumenImportacion>("/calificaciones/importar", { metodo: "POST", csv: archivo });

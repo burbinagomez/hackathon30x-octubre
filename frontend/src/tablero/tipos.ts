@@ -39,3 +39,13 @@ export type FilaCpql = {
 };
 
 export type Cpql = { fuentes: FilaCpql[]; total: FilaCpql | null };
+
+/** Resumen de POST /calificaciones/importar. Los contactos nunca vuelven en la respuesta. */
+export type ResumenImportacion = {
+  importadas: number;
+  duplicadas: number;
+  conflictos: number;
+  no_cumple: number;
+  ref_desconocida: number;
+  rechazadas: { fila: number; motivo: string }[];
+};
