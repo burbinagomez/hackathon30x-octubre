@@ -68,7 +68,11 @@
       "consultando": "Querying {{fuente}}",
       "vista_previa": "Calculating count and cost",
       "frase": "The AI is reading your sentence",
-      "lookalike": "Looking up your customers in RUES"
+      "lookalike": "Looking up your customers in RUES",
+      "detalle_fuente": "{{fuente}}: {{conteo}} expected",
+      "detalle_fuente_sin_conteo": "{{fuente}}: no prior count",
+      "detalle_ignora": "does not filter by: {{campos}}",
+      "detalle_costo": "Maximum cost {{maximo}} · cap {{tope}}"
     }
   },
   "fuentes": {

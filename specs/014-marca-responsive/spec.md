@@ -108,6 +108,7 @@ Ninguna.
 Pedido del dueño: "los spinners, los colores, cómo se ve que está trabajando: esos detalles nos faltan".
 - **`Trabajando`** (`compartido/Trabajando.tsx`): píldora con anillo lima que gira, texto de qué pasa y cronómetro `m:ss`; opcionalmente una línea por paso. `role="status"`, nombre accesible = el texto, anillo `aria-hidden`.
 - Se usa en: vista previa ("Calculando conteo y costo"), **Buscar** (con una línea "Consultando <fuente>" por cada fuente de la vista previa, porque la API responde todo junto al final), sugerir por frase ("La IA está leyendo tu frase") y Ya me compran ("Buscando tus clientes en el RUES").
+- La píldora se **despliega** (botón con `aria-expanded`) para ver el detalle de lo que hace: en Buscar, cada fuente con su conteo previsto y lo que no filtra, más el costo máximo y el tope. Solo datos de la vista previa, nada inventado (la API responde al final, no transmite avances).
 - Los botones que disparan trabajo muestran el anillo adentro, quedan `disabled` y con `aria-busy="true"`.
 - **`Esqueleto`** (`compartido/Esqueleto.tsx`): barras que brillan en tablero, lista de búsquedas y lista de leads mientras cargan; anuncia "Cargando…" a lectores de pantalla.
 - Solo tokens de color (claro y oscuro); con `prefers-reduced-motion: reduce` no hay animación.

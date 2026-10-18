@@ -6,6 +6,7 @@ import {
   divisionesDe, ejecutar, estadoIntake, listarActividades, listarPaises, sugerirDesdeFrase, vistaPrevia,
   type EstadoIntake, type Sugerencia,
 } from "./api";
+import { entero, moneda, monedaFina } from "../compartido/formato";
 import Trabajando from "../compartido/Trabajando";
 import IntakeLookalike from "./IntakeLookalike";
 import ResultadoPorFuente from "./ResultadoPorFuente";
@@ -65,6 +66,29 @@ function Campo({ id, etiqueta, children }: { id: string; etiqueta: string; child
       <label htmlFor={id}>{etiqueta}</label>
       {children}
     </div>
+  );
+}
+
+/** Lo que la búsqueda en curso está consultando, con los números de la vista previa: nada inventado. */
+function DetalleBusqueda({ vista, tope }: { vista: VistaPrevia; tope: number }) {
+  const { t } = useTranslation();
+  const nombre = (clave: string) => t(`fuentes.${clave}`, { defaultValue: clave });
+  return (
+    <>
+      <ul>
+        {vista.fuentes.map((f) => (
+          <li key={f.fuente}>
+            {f.conteo === null
+              ? t("busqueda.trabajando.detalle_fuente_sin_conteo", { fuente: nombre(f.fuente) })
+              : t("busqueda.trabajando.detalle_fuente", { fuente: nombre(f.fuente), conteo: entero(f.conteo) })}
+            {f.ignorados.length > 0 && ` · ${t("busqueda.trabajando.detalle_ignora", { campos: f.ignorados.join(", ") })}`}
+          </li>
+        ))}
+      </ul>
+      {vista.costo_maximo_usd !== null && (
+        <p>{t("busqueda.trabajando.detalle_costo", { maximo: monedaFina(vista.costo_maximo_usd), tope: moneda(tope) })}</p>
+      )}
+    </>
   );
 }
 
@@ -159,6 +183,7 @@ export default function NuevaBusqueda() {
   const palabrasClave = entrada("palabrasClave", t("busqueda.palabras_clave"));
   const exclusiones = entrada("exclusiones", t("busqueda.exclusiones"));
   const tope = entrada("tope", t("busqueda.tope"), "number");
+  const nombreFuente = (clave: string) => t(`fuentes.${clave}`, { defaultValue: clave });
   const nombre = (a: Actividad) => (i18n.language === "en" ? a.nombre_en ?? a.nombre_es : a.nombre_es);
   const pestanas: Pestana[] = [
     ...(puertas.lookalike ? (["lookalike"] as const) : []),
@@ -181,7 +206,7 @@ export default function NuevaBusqueda() {
         </div>
       )}
       {pestana === "frase" && (
-        <div className="formulario formulario-ancho" role="tabpanel">
+        <div className="formulario panel-intake" role="tabpanel">
           <Campo id="frase" etiqueta={t("busqueda.frase.etiqueta")}>
             <textarea id="frase" maxLength={MAX_FRASE} value={frase} onChange={(e) => setFrase(e.target.value)} />
           </Campo>
@@ -197,7 +222,7 @@ export default function NuevaBusqueda() {
         </div>
       )}
       {pestana === "lookalike" && (
-        <div className="formulario formulario-ancho" role="tabpanel">
+        <div className="panel-intake" role="tabpanel">
           {sugerido && <p role="status" className="aviso">{t("busqueda.frase.revisar")}</p>}
           <IntakeLookalike alSugerir={aplicarLookalike} />
         </div>
@@ -286,8 +311,10 @@ export default function NuevaBusqueda() {
       {ocupado === "buscar" && vista && (
         // La API responde todo junto al final: mientras tanto se ve qué fuentes se están consultando.
         <Trabajando
+          flotante
           texto={t("busqueda.trabajando.buscando")}
-          pasos={vista.fuentes.map((f) => t("busqueda.trabajando.consultando", { fuente: t(`fuentes.${f.fuente}`, { defaultValue: f.fuente }) }))}
+          pasos={vista.fuentes.map((f) => t("busqueda.trabajando.consultando", { fuente: nombreFuente(f.fuente) }))}
+          detalle={<DetalleBusqueda vista={vista} tope={Number(form.tope)} />}
         />
       )}
       {resultado && (
