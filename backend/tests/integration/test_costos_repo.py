@@ -1,15 +1,23 @@
+import json
 import os
 from decimal import Decimal
+from pathlib import Path
 from uuid import uuid4
 
+import httpx
 import pytest
 from sqlalchemy import create_engine, event, text
 
 from app import db
 from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.costos.infraestructura.postgres_costos import PostgresCostos
+from app.modulos.descubrimiento.aplicacion.registro import cargar_registro
+from app.modulos.descubrimiento.dominio.modelos import CriteriosICP
+from app.modulos.descubrimiento.infraestructura.adaptadores.osm_overpass import OsmOverpass
 
 PROVEEDOR = "croma"
+BACKEND = Path(__file__).resolve().parents[2]
+FIXTURE_OSM = BACKEND / "tests" / "fixtures" / "osm" / "bogota_4711.json"
 
 
 def _url(nombre):
@@ -99,3 +107,28 @@ def test_registrar_sobrevive_al_rollback_de_otra_transaccion(rt, admin, tenant):
         busquedas = c.execute(text("SELECT count(*) FROM busquedas WHERE tenant_id = :t"), {"t": tenant}).scalar()
     assert costos == [("overpass_query", Decimal(1), Decimal(0), "USD", "osm", "osm", None, lead, lote, True)]
     assert busquedas == 0
+
+
+def test_overpass_query_escribe_fila_en_costos(rt, admin, tenant):
+    """OSM real contra el libro real: 1 request deja 1 fila `overpass_query` del tenant, con la tarifa como numeric."""
+    meta = cargar_registro(BACKEND / "config" / "fuentes.yaml", {"osm_overpass": object}).fuentes["osm_overpass"][1]
+    ahora = [100.0]
+
+    def responder(request):
+        ahora[0] += 2.0  # el request "dura" 2 s
+        return httpx.Response(200, json=json.loads(FIXTURE_OSM.read_text()))
+
+    lote = uuid4()
+    adaptador = OsmOverpass(meta=meta, registro_costos=PostgresCostos(rt, tenant), transporte=httpx.MockTransport(responder),
+                            costo_unitario=Decimal("0.0000070"), lote_id=lote, repo_url="https://example.invalid/repo",
+                            reloj=lambda: ahora[0])
+
+    adaptador.buscar(CriteriosICP("CO", {"ciudad": "Bogotá", "tipo_negocio": ("shop=supermarket",)}), 1)
+
+    with admin.connect() as c:
+        filas = c.execute(text("SELECT tenant_id, tipo, unidades, costo_unitario, moneda, proveedor, fuente, lead_id, "
+                               "lote_id, gratis FROM costos WHERE tenant_id = :t"), {"t": tenant}).all()
+        tipo_costo = c.execute(text("SELECT data_type FROM information_schema.columns "
+                                    "WHERE table_schema = 'public' AND table_name = 'costos' AND column_name = 'costo_unitario'")).scalar()
+    assert filas == [(tenant, "overpass_query", Decimal(2), Decimal("0.0000070"), "USD", "osm", "osm_overpass", None, lote, False)]
+    assert tipo_costo == "numeric"

@@ -42,8 +42,8 @@ Arma el ciclo de PRD §6b: casos → agente → scorers → baseline → verde/r
    1. Valida el entorno (`ANTHROPIC_API_KEY`, `DATABASE_URL`, `--tenant`) y `evals.yaml`. Si falta algo, sale con **2**, sin llamar a nada.
    2. Calcula el fingerprint de cada eval: hash de (dataset, prompt del juez, modelo, corte, umbral). **k no entra**: correr a k=1 tras demostrar determinación a k=3 no puede volver obsoleto el baseline que lo habilita.
    3. Por caso: scorers de forma primero. Si la forma falla, el caso falla con motivo `forma:<regla>` y **no se gasta el juez**. Si pasa, el juez corre k veces.
-   4. El caso pasa solo si pasa las k corridas (PASS^k). Una salida del juez que no respeta el esquema cuenta como corrida fallida con motivo `juez_salida_invalida`.
-   5. Por eval: `agregado` (fracción de **todos** los casos que pasan), `determinacion` (fracción de los casos **juzgados** cuyas k corridas dieron el mismo resultado; los fallidos por forma no entran, porque determinación mide al juez y ahí el juez no corrió) y la lista de fallidos `{id, motivo}`.
+   4. El caso pasa solo si pasa las k corridas (PASS^k). Una salida del juez que no respeta el esquema cuenta como corrida fallida con motivo `juez_salida_invalida`. Un caso que falla alguna de las k corridas por no coincidir con la etiqueta lleva motivo `fallo_corrida`.
+   5. Por eval: `agregado` (fracción de **todos** los casos que pasan), `determinacion` (fracción de los casos **juzgados** cuyas k corridas dieron el mismo resultado; los fallidos por forma no entran, porque determinación mide al juez y ahí el juez no corrió) la lista de fallidos `{id, motivo}` y su `estado` (`ok`, `bajo_umbral`, `regresion`, `sin_baseline` o `baseline_obsoleto`).
    6. Compara con `baseline.json` e imprime el reporte en JSON por stdout.
 4. **Código de salida:** `0` si todo eval está ≥ umbral y ≥ baseline − tolerancia; `1` si alguno baja, queda bajo el umbral, no tiene baseline o tiene el baseline obsoleto (fingerprint distinto); `2` si falta entorno o la config es inválida.
 5. **Baseline.** El baseline **solo se fija a k=3**: `--actualizar-baseline` con k < 3 sale 2. Así la prueba de determinación nunca la pisa una corrida a k=1. `--actualizar-baseline` escribe `baseline.json` (agregado, determinación, k, n, fingerprint, fecha, motivo) solo si cada eval pasa su umbral **y** no baja respecto al baseline vigente con el mismo fingerprint. Bajar el baseline exige `--motivo "<justificación>"`, que queda escrito en el baseline y se lee en el PR (principio IX: no mergea sin justificación). Nunca se reescribe solo: si una corrida mejora sin el flag, sale 0 y avisa que hay mejora para fijar en el PR.
@@ -96,11 +96,11 @@ Arma el ciclo de PRD §6b: casos → agente → scorers → baseline → verde/r
 - `::test_salida_invalida_falla_el_caso_con_motivo`: el caso queda en fallidos con `motivo="juez_salida_invalida"` y la corrida sigue con el resto.
 - `::test_reporta_fallidos_con_id_y_motivo`.
 - `::test_k_menor_a_3_con_juez_llm_es_config_invalida`: `k: 1` con `juez: claude` sale 2 con `ConfigInvalida`.
-- `::test_k1_solo_con_determinacion_demostrada`: con un juez marcado `determinista_si_se_demuestra: true` (lo usará `jev` en la 006), `k: 1` sale 2 si el baseline a k=3 tiene `determinacion < 1.0`, o si no hay baseline a k=3; con `determinacion == 1.0` a k=3, se acepta. Secuencia en un mismo test: k=3 con `--actualizar-baseline` (sale 0), después k=1 (sale 0, no `baseline_obsoleto`) y otra vez k=1 (sale 0). Además, k=1 con `--actualizar-baseline` sale 2 y no escribe.
+- `::test_k1_solo_con_determinacion_demostrada`: con un juez cuyo atributo de clase `determinista_si_se_demuestra` es `True` (lo usará `jev` en la 006), `k: 1` sale 2 si el baseline a k=3 tiene `determinacion < 1.0`, o si no hay baseline a k=3; con `determinacion == 1.0` a k=3, se acepta. Secuencia en un mismo test: k=3 con `--actualizar-baseline` (sale 0), después k=1 (sale 0, no `baseline_obsoleto`) y otra vez k=1 (sale 0). Además, k=1 con `--actualizar-baseline` sale 2 y no escribe.
 - `::test_igual_al_baseline_sale_0`.
 - `::test_baja_respecto_al_baseline_sale_1`: baseline 0.80, corrida 0.75, tolerancia 0 → 1, y el reporte nombra el eval.
 - `::test_bajo_umbral_sale_1_aunque_no_baje`: baseline 0.60, corrida 0.60, umbral 0.70 → 1.
-- `::test_fingerprint_distinto_es_baseline_obsoleto`: cambiar el prompt del juez, el dataset, el modelo, el corte o el umbral → sale 1 con `motivo="baseline_obsoleto"`.
+- `::test_fingerprint_distinto_es_baseline_obsoleto`: cambiar el prompt del juez, el dataset, el modelo, el corte o el umbral → sale 1 con `estado="baseline_obsoleto"` en ese eval.
 - `::test_sin_baseline_sale_1`: salvo con `--actualizar-baseline`.
 - `::test_mejora_no_reescribe_baseline_sin_flag`: sale 0, `baseline.json` queda byte a byte igual y el reporte trae `mejora_sin_fijar`.
 - `::test_actualizar_baseline_solo_si_pasa_umbrales`: con un eval bajo su umbral, `--actualizar-baseline` sale 1 y no escribe.
@@ -131,7 +131,7 @@ Arma el ciclo de PRD §6b: casos → agente → scorers → baseline → verde/r
 ## Decisiones técnicas
 
 **Ubicación:** `backend/evals/` es un paquete de primer nivel, hermano de `app`:
-- `run.py` (`main(argv, entorno)`, inyectable para los tests), `config.py` (carga y valida `evals.yaml`), `fingerprint.py`, `exportar_candidatos.py`, `esquema.py` (whitelist y validación de los JSON);
+- `run.py` (`main(argv, entorno, fabrica_juez=None, registro_costos=None)`, inyectable para los tests), `config.py` (carga y valida `evals.yaml`), `fingerprint.py`, `exportar_candidatos.py`, `esquema.py` (whitelist y validación de los JSON);
 - `scorers/forma.py`;
 - `jueces/puerto.py` (Protocol `Juez`: `juzgar(tarea, caso) -> Veredicto`), `jueces/claude.py`, `jueces/falso.py`, `jueces/encaje_v1.md`, `jueces/mensaje_v1.md`;
 - `dataset.json`, `casos/calibracion_mensajes.json`, `baseline.json`, `evals.yaml`, `LICENCIA.md`.
@@ -155,18 +155,18 @@ Arma el ciclo de PRD §6b: casos → agente → scorers → baseline → verde/r
 - La corrida necesita `--tenant` porque `costos` tiene RLS.
 - **La 005 excluye `fuente='evals'` del CPL, del CPQL y de los totales del tablero.** Es gasto de desarrollo, no de adquisición. Se muestra aparte como "costo de evals".
 
-**`evals.yaml`** (por eval): `juez`, `modelo`, `prompt`, `k` (default 3), `corte` (0.5), `umbral`, `tolerancia` (default 0). Una tolerancia > 0 lleva un comentario con su justificación.
+**`evals.yaml`** (por eval): `juez`, `modelo`, `prompt`, `casos` (ruta del archivo de casos, relativa a `backend/evals/`), `k` (default 3), `corte` (0.5), `umbral`, `tolerancia` (default 0). Una tolerancia > 0 lleva un comentario con su justificación.
 
 **`baseline.json`** (por eval): `agregado`, `determinacion`, `k` (siempre 3), `n`, `fingerprint`, `fecha`, `motivo` (null salvo que se haya bajado el baseline).
 
-**Dependencias nuevas:** `anthropic`.
+**Dependencias nuevas:** `anthropic` en el grupo `dev` (`evals/` no entra en la imagen de `api`); `pyyaml` en `dependencies` (la misma línea que declaran la 002 y la 012; el choque en `pyproject.toml`/`uv.lock` se resuelve en el merge).
 
 ## Plan de tareas (TDD, en orden)
 1. **Contrato `app` ↛ `evals`:** canario en rojo → contrato `forbidden` en `pyproject.toml` → verde.
 2. **Esquema y whitelist:** `test_dataset.py` contra fixtures en `tmp_path` en rojo → `esquema.py` → verde. El fixture con un teléfono en `notas` tiene que fallar. El **advisor revisa la whitelist y la regla del nombre** (es cumplimiento).
 3. **Scorers de forma:** los 10 tests en rojo → `scorers/forma.py` → verde.
 4. **Puerto `Juez` + `JuezFalso` + runner:** los 19 tests de `test_runner.py` en rojo → `run.py`, `config.py`, `fingerprint.py` → verde. El **advisor revisa PASS^3, determinación, k=1 y la comparación con el baseline** (son las fórmulas del eval).
-5. **`JuezClaude`:** los 5 tests con `MockTransport` + la suite de contrato + `test_todo_juez_recibe_registro_costos` en rojo → verde. Después, `test_juez_escribe_filas_llm_en_costos` en integración.
+5. **`JuezClaude`:** primero `test_todo_juez_recibe_registro_costos` en rojo sin stub; después un stub de `JuezClaude` sin `registro_costos` (rojo por el assert del constructor) y recién con el parámetro agregado, la firma completa; el stub devuelve `Veredicto(-1.0, "")`, fuera de rango, sin escribir costos; recién ahí los 5 tests con `MockTransport`, la suite de contrato y `test_juez_escribe_filas_llm_en_costos` en integración, en rojo por assert (0 requests capturados donde se espera 1, probabilidad fuera de rango, 0 filas). El advisor los revisa → verde.
 6. **Exportación:** `test_exportar_candidatos.py` en rojo → verde. Se corre contra la búsqueda real del 002/003.
 7. **Tarea humana — dataset (~20 min):** etiquetar 20–40 candidatos, con mínimo 5 por etiqueta, y pasarlos a `dataset.json`. `test_dataset_real_valida_contra_esquema` pasa de rojo a verde recién acá.
 8. **Tarea humana — calibración (~15 min):** el `swarm` genera 10–12 mensajes sintéticos con la plantilla de la regla 7, 3 o más con datos inventados; un humano marca `pertinente`. `test_calibracion_valida` en verde.

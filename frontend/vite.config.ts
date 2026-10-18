@@ -9,5 +9,7 @@ export default defineConfig({
     setupFiles: "./src/setupTests.ts",
     // e2e/ es de Playwright.
     include: ["src/**/*.test.{ts,tsx}"],
+    // Sin esto, vitest vacía todo CSS y un `?raw` de tokens.css llega como "".
+    css: { include: [/\?raw/] },
   },
 });
