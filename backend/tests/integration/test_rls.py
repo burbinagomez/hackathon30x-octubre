@@ -9,7 +9,9 @@ from app import db
 
 # fuente_cache queda fuera: es global, sin tenant_id. Guarda datos públicos de gobierno, no del tenant,
 # y no se expone por API (spec, Decisiones técnicas).
-EXCLUIDAS = {"fuente_cache"}
+EXCLUIDAS = {"fuente_cache", "usuarios"}
+# usuarios queda fuera: app_rt no tiene privilegios sobre ella (entra solo por tenant_de_usuario), así que el test de
+# tablas daría permission denied y no probaría RLS. Su aislamiento lo prueban test_usuarios_tiene_rls y test_usuarios_repo.
 TABLAS = ["tenants", "busquedas", "leads", "lead_fuentes", "cumplimiento", "costos"]
 
 PRIVILEGIO_INSUFICIENTE = "42501"  # también es el sqlstate de una violación de política RLS
@@ -43,11 +45,11 @@ def datos():
             c.execute(text("INSERT INTO tenants (id, nombre) VALUES (:a, 'A'), (:b, 'B')"), ids)
             c.execute(text("INSERT INTO busquedas (id, tenant_id, pais, criterios) VALUES "
                            "(:busquedas, :a, 'CO', '{}'), (:busqueda_b, :b, 'CO', '{}')"), ids)
-            c.execute(text("INSERT INTO leads (id, tenant_id, pais, nombre) VALUES "
-                           "(:leads, :a, 'CO', 'A1'), (:lead_sin_cumplimiento, :a, 'CO', 'A2'), "
-                           "(:lead_b, :b, 'CO', 'B1')"), ids)
+            c.execute(text("INSERT INTO leads (id, tenant_id, pais, nombre, tipo_titular) VALUES "
+                           "(:leads, :a, 'CO', 'A1', 'juridica'), (:lead_sin_cumplimiento, :a, 'CO', 'A2', 'juridica'), "
+                           "(:lead_b, :b, 'CO', 'B1', 'juridica')"), ids)
             c.execute(text("INSERT INTO lead_fuentes (id, tenant_id, lead_id, busqueda_id, fuente, url_origen, licencia) "
-                           "VALUES (:lead_fuentes, :a, :leads, :busquedas, 'f', 'u', 'l')"), ids)
+                           "VALUES (:lead_fuentes, :a, :leads, :busquedas, 'osm_overpass', 'u', 'l')"), ids)
             c.execute(text("INSERT INTO cumplimiento (id, tenant_id, lead_id, fuente, licencia, url_origen, as_of) "
                            "VALUES (:cumplimiento, :a, :leads, 'f', 'l', 'u', now())"), ids)
             c.execute(text("INSERT INTO costos (id, tenant_id, tipo, unidades, costo_unitario, moneda, proveedor, gratis) "
@@ -66,7 +68,7 @@ def datos():
 INSERT_CON_TENANT_DE_A = {
     "tenants": "INSERT INTO tenants (nombre) VALUES ('intruso')",
     "busquedas": "INSERT INTO busquedas (tenant_id, pais, criterios) VALUES (:a, 'CO', '{}')",
-    "leads": "INSERT INTO leads (tenant_id, pais, nombre) VALUES (:a, 'CO', 'intruso')",
+    "leads": "INSERT INTO leads (tenant_id, pais, nombre, tipo_titular) VALUES (:a, 'CO', 'intruso', 'juridica')",
     "lead_fuentes": "INSERT INTO lead_fuentes (tenant_id, lead_id, busqueda_id, fuente, url_origen, licencia) "
                     "VALUES (:a, :lead_sin_cumplimiento, :busquedas, 'otra', 'u', 'l')",
     "cumplimiento": "INSERT INTO cumplimiento (tenant_id, lead_id, fuente, licencia, url_origen, as_of) "
@@ -130,3 +132,47 @@ COLGAR_DE_LEAD_DE_A = {
 @pytest.mark.parametrize("tabla", sorted(COLGAR_DE_LEAD_DE_A))
 def test_tenant_b_no_cuelga_filas_de_un_lead_de_a(rt, datos, tabla):
     _rechazado(rt, datos, COLGAR_DE_LEAD_DE_A[tabla], FK_VIOLADA)
+
+
+# Vistas del libro. Con datos solo de A (la siembra trae costos, un lead y una lead_fuentes de osm_overpass).
+VISTAS = ["v_tablero_fuentes", "v_atribuciones"]
+
+
+def _filas_de_la_vista(rt, tenant, vista):
+    with db.unidad_de_trabajo(rt, tenant) as c:
+        return c.execute(text(f"SELECT * FROM {vista}")).all()
+
+
+@pytest.mark.parametrize("vista", VISTAS)
+def test_tenant_b_no_accede_a_datos_de_a_en_vistas(rt, datos, vista):
+    # Control positivo: sin él, el 0 de B no probaría nada.
+    assert len(_filas_de_la_vista(rt, datos["a"], vista)) >= 1
+    # También la fila TOTAL de v_tablero_fuentes: solo existe si hay datos (HAVING count(*) > 0).
+    assert _filas_de_la_vista(rt, datos["b"], vista) == []
+
+
+def test_la_lista_cubre_todas_las_vistas_de_public(rt):
+    with rt.connect() as c:
+        en_public = set(c.execute(text("SELECT viewname FROM pg_views WHERE schemaname = 'public'")).scalars())
+    assert en_public == set(VISTAS)
+
+
+def test_toda_vista_es_security_invoker(rt):
+    with rt.connect() as c:
+        vistas = dict(c.execute(text(
+            "SELECT c.relname, coalesce(c.reloptions, '{}') FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "WHERE n.nspname = 'public' AND c.relkind = 'v'")).all())
+    assert set(VISTAS) <= set(vistas)  # una lista vacía dejaría el test verde sin probar nada
+    sin_la_opcion = sorted(v for v, opciones in vistas.items() if "security_invoker=true" not in opciones)
+    assert sin_la_opcion == []
+
+
+def test_usuarios_tiene_rls(rt):
+    with rt.connect() as c:
+        activa = c.execute(text("SELECT relrowsecurity FROM pg_class WHERE oid = 'public.usuarios'::regclass")).scalar_one()
+        politicas = c.execute(text("SELECT qual, with_check FROM pg_policies "
+                                   "WHERE schemaname = 'public' AND tablename = 'usuarios'")).all()
+    assert activa is True
+    assert len(politicas) == 1
+    assert "tenant_id" in politicas[0].qual and "app.tenant_id" in politicas[0].qual
+    assert "tenant_id" in politicas[0].with_check

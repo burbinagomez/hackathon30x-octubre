@@ -1,7 +1,8 @@
+from collections.abc import Mapping
 from typing import Protocol
 from uuid import UUID
 
-from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, EmpresaCruda, MetaFuente, PaginaEmpresas
+from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, EmpresaCruda, Lead, MetaFuente, PaginaEmpresas
 
 
 class FuenteDescubrimiento(Protocol):
@@ -24,3 +25,13 @@ class RepositorioLeads(Protocol):
         ...
 
     def cerrar_busqueda(self, busqueda_id: UUID, estado: str) -> None: ...
+
+    def obtener_lead(self, lead_id: UUID) -> Lead | None:
+        """Con nombre y dirección descifrados. None si no existe o es de otro tenant."""
+        ...
+
+
+class FabricaFuentes(Protocol):
+    """Arma las fuentes de UNA búsqueda: el lote_id nace en el caso de uso (lote = búsqueda). La implementa app/api."""
+
+    def __call__(self, lote_id: UUID) -> Mapping[str, FuenteDescubrimiento]: ...

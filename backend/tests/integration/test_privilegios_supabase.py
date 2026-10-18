@@ -37,10 +37,18 @@ ROLES_SUPABASE = ["anon", "authenticated"]
 PRIVILEGIOS = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE"]
 
 
+PRIVILEGIOS_DE_COLUMNA = ["SELECT", "INSERT", "UPDATE"]
+
+
 def _concedidos(c, rol, tablas):
-    return [(t, p) for t in tablas for p in PRIVILEGIOS
-            if c.execute(text("SELECT has_table_privilege(:rol, :t, :p)"),
-                         {"rol": rol, "t": f"public.{t}", "p": p}).scalar()]
+    # has_table_privilege no ve un GRANT por columna: has_any_column_privilege sí.
+    de_tabla = [(t, p) for t in tablas for p in PRIVILEGIOS
+                if c.execute(text("SELECT has_table_privilege(:rol, :t, :p)"),
+                             {"rol": rol, "t": f"public.{t}", "p": p}).scalar()]
+    de_columna = [(t, f"{p} (columna)") for t in tablas for p in PRIVILEGIOS_DE_COLUMNA
+                  if c.execute(text("SELECT has_any_column_privilege(:rol, :t, :p)"),
+                               {"rol": rol, "t": f"public.{t}", "p": p}).scalar()]
+    return de_tabla + [x for x in de_columna if x[0] not in {t for t, _ in de_tabla}]
 
 
 @pytest.fixture
@@ -57,8 +65,10 @@ def admin():
 # cada (tabla, privilegio) concedido. Parametrizar por tabla exigiría consultar la base al colectar.
 @pytest.mark.parametrize("rol", ROLES_SUPABASE)
 def test_anon_y_authenticated_sin_privilegios(admin, rol):
-    tablas = list(admin.execute(text("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")).scalars())
+    tablas = list(admin.execute(text("SELECT tablename FROM pg_tables WHERE schemaname = 'public' "
+                                     "UNION SELECT viewname FROM pg_views WHERE schemaname = 'public'")).scalars())
     assert "leads" in tablas  # una lista vacía dejaría el test verde sin probar nada
+    assert "v_tablero_fuentes" in tablas  # y sin las vistas el test no vería un GRANT a anon sobre ellas
     assert _concedidos(admin, rol, tablas) == []
 
 
@@ -70,3 +80,16 @@ def test_default_privileges_no_conceden_a_anon_ni_authenticated(admin):
         assert {rol: _concedidos(admin, rol, ["x"]) for rol in ROLES_SUPABASE} == {"anon": [], "authenticated": []}
     finally:
         transaccion.rollback()
+
+
+def test_anon_y_authenticated_sin_execute_en_funciones_de_public(admin):
+    # Supabase da EXECUTE en funciones nuevas a anon/authenticated (default privileges) y Postgres a PUBLIC:
+    # cualquier función de public tiene que cerrarse a mano. Las de extensiones (pg_trgm) viven en extensions.
+    funciones = list(admin.execute(text(
+        "SELECT p.oid::regprocedure::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace "
+        "WHERE n.nspname = 'public' AND p.prokind = 'f' "
+        "AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e')")).scalars())
+    assert any(f.startswith("tenant_de_usuario") for f in funciones)  # una lista vacía dejaría el test verde sin probar nada
+    abiertas = [(f, rol) for f in funciones for rol in ROLES_SUPABASE
+                if admin.execute(text("SELECT has_function_privilege(:rol, :f, 'EXECUTE')"), {"rol": rol, "f": f}).scalar()]
+    assert abiertas == []
