@@ -176,7 +176,7 @@ Va después del mínimo, en este orden. Cada Rojo sigue siendo rojo real.
 
 ### Cámaras completas (Paso 2)
 
-- [ ] T054 [Paso 2] **Rojo:** `test_camaras_co.py::test_yaml_real_cubre_58_camaras_y_33_departamentos`. Falla por aserción: hay 4 cámaras. **Verde:** las 58. Las `[VALIDAR]` se confirman con **una** consulta `$select=codigo_camara,camara_comercio&$group=codigo_camara,camara_comercio`, avisada antes y sin token, y con el sitio de Confecámaras. Solo se anotan los códigos en el YAML. *Auditoría 2026-10-18: `camaras_co.yaml` sigue con 4 cámaras*
+- [ ] T054 [Paso 2] **Rojo:** `test_camaras_co.py::test_yaml_real_cubre_58_camaras_y_33_departamentos`. Falla por aserción: hay 4 cámaras. **Verde:** las 58. Las `[VALIDAR]` se confirman con **una** consulta `$select=codigo_camara,camara_comercio&$group=codigo_camara,camara_comercio`, avisada antes y sin token, y con el sitio de Confecámaras. Solo se anotan los códigos en el YAML. *Auditoría 2026-10-18: `camaras_co.yaml` sigue con 4 cámaras* *Parcial 2026-10-18: sin red a datos.gov.co ni a Confecámaras desde el entorno (proxy 403); no se inventaron códigos. Agregados los tests estructurales (geografía válida, sin repetidos); faltan las 54 cámaras y los casos Medellín, Cali, Barranquilla, Bucaramanga.*
 
 ### Conteo de naturales (Paso 5), bloqueada por D2 y D3
 
