@@ -13,6 +13,17 @@ from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.costos.dominio.puertos import RegistroCostos
 
 _TIMEOUT = 20
+
+
+def _contexto_tls() -> ssl.SSLContext:
+    """Certificado y nombre del servidor siempre verificados, nunca por debajo de TLS 1.2. Explícito aunque sea el default."""
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = True
+    ctx.verify_mode = ssl.CERT_REQUIRED
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    return ctx
+
+
 # local@dominio y nada más: sin nombre visible, separadores, espacios ni CR/LF.
 _CASILLA = re.compile(r'[^@\s,;<>"]+@[^@\s,;<>"]+')
 
@@ -48,10 +59,10 @@ class SmtpEmail:
     def _conectar(self) -> smtplib.SMTP:
         a = self._ajustes
         if a.smtp_seguridad == "ssl":
-            return smtplib.SMTP_SSL(a.smtp_host, a.smtp_port, timeout=_TIMEOUT, context=ssl.create_default_context())
+            return smtplib.SMTP_SSL(a.smtp_host, a.smtp_port, timeout=_TIMEOUT, context=_contexto_tls())
         smtp = smtplib.SMTP(a.smtp_host, a.smtp_port, timeout=_TIMEOUT)
         if a.smtp_seguridad == "starttls":
-            smtp.starttls(context=ssl.create_default_context())
+            smtp.starttls(context=_contexto_tls())
         return smtp
 
     def _armar(self, m: MensajeSaliente) -> EmailMessage:
