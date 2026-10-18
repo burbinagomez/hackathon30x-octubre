@@ -33,6 +33,8 @@ def _arbol_modulos(raiz: Path, archivo: str, contenido: str) -> None:
     shutil.copy(BACKEND / "pyproject.toml", raiz)
     paquetes = ["app", "app/modulos",
                 "app/modulos/descubrimiento", "app/modulos/costos", "app/modulos/acceso",
+                "app/modulos/intake", "app/modulos/enriquecimiento",
+                *(f"app/modulos/intake/{c}" for c in ("dominio", "aplicacion", "infraestructura")),
                 *(f"app/modulos/descubrimiento/{c}" for c in ("dominio", "aplicacion", "infraestructura")),
                 *(f"app/modulos/costos/{c}" for c in ("dominio", "infraestructura")),
                 *(f"app/modulos/acceso/{c}" for c in ("dominio", "infraestructura"))]
@@ -95,6 +97,28 @@ def test_repo_cumple_contratos():
 
 def test_acceso_dominio_no_importa_su_infraestructura(tmp_path):
     _arbol_modulos(tmp_path, "app/modulos/acceso/dominio/x.py", "import app.modulos.acceso.infraestructura\n")
+
+    r = lint_imports(tmp_path)
+
+    assert r.returncode != 0
+    assert f"{CAPAS} BROKEN" in r.stdout
+
+
+SIN_ENRIQUECIMIENTO = "Intake no importa enriquecimiento"
+
+
+def test_intake_no_importa_enriquecimiento(tmp_path):
+    # El consumidor es dueño de su puerto (BuscadorRazonSocial): solo la raíz de composición conoce a los dos.
+    _arbol_modulos(tmp_path, "app/modulos/intake/infraestructura/x.py", "import app.modulos.enriquecimiento\n")
+
+    r = lint_imports(tmp_path)
+
+    assert r.returncode != 0
+    assert f"{SIN_ENRIQUECIMIENTO} BROKEN" in r.stdout
+
+
+def test_intake_dominio_no_importa_su_infraestructura(tmp_path):
+    _arbol_modulos(tmp_path, "app/modulos/intake/dominio/x.py", "import app.modulos.intake.infraestructura\n")
 
     r = lint_imports(tmp_path)
 
