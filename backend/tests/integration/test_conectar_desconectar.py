@@ -56,7 +56,7 @@ def _yaml(tmp_path, habilitado):
     return ruta
 
 
-def _buscar(rt, tenant, ruta_yaml):
+def _buscar(rt, tenant, ruta_yaml, cifrador):
     """EjecutarBusqueda real: registro desde `ruta_yaml`, catálogo real, transporte falso por host y Postgres real."""
     registro = cargar_registro(ruta_yaml, catalogo)
     pedidas: list[httpx.Request] = []
@@ -85,7 +85,7 @@ def _buscar(rt, tenant, ruta_yaml):
         return armar
 
     fuentes = {c: (m, fabrica_de(c, k, m)) for c, (k, m) in registro.fuentes.items()}
-    caso = EjecutarBusqueda(RepositorioLeadsPostgres(rt, tenant), fuentes, cargar_actividades(CONFIG / "actividades.yaml"))
+    caso = EjecutarBusqueda(RepositorioLeadsPostgres(rt, tenant, cifrador), fuentes, cargar_actividades(CONFIG / "actividades.yaml"))
     resultado = caso.ejecutar(ICP)
     return resultado, [r for r in pedidas if r.url.host == "www.datos.gov.co"]
 
@@ -99,14 +99,14 @@ def _ver(rt, tenant):
     return leads, licencias, lead_fuentes, costos
 
 
-def test_yaml_real_consulta_datos_gov_co(rt, tenant):
-    _, a_datos_gov = _buscar(rt, tenant, CONFIG / "fuentes.yaml")
+def test_yaml_real_consulta_datos_gov_co(rt, tenant, cifrador):
+    _, a_datos_gov = _buscar(rt, tenant, CONFIG / "fuentes.yaml", cifrador)
 
     assert len(a_datos_gov) >= 1
 
 
-def test_habilitada_por_yaml_temporal_da_leads_cc_by_sa(rt, tenant, tmp_path):
-    _buscar(rt, tenant, _yaml(tmp_path, habilitado=True))
+def test_habilitada_por_yaml_temporal_da_leads_cc_by_sa(rt, tenant, tmp_path, cifrador):
+    _buscar(rt, tenant, _yaml(tmp_path, habilitado=True), cifrador)
 
     leads, cumplimiento, lead_fuentes, costos = _ver(rt, tenant)
     assert sorted(leads) == [(e["nit"], "juridica") for e in FILAS]
@@ -118,7 +118,7 @@ def test_habilitada_por_yaml_temporal_da_leads_cc_by_sa(rt, tenant, tmp_path):
     assert costos == [(tenant, "socrata_descarga", "datos.gov.co", False)]
 
 
-def test_deshabilitada_por_yaml_temporal_no_toca_datos_gov_co(rt, tenant, tmp_path):
-    _, a_datos_gov = _buscar(rt, tenant, _yaml(tmp_path, habilitado=False))
+def test_deshabilitada_por_yaml_temporal_no_toca_datos_gov_co(rt, tenant, tmp_path, cifrador):
+    _, a_datos_gov = _buscar(rt, tenant, _yaml(tmp_path, habilitado=False), cifrador)
 
     assert a_datos_gov == []
