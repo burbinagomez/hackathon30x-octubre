@@ -10,7 +10,7 @@ import httpx
 import yaml
 from pydantic import ValidationError
 
-from app.composicion import CONFIG, adaptadores_enriquecer, armador_de_fuente, cargar_tarifas
+from app.composicion import CONFIG, adaptadores_enriquecer, armador_de_fuente, buscador_sitio_web, cargar_tarifas
 from app.config import Settings, SettingsEmail
 from app.modulos.contacto.dominio.errores import MensajeCambio, SinVistaPrevia
 from app.modulos.contacto.dominio.tokens import firmar
@@ -200,7 +200,10 @@ def _enriquecer(args, ajustes, persistencia, adaptadores) -> int:
         print(f"configuración inválida: {', '.join(sorted({str(e['loc'][0]).upper() for e in error.errors()}))}",
               file=sys.stderr)
         return 2
-    r = EnriquecerLead(persistencia.repo, verificador, enriquecedor, clasificador).ejecutar(args.busqueda)
+    # El buscador de sitio web solo con los adaptadores reales: los tests de la CLI inyectan los suyos.
+    buscador = buscador_sitio_web(persistencia.costos, cargar_tarifas(), httpx.HTTPTransport()) \
+        if adaptadores is _adaptadores_enriquecer else None
+    r = EnriquecerLead(persistencia.repo, verificador, enriquecedor, clasificador, buscador=buscador).ejecutar(args.busqueda)
     # Solo conteos: el contacto nunca sale de memoria sin cifrar.
     print(f"procesados {r.procesados} · contactables {r.contactables} · clasificados {r.clasificados}"
           f" · sin_clasificar {r.sin_clasificar} · cortado {'sí' if r.cortado else 'no'}")
