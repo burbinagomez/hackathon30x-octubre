@@ -75,10 +75,16 @@ def _parser() -> argparse.ArgumentParser:
     d = sub.add_parser("baja", help="Da de baja a mano (via humano) al lead de un contacto: cierra todos los canales.")
     d.add_argument("--tenant", type=UUID, required=True)
     d.add_argument("--contacto", type=UUID, required=True)
+    r = sub.add_parser("respondio", help="Marca a mano que el contacto respondió (solo si se le envió).")
+    r.add_argument("--tenant", type=UUID, required=True)
+    r.add_argument("--contacto", type=UUID, required=True)
+    t = sub.add_parser("tasa-respuesta", help="Contactados, respondieron y tasa por canal del tenant.")
+    t.add_argument("--tenant", type=UUID, required=True)
     return p
 
 
-def _baja(args) -> int:
+def _contactos(args) -> int:
+    """baja, respondio y tasa-respuesta: van directo al repo, sin caso de uso propio."""
     from app import db
     from app.modulos.contacto.infraestructura.repositorio_contactos import RepositorioContactosPostgres
 
@@ -87,10 +93,22 @@ def _baja(args) -> int:
     except ValidationError as error:
         return _invalida(error)
     repo = RepositorioContactosPostgres(db.crear_engine(settings.database_url), args.tenant)
-    if not repo.dar_de_baja(args.contacto, "humano"):
-        print("no existe ese contacto en ese tenant", file=sys.stderr)
+    if args.comando == "tasa-respuesta":
+        filas = repo.tasa_por_canal()
+        for canal, contactados, respondieron, tasa in filas:
+            print(f"{canal}: contactados={contactados} respondieron={respondieron} "
+                  f"tasa={'sin dato' if tasa is None else tasa.normalize()}")
+        if not filas:
+            print("sin contactos")
+        return 0
+    if args.comando == "respondio":
+        hecho, falta = repo.marcar_respondio(args.contacto), "no hay un envío de ese contacto en ese tenant"
+    else:
+        hecho, falta = repo.dar_de_baja(args.contacto, "humano"), "no existe ese contacto en ese tenant"
+    if not hecho:
+        print(falta, file=sys.stderr)
         return 1
-    print("baja: 1")
+    print(f"{args.comando}: 1")
     return 0
 
 
@@ -149,8 +167,8 @@ def main(argv=None, *, catalogo=catalogo, persistencia=None, armar_envio=None) -
         return int(salida.code or 0)
     if args.comando == "enviar":
         return _enviar(args, armar_envio)
-    if args.comando == "baja":
-        return _baja(args)
+    if args.comando in ("baja", "respondio", "tasa-respuesta"):
+        return _contactos(args)
 
     @cache
     def ajustes() -> Settings:

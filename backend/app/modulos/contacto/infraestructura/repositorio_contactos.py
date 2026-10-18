@@ -1,4 +1,5 @@
 """Contactos en Postgres. La elegibilidad legal vive en SQL y se reevalúa al crear, al reclamar y antes de mandar."""
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import Engine, text
@@ -80,3 +81,11 @@ class RepositorioContactosPostgres:
                            "('aprobado', 'pendiente_aprobacion') THEN 'descartado' ELSE estado END WHERE lead_id = :l"),
                       {"l": lead})
             return True
+
+    def marcar_respondio(self, contacto_id: UUID) -> bool:
+        return self._ejecutar("UPDATE contactos SET respondio_en = COALESCE(respondio_en, now()) "
+                              "WHERE id = :c AND enviado_en IS NOT NULL", c=contacto_id) == 1
+
+    def tasa_por_canal(self) -> list[tuple[str, int, int, Decimal | None]]:
+        return self._ejecutar("SELECT canal, contactados, respondieron, tasa FROM v_tasa_respuesta_canal ORDER BY canal",
+                              lambda r: [tuple(f) for f in r.all()])

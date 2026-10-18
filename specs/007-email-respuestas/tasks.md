@@ -66,8 +66,10 @@
 
 ## Fase 7: Respuestas y tasa (Paso 6)
 
-- [ ] T060 [Paso 6] `tests/integration/test_respuestas_manual.py`: `::test_marcar_respondio_es_idempotente`, `::test_no_se_marca_un_no_enviado` (CHECK), `::test_tasa_por_canal` (2 enviados, 1 respondió → `0.5`), `::test_tasa_sin_envios_es_sin_dato`. Mutación `sabotaje_tasa_sobre_todos`: dividir por `count(*)` en vez de enviados.
-- [ ] T061 [Paso 6] Implementar `MarcarRespondio`, `TasaRespuesta`, `app.cli respondio` y `app.cli tasa-respuesta` hasta verde.
+- [x] T060 [Paso 6] `tests/integration/test_respuestas_manual.py`: `::test_marcar_respondio_es_idempotente`, `::test_no_se_marca_un_no_enviado` (CHECK), `::test_tasa_por_canal` (2 enviados, 1 respondió → `0.5`), `::test_tasa_sin_envios_es_sin_dato`. Mutación `sabotaje_tasa_sobre_todos`: dividir por `count(*)` en vez de enviados.
+- [x] T061 [Paso 6] Implementar `MarcarRespondio`, `TasaRespuesta`, `app.cli respondio` y `app.cli tasa-respuesta` hasta verde.
+  - Desvío: sin casos de uso `MarcarRespondio`/`TasaRespuesta`; serían un pase directo al repo. La CLI llama a `marcar_respondio` (monotónico, solo con `enviado_en`) y a `tasa_por_canal` (la vista bajo RLS).
+  - Agregado `::test_no_se_marca_desde_otro_tenant`. Sabotajes: `sabotaje_tasa_sobre_todos` (vista reemplazada en la base de test: 4 rojos, 2 de acá y 2 de `test_contactos_db`), `sabotaje_respondio_no_monotonico` (1 rojo) y `sabotaje_respondio_sin_envio` (1 rojo).
 
 ## Fase 8: Revisión, corrida real y docs (Paso 7)
 

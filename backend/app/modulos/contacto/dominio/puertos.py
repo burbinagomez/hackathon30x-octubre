@@ -1,4 +1,5 @@
 from typing import Protocol
+from decimal import Decimal
 from uuid import UUID
 
 from app.modulos.contacto.dominio.modelos import LeadContactable, MensajeSaliente, ResultadoEnvio
@@ -49,4 +50,12 @@ class RepositorioContactos(Protocol):
 
     def dar_de_baja(self, contacto_id: UUID, via: str) -> bool:
         """Opt-out del lead del contacto (todos los canales), monotónico, en una transacción. False si no existe."""
+        ...
+
+    def marcar_respondio(self, contacto_id: UUID) -> bool:
+        """Monotónico: conserva la primera marca. False si el contacto no existe o nunca se envió."""
+        ...
+
+    def tasa_por_canal(self) -> list[tuple[str, int, int, Decimal | None]]:
+        """(canal, contactados, respondieron, tasa); tasa None si no hubo envíos."""
         ...
