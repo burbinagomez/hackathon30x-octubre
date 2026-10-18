@@ -1,0 +1,11 @@
+# Required checks de main (principio V). Nombres de check-run, no ids de job.
+# Lo valida backend/tests/arquitectura/test_required_checks.py; la protección real, verificar_proteccion.sh.
+# Sin checks de apps externas (Vercel, SonarCloud, TestSprite).
+back
+front
+seguridad
+evals
+imagenes
+revision-seguridad
+Analyze (python)
+Analyze (javascript-typescript)

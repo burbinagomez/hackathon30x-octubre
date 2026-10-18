@@ -186,7 +186,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3" },
     { name = "pydantic-settings", specifier = ">=2.16.0" },
-    { name = "pyyaml", specifier = ">=6" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "sqlalchemy", specifier = ">=2" },
     { name = "uvicorn", specifier = ">=0.54.0" },
 ]
