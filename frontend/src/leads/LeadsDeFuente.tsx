@@ -8,5 +8,5 @@ export default function LeadsDeFuente({ fuente }: { fuente: string | null }) {
   const titulo = fuente
     ? t("leads.titulo_de_fuente", { fuente: t(`fuentes.${fuente}`, { defaultValue: fuente }) })
     : t("leads.titulo_todos");
-  return <ListaLeads clave={`fuente:${fuente ?? ""}`} titulo={titulo} cargar={(p) => listarLeadsDeFuente(fuente, p)} />;
+  return <ListaLeads clave={`fuente:${fuente ?? ""}`} titulo={titulo} cargar={(p, c) => listarLeadsDeFuente(fuente, p, c)} />;
 }

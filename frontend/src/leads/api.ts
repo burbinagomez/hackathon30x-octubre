@@ -5,14 +5,15 @@ export const TAMANO = 25;
 
 export const listarBusquedas = () => pedir<{ items: Busqueda[] }>("/busquedas");
 
-export const listarLeads = (id: string, pagina: number) =>
-  pedir<PaginaLeads>(`/busquedas/${encodeURIComponent(id)}/leads?pagina=${pagina}&tamano=${TAMANO}`);
+export const listarLeads = (id: string, pagina: number, conContacto = false) =>
+  pedir<PaginaLeads>(`/busquedas/${encodeURIComponent(id)}/leads?pagina=${pagina}&tamano=${TAMANO}${conContacto ? "&con_contacto=true" : ""}`);
 
 /** Todos los leads del tenant, o los de una fuente en todas las búsquedas. */
-export const listarLeadsDeFuente = (fuente: string | null, pagina: number) => {
+export const listarLeadsDeFuente = (fuente: string | null, pagina: number, conContacto = false) => {
   const q = new URLSearchParams();
   if (fuente) q.set("fuente", fuente);
   q.set("pagina", String(pagina));
   q.set("tamano", String(TAMANO));
+  if (conContacto) q.set("con_contacto", "true");
   return pedir<PaginaLeads>(`/leads?${q.toString()}`);
 };
