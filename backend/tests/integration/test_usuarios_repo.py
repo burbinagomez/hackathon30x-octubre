@@ -12,11 +12,12 @@ PRIVILEGIO_INSUFICIENTE = "42501"
 
 @pytest.fixture
 def usuarios(admin, tenants):
-    """Un usuario en A (idioma 'en') y uno en B (sin elección), sembrados como postgres. tenants limpia las filas."""
-    ids = {"a": uuid4(), "b": uuid4(), "tenant_a": tenants["a"], "tenant_b": tenants["b"]}
+    """Dos usuarios en A (idioma 'en' y 'es') y uno en B (sin elección), sembrados como postgres. tenants limpia las filas.
+    El segundo de A hace que un WHERE por tenant y no por auth_user_id devuelva 2 filas y no 1."""
+    ids = {"a": uuid4(), "a2": uuid4(), "b": uuid4(), "tenant_a": tenants["a"], "tenant_b": tenants["b"]}
     with admin.begin() as c:
         c.execute(text("INSERT INTO usuarios (auth_user_id, tenant_id, idioma) VALUES "
-                       "(:a, :tenant_a, 'en'), (:b, :tenant_b, NULL)"), ids)
+                       "(:a, :tenant_a, 'en'), (:a2, :tenant_a, 'es'), (:b, :tenant_b, NULL)"), ids)
     return ids
 
 

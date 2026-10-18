@@ -170,9 +170,10 @@ def test_toda_vista_es_security_invoker(rt):
 def test_usuarios_tiene_rls(rt):
     with rt.connect() as c:
         activa = c.execute(text("SELECT relrowsecurity FROM pg_class WHERE oid = 'public.usuarios'::regclass")).scalar_one()
-        politicas = c.execute(text("SELECT qual, with_check FROM pg_policies "
-                                   "WHERE schemaname = 'public' AND tablename = 'usuarios'")).all()
+        politicas = {tabla: c.execute(text("SELECT qual, with_check FROM pg_policies "
+                                           "WHERE schemaname = 'public' AND tablename = :t"), {"t": tabla}).all()
+                     for tabla in ("usuarios", "leads")}
     assert activa is True
-    assert len(politicas) == 1
-    assert "tenant_id" in politicas[0].qual and "app.tenant_id" in politicas[0].qual
-    assert "tenant_id" in politicas[0].with_check
+    assert len(politicas["leads"]) == 1  # la referencia: sin ella, igualar dos listas vacías pasaría
+    # Igualdad con la política de leads, no subcadenas: "tenant_id = app.tenant_id OR true" las cumpliría.
+    assert politicas["usuarios"] == politicas["leads"]

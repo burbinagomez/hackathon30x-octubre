@@ -18,6 +18,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "alembic>=1.20.0",
+    "anthropic>=1.15.0",
     "import-linter>=2.15",
     "pip-audit>=2.10.1",
     "pytest>=9.1.1",
@@ -44,7 +45,7 @@ name = "Capas de los modulos"
 type = "layers"
 # "(aplicacion)": capa opcional; costos todavía no la tiene.
 layers = ["infraestructura", "(aplicacion)", "dominio"]
-containers = ["app.modulos.descubrimiento", "app.modulos.costos"]
+containers = ["app.modulos.descubrimiento", "app.modulos.costos", "app.modulos.acceso"]
 
 [[tool.importlinter.contracts]]
 name = "Descubrimiento no usa la infraestructura de costos"
@@ -59,6 +60,13 @@ type = "forbidden"
 # El dominio maneja texto en claro; cifrar y llamar por HTTP son adaptadores (principio I).
 source_modules = ["app.modulos.descubrimiento.dominio"]
 forbidden_modules = ["cryptography", "httpx"]
+
+[[tool.importlinter.contracts]]
+name = "App no importa evals"
+type = "forbidden"
+# evals es tooling hermano de app y no entra en la imagen de api: evals -> app vale, al revés no.
+source_modules = ["app"]
+forbidden_modules = ["evals"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
