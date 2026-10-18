@@ -1117,3 +1117,9 @@ table.tabla-costos {
     font-size: 2.5rem;
   }
 }
+
+/* Chat ya en curso: el cuadro de respuesta pasa a una línea (la pregunta grande ya se contestó). */
+.chat-entrada textarea.chat-entrada-corta {
+  min-height: 44px;
+  resize: none;
+}

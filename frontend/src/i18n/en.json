@@ -54,6 +54,7 @@
       "filtros": "Filters"
     },
     "frase": {
+      "ajustar": "Want to adjust anything?",
       "etiqueta": "Who do you sell to and what do you offer?",
       "ayuda": "Tell me who you sell to and what you offer, in one or two sentences. For example: I sell accounting software to mid-sized hardware stores in Antioquia.",
       "pensando": "Thinking…",
