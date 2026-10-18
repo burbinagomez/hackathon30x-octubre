@@ -1,4 +1,5 @@
 """Tabla contactos y sus dos vistas (spec 007, plan.md §DDL). Se siembra como postgres y se lee como app_rt."""
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -8,6 +9,7 @@ from sqlalchemy.exc import DBAPIError
 from app.db import unidad_de_trabajo
 
 VISTAS = ["v_leads_con_opt_out", "v_tasa_respuesta_canal"]
+MIGRACION = next((Path(__file__).parents[3] / "supabase" / "migrations").glob("*_contactos.sql"))
 UNIQUE_VIOLADO = "23505"
 INSERT_CONTACTO = text(
     "INSERT INTO contactos (tenant_id, lead_id, busqueda_id, canal, asunto, cuerpo, estado, enviado_en, respondio_en) "
@@ -59,6 +61,21 @@ def test_privilegios_vistas(admin, rol):
         concedidos = [(v, p) for v in [*VISTAS, "contactos"] for p in ("SELECT", "INSERT", "UPDATE", "DELETE")
                       if c.execute(text("SELECT has_table_privilege(:r, :o, :p)"),
                                    {"r": rol, "o": f"public.{v}", "p": p}).scalar()]
+    assert concedidos == []
+
+
+def test_la_migracion_cierra_sus_objetos_aunque_supabase_reabra_los_default_privileges(admin):
+    # La 0002 ya cerró los default privileges, así que en esta base todo nace cerrado y el REVOKE de la
+    # migración no se vería. Se reabren (lo que hace Supabase por default), se reaplica y se deshace todo.
+    with admin.connect() as c, c.begin() as tx:
+        c.exec_driver_sql("DROP VIEW v_tasa_respuesta_canal, v_leads_con_opt_out; DROP TABLE contactos; "
+                          "ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public "
+                          "GRANT ALL ON TABLES TO anon, authenticated")
+        c.exec_driver_sql(MIGRACION.read_text())
+        concedidos = [(o, r) for o in [*VISTAS, "contactos"] for r in ("anon", "authenticated")
+                      if c.execute(text("SELECT has_table_privilege(:r, :o, 'SELECT')"),
+                                   {"r": r, "o": f"public.{o}"}).scalar()]
+        tx.rollback()
     assert concedidos == []
 
 
