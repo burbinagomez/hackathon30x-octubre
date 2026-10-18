@@ -45,7 +45,7 @@ La 002 todavía no tiene plan ni código en `main` (`backend/app/modulos/` está
 
 | Id | Qué se necesita | Lo trae | Bloquea |
 |---|---|---|---|
-| D1 | Protocol `RegistroCostos` y `OperacionCosto` (con `gratis`) en el dominio de `descubrimiento` | 002 | `JuezClaude`, su contrato, `test_todo_juez_recibe_registro_costos` (US1) |
+| D1 | Protocol `RegistroCostos` y `OperacionCosto` (con `gratis`) en `app/modulos/costos/dominio/` (`puertos.py`, `modelos.py`; divergencia: el plan decía `descubrimiento`, la 002 lo dejó en su propio módulo `costos`) | 002 | `JuezClaude`, su contrato, `test_todo_juez_recibe_registro_costos` (US1) |
 | D2 | `postgres_costos`, migración `0002` (`costos`, `tenants`), unidad de trabajo con `SET LOCAL app.tenant_id` | 002 | integración `test_juez_escribe_filas_llm_en_costos`, composición real de `evals.run`, primera corrida |
 | D3 | Carga única de `config/tarifas.yaml` que entrega `costo_unitario` resuelto | 002 | `JuezClaude` (tarifa `llm.claude-sonnet-5-5`) |
 | D4 | Puerto `RepositorioLeads` (forma del lead leído) | 002 | `exportar_candidatos` y su repositorio falso |
@@ -72,6 +72,7 @@ La 002 todavía no tiene plan ni código en `main` (`backend/app/modulos/` está
 ### Runner (`run.py`)
 - `main(argv, entorno, fabrica_juez=None, registro_costos=None) -> int`. Los tests inyectan juez y registro falsos. Solo en la rama por defecto (`fabrica_juez is None`) `run.py` importa `evals.jueces` y arma los reales (D2, D3). El entorno se lee del mapeo inyectado (default `os.environ`), nunca se imprime.
 - Orden, tal cual la spec (Flujo principal §3): validar entorno y `evals.yaml` (sale **2** sin construir el juez) → fingerprint por eval → por caso: forma primero, juez k veces solo si la forma pasa → PASS^k → `agregado`, `determinacion`, `fallidos` → comparar con baseline → reporte JSON por stdout → código 0/1/2.
+- `--config <ruta a evals.yaml>` (default `backend/evals/evals.yaml`); `casos`, `prompt` y `baseline.json` se resuelven relativos a su carpeta. Lo agregó T010 para correr el runner en `tmp_path`; la spec no fijaba cómo se ubica `evals.yaml`.
 - `lote_id` = un `uuid4` por corrida, el mismo para todas las filas de costo.
 - Fórmulas (las revisa el advisor):
   - `agregado = casos_que_pasan / todos_los_casos`;
