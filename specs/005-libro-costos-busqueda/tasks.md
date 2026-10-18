@@ -12,12 +12,12 @@
 
 ## Fase 1: Puerta y setup
 
-- [ ] T001 [MIN] [Paso 0] **Puerta.** `git fetch origin`. Confirmar que 002, 003 y 011 están en `main` (la 004 no es requisito: decisión del dueño, plan.md, Preguntas abiertas). Elegir el número de migración: el siguiente libre en `supabase/migrations/` (P5). Se frena en dos casos:
+- [x] T001 [MIN] [Paso 0] **Puerta.** `git fetch origin`. Confirmar que 002, 003 y 011 están en `main` (la 004 no es requisito: decisión del dueño, plan.md, Preguntas abiertas). Elegir el número de migración: el siguiente libre en `supabase/migrations/` (P5). Se frena en dos casos:
   - P1 (estados, y qué deja la CLI) no tiene respuesta del dueño;
   - el default de P2 no está aprobado.
 
   El default de P4 frena solo la Fase 4, que es Pulido: el [MIN] arranca sin él.
-- [ ] T002 [MIN] [P] [Paso 0] `backend/pyproject.toml` suma `PyJWT`. `uv lock`.
+- [x] T002 [MIN] [P] [Paso 0] `backend/pyproject.toml` suma `PyJWT`. `uv lock`.
 - [ ] T003 [MIN] [P] [Paso 0] `frontend/package.json` suma `react-i18next` e `i18next` como dependencias, y `eslint`, `typescript-eslint`, `eslint-plugin-boundaries`, `eslint-plugin-import`, `eslint-import-resolver-typescript` y `eslint-plugin-i18next` como devDependencies.
 - [ ] T004 [MIN] [Paso 0] **Esqueletos de Python.** Las firmas del plan, que devuelven valores equivocados para que los rojos sean por aserción:
   - `contar` → `-1` en Croma y OSM. **`datos_gov_co_rues` queda afuera:** la 011 ya implementa `contar` completo (011 tasks c64c5f8:163-173), y un stub rompería `test_contar_usa_count_con_el_mismo_where` de la 011;
@@ -28,6 +28,8 @@
   - `filtrar_por_palabras` → `[]`;
   - `VistaPrevia` y `EjecutarBusqueda` → resultados vacíos;
   - los routers registrados, que devuelven `501`.
+
+  *Hecho (parte [MIN]):* `FabricaFuentes`, `hmac_email`, `VistaPrevia` y los routers `auth`, `busquedas`, `tablero` y `actividades` en 501. *Falta:* el esqueleto de `EjecutarBusqueda`, que se diseña en T026 junto con su signature (`ejecutar(busqueda_id)`): hoy la clase es la de la 003, con `ejecutar(criterios)` y tests propios.
 
 ## Fase 2: Migración y vistas (Paso 1)
 

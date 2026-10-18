@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app import db
+from app.api import actividades, auth, busquedas, tablero
 from app.config import Settings, verificar_entorno
 
 
@@ -37,3 +38,7 @@ def health(request: Request):
     except Exception:
         return JSONResponse(status_code=503, content={"status": "error", "db": "error"})
     return {"status": "ok", "db": "ok"}
+
+
+for _router in (auth.router, busquedas.router, tablero.router, actividades.router):
+    app.include_router(_router)
