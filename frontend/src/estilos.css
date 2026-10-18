@@ -217,6 +217,7 @@ h2 {
 .fila-fuente {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
   gap: 0 var(--espacio);
   padding-bottom: var(--espacio-chico);
   border-bottom: 1px solid var(--color-borde);
@@ -240,6 +241,7 @@ h2 {
 
 .metricas-vista > .metrica {
   margin: 0;
+  padding: var(--espacio-chico) var(--espacio);
 }
 
 /* Tablero */
@@ -433,7 +435,7 @@ table.tabla-leads {
   }
 
   .fila-fuente {
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 2fr);
+    grid-template-columns: minmax(0, 1fr) max-content minmax(0, 1fr);
   }
 
   .fila-fuente-ignora {
