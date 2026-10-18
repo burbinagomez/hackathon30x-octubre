@@ -41,17 +41,19 @@ Re-chequeo post-diseño: sin violaciones nuevas.
 
 ## Dependencias externas al slice (no se diseñan acá)
 
-La 002 todavía no tiene plan ni código en `main` (`backend/app/modulos/` está vacío). Este plan **usa** sus piezas por nombre y no fija su forma:
+Corrección (T011): cuando se escribió este plan la 002 no estaba en `main`; hoy sí lo está (`main` en `e113dbd`), así que la mayoría de estas piezas ya existen. Este plan las **usa** por nombre y no fija su forma. Estado verificado contra `main`:
 
-| Id | Qué se necesita | Lo trae | Bloquea |
-|---|---|---|---|
-| D1 | Protocol `RegistroCostos` y `OperacionCosto` (con `gratis`) en `app/modulos/costos/dominio/` (`puertos.py`, `modelos.py`; divergencia: el plan decía `descubrimiento`, la 002 lo dejó en su propio módulo `costos`) | 002 | `JuezClaude`, su contrato, `test_todo_juez_recibe_registro_costos` (US1) |
-| D2 | `postgres_costos`, migración `0002` (`costos`, `tenants`), unidad de trabajo con `SET LOCAL app.tenant_id` | 002 | integración `test_juez_escribe_filas_llm_en_costos`, composición real de `evals.run`, primera corrida |
-| D3 | Carga única de `config/tarifas.yaml` que entrega `costo_unitario` resuelto | 002 | `JuezClaude` (tarifa `llm.claude-sonnet-5-5`) |
-| D4 | Puerto `RepositorioLeads` (forma del lead leído) | 002 | `exportar_candidatos` y su repositorio falso |
-| D5 | Archivos `tests/arquitectura/test_costos_por_adaptador.py` y `tests/integration/test_costos_repo.py` | 002 (los crea) | la 004 les suma un test a cada uno |
-| D6 | Leads de OSM con `tipo_titular` confirmado contra el registro | 003 | exportación real y etiquetado del dataset |
-| D7 | Sección `[tool.importlinter]` con el contrato `layers` | 002 | merge: los dos slices tocan el mismo bloque de `pyproject.toml` |
+| Id | Qué se necesita | Lo trae | Bloquea | Estado en `main` |
+|---|---|---|---|---|
+| D1 | Protocol `RegistroCostos` y `OperacionCosto` (con `gratis`) en `app/modulos/costos/dominio/` (`puertos.py`, `modelos.py`; divergencia: el plan decía `descubrimiento`, la 002 lo dejó en su propio módulo `costos`). El Protocol pide **además** `requests_24h` y `creditos_mes` (`puertos.py:7-14`): el contrato de T015 y todo falso que se tipe como `RegistroCostos` tiene que cubrirlos, no solo `registrar` | 002 | `JuezClaude`, su contrato, `test_todo_juez_recibe_registro_costos` (US1) | existe |
+| D2 | `postgres_costos`, migración `0002` (`costos`, `tenants`), unidad de trabajo con `SET LOCAL app.tenant_id` | 002 | integración `test_juez_escribe_filas_llm_en_costos`, composición real de `evals.run`, primera corrida | existe: `PostgresCostos(engine, tenant_id)` y `app/db.py::unidad_de_trabajo` |
+| D3 | Carga única de `config/tarifas.yaml` que entrega `costo_unitario` resuelto | 002 | `JuezClaude` (tarifa `llm.claude-sonnet-5-5`) | parcial: solo `_cargar_tarifas()` privado en `app/cli.py`, sin la sección `llm` (que sí está en `tarifas.yaml`). T019 tiene que exponerlo o leer `llm` aparte |
+| D4 | Puerto `RepositorioLeads` (forma del lead leído) | 002 | `exportar_candidatos` y su repositorio falso | existe en `descubrimiento/dominio/puertos.py` |
+| D5 | Archivos `tests/arquitectura/test_costos_por_adaptador.py` y `tests/integration/test_costos_repo.py` | 002 (los crea) | la 004 les suma un test a cada uno | parcial: existe `test_costos_repo.py`; `test_costos_por_adaptador.py` **no**, lo crea T013 |
+| D6 | Leads de OSM con `tipo_titular` confirmado contra el registro | 003 | exportación real y etiquetado del dataset | — |
+| D7 | Sección `[tool.importlinter]` con el contrato `layers` | 002 | merge: los dos slices tocan el mismo bloque de `pyproject.toml` | existe (contrato "Capas de los modulos" junto a "App no importa evals") |
+
+**T034:** su premisa ("después de que la 002 esté en `main`") ya se cumple: la rama sale de `main` con la 002 adentro, `pyproject.toml` tiene una sola línea de `pyyaml` en `dependencies` y `uv lock --check` pasa. Queda como verificación antes del merge, no como merge pendiente.
 
 **Qué no espera a nadie:** contrato `app` ↛ `evals`, `esquema.py`, scorers de forma, puerto `Juez` + `JuezFalso`, `config.py`, `fingerprint.py` y el runner con juez falso. Es la Fase 2 de `tasks.md`.
 
@@ -61,8 +63,8 @@ La 002 todavía no tiene plan ni código en `main` (`backend/app/modulos/` está
 - `jueces/puerto.py`: `Juez` (Protocol) con `juzgar(tarea, caso) -> Veredicto`; `Veredicto(probabilidad: float, razon: str)` frozen; excepción `SalidaJuezInvalida`.
 - `jueces/__init__.py`: `CATALOGO = {"claude": JuezClaude, "falso": JuezFalso}`. Es el único lugar que conoce clases concretas, igual que el catálogo de adaptadores del 002. `jev` se suma en la 006.
 - `JuezFalso`: devuelve una secuencia programada por caso y cuenta llamadas por `id`. Sin red, sin `RegistroCostos` (exclusión cerrada del test de arquitectura).
-- `JuezClaude(registro_costos, tarifa, modelo, prompt, http_client)`: SDK `anthropic`, `tool_choice` forzado con `input_schema {probabilidad: number, razon: string}`, temperatura 0. Escribe las 2 filas de costo con `usage` **antes** de validar la salida; después valida y, si no cumple, lanza `SalidaJuezInvalida`.
-- `determinista_si_se_demuestra` vive en **un solo lugar**: es atributo de clase del juez (`False` en `JuezClaude` y en `JuezFalso`). El runner lo lee del juez que devuelve `fabrica_juez(nombre)`, nunca del `CATALOGO`: el catálogo existe recién en T018 y los tests del runner son de la Fase 2. El test de k=1 usa una subclase de `JuezFalso` con el atributo en `True`.
+- `JuezClaude(registro_costos, tarifa, modelo, prompt, lote_id, http_client)`: SDK `anthropic`, `tool_choice` forzado con `input_schema {probabilidad: number, razon: string}`, temperatura 0. Escribe las 2 filas de costo con `usage` **antes** de validar la salida; después valida y, si no cumple, lanza `SalidaJuezInvalida`.
+- `determinista_si_se_demuestra` vive en **un solo lugar**: es atributo de clase del juez (`False` en `JuezClaude` y en `JuezFalso`). El runner lo lee del juez que devuelve `fabrica_juez(nombre_eval, lote_id)`, nunca del `CATALOGO`: el catálogo existe recién en T018 y los tests del runner son de la Fase 2. El test de k=1 usa una subclase de `JuezFalso` con el atributo en `True`.
 
 ### Lo que ya costó con Jev (CLAUDE.md), aplicado desde hoy
 - **Un caso por llamada.** El runner nunca manda un array de casos al juez ni pide "el ítem 3". Cada `juzgar` recibe un solo caso como objeto con clave; la respuesta es de ese caso.
@@ -73,7 +75,11 @@ La 002 todavía no tiene plan ni código en `main` (`backend/app/modulos/` está
 - `main(argv, entorno, fabrica_juez=None, registro_costos=None) -> int`. Los tests inyectan juez y registro falsos. Solo en la rama por defecto (`fabrica_juez is None`) `run.py` importa `evals.jueces` y arma los reales (D2, D3). El entorno se lee del mapeo inyectado (default `os.environ`), nunca se imprime.
 - Orden, tal cual la spec (Flujo principal §3): validar entorno y `evals.yaml` (sale **2** sin construir el juez) → fingerprint por eval → por caso: forma primero, juez k veces solo si la forma pasa → PASS^k → `agregado`, `determinacion`, `fallidos` → comparar con baseline → reporte JSON por stdout → código 0/1/2.
 - `--config <ruta a evals.yaml>` (default `backend/evals/evals.yaml`); `casos`, `prompt` y `baseline.json` se resuelven relativos a su carpeta. Lo agregó T010 para correr el runner en `tmp_path`; la spec no fijaba cómo se ubica `evals.yaml`.
-- `lote_id` = un `uuid4` por corrida, el mismo para todas las filas de costo.
+- `lote_id` = un `uuid4` por corrida, el mismo para todas las filas de costo, y va en el reporte.
+- `fabrica_juez(nombre_eval, lote_id) -> Juez` (decisión T011, la revisa el advisor): el argumento es el **nombre del eval**, no la clave `juez`, porque la fábrica por defecto necesita también `modelo` y `prompt` de ese eval. Se llama una vez por eval, después de validar entorno, `evals.yaml` y datasets, y antes de cualquier `juzgar`. El `lote_id` llega al juez por constructor: `JuezClaude(registro_costos, tarifa, modelo, prompt, lote_id, http_client)`.
+- La regla de k se valida **después** de `fabrica_juez` (necesita `determinista_si_se_demuestra` del juez devuelto) y **antes** de cualquier `juzgar`: k inválido sale 2 con 0 llamadas.
+- Qué recibe el juez: `tarea` = nombre del eval; `caso` = el caso **sin** `etiqueta`/`pertinente` (el juez no ve la respuesta), y en `encaje_icp` con el ICP del dataset bajo la clave `icp`. Una `etiqueta`/`pertinente` ausente o nula es `ConfigInvalida` → 2.
+- Comparaciones con baseline y tolerancia redondeadas (p. ej. `round(x, 9)`): en float `0.80 - 0.05` no da `0.75` exacto y el test de tolerancia lo pide como "ok".
 - Fórmulas (las revisa el advisor):
   - `agregado = casos_que_pasan / todos_los_casos`;
   - `determinacion = juzgados_con_k_resultados_iguales / juzgados`, `null` si `juzgados == 0`;
