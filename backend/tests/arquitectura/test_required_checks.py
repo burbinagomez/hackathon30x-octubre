@@ -19,6 +19,9 @@ REQUIRED = GITHUB / "required-checks.txt"
 VEREDICTO = GITHUB / "scripts" / "veredicto_security.sh"
 # Corre solo en push a main (deploy de migraciones): en un PR nunca reporta, y como required trabaría main.
 EXCLUIDOS = {("ci.yml", "migrar")}
+# CodeQL corre por el default setup del repo, no por un workflow propio (GitHub rechaza el SARIF de los dos).
+# Nombres vistos en los check-runs del workflow "CodeQL" del PR #23. Analyze (actions) también sale, no es required.
+DEFAULT_SETUP = {"Analyze (python)", "Analyze (javascript-typescript)"}
 
 
 def _workflow(nombre: str) -> dict:
@@ -100,11 +103,11 @@ def test_cada_check_requerido_existe_como_job():
     }
     requeridos = _requeridos()
 
-    huerfanos = [n for n in requeridos if n not in derivados]
+    huerfanos = [n for n in requeridos if n not in derivados | DEFAULT_SETUP]
     assert not huerfanos, f"required-checks.txt nombra checks que ningún workflow produce: {huerfanos}"
 
     faltan = []
-    for archivo in ("ci.yml", "codeql.yml"):
+    for archivo in ("ci.yml",):
         wf = _workflow(archivo)
         if "pull_request" not in _eventos(wf):
             faltan.append(f"{archivo} no corre en pull_request")
@@ -128,26 +131,8 @@ def _ci_corre(*fragmentos):
     return chequeo
 
 
-def _codeql_analiza():
-    wf = _workflow("codeql.yml")
-    assert {"pull_request", "push"} <= _eventos(wf), "codeql.yml tiene que correr en pull_request y push"
-    lenguajes = set()
-    for job in wf["jobs"].values():
-        matriz = (job.get("strategy") or {}).get("matrix") or {}
-        for s in job.get("steps", []):
-            if s.get("uses", "").startswith("github/codeql-action/init@"):
-                pedido = str((s.get("with") or {}).get("languages", ""))
-                if re.fullmatch(r"\$\{\{\s*matrix\.language\s*\}\}", pedido):
-                    lenguajes |= set(matriz.get("language", []))
-                else:
-                    lenguajes |= {l.strip() for l in pedido.split(",") if l.strip()}
-    assert {"python", "javascript-typescript"} <= lenguajes, f"codeql.yml analiza {lenguajes or 'nada'}"
-    # Decisión del dueño: mismos nombres que el default setup, para que los checks no cambien.
-    runs = {n for job_id, job in wf["jobs"].items() for n in _check_runs(job_id, job)}
-    assert {"Analyze (python)", "Analyze (javascript-typescript)"} <= runs, f"check-runs de codeql.yml: {runs}"
-
-
-FIJADOS = ("ci.yml", "codeql.yml")
+# Sin codeql.yml: lo reemplaza el default setup y su workflow no vive en el repo.
+FIJADOS = ("ci.yml",)
 # e2e.yml choca con el criterio de la 014, que no está en main: specs/012-seguridad/spec.md:168, "e2e.yml sin fijar".
 SIN_FIJAR_TODAVIA = {"e2e.yml"}
 
@@ -294,7 +279,6 @@ def _revision_seguridad():
     pytest.param(_ci_corre("npm audit --audit-level=high"), id="npm-audit"),
     # Repuesto con el PR #19: versión fija, descarga verificada, --redact (spec 012, Gitleaks).
     pytest.param(_ci_corre("sha256sum --check", "gitleaks git", "--redact"), id="gitleaks"),
-    pytest.param(_codeql_analiza, id="codeql-lenguajes"),
     pytest.param(_revision_seguridad, id="revision-seguridad"),
     pytest.param(_ci_acciones_pinneadas, id="ci-acciones-pinneadas"),
     pytest.param(_ci_checkout_sin_credenciales, id="ci-checkout-sin-credenciales"),
@@ -346,7 +330,7 @@ cat "$f"
 """
 PROTECCION = "repos/o/r/branches/main/protection"
 REPO = "repos/o/r"
-DEFAULT_SETUP = "repos/o/r/code-scanning/default-setup"
+API_DEFAULT_SETUP = "repos/o/r/code-scanning/default-setup"
 
 
 def _api(**cambios) -> dict:
@@ -356,7 +340,7 @@ def _api(**cambios) -> dict:
             "secret_scanning": {"status": "enabled"},
             "secret_scanning_push_protection": {"status": "enabled"},
         }},
-        DEFAULT_SETUP: {"state": "not-configured"},
+        API_DEFAULT_SETUP: {"state": "configured"},
     }
     if "contexts" in cambios:
         api[PROTECCION]["required_status_checks"]["contexts"] = cambios["contexts"]
@@ -366,7 +350,7 @@ def _api(**cambios) -> dict:
         if clave in cambios:
             api[REPO]["security_and_analysis"][clave]["status"] = cambios[clave]
     if "default_setup" in cambios:
-        api[DEFAULT_SETUP]["state"] = cambios["default_setup"]
+        api[API_DEFAULT_SETUP]["state"] = cambios["default_setup"]
     return api
 
 
@@ -381,11 +365,12 @@ CASOS_PROTECCION = {
     "secret-scanning-apagado": (lambda: _api(secret_scanning="disabled"), lambda: ["secret_scanning: disabled"]),
     "push-protection-apagado": (lambda: _api(secret_scanning_push_protection="disabled"),
                                 lambda: ["secret_scanning_push_protection: disabled"]),
-    "default-setup-prendido": (lambda: _api(default_setup="configured"),
-                               lambda: ["code-scanning/default-setup: configured"]),
+    # Los Analyze required los publica el default setup: apagado, main queda trabado.
+    "default-setup-apagado": (lambda: _api(default_setup="not-configured"),
+                              lambda: ["code-scanning/default-setup: not-configured"]),
     # Reporta cada motivo, no solo el primero.
-    "dos-fallas": (lambda: _api(contexts=_requeridos()[1:], default_setup="configured"),
-                   lambda: [f"falta el required check: {_requeridos()[0]}", "code-scanning/default-setup: configured"]),
+    "dos-fallas": (lambda: _api(contexts=_requeridos()[1:], default_setup="not-configured"),
+                   lambda: [f"falta el required check: {_requeridos()[0]}", "code-scanning/default-setup: not-configured"]),
 }
 
 

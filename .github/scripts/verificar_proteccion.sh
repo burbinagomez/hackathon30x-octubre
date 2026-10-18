@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Spec 012: lo corre el dueño del repo, porque el token de Actions no es admin y no ve esta config.
 # Compara la protección real de main contra required-checks.txt, y verifica secret scanning con
-# push protection prendidos y el default setup de CodeQL apagado (choca con codeql.yml).
+# push protection prendidos y el default setup de CodeQL prendido (publica los checks Analyze required).
 # Reporta cada motivo, no solo el primero. La salida se pega en docs/seguridad/revision-002-008.md.
 set -euo pipefail
 repo=${1:?uso: verificar_proteccion.sh <owner/repo>}
@@ -31,7 +31,7 @@ fi
 
 if setup=$(gh api "repos/$repo/code-scanning/default-setup"); then
   estado=$(jq -r '.state // "ausente"' <<<"$setup")
-  [ "$estado" = not-configured ] || falla "code-scanning/default-setup: $estado (tiene que ser not-configured)"
+  [ "$estado" = configured ] || falla "code-scanning/default-setup: $estado (tiene que ser configured)"
 else
   falla "code-scanning/default-setup: no se pudo leer"
 fi
