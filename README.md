@@ -39,7 +39,10 @@ CIFRADO_KEY=<clave> DATABASE_URL=postgresql+psycopg://app_rt@localhost:5432/post
 
 # Front (otra terminal)
 cd frontend && npm ci
-VITE_API_URL=http://localhost:8000 npm run dev    # http://localhost:5173
+VITE_API_URL=http://localhost:8000 VITE_SUPABASE_URL=<url> VITE_SUPABASE_PUBLISHABLE_KEY=<publishable> \
+  npm run dev                                     # http://localhost:5173
+# En Railway, servicio web (variables del build): VITE_API_URL, VITE_SUPABASE_URL y
+# VITE_SUPABASE_PUBLISHABLE_KEY. La publishable es pública; la sb_secret_ no va en ningún lado del front.
 ```
 
 ### Migraciones

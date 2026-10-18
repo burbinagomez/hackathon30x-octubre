@@ -1,0 +1,90 @@
+{
+  "acceso": {
+    "ingresar": "Sign in",
+    "titulo": "Sign in",
+    "email": "Email",
+    "clave": "Password",
+    "error_credenciales": "Wrong email or password",
+    "error_generico": "Could not sign in. Try again."
+  },
+  "motivos": {
+    "sin_mapeo_actividad": "The activity has no equivalent in this source",
+    "pais": "The source does not cover this country",
+    "sin_geografia": "The source needs a state or city"
+  },
+  "salud": {
+    "estado": "API: {{api}} · DB: {{db}}"
+  },
+  "busqueda": {
+    "titulo": "New search",
+    "pais": "Country",
+    "actividad": "Activity",
+    "actividad_vacia": "Pick an activity",
+    "departamento": "State",
+    "ingresos_min": "Minimum revenue (USD)",
+    "palabras_clave": "Keywords (comma separated)",
+    "exclusiones": "Exclusions (comma separated)",
+    "canal": "Preferred channel",
+    "tope": "Spend cap (USD)",
+    "mensaje": "Base message",
+    "vista_previa": "Preview",
+    "buscar": "Search",
+    "conteo_antes_de_filtros": "Counts are before keywords and exclusions are applied.",
+    "se_compara_el_maximo": "Search is enabled by the maximum cost, not the estimate.",
+    "ninguna_fuente_cubre": "No source covers this search.",
+    "costo_estimado": "Estimated cost: {{monto}}",
+    "costo_maximo": "Maximum cost: {{monto}}",
+    "tope_linea": "Cap: {{monto}}",
+    "creditos_restantes": "Croma credits left this month: {{n}}",
+    "requests_restantes": "Croma requests left in 24 h: {{n}}",
+    "descartadas": "Discarded sources",
+    "ignorados": "ignored: {{lista}}",
+    "error": "The operation could not be completed. Try again."
+  },
+  "fuentes": {
+    "croma_supersociedades_co": "Supersociedades (Croma)",
+    "croma_dian_trade_co": "DIAN Trade (Croma)",
+    "osm_overpass": "OpenStreetMap",
+    "datos_gov_co_rues": "RUES (datos.gov.co)",
+    "sin_atribuir": "Unattributed"
+  },
+  "criterios": {
+    "pais": "Country",
+    "ciiu": "Activity",
+    "departamento": "State",
+    "ingresos_min": "Minimum revenue"
+  },
+  "tablero": {
+    "titulo": "Dashboard by source",
+    "fuente": "Source",
+    "encontrados": "Found",
+    "unicos": "Unique",
+    "costo_lista": "Cost (list)",
+    "costo_real": "Cost (actual)",
+    "desperdicio_lista": "Waste (list)",
+    "cpl_lista": "CPL (list)",
+    "cpl_real": "CPL (actual)",
+    "naturales": "Individuals (not contactable)",
+    "no_aplica": "Not applicable",
+    "total": "Total",
+    "costo_evals": "Evals cost (separate): {{monto}}",
+    "cobertura": "Coverage by country",
+    "revisiones_pendientes": "Pending reviews: {{n}}",
+    "atribucion": "Data attribution",
+    "desperdicio_real": "Waste (actual)"
+  },
+  "idioma": {
+    "etiqueta": "Language",
+    "es": "Español",
+    "en": "English"
+  },
+  "paises": {
+    "CO": "Colombia",
+    "MX": "Mexico",
+    "BR": "Brazil",
+    "PE": "Peru"
+  },
+  "canales": {
+    "email": "Email"
+  }
+}

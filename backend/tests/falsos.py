@@ -49,6 +49,9 @@ class RegistroCostosFalso:
     def creditos_mes(self, proveedor: str) -> Decimal:
         return self._creditos_mes
 
+    def gasto_busqueda(self, busqueda_id: UUID) -> Decimal:
+        return sum((op.unidades * op.costo_unitario for op in self.filas if op.lote_id == busqueda_id), Decimal(0))
+
 
 class FuenteFalsa:
     """Escribe 1 fila de costos con su lote_id y devuelve sus empresas del país pedido en la página 1, o lanza `error`."""

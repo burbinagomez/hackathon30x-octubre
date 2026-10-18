@@ -23,7 +23,7 @@ La 005 entrega:
 - `gasto_busqueda` en `RegistroCostos`;
 - el post-filtro de palabras clave y exclusiones;
 - los casos de uso `VistaPrevia` y `EjecutarBusqueda` con tope;
-- auth mínima: `usuarios` con RLS, funciones `SECURITY DEFINER`, scrypt y JWT HS256;
+- auth mínima con **Supabase Auth**: la API verifica el access token (JWKS), resuelve el tenant en `usuarios` por `sub` con una función `SECURITY DEFINER`, y la RLS sigue con `app.tenant_id`;
 - los endpoints HTTP;
 - el front con login, "Nueva búsqueda" y tablero, con límites por feature e i18n es/en;
 - el E2E local;
@@ -34,7 +34,7 @@ Además absorbe de la 011, por la D7, seis tests y el verde del tablero de natur
 ## Technical Context
 
 - **Language/Version:** Python 3.12; TypeScript 5.7 con React 18.3.
-- **Primary Dependencies, back:** FastAPI, SQLAlchemy Core + psycopg 3, httpx y pyyaml, todos de la 002. Nueva: **PyJWT**.
+- **Primary Dependencies, back:** FastAPI, SQLAlchemy Core + psycopg 3, httpx y pyyaml, todos de la 002. Nueva: **`pyjwt[crypto]`** (verificar el token con JWKS; `cryptography` para ES256/RS256).
 - **Primary Dependencies, front:** react-i18next e i18next como dependencias nuevas. Como devDependencies nuevas: `eslint`, `typescript-eslint`, `eslint-plugin-boundaries`, `eslint-plugin-import`, `eslint-import-resolver-typescript` y `eslint-plugin-i18next`. MSW 2.6.6 ya está en `package.json`.
 - **Storage:** Postgres (`postgres:16` en CI) y una migración a mano. El número se discute en la pregunta P5.
 - **Testing:** pytest, con integración contra Postgres real como `app_rt`. Vitest + Testing Library + MSW en el front y Playwright para el E2E local. Se usan `httpx.MockTransport` y un reloj inyectable, como en la 002 y la 003.
@@ -52,8 +52,8 @@ Además absorbe de la 011, por la D7, seis tests y el verde del tablero de natur
 | II Test primero | Cada test tiene una mutación que lo pone en rojo por aserción (ver `tasks.md`). Los esqueletos van antes del rojo, para que no haya `ImportError` ni `AttributeError`. El advisor y security revisan antes de aceptar. | ✅ |
 | III Tenant/RLS | Vistas `security_invoker` con `test_rls[vista]` y control positivo. `usuarios` con RLS y sin privilegios para `app_rt`. Las funciones `SECURITY DEFINER` llevan `search_path` y `REVOKE` a `PUBLIC`/`anon`/`authenticated`. `pg_views` entra en `test_privilegios_supabase`. | ✅ |
 | IV Migraciones | Una migración a mano. `app/modelos.py` suma columnas y `usuarios`, y el drift sigue vacío (las vistas no las compara `compare_metadata`; T006 lo confirma). | ✅ |
-| V Seguridad | `SESSION_SECRET` y `EMAIL_HMAC_CLAVE` (≥ 32 bytes cada una), `WEB_ORIGIN` y `CROMA_BASE_URL` por `Settings`. Docs desactivadas, CORS cerrado, clave fuera de logs y `extra='forbid'`. | ✅ |
-| VI Contacto | El formulario no pide contacto y la cola no lo expone (`test_cola_no_expone_contacto`). El email del usuario no se guarda: solo `email_hmac` (HMAC-SHA256 con clave de entorno sobre el email normalizado), por minimización. Lo decidió el dueño (P13). | ✅ |
+| V Seguridad | `AUTH_JWKS_URL` y `AUTH_ISSUER` (públicos, sin secreto de firma en la api), `WEB_ORIGIN` y `CROMA_BASE_URL` por `Settings`. Docs desactivadas, CORS cerrado, token fuera de logs y `extra='forbid'`. **Enmienda pendiente** del dueño: la web necesita la publishable key de Supabase (constitución:30, ver Conflictos). | ⚠ pendiente |
+| VI Contacto | El formulario no pide contacto y la cola no lo expone (`test_cola_no_expone_contacto`). El email del operador vive en `auth.users` (Supabase) y `usuarios` no lo guarda: minimización total (reemplaza al `email_hmac` de P13). | ✅ |
 | VII Cumplimiento | Una empresa filtrada por palabra clave no genera lead ni `cumplimiento`. Fusionar no toca `cumplimiento`. `v_atribuciones` sale de `lead_fuentes`. | ✅ |
 | VIII Costos | `contar` registra antes de devolver o de lanzar, igual que `buscar`. Todo descubrimiento lleva `lote_id = busqueda.id`. El CPL sale solo de vistas sobre `costos`. | ✅ |
 | IX Evals | N/A (sin IA). `fuente='evals'` aparte, en `v_costo_evals`. | — |
@@ -136,7 +136,7 @@ Cada uno tiene su test en el archivo del adaptador, y `test_costo_maximo_suma_co
 
 **Tope:** el chequeo es `gasto_busqueda(id) + meta.costo_maximo_llamada ≤ tope` antes de cada `buscar`. Lo hace el caso de uso, no el adaptador: el adaptador no conoce el tope.
 
-**Auth:** spec:363-380, con un cambio por el principio VI (P13). `usuarios` no guarda el email: guarda `email_hmac bytea UNIQUE`, que es HMAC-SHA256 con `EMAIL_HMAC_CLAVE` (entorno, ≥ 32 bytes, por `Settings`) sobre `lower(strip(email))`. El normalizador y el HMAC son una función pura en `acceso/dominio/`. `usuario_para_login(p_email_hmac bytea)` recibe el HMAC, y `crear_usuario.py` lo calcula igual. `tenant_actual` abre la unidad de trabajo de la 002 con `set_config('app.tenant_id', …, true)`.
+**Auth (Supabase Auth, decisión del dueño 2026-10-18):** ver la sección "Auth con Supabase Auth" abajo y spec:365-383. Reemplaza al login propio (scrypt, JWT HS256, `email_hmac`, `usuario_para_login`, `SESSION_SECRET`, `EMAIL_HMAC_CLAVE`).
 
 **Tablero:**
 - `repositorio_tablero.py` solo lee vistas. Suma la columna de naturales de la 011 desde `busquedas.naturales_por_fuente`, con `DISTINCT ON (fuente) … ORDER BY fuente, creado_en DESC`. `busquedas.creado_en` ya existe (002 migración:19); la 011 spec:203 lo escribe `creada_en`, pero es la misma columna. También la combina en la API con `meta.cuenta_naturales` del registro.
@@ -150,13 +150,225 @@ Va un único archivo, `supabase/migrations/NNNN_libro_costos_busqueda.sql` (el n
 - en `busquedas`: `+ costo_estimado_usd`, `+ costo_maximo_usd`, `+ ejecutada_en` y el `CHECK` nuevo de `estado` (P1);
 - en `leads`: `+ fusionado_en uuid NULL` con `FOREIGN KEY (tenant_id, fusionado_en) REFERENCES leads (tenant_id, id)`, que se apoya en `leads_tenant_id_id_key` (002 migración:41) y sigue el patrón de las FKs compuestas de la 002 (002 migración:57). Una FK simple no pasa por RLS: el tenant B podría apuntar a un lead de A (`test_tenant_b_no_fusiona_con_lead_de_a`);
 - en `revision_dedup`: `+ motivo`;
-- la tabla `usuarios` (`email_hmac bytea UNIQUE`, sin email) con RLS;
-- las funciones `usuario_para_login(p_email_hmac bytea)` y `fijar_idioma`;
+- la tabla `usuarios` (`auth_user_id uuid PRIMARY KEY`, `tenant_id`, `idioma`, `creado_en`; sin email ni clave) con RLS;
+- las funciones `tenant_de_usuario(p_auth_user_id uuid)` (MIN) y `fijar_idioma` (Pulido);
 - los índices `(tenant_id, lote_id)` y `(busqueda_id, fuente)`;
 - las 9 vistas;
 - un `DO` con el guard de `pg_roles` para los `REVOKE EXECUTE`.
 
 `app/modelos.py` suma las columnas y `usuarios`.
+
+### DDL de la 0004 v2 (APROBADO 2026-10-18)
+
+Es el contenido exacto de `supabase/migrations/0006_libro_costos_busqueda.sql`. Basado en el v1 (que queda abajo como superseded): mismo `CHECK` de estados, vistas y `REVOKE`; cambia `usuarios` (`auth_user_id`, sin FK) y la función de acceso `tenant_de_usuario(uuid)`, y suma el `REVOKE` global de `EXECUTE` a `PUBLIC` en funciones nuevas. El dueño lo aprobó tal cual (2026-10-18, con security OK). `backend/tests/arquitectura/test_migracion_0006.py` compara el archivo con este bloque byte a byte.
+
+```sql
+-- 0004: libro de costos y búsqueda [MIN]. SQL a mano. Corre como postgres (dueño). Va después de la 0003.
+-- Login con Supabase Auth (decisión del dueño, 2026-10-18): usuarios no guarda email ni clave; el email vive en auth.users.
+
+-- P1 (dueño, 2026-10-18): unión de los 8 estados. Un solo ALTER: nunca queda la tabla sin CHECK.
+ALTER TABLE public.busquedas
+  DROP CONSTRAINT busquedas_estado_check,
+  ADD CONSTRAINT busquedas_estado_check CHECK (estado IN (
+    'creada', 'terminada', 'con_errores',
+    'borrador', 'ejecutando', 'completada', 'tope_alcanzado', 'error'));
+
+-- auth_user_id = auth.users.id = claim `sub` del access token de Supabase. Sin email ni clave: viven en auth.users.
+-- Sin FK a auth.users: en CI y local (postgres vanilla) el esquema auth no existe, y una FK condicional haría que
+-- prod y CI tengan esquemas distintos que el drift check no ve. La autoridad es esta fila: si no hay fila, no hay acceso.
+CREATE TABLE public.usuarios (
+  auth_user_id uuid PRIMARY KEY,
+  tenant_id    uuid NOT NULL REFERENCES public.tenants(id),
+  idioma       text CHECK (idioma IN ('es', 'en')),
+  creado_en    timestamptz NOT NULL DEFAULT now()
+);
+
+-- RLS sin FORCE a propósito: app_rt no es dueño y la política lo alcanza; el dueño (postgres) es quien
+-- corre tenant_de_usuario antes de conocer el tenant. Con FORCE, esa función fallaría o dependería de BYPASSRLS.
+-- app_rt no tiene ningún privilegio sobre la tabla: entra solo por la función.
+ALTER TABLE public.usuarios ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_aislado ON public.usuarios
+  USING (tenant_id = current_setting('app.tenant_id')::uuid)
+  WITH CHECK (tenant_id = current_setting('app.tenant_id')::uuid);
+
+-- Resolver el tenant: después de verificar el token, antes de conocer el tenant. Devuelve la fila de ESE
+-- auth_user_id y nada más (PRIMARY KEY: 0 o 1 fila). El tenant NO sale del token (user_metadata lo edita el usuario).
+-- Todo calificado con public.; pg_catalog va implícito primero, pg_temp al final.
+CREATE FUNCTION public.tenant_de_usuario(p_auth_user_id uuid)
+  RETURNS TABLE (tenant_id uuid, idioma_usuario text, idioma_tenant text)
+  LANGUAGE sql STABLE SECURITY DEFINER
+  SET search_path = public, pg_temp
+AS $$
+  SELECT u.tenant_id, u.idioma, t.idioma
+  FROM public.usuarios u
+  JOIN public.tenants t ON t.id = u.tenant_id
+  WHERE u.auth_user_id = p_auth_user_id
+$$;
+REVOKE ALL ON FUNCTION public.tenant_de_usuario(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.tenant_de_usuario(uuid) TO app_rt;
+
+-- Vistas [MIN]. security_invoker: corren como app_rt y pasan por la RLS de lead_fuentes.
+-- Pulido: un CREATE OR REPLACE VIEW sin WITH (security_invoker = true) BORRA la opción; repetirla siempre.
+CREATE VIEW public.v_tablero_fuentes WITH (security_invoker = true) AS
+  SELECT fuente, count(*) AS encontrados, count(DISTINCT lead_id) AS unicos
+  FROM public.lead_fuentes
+  GROUP BY fuente
+  UNION ALL
+  SELECT 'TOTAL', count(*), count(DISTINCT lead_id)
+  FROM public.lead_fuentes
+  HAVING count(*) > 0;
+
+CREATE VIEW public.v_atribuciones WITH (security_invoker = true) AS
+  SELECT a.fuente, a.texto, a.url, a.orden
+  FROM (VALUES
+    ('osm_overpass', '© OpenStreetMap contributors', 'https://www.openstreetmap.org/copyright', 1),
+    ('datos_gov_co_rues', 'Datos: Confecámaras vía datos.gov.co (CC BY-SA 4.0)',
+     'https://creativecommons.org/licenses/by-sa/4.0/', 2)
+  ) AS a(fuente, texto, url, orden)
+  WHERE EXISTS (SELECT 1 FROM public.lead_fuentes lf WHERE lf.fuente = a.fuente);
+
+GRANT SELECT ON public.v_tablero_fuentes, public.v_atribuciones TO app_rt;
+
+-- El EXECUTE a PUBLIC de las funciones nuevas es un default GLOBAL de Postgres: un ALTER DEFAULT PRIVILEGES
+-- ... IN SCHEMA no lo puede sacar, y anon/authenticated lo heredan por PUBLIC. Se cierra para todo lo que cree postgres.
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+
+-- Roles de Supabase. Supabase da EXECUTE en funciones nuevas de public a anon/authenticated por default
+-- privileges; la 0002 solo cerró TABLES y SEQUENCES. Solo si existen (en vanilla no hay nada que revocar).
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon')
+     AND EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON FUNCTION public.tenant_de_usuario(uuid) FROM anon, authenticated;
+    REVOKE ALL ON public.usuarios, public.v_tablero_fuentes, public.v_atribuciones FROM anon, authenticated;
+    ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM anon, authenticated;
+  END IF;
+END
+$$;
+```
+
+### DDL de la 0004 (APROBADO 2026-10-18; SUPERSEDIDO por el login con Supabase Auth, no se usa)
+
+Es el contenido exacto de `supabase/migrations/0006_libro_costos_busqueda.sql` ([MIN]); `backend/tests/arquitectura/test_migracion_0006.py` compara el archivo con este bloque. Va entre la 0003 y la 0005.
+
+```sql
+-- 0004: libro de costos y búsqueda [MIN]. SQL a mano. Corre como postgres (dueño). Va después de la 0003.
+
+-- P1 (dueño, 2026-10-18): unión de los 8 estados. Un solo ALTER: nunca queda la tabla sin CHECK.
+ALTER TABLE public.busquedas
+  DROP CONSTRAINT busquedas_estado_check,
+  ADD CONSTRAINT busquedas_estado_check CHECK (estado IN (
+    'creada', 'terminada', 'con_errores',
+    'borrador', 'ejecutando', 'completada', 'tope_alcanzado', 'error'));
+
+-- P13 (dueño): sin email. email_hmac = HMAC-SHA256(EMAIL_HMAC_CLAVE, lower(strip(email))): 32 bytes.
+-- El CHECK de largo impide guardar el email crudo en bytea por error.
+CREATE TABLE public.usuarios (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id  uuid NOT NULL REFERENCES public.tenants(id),
+  email_hmac bytea NOT NULL CHECK (octet_length(email_hmac) = 32),
+  hash_clave text NOT NULL,
+  idioma     text CHECK (idioma IN ('es', 'en')),
+  creado_en  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT usuarios_email_hmac_key UNIQUE (email_hmac)
+);
+
+-- RLS sin FORCE a propósito: app_rt no es dueño y la política lo alcanza; el dueño (postgres) es quien
+-- corre usuario_para_login antes de conocer el tenant. Con FORCE, esa función fallaría o dependería de BYPASSRLS.
+-- app_rt no tiene ningún privilegio sobre la tabla: entra solo por la función.
+ALTER TABLE public.usuarios ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_aislado ON public.usuarios
+  USING (tenant_id = current_setting('app.tenant_id')::uuid)
+  WITH CHECK (tenant_id = current_setting('app.tenant_id')::uuid);
+
+-- Login: antes del tenant. Devuelve la fila de ESE email_hmac y nada más (UNIQUE: 0 o 1 fila).
+-- Todo calificado con public.; pg_catalog va implícito primero, pg_temp al final.
+CREATE FUNCTION public.usuario_para_login(p_email_hmac bytea)
+  RETURNS TABLE (id uuid, tenant_id uuid, hash_clave text, idioma_usuario text, idioma_tenant text)
+  LANGUAGE sql STABLE SECURITY DEFINER
+  SET search_path = public, pg_temp
+AS $$
+  SELECT u.id, u.tenant_id, u.hash_clave, u.idioma, t.idioma
+  FROM public.usuarios u
+  JOIN public.tenants t ON t.id = u.tenant_id
+  WHERE u.email_hmac = p_email_hmac
+$$;
+REVOKE ALL ON FUNCTION public.usuario_para_login(bytea) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.usuario_para_login(bytea) TO app_rt;
+
+-- Vistas [MIN]. security_invoker: corren como app_rt y pasan por la RLS de lead_fuentes.
+-- Pulido: un CREATE OR REPLACE VIEW sin WITH (security_invoker = true) BORRA la opción; repetirla siempre.
+CREATE VIEW public.v_tablero_fuentes WITH (security_invoker = true) AS
+  SELECT fuente, count(*) AS encontrados, count(DISTINCT lead_id) AS unicos
+  FROM public.lead_fuentes
+  GROUP BY fuente
+  UNION ALL
+  SELECT 'TOTAL', count(*), count(DISTINCT lead_id)
+  FROM public.lead_fuentes
+  HAVING count(*) > 0;
+
+CREATE VIEW public.v_atribuciones WITH (security_invoker = true) AS
+  SELECT a.fuente, a.texto, a.url, a.orden
+  FROM (VALUES
+    ('osm_overpass', '© OpenStreetMap contributors', 'https://www.openstreetmap.org/copyright', 1),
+    ('datos_gov_co_rues', 'Datos: Confecámaras vía datos.gov.co (CC BY-SA 4.0)',
+     'https://creativecommons.org/licenses/by-sa/4.0/', 2)
+  ) AS a(fuente, texto, url, orden)
+  WHERE EXISTS (SELECT 1 FROM public.lead_fuentes lf WHERE lf.fuente = a.fuente);
+
+GRANT SELECT ON public.v_tablero_fuentes, public.v_atribuciones TO app_rt;
+
+-- Roles de Supabase. Supabase da EXECUTE en funciones nuevas de public a anon/authenticated por default
+-- privileges; la 0002 solo cerró TABLES y SEQUENCES. Solo si existen (en vanilla no hay nada que revocar).
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon')
+     AND EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON FUNCTION public.usuario_para_login(bytea) FROM anon, authenticated;
+    REVOKE ALL ON public.usuarios, public.v_tablero_fuentes, public.v_atribuciones FROM anon, authenticated;
+    ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM anon, authenticated;
+  END IF;
+END
+$$;
+```
+
+## Auth con Supabase Auth (decisión del dueño, 2026-10-18)
+
+**Flujo.** El front inicia sesión con `supabase-js` (P15: email + contraseña). Manda el access token como `Authorization: Bearer`. La API:
+1. verifica el token (firma, `exp`, `iss`, `aud`) con las claves públicas del proyecto;
+2. toma `sub` y llama `tenant_de_usuario(sub)`: 0 filas → 403 (`sin_acceso`);
+3. abre la unidad de trabajo con `SET LOCAL app.tenant_id` (002). La RLS no cambia.
+
+**Verificación (lo más simple y seguro).**
+- `PyJWKClient(AUTH_JWKS_URL)` con caché, `algorithms=["ES256", "RS256"]` (nunca HS256: evita la confusión de algoritmo con la clave pública), `audience="authenticated"`, `issuer=AUTH_ISSUER` y `options={"require": ["exp", "sub", "aud", "iss"]}`.
+- La api no tiene ningún secreto de firma ni `service_role`. `AUTH_JWKS_URL` y `AUTH_ISSUER` son URLs públicas y **no** empiezan por `SUPABASE_`, así que `verificar_entorno` (config.py:87-89) no cambia.
+- Alternativa descartada: el secreto JWT compartido (HS256). Pondría en el entorno de la api una clave que acuña tokens de cualquier usuario, y `verificar_entorno` ya prohíbe credenciales de Supabase ahí.
+- JWKS inaccesible: falla cerrado (503), nunca 200.
+- Los tests no usan red: generan un par EC P-256 y le inyectan al verificador un JWKS local.
+
+**El tenant sale de `usuarios`, nunca del token.** `user_metadata` lo edita el propio usuario y `app_metadata` depende de cómo se configure el proyecto; ningún claim de tenant se lee. Revocar es borrar la fila de `usuarios`: la función devuelve 0 filas y el token deja de servir aunque no haya vencido (1 h).
+
+**`tenant_de_usuario(uuid)` frente a lectura directa.** Con lectura directa, la política `tenant_id = current_setting('app.tenant_id')` falla antes de conocer el tenant. Habría que sumar una segunda política por `auth_user_id` y darle `SELECT` a `app_rt` sobre la tabla. Se queda la función: `app_rt` sigue sin ningún privilegio sobre `usuarios` y el único patrón de acceso es "dame el tenant de ESTE uid" (mismo patrón que aprobó security para `usuario_para_login`).
+
+**Qué desaparece:** `POST /auth/sesion`, `email_hmac`, `hash_clave`, `usuario_para_login`, `EMAIL_HMAC_CLAVE`, `SESSION_SECRET`, `hmac_email`, scrypt y el JWT propio. **Qué queda:** PyJWT (con `[crypto]`), solo para verificar. `GET /usuarios/me` devuelve `idioma_usuario` e `idioma_tenant` para `elegirIdioma`; `PATCH /usuarios/me` (Pulido) llama a `fijar_idioma(sub, idioma)`.
+
+**Alta de usuarios (paso humano, frontera de Daniel).** El dueño crea el usuario en el panel de Supabase. Después `backend/scripts/crear_usuario.py --auth-user-id UUID --tenant UUID [--idioma es|en]`, con la URL de `postgres` por `getpass`, inserta la fila de `usuarios`.
+
+**Riesgo aceptado.** El rate limit y el bloqueo por intentos del login pasan a ser los de Supabase Auth, no los de la api (la 012 ya no los construye).
+
+**Variables.** api: `AUTH_JWKS_URL`, `AUTH_ISSUER`, `WEB_ORIGIN`. web: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (clave pública por diseño; choca con constitución:30, abajo).
+
+### Conflictos con la constitución y CLAUDE.md (enmienda que decide el dueño; no se editan acá)
+
+| Dónde | Dice | Conflicto |
+|---|---|---|
+| `CLAUDE.md:23` | "Postgres en Supabase (solo Postgres: sin Auth, Storage, Edge Functions ni Data API sobre `public`)" | Pasa a usar Auth. Storage, Edge Functions y Data API siguen apagados. |
+| `.specify/memory/constitution.md:30` (V) | "Ninguna key de Supabase (anon, service_role, publishable, secret) existe en el entorno de `api` ni de `web`: la app no arranca si la ve." | `supabase-js` en el front necesita `VITE_SUPABASE_URL` y la publishable key. Enmienda mínima: la publishable key se permite **solo en `web`**; `service_role`, secret y todo lo de Supabase en `api` siguen prohibidos. |
+| `.specify/memory/constitution.md:3` | Cabecera con las versiones (1.2.0 "Postgres en Supabase") | La enmienda cambia un principio (V) y el alcance de Supabase: es MAJOR, versión 2.0.0. |
+| `.specify/memory/constitution.md:22` (III) | "`anon` y `authenticated` no tienen privilegios sobre tablas de `public`" | Sigue valiendo: la api entra como `app_rt`, nunca con el rol del token. No es conflicto, pero Auth hace que `authenticated` exista de verdad: `test_privilegios_supabase` pasa a ser más importante. |
+| `.specify/memory/constitution.md:34` (VI) | "correos… se cifran en reposo" | Sin conflicto: el email del operador no está en nuestra base. |
+| `backend/app/config.py:10-11, 87-89` y `backend/tests/arquitectura/test_secrets.py:38-39` | `verificar_entorno` corta si ve `SUPABASE_*`, `sb_publishable_` o un JWT con rol `anon`/`service_role` en el entorno de `api` | Sin cambio **si** la api usa `AUTH_JWKS_URL` y `AUTH_ISSUER`. Si el dueño prefiere `SUPABASE_URL` en la api, hay que cambiar esa guarda. |
+| `specs/001-walking-skeleton/spec.md:10, 28-29`, `plan.md:13`, `quickstart.md:46-48` | Mismo texto de "solo Postgres" y la guarda de keys | Se alinean con la enmienda. |
 
 ## Validación (quickstart)
 
@@ -172,13 +384,13 @@ La corrida real (Fase 12) se avisa antes. Se anota el saldo de Croma antes y des
 
 ```text
 backend/
-├── pyproject.toml                         # + PyJWT
+├── pyproject.toml                         # + pyjwt[crypto]
 ├── config/{tarifas.yaml (+ limites_app.tope_maximo_usd), actividades.yaml (+ nombre_es/nombre_en)}
 ├── app/
-│   ├── config.py                          # + session_secret, web_origin, croma_base_url
+│   ├── config.py                          # + auth_jwks_url, auth_issuer, web_origin, croma_base_url
 │   ├── main.py                            # docs off, CORS, routers
 │   ├── modelos.py
-│   ├── api/{sesion.py, auth.py, busquedas.py, tablero.py, dedup.py, actividades.py, usuarios.py}
+│   ├── api/{sesion.py, busquedas.py, tablero.py, dedup.py, actividades.py, usuarios.py}
 │   └── modulos/
 │       ├── costos/{dominio/puertos.py (+gasto_busqueda), infraestructura/postgres_costos.py}
 │       ├── descubrimiento/
@@ -186,8 +398,8 @@ backend/
 │       │   ├── aplicacion/{vista_previa.py, ejecutar_busqueda.py (+tope), resolver_revision.py}
 │       │   └── infraestructura/adaptadores/{croma_supersociedades.py, osm_overpass.py, datos_gov_co_rues.py}
 │       ├── tablero/infraestructura/persistencia/repositorio_tablero.py
-│       └── acceso/{dominio/claves.py, infraestructura/persistencia/repositorio_usuarios.py}
-├── scripts/crear_usuario.py
+│       └── acceso/{dominio/{puertos.py (VerificadorToken), errores.py}, infraestructura/{verificador_jwks.py, persistencia/repositorio_usuarios.py}}
+├── scripts/crear_usuario.py               # inserta la fila de usuarios (auth_user_id + tenant); el usuario de Supabase lo crea el dueño
 └── tests/
     ├── contratos/test_fuente_descubrimiento.py      # + 3 de contar
     ├── unit/descubrimiento/{test_croma_supersociedades, test_osm_overpass, test_datos_gov_co,
@@ -210,8 +422,16 @@ docs/{arquitectura-backend.md, arquitectura-frontend.md, prd.md (§4)}
 ## Preguntas abiertas
 
 Ninguna se resuelve en este plan. Cada fila dice qué tareas bloquea.
+
+**Decisiones del dueño (2026-10-18):**
+- **P1 aprobada con el default:** el `CHECK` de `busquedas.estado` es la unión de los 8 valores; la CLI sigue igual; en la API una fuente caída con otra que respondió deja `completada` con el error por fuente, y `error` es solo cuando fallan todas.
+- **P2 aprobada con el default:** `crear_borrador`, `fijar_estimados`, `obtener_borrador` y `pasar_a_ejecutando`; los métodos del 002 no cambian.
+- **P4 aprobada con el default:** la fábrica de cada adaptador calcula `costo_maximo_llamada` con la tarifa resuelta; el YAML no lo declara.
+- **T001 sin la 004:** la 004 (evals) no es requisito para arrancar la 005; `v_costo_evals` lee una tabla vacía hasta que la 004 escriba.
+- **P5:** la migración de la 005 es la `0004`; la `0003` queda para el cifrado de `nombre`/`direccion` de la 003.
+  _Reemplazado 2026-10-18: el archivo pasa a `0006_libro_costos_busqueda.sql` sin cambiar una línea de SQL, porque la `0005` de la 003 ya estaba aplicada en prod y `supabase db push` no inserta una versión anterior a la última remota. El texto "0004" del DDL de abajo es el aprobado y no se toca._
 - **Bloquea la puerta T001: P1.** La decide el dueño.
-- **P13 está decidida por el dueño:** `email_hmac`.
+- **P13 queda sin efecto:** el dueño decidió login con Supabase Auth (2026-10-18); `email_hmac` desaparece. Preguntas nuevas: P15 a P18.
 - **P2 y P4** tienen default, pero falta que el dueño lo apruebe.
 - P3, P5, P7–P12 y P14 no bloquean.
 - P6 se borró: `busquedas.creado_en` ya existe (002 migración:19).
@@ -229,8 +449,12 @@ Ninguna se resuelve en este plan. Cada fila dice qué tareas bloquea.
 | P10 | **`EXCLUIDOS`** (002 spec:66, enmendado en 002 plan:297). La 005 suma `repositorio_tablero.py` y `repositorio_usuarios.py` (spec:305). | T033 | Se enmienda en el mismo commit que los crea. |
 | P11 | **`limites_app` en `tarifas.yaml`.** Hoy no existe. ¿Lo lee el cargador de tarifas de la 002 o uno aparte? | T032 | Lo lee el mismo cargador, como `Decimal(str(v))`, y llega a la API por `Settings` en la raíz de composición. |
 | P12 | **Costo de `contar` de Croma.** Si la página 1 queda en caché, `buscar` no vuelve a cobrar. ¿La fila `croma_consulta` de `contar` es la misma que la de `buscar` (1 crédito en total)? | T017 | Sí: `contar` hace la request y escribe la fila, y `buscar(1)` es cache hit y no escribe nada. Es lo que prueba `test_contar_y_buscar_hacen_una_sola_request`. |
-| P13 | **Email de `usuarios`.** El principio VI dice "correos… se cifran en reposo" (constitution.md:34), sin distinguir entre lead y operador. Guardarlo en claro y meterlo en la lista cerrada de `test_ninguna_columna_de_contacto_fuera_del_catalogo` sería saltarse la regla. | — (decidida; aplica a T005, T012–T013, T029–T030) | **Decidida por el dueño: HMAC.** `email_hmac bytea UNIQUE`, que es HMAC-SHA256(`EMAIL_HMAC_CLAVE`, `lower(strip(email))`), sin email en claro. Es minimización: el login solo necesita igualdad, y `usuario_para_login` recibe el HMAC. Si el test de catálogo de la 003 matchea columnas por nombre (`email*`), `email_hmac` entra con la razón "HMAC no reversible, no es contacto". Lo revisa security. |
+| P13 | ~~Email de `usuarios` (`email_hmac`)~~ | — | **Reemplazada por Supabase Auth (2026-10-18):** el email vive en `auth.users`, `usuarios` no lo guarda. |
 | P14 | **Costo de `contar` de OSM en la vista previa de un ICP de BR o PE** (estimado de OSM como cota baja, spec:341). Sin pregunta de diseño, pero se registra para la Fase 12. | — | Se mide en la corrida real. |
+| P15 | Método de login con Supabase Auth. | — | **DECIDIDA (dueño, 2026-10-18): email y contraseña.** |
+| P16 | ¿FK de `usuarios.auth_user_id` a `auth.users(id)`? | — | **DECIDIDA: sin FK.** Procedimiento de baja: borrar la fila en `usuarios` (T013, T049). |
+| P17 | ¿Claves de firma asimétricas (JWKS) en el proyecto Supabase? | T013, T029 | **DECIDIDA: JWKS.** **Pendiente humano (Brayan):** verificar en el panel que el proyecto firma con claves asimétricas y que la Data API no expone `public`. Hasta entonces, la verificación se prueba solo con JWKS local. |
+| P18 | Enmiendas a CLAUDE.md y a la constitución. | — | **APROBADA y aplicada** (2026-10-18): `CLAUDE.md:23` y constitución 2.0.0 (V). El chequeo de la enmienda es `frontend/tests/arquitectura/sin_secretos.test.ts` (T039). |
 
 ## Complexity Tracking
 

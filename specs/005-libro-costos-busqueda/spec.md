@@ -15,7 +15,7 @@
 - **`lote_id` = `busquedas.id`:** formaliza el "lote de la corrida" del 002 y el 003.
 - **`contar()` en el puerto `FuenteDescubrimiento`:** sirve para la vista previa con costo estimado.
 - **Tope de gasto por búsqueda,** a valor de lista.
-- **Auth mínima:** usuarios, sesión y tenant sacado del token. Llega con el primer endpoint que gasta créditos, como prometió el 002.
+- **Auth mínima con Supabase Auth:** el front inicia sesión con Supabase, la API verifica el access token, y el tenant sale de la tabla `usuarios` por el `sub`. Llega con el primer endpoint que gasta créditos, como prometió el 002.
 - **Endpoints HTTP** de vista previa, ejecución, tablero y cola de revisión de dedup.
 - **Front:** login, formulario "Nueva búsqueda" y tablero por fuente.
 - **Pantalla de la cola de revisión de dedup,** que prometió el 003. Es la última tarea y se puede recortar.
@@ -44,7 +44,7 @@
 Ninguno: este slice no usa IA. La medición es el test de fórmulas, con números calculados a mano (abajo). El slice separa el costo de evals del 004 para que no ensucie el CPL: `fuente='evals'` va a `v_costo_evals` y a ninguna otra vista.
 
 ## Flujo principal
-1. **Login:** `POST /auth/sesion {email, clave}` devuelve un JWT con `sub`, `tenant_id` y `exp` (8 h), y, en el body junto al token (no como claim), `idioma_usuario` (la elección guardada, o `null`) e `idioma_tenant`. El front guarda los tres en `sessionStorage` y lo manda como `Authorization: Bearer`.
+1. **Login (Supabase Auth):** el front inicia sesión con `supabase-js` (email + contraseña; P15 pendiente) y manda el access token como `Authorization: Bearer`. `GET /usuarios/me` devuelve `idioma_usuario` (la elección guardada, o `null`) e `idioma_tenant`; el front los usa para `elegirIdioma`. No hay `POST /auth/sesion` ni clave propia.
 2. **Formulario "Nueva búsqueda" (puerta C):**
    - filtros: país · actividad (CIIU) · departamento o ciudad · tamaño (`ingresos_min`) · palabras clave · exclusiones;
    - formulario común: canal preferido · tope de gasto (USD) · mensaje base.
@@ -131,10 +131,10 @@ Costo por canal: email 0.05, whatsapp 0.30. Costo de evals: 1.00.
 - `test_privilegios_supabase.py::test_anon_y_authenticated_sin_privilegios`: la lista suma `pg_views WHERE schemaname='public'`, y el assert previo exige que esté `v_tablero_fuentes`. `usuarios` entra sola por `pg_tables`.
 - `backend/tests/integration/test_usuarios_repo.py`:
   - `::test_app_rt_no_lee_usuarios_directo`: un `SELECT`, INSERT, UPDATE o DELETE de `app_rt` sobre `usuarios` falla por privilegios;
-  - `::test_usuario_para_login_devuelve_solo_ese_email`: con usuarios de 2 tenants, `usuario_para_login(hmac_email('a@x.co'))` devuelve 1 fila (`id`, `tenant_id`, `hash_clave`), y un HMAC inexistente devuelve 0;
-  - `backend/tests/unit/acceso/test_email_hmac.py::test_hmac_normaliza_y_depende_de_la_clave` reemplaza al test de minúsculas en la base: `hmac_email(" A@X.co ", k) == hmac_email("a@x.co", k)` (32 bytes, HMAC-SHA256) y es distinto con otra clave;
-  - `::test_fijar_idioma_no_cruza_tenants`: control positivo: con `app.tenant_id` de A, `fijar_idioma(<id de A>, 'en')` modifica 1 fila. Después, con `app.tenant_id` de B, `fijar_idioma(<id de A>, 'en')` modifica 0 filas y el `idioma` de A no cambia;
-  - `::test_funcion_es_security_definer_con_search_path[usuario_para_login|fijar_idioma]`: en `pg_proc`, `prosecdef = true`, `proconfig` contiene `search_path=` y `has_function_privilege` da `app_rt` sí y `anon`/`authenticated` no. Para que no nazca verde por la razón equivocada, `supabase_simulado.sql` (002) suma `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, authenticated`, que es lo que hace Supabase real. Sin el `REVOKE` de la 0004, el test falla.
+  - `::test_tenant_de_usuario_devuelve_solo_ese_usuario`: con usuarios de 2 tenants, `tenant_de_usuario(<auth_user_id de A>)` devuelve 1 fila (`tenant_id` de A, `idioma_usuario`, `idioma_tenant`), y un uuid inexistente devuelve 0;
+  - `backend/tests/unit/acceso/test_verificar_token.py::test_token_valido_devuelve_sub` y `::test_token_invalido_lanza[caso]` (sin red: par EC P-256 generado en el test y JWKS local). Casos inválidos: vencido, sin `exp`, sin `sub`, `aud` distinto, `iss` distinto, firmado con otra clave, `alg=none`, HS256 firmado con la clave pública como secreto (confusión de algoritmo) y `kid` ausente del JWKS;
+  - `::test_fijar_idioma_no_cruza_tenants` (Pulido): control positivo: con `app.tenant_id` de A, `fijar_idioma(<auth_user_id de A>, 'en')` modifica 1 fila. Después, con `app.tenant_id` de B, `fijar_idioma(<auth_user_id de A>, 'en')` modifica 0 filas y el `idioma` de A no cambia;
+  - `::test_funcion_es_security_definer_con_search_path[tenant_de_usuario|fijar_idioma]`: en `pg_proc`, `prosecdef = true`, `proconfig` contiene `search_path=` y `has_function_privilege` da `app_rt` sí y `anon`/`authenticated` no. Para que no nazca verde por la razón equivocada, `supabase_simulado.sql` (002) suma `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, authenticated`, que es lo que hace Supabase real. Sin el `REVOKE` de la 0004, el test falla.
 
 **Libro y lote** (`backend/tests/integration/test_costos_repo.py`)
 - `::test_gasto_busqueda_suma_lista_del_lote`: con filas `gratis` true y false en el lote, y filas de otro lote, `gasto_busqueda` da la Σ a valor de lista solo de su lote.
@@ -181,17 +181,17 @@ Costo por canal: email 0.05, whatsapp 0.30. Costo de evals: 1.00.
 - El advisor revisa estos tests antes de aceptarlos: son de juicio sobre costos.
 
 **API y auth** (`backend/tests/integration/test_api_busquedas.py` y `test_auth.py`, `TestClient` contra Postgres de prueba, transportes falsos)
-- `test_auth.py`:
-  - `::test_sesion_con_clave_correcta_devuelve_token`;
-  - `::test_clave_incorrecta_y_email_inexistente_dan_el_mismo_401`: mismo cuerpo de respuesta, y se calcula scrypt también para el email inexistente;
-  - `::test_sin_token_da_401[ruta]`: parametrizado sobre `app.routes`, menos `/health` y `/auth/sesion`. Una ruta nueva entra sola;
-  - `::test_token_invalido_da_401[caso]`: token vencido, firmado con otra clave, `alg=none`, sin `exp`, sin `tenant_id`;
-  - `::test_app_no_arranca_sin_session_secret` (también con uno de menos de 32 bytes);
+- `test_auth.py` (el token lo firma una clave de prueba; el verificador recibe un JWKS local):
+  - `::test_token_valido_resuelve_el_tenant_desde_usuarios`: un token con un claim `tenant_id` (o `user_metadata.tenant_id`) de B y un `sub` de un usuario de A actúa como A. El tenant sale de la base, no del token;
+  - `::test_token_valido_sin_fila_en_usuarios_da_403`: cuerpo `sin_acceso`, y revocar (borrar la fila) corta el acceso con el mismo token;
+  - `::test_sin_token_da_401[ruta]`: parametrizado sobre `app.routes`, menos `/health`. Una ruta nueva entra sola;
+  - `::test_token_invalido_da_401[caso]`: los mismos casos del verificador, ahora por la API;
+  - `::test_app_no_arranca_sin_auth_jwks_url_ni_issuer`, y `::test_jwks_inaccesible_da_503`;
   - `::test_docs_desactivadas`: `/docs`, `/redoc` y `/openapi.json` dan 404;
   - `::test_cors_solo_permite_web_origin`: un preflight desde `WEB_ORIGIN` recibe `Access-Control-Allow-Origin` con ese valor, y uno desde `https://otro.example` no recibe el header;
-  - `::test_clave_no_aparece_en_logs` (`caplog` durante un login fallido y uno exitoso);
-  - `::test_sesion_devuelve_idioma[caso]`: con `usuarios.idioma='en'` y tenant `es`, devuelve `idioma_usuario='en'` e `idioma_tenant='es'`; con `usuarios.idioma` NULL, `idioma_usuario` es `null`;
-  - `::test_fijar_idioma_persiste`: `PATCH /usuarios/me {idioma: 'en'}` da 204, y el login siguiente devuelve `idioma_usuario='en'`;
+  - `::test_token_no_aparece_en_logs` (`caplog` durante un 401 y un 200);
+  - `::test_usuarios_me_devuelve_idioma[caso]`: `GET /usuarios/me` con `usuarios.idioma='en'` y tenant `es` devuelve `idioma_usuario='en'` e `idioma_tenant='es'`; con `usuarios.idioma` NULL, `idioma_usuario` es `null`;
+  - `::test_fijar_idioma_persiste` (Pulido): `PATCH /usuarios/me {idioma: 'en'}` da 204, y el `GET /usuarios/me` siguiente devuelve `idioma_usuario='en'`;
   - `::test_fijar_idioma_invalido_da_422[caso]`: `idioma` `'pt'` o `''`, y un body con `usuario_id` o `tenant_id` (`extra='forbid'`). El usuario sale del `sub` del token, nunca del body. El 401 sin token lo cubre `test_sin_token_da_401[ruta]`, que levanta la ruta nueva sola.
 - `test_api_busquedas.py`:
   - `::test_tenant_sale_del_token_no_del_body`: un body con `tenant_id` da 422 (`extra='forbid'`), y la búsqueda creada sin ese campo tiene el tenant del token;
@@ -269,7 +269,7 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
   - `::muestra_revisiones_pendientes`.
 - `frontend/src/api/cliente.test.ts::un_401_lleva_al_login_y_borra_el_token`.
 
-**E2E** (`frontend/e2e/busqueda.spec.ts::login_vista_previa_buscar_tablero`): login con el usuario sembrado → formulario CO + CIIU 1081 + Bogotá → la vista previa muestra los conteos del stub (cs 3, osm 2) → Buscar → el tablero muestra 5 únicos y un CPL de cs que no es "sin dato". Corre en CI **local**, con api y web levantados en el runner, Postgres de servicio y un stub HTTP (`backend/tests/stubs/servidor_fuentes.py`) apuntado por `CROMA_BASE_URL` y `OVERPASS_URL`. Nunca corre contra Railway: gastaría créditos reales. El E2E del 001 contra Railway (health) sigue como está.
+**E2E** (`frontend/e2e/busqueda.spec.ts::login_vista_previa_buscar_tablero`): login con Supabase Auth contra un stub local (`/auth/v1/token` y un JWKS firmado con una clave de prueba, en `servidor_fuentes.py`; nunca el proyecto real) con el usuario sembrado → formulario CO + CIIU 1081 + Bogotá → la vista previa muestra los conteos del stub (cs 3, osm 2) → Buscar → el tablero muestra 5 únicos y un CPL de cs que no es "sin dato". Corre en CI **local**, con api y web levantados en el runner, Postgres de servicio y un stub HTTP (`backend/tests/stubs/servidor_fuentes.py`) apuntado por `CROMA_BASE_URL` y `OVERPASS_URL`. Nunca corre contra Railway: gastaría créditos reales. El E2E del 001 contra Railway (health) sigue como está.
 
 ## Fuera del alcance
 - **006:**
@@ -284,8 +284,8 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
 - **010:** puertas A y B. Prellenan este formulario y no lo reemplazan.
 - **012:**
   - pantalla de cumplimiento;
-  - rate limit del login y bloqueo por intentos;
-  - rotación de `SESSION_SECRET`.
+  - rate limit del login y bloqueo por intentos: los da Supabase Auth, ya no se construyen;
+  - rotación de las claves de firma: es de Supabase (JWKS).
 - Paginación: más de la página 1 de Croma y más de 500 elementos de Overpass.
 - Alta de usuarios por UI (va por script), roles y más de un usuario por tenant con permisos distintos.
 - Monedas que no sean USD.
@@ -300,9 +300,10 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
   - `aplicacion/vista_previa.py`, `aplicacion/ejecutar_busqueda.py` (con el tope) y `aplicacion/resolver_revision.py` (reusa la función `fusionar` del dominio del 003).
 - **`app/modulos/tablero/infraestructura/persistencia/repositorio_tablero.py`:** solo lee vistas. Es un módulo sin dominio a propósito, porque la lógica vive en SQL (PRD §7).
 - **`app/modulos/acceso/`:**
-  - `dominio/claves.py`: scrypt y verificación;
-  - `infraestructura/persistencia/repositorio_usuarios.py`.
-- **`app/api/`:** los routers (adaptadores de entrada) y `sesion.py` (JWT + dependencia `tenant_actual`).
+  - `dominio/`: el puerto `VerificadorToken` y `TokenInvalido`;
+  - `infraestructura/verificador_jwks.py`: el adaptador con PyJWT y JWKS;
+  - `infraestructura/persistencia/repositorio_usuarios.py`: llama a `tenant_de_usuario`.
+- **`app/api/`:** los routers (adaptadores de entrada) y `sesion.py` (Bearer → `VerificadorToken` → `tenant_de_usuario(sub)` → dependencia `tenant_actual`).
 - **`EXCLUIDOS`** de los tests de arquitectura suma `repositorio_tablero.py` y `repositorio_usuarios.py`, con la misma razón del 002: base propia, sin HTTP.
 
 **Lote = búsqueda:**
@@ -362,24 +363,21 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
 - No hay substring a propósito: `"pan"` no debe traer `"panaderia"` ni `"empanadas"`.
 - `# ponytail:` solo mira el nombre. Si hace falta mirar la actividad o la web, se agrega cuando haya un caso real.
 
-**Auth:**
-- **`usuarios`** (`id`, `email_hmac bytea` UNIQUE, `hash_clave`, `tenant_id` FK, `idioma` NULL con `CHECK IN ('es','en')`, `creado_en`) tiene **RLS por `tenant_id`**, como toda tabla con datos de un tenant (constitución III).
-  - **El email no se guarda** (constitución VI, minimización): `email_hmac` = HMAC-SHA256 con `EMAIL_HMAC_CLAVE` (entorno, ≥ 32 bytes, por `Settings`) sobre `lower(strip(email))`. Lo calcula `acceso/dominio/email.py::hmac_email`, que comparten la API y `crear_usuario.py`. Lo decidió el dueño (plan P13).
-  - `app_rt` no tiene ningún privilegio sobre la tabla.
-  - El login, que ocurre antes de conocer el tenant, entra por la función `usuario_para_login(p_email_hmac bytea)`:
-    - `SECURITY DEFINER`, con dueño `postgres`;
-    - `SET search_path = public, pg_temp`;
-    - compara `email_hmac = p_email_hmac` y devuelve `id`, `tenant_id`, `hash_clave`, `usuarios.idioma` y `tenants.idioma` (por separado: el front necesita saber si hubo elección) de **ese** usuario y nada más (`crear_usuario.py` guarda el mismo HMAC, y acepta `--idioma es|en` opcional);
-    - `REVOKE EXECUTE … FROM PUBLIC, anon, authenticated` (Postgres da `EXECUTE` a `PUBLIC` por defecto y Supabase a `anon`/`authenticated`; la 0004 trae su propio `DO` con el mismo guard de `pg_roles` del 002, para no fallar en vanilla; no toca la 0002, que ya está aplicada) y `GRANT EXECUTE` solo a `app_rt`.
-  - Así un `SELECT` de `app_rt` no puede volcar los hashes de todos los tenants.
-  - La elección del selector entra por `fijar_idioma(p_usuario uuid, p_idioma text)`, con el mismo patrón (`SECURITY DEFINER`, `search_path`, `REVOKE`/`GRANT` solo a `app_rt`). Hace `UPDATE usuarios SET idioma = p_idioma WHERE id = p_usuario AND tenant_id = current_setting('app.tenant_id')::uuid`. El filtro por tenant va escrito porque el dueño `postgres` no pasa por RLS. Así `app_rt` sigue sin ningún privilegio sobre la tabla. `PATCH /usuarios/me` la llama con el `sub` del token.
-  - Se siembra con `postgres` desde `backend/scripts/crear_usuario.py`, que corre un humano desde local, igual que `sembrar_tenant.py` de la 002: lee la URL de `postgres` y la clave del usuario por `getpass` (nunca por argv, para que no queden en el historial), nunca por `DATABASE_URL` ni por una variable en Railway.
-- **Clave:** `hashlib.scrypt` (n=2¹⁷, r=8, p=1, sal de 16 bytes, `maxmem=2²⁸`, porque con n=2¹⁷ el default de `maxmem` no alcanza) y `hmac.compare_digest`. El n es el mínimo de OWASP. Son ~128 MiB por login, y `security` lo confirma contra la memoria del servicio en Railway. Ante un email inexistente se calcula igual un scrypt de relleno, para no filtrar qué emails existen por timing.
-- **JWT:** HS256 con **PyJWT** (dependencia nueva), `algorithms=["HS256"]` explícito (rechaza `alg=none`) y `options={"require": ["exp", "sub", "tenant_id"]}`, porque PyJWT no exige `exp` si el token no lo trae. Razón: firmar y verificar a mano es justo donde se cuelan los bugs de verificación.
-- **`/docs`, `/redoc` y `/openapi.json` desactivados** (`docs_url=None`, etc.): describen la API pública y no los necesita nadie en el evento. Así el test de 401 sobre `app.routes` no tiene excepciones escondidas.
-  - `SESSION_SECRET` (≥ 32 bytes) viene del entorno, y la app no arranca sin él. Va en Railway y en los secrets de CI; nunca en el repo ni en el front.
-- **El tenant sale solo del token.** Los modelos de entrada son `extra='forbid'`, así que un `tenant_id` en el body es 422. La dependencia `tenant_actual` abre la unidad de trabajo con `SET LOCAL app.tenant_id` (002).
-- **Token en `sessionStorage`:** sin cookies no hay CSRF. El riesgo es XSS. React escapa, el front no usa `dangerouslySetInnerHTML`, y `mensaje_base` se guarda y se muestra como texto plano. La CSP la revisa la 012.
+**Auth (Supabase Auth, decisión del dueño 2026-10-18; detalle y alternativas en plan.md, "Auth con Supabase Auth"):**
+- **Login:** lo hace Supabase Auth desde el front (`supabase-js`, email + contraseña; P15 pendiente). La API no ve ni guarda emails ni claves.
+- **`usuarios`** (`auth_user_id uuid PRIMARY KEY` = `sub` del token, `tenant_id` FK, `idioma` NULL con `CHECK IN ('es','en')`, `creado_en`) tiene **RLS por `tenant_id`** (constitución III). **Sin FK a `auth.users`** (P16): en CI no existe el esquema `auth`. `app_rt` no tiene ningún privilegio sobre la tabla.
+- **Verificación del token:** `PyJWT` con `PyJWKClient(AUTH_JWKS_URL)`, `algorithms=["ES256","RS256"]` (nunca HS256), `audience="authenticated"`, `issuer=AUTH_ISSUER` y `require: exp, sub, aud, iss`. La api no tiene secreto de firma ni `service_role` (P17). JWKS inaccesible: 503.
+- **El tenant sale de la tabla, no del token.** Después de verificar, la API llama a `tenant_de_usuario(p_auth_user_id uuid)`:
+  - `SECURITY DEFINER`, dueño `postgres`, `SET search_path = public, pg_temp`;
+  - devuelve `tenant_id`, `usuarios.idioma` y `tenants.idioma` de **ese** usuario y nada más; 0 filas → 403 `sin_acceso`;
+  - `REVOKE EXECUTE … FROM PUBLIC, anon, authenticated` y `GRANT EXECUTE` solo a `app_rt` (la 0004 trae su `DO` con el guard de `pg_roles` del 002; no toca la 0002);
+  - así un `SELECT` de `app_rt` no puede volcar `usuarios` de otros tenants.
+- **Revocar** es borrar la fila de `usuarios`.
+- `fijar_idioma(p_auth_user_id uuid, p_idioma text)` (Pulido), mismo patrón, `UPDATE … WHERE auth_user_id = p_auth_user_id AND tenant_id = current_setting('app.tenant_id')::uuid`. `PATCH /usuarios/me` la llama con el `sub`.
+- **Alta (paso humano):** el dueño crea el usuario en el panel de Supabase y `backend/scripts/crear_usuario.py --auth-user-id UUID --tenant UUID [--idioma es|en]` (URL de `postgres` por `getpass`) inserta la fila.
+- **`/docs`, `/redoc` y `/openapi.json` desactivados** (`docs_url=None`, etc.). Así el test de 401 sobre `app.routes` no tiene excepciones escondidas.
+- **Los modelos de entrada son `extra='forbid'`:** un `tenant_id` en el body es 422. La dependencia `tenant_actual` abre la unidad de trabajo con `SET LOCAL app.tenant_id` (002).
+- **Sesión en el navegador:** la guarda `supabase-js` (almacenamiento del navegador). Sin cookies no hay CSRF. El riesgo es XSS: React escapa, no hay `dangerouslySetInnerHTML`, y `mensaje_base` se guarda y se muestra como texto plano. La CSP la revisa la 012.
 - **CORS:** `allow_origins=[WEB_ORIGIN]`, sin `allow_credentials`.
 
 **Cola de revisión (fusionar):**
@@ -398,15 +396,15 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
   - un `opt_out_at` en el `cumplimiento` de cualquier lead absorbido bloquea al superviviente. El opt-out se busca por la cadena `fusionado_en`, no solo por el `lead_id` del superviviente.
 - Mientras una revisión está pendiente, los dos leads cuentan como únicos. El tablero muestra cuántas hay, porque inflan los únicos.
 
-**Migración `supabase/migrations/0004_libro_costos_busqueda.sql`** (a mano, con `GRANT SELECT` de las vistas a `app_rt`):
+**Migración `supabase/migrations/0006_libro_costos_busqueda.sql`** (a mano, con `GRANT SELECT` de las vistas a `app_rt`):
 
 | Objeto | Cambio |
 |---|---|
 | `busquedas` | `+ costo_estimado_usd numeric`, `+ costo_maximo_usd numeric`, `+ ejecutada_en`, `CHECK` de `estado` |
 | `leads` | `+ fusionado_en uuid NULL`, `FOREIGN KEY (tenant_id, fusionado_en) REFERENCES leads (tenant_id, id)` (se apoya en `leads_tenant_id_id_key` de la 002; una FK simple no pasa por RLS: `test_rls.py::test_tenant_b_no_fusiona_con_lead_de_a`) |
 | `revision_dedup` | `+ motivo text NULL` |
-| `usuarios` | nueva, con RLS e `idioma` (arriba) |
-| `usuario_para_login(text)` | función `SECURITY DEFINER` (arriba), devuelve también los dos idiomas |
+| `usuarios` | nueva (`auth_user_id` PK sin FK, `tenant_id`, `idioma`), con RLS (arriba) |
+| `tenant_de_usuario(uuid)` | función `SECURITY DEFINER` (arriba), devuelve también los dos idiomas |
 | `fijar_idioma(uuid, text)` | función `SECURITY DEFINER` (arriba) |
 | `costos` | índice `(tenant_id, lote_id)` |
 | `lead_fuentes` | índice `(busqueda_id, fuente)` |
@@ -463,9 +461,9 @@ Los `ALTER DEFAULT PRIVILEGES … ON TABLES` del 002 ya cubren las vistas nuevas
 **Idiomas** (es y en desde el primer componente):
 - **`react-i18next`** + `i18next` (dependencias nuevas). `src/i18n/index.ts` inicializa con `resources` de `src/i18n/es.json` y `en.json`, importados estáticamente: sin backend HTTP ni carga perezosa, son dos archivos chicos. `fallbackLng: 'es'`.
 - **Idioma de la UI:** el primero que exista de:
-  1. `usuarios.idioma`, la elección explícita (`idioma_usuario` del login);
+  1. `usuarios.idioma`, la elección explícita (`idioma_usuario` de `GET /usuarios/me`);
   2. `navigator.languages` cortado al código base (`en-US` → `en`), el primero que esté en `{es, en}`;
-  3. `tenants.idioma` (`idioma_tenant` del login);
+  3. `tenants.idioma` (`idioma_tenant` de `GET /usuarios/me`);
   4. `es`.
 
   En la pantalla de login todavía no hay usuario ni tenant: valen 2 y 4. La elige `elegirIdioma(languages, idiomaUsuario, idiomaTenant)` en `src/i18n/elegirIdioma.ts`, pura.
@@ -477,7 +475,8 @@ Los `ALTER DEFAULT PRIVILEGES … ON TABLES` del 002 ya cubren las vistas nuevas
 - **El idioma del mensaje al lead no sale de acá:** lo fija `leads.idioma_contacto` por país (002) y lo usa el 007.
 
 **Variables de entorno nuevas:**
-- `SESSION_SECRET` y `WEB_ORIGIN` (api);
+- `AUTH_JWKS_URL`, `AUTH_ISSUER` y `WEB_ORIGIN` (api);
+- `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` (web; la publishable key es pública por diseño, y necesita la enmienda de constitución:30);
 - `CROMA_BASE_URL` (override de la base de Croma, igual que `OVERPASS_URL`; los dos solo se usan en CI y en el E2E).
 
 ## Plan de tareas (TDD, en orden)
@@ -488,7 +487,7 @@ Los `ALTER DEFAULT PRIVILEGES … ON TABLES` del 002 ya cubren las vistas nuevas
 3. **`contar()`:** contrato rojo → Croma (con el test de una sola request) → Overpass.
 4. **Selección y post-filtro:** 4a tamaño como refinamiento; 4b palabras clave y exclusiones.
 5. **`VistaPrevia` + `EjecutarBusqueda` con tope** (unit). El **advisor revisa los tests de tope y de estimado.**
-6. **Auth:** `usuarios`, scrypt, JWT, `tenant_actual` y `PATCH /usuarios/me` con `fijar_idioma`. El **`security` revisa los tests de auth antes de aceptarlos.**
+6. **Auth (Supabase Auth):** `usuarios`, `tenant_de_usuario`, verificador JWKS, `tenant_actual`, `GET /usuarios/me` y `PATCH /usuarios/me` con `fijar_idioma`. El **`security` revisa los tests de auth antes de aceptarlos.**
 7. **Endpoints + validación:** `test_api_busquedas.py`.
 8. **Front:**
    - Primero `limites.test.ts` en rojo: sin la config de boundaries, los tres negativos no dan error y `import_sin_resolver_es_error` tampoco. El control positivo y `el_repo_no_tiene_violaciones` nacerían verdes: se aceptan solo porque el canario crea los destinos y el escaneo exige los `results` conocidos (sin `App.tsx` todavía, el escaneo está en rojo). Después `eslint.config.js` → verde (≈ 25 min).
@@ -515,6 +514,6 @@ Los `ALTER DEFAULT PRIVILEGES … ON TABLES` del 002 ya cubren las vistas nuevas
 - **El CPL histórico cambia al fusionar.** Es el número correcto, porque refleja los leads reales, y queda probado en `test_lead_fusionado_no_cuenta`.
 - **Una revisión pendiente infla los únicos.** Se muestra el conteo de pendientes al lado.
 - **Request síncrona larga:** Overpass (timeout de cliente 30 s + reintento) + Croma (10 s + reintento) pueden pasar los 30 s. Se mide en el paso 11 y hay salida prevista (background con polling).
-- **Token en `sessionStorage` y XSS:** mitigado por React y por no renderizar HTML de datos. Lo cierra la CSP de la 012.
+- **Token en el navegador y XSS:** `supabase-js` guarda la sesión en el almacenamiento del navegador. Mitigado por React y por no renderizar HTML de datos. Lo cierra la CSP de la 012.
 - **El slice no entra completo en ≤ 5 h.** El mínimo para la demo está declarado, y cada recorte dice a qué slice va.
-- **Memoria de scrypt (~128 MiB por login):** con logins concurrentes en un servicio chico de Railway puede haber OOM. `security` confirma el n, y el rate limit de la 012 lo acota.
+- **Dependencia de Supabase Auth y de su JWKS:** si Supabase cae, nadie entra; el JWKS se cachea. La api falla cerrado. El proyecto tiene que tener claves asimétricas (P17).
