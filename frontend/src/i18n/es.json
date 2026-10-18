@@ -107,6 +107,32 @@
     "palabras_clave": "Palabras clave",
     "exclusiones": "Exclusiones"
   },
+  "costos": {
+    "titulo": "Libro de costos",
+    "error": "No se pudo cargar el libro de costos. Probá de nuevo.",
+    "filtrado": "Filtrado por búsqueda.",
+    "ver_todo": "Ver todo el libro",
+    "total": "Total (lista)",
+    "total_real": "Total (real)",
+    "por_tipo": "Por tipo",
+    "por_fuente": "Por fuente",
+    "vacio": "Todavía no hay costos registrados.",
+    "operaciones": "{{total}} operaciones",
+    "tabla": "Operaciones",
+    "si": "Sí",
+    "no": "No",
+    "anterior": "Anterior",
+    "siguiente": "Siguiente",
+    "pagina_de": "Página {{pagina}} de {{paginas}}",
+    "ver_costos": "Ver costos",
+    "col": {"ts": "Fecha", "tipo": "Tipo", "fuente": "Fuente", "proveedor": "Proveedor", "cantidad": "Cantidad", "costo": "Costo (USD)", "gratis": "Gratis", "lead": "De un lead"},
+    "tipos": {
+      "socrata_descarga": "Descarga Socrata", "overpass_query": "Consulta Overpass", "web_fetch": "Consulta de web",
+      "llm_tokens_in": "Tokens LLM (entrada)", "llm_tokens_out": "Tokens LLM (salida)", "jev_tokens": "Tokens Jev",
+      "croma_consulta": "Consulta Croma", "email_envio": "Envío de email", "whatsapp_plantilla": "Plantilla WhatsApp",
+      "dapta_llamada": "Llamada Dapta", "minutos_humanos": "Minutos humanos"
+    }
+  },
   "tablero": {
     "titulo": "Tablero por fuente",
     "fuente": "Fuente",
@@ -127,6 +153,7 @@
     "desperdicio_real": "Desperdicio (real)",
     "error": "No se pudo cargar el tablero. Probá de nuevo.",
     "ver_busquedas": "Ver búsquedas",
+    "ver_costos": "Ver costos",
     "licencia": "Licencia",
     "calificados": "Calificados",
     "pct_calificados": "% calificados (de únicos)",

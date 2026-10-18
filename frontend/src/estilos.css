@@ -796,3 +796,28 @@ table.tabla-leads {
   max-width: 100%;
   min-width: 0;
 }
+
+/* Libro de costos: subtotales lado a lado desde 48rem; la tabla scrollea dentro de su contenedor (.tabla-scroll). */
+.subtotales {
+  display: grid;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.subtotales .lista li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--color-borde);
+  padding: 4px 0;
+}
+
+table.tabla-costos {
+  min-width: 48rem;
+}
+
+@media (min-width: 48rem) {
+  .subtotales {
+    grid-template-columns: 1fr 1fr;
+  }
+}

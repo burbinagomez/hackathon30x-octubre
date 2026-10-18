@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app import db
-from app.api import (actividades, baja, busquedas, calificaciones, enriquecimiento, geografia, intake, intake_lookalike, leads,
+from app.api import (actividades, baja, busquedas, calificaciones, costos, enriquecimiento, geografia, intake, intake_lookalike, leads,
                      tablero, usuarios)
 from app.api.sesion import tenant_actual
 from app.composicion import CONFIG, calificador_api, cargar_geografia, cargar_tarifas, cargar_tarifas_llm, registro_api
@@ -85,7 +85,7 @@ def health(request: Request):
 
 # La dependencia va en el include: una ruta nueva no puede quedar sin auth por olvido.
 for _router in (busquedas.router, enriquecimiento.router, leads.router, tablero.router, actividades.router, geografia.router, usuarios.router,
-                calificaciones.router, intake.router, intake_lookalike.router):
+                calificaciones.router, costos.router, intake.router, intake_lookalike.router):
     app.include_router(_router, dependencies=[Depends(tenant_actual)])
 
 # Pública a propósito: el enlace de baja llega por mail, sin sesión. Está en RUTAS_PUBLICAS y su test la fija.
