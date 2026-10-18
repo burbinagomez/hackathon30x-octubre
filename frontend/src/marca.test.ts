@@ -40,6 +40,15 @@ describe("tokens.css", () => {
   });
 });
 
+// Compara el hostname parseado: un `includes` sobre la URL aceptaría cualquier host que lo contenga.
+const host = (href: string | null) => {
+  try {
+    return new URL(href ?? "").hostname;
+  } catch {
+    return "";
+  }
+};
+
 describe("index.html", () => {
   test("tiene el meta viewport", () => {
     const meta = leerHtml().querySelector('meta[name="viewport"]');
@@ -51,12 +60,12 @@ describe("index.html", () => {
     const preconnect = Array.from(doc.querySelectorAll('link[rel="preconnect"]'), (l) =>
       l.getAttribute("href"),
     );
-    expect(preconnect.some((h) => h?.includes("fonts.googleapis.com"))).toBe(true);
-    expect(preconnect.some((h) => h?.includes("fonts.gstatic.com"))).toBe(true);
+    expect(preconnect.some((h) => host(h) === "fonts.googleapis.com")).toBe(true);
+    expect(preconnect.some((h) => host(h) === "fonts.gstatic.com")).toBe(true);
 
     const hojas = Array.from(doc.querySelectorAll('link[rel="stylesheet"]'), (l) =>
       l.getAttribute("href") ?? "",
-    ).filter((h) => h.includes("fonts.googleapis.com"));
+    ).filter((h) => host(h) === "fonts.googleapis.com");
     expect(hojas.some((h) => h.includes("family=Poppins"))).toBe(true);
     expect(hojas.some((h) => h.includes("family=DM+Sans"))).toBe(true);
     expect(hojas.every((h) => h.includes("display=swap"))).toBe(true);
