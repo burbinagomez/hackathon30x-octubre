@@ -22,7 +22,8 @@ def unidad_de_trabajo(engine: Engine, tenant_id: UUID) -> Iterator[Connection]:
 
 def crear_engine(url):
     # Supavisor en modo transacción no soporta prepared statements; None = psycopg no prepara nunca (R10).
-    engine = create_engine(url, connect_args={"prepare_threshold": None})
+    # hide_parameters: el "[parameters: …]" de SQLAlchemy lleva nombre y dirección de los leads (principio VI).
+    engine = create_engine(url, connect_args={"prepare_threshold": None}, hide_parameters=True)
     event.listen(engine, "first_connect", _verificar_rol)
     return engine
 

@@ -60,11 +60,12 @@ class _ContadorDeCreditos:
 
 def _persistencia_postgres(settings: Settings, tenant: UUID) -> Persistencia:
     from app import db
+    from app.seguridad.cifrado import Cifrador
     from app.modulos.costos.infraestructura.postgres_costos import PostgresCostos
     from app.modulos.descubrimiento.infraestructura.persistencia.repositorio_leads import RepositorioLeadsPostgres
 
     engine = db.crear_engine(settings.database_url)
-    return Persistencia(RepositorioLeadsPostgres(engine, tenant), PostgresCostos(engine, tenant))
+    return Persistencia(RepositorioLeadsPostgres(engine, tenant, Cifrador(settings.cifrado_key.get_secret_value())), PostgresCostos(engine, tenant))
 
 
 def _parser() -> argparse.ArgumentParser:
