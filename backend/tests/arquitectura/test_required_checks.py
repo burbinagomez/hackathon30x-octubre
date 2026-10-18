@@ -17,6 +17,7 @@ GITHUB = Path(__file__).resolve().parents[3] / ".github"
 WORKFLOWS = GITHUB / "workflows"
 REQUIRED = GITHUB / "required-checks.txt"
 VEREDICTO = GITHUB / "scripts" / "veredicto_security.sh"
+REVISION = GITHUB / "scripts" / "revision_seguridad.sh"
 # Corre solo en push a main (deploy de migraciones): en un PR nunca reporta, y como required trabaría main.
 EXCLUIDOS = {("ci.yml", "migrar")}
 # CodeQL corre por el default setup del repo, no por un workflow propio (GitHub rechaza el SARIF de los dos).
@@ -269,8 +270,66 @@ def test_reglas_de_revision_seguridad(job, esperado):
 def _revision_seguridad():
     job = _workflow("ci.yml")["jobs"].get("revision-seguridad")
     assert job, "ci.yml no tiene el job revision-seguridad"
-    problemas = _problemas_revision(job)
+    # El step corre el script: las reglas se aplican a su texto, en la posición del step.
+    steps = [{**s, "run": REVISION.read_text()} if s.get("run", "").strip() == ".github/scripts/revision_seguridad.sh"
+             else s for s in job["steps"]]
+    problemas = _problemas_revision({**job, "steps": steps})
     assert not problemas, f"revision-seguridad: {problemas}"
+
+
+# `claude` y `git` falsos: el step corre de verdad, sin red ni key real.
+CLAUDE_FALSO = """#!/usr/bin/env bash
+touch "$LLAMADAS/claude"
+[ -n "$CLAUDE_FALLA" ] && exit 1
+printf '{"result": "%s", "total_cost_usd": 0.01}' "$RESPUESTA"
+"""
+KEY_FALSA = "clave-de-prueba-012"
+OMITIDA = "falta el secret ANTHROPIC_API_KEY, revisión omitida"
+CASOS_STEP_REVISION = {
+    # Pendiente humano (spec 012, Fuera del alcance): con el secret cargado, sin key vuelve a fallar.
+    "sin-key-se-omite": ("", {}, 0),
+    "con-key-pasa": (KEY_FALSA, {}, 0),
+    "con-key-bloquea": (KEY_FALSA, {"RESPUESTA": "Veredicto: BLOQUEA"}, 1),
+    "con-key-claude-falla": (KEY_FALSA, {"CLAUDE_FALLA": "1"}, 1),
+    "con-key-fuga-del-secret": (KEY_FALSA, {"RESPUESTA": f"Veredicto: PASA {KEY_FALSA}"}, 1),
+}
+
+
+@pytest.mark.parametrize("key, extra, esperado", CASOS_STEP_REVISION.values(), ids=CASOS_STEP_REVISION.keys())
+def test_step_revision_seguridad(key, extra, esperado, tmp_path):
+    paso = next(s for s in _workflow("ci.yml")["jobs"]["revision-seguridad"]["steps"]
+                if s.get("name") == "revisión del agente security")
+    bin_ = tmp_path / "bin"
+    bin_.mkdir()
+    for nombre, cuerpo in (("claude", CLAUDE_FALSO), ("git", "#!/usr/bin/env bash\nexit 0\n")):
+        (bin_ / nombre).write_text(cuerpo)
+        (bin_ / nombre).chmod(0o755)
+    repo = tmp_path / "repo"
+    (repo / ".claude" / "agents").mkdir(parents=True)
+    (repo / ".claude" / "agents" / "security.md").write_text("---\nname: security\n---\nRevisá.\n")
+    (repo / ".github").mkdir()
+    (repo / ".github" / "scripts").symlink_to(GITHUB / "scripts")
+    resumen = tmp_path / "summary"
+    env = {**os.environ, "PATH": f"{bin_}{os.pathsep}{os.environ['PATH']}", "ANTHROPIC_API_KEY": key,
+           "BASE": "a", "HEAD": "b", "GITHUB_STEP_SUMMARY": str(resumen), "LLAMADAS": str(tmp_path),
+           "RESPUESTA": "Veredicto: PASA", "CLAUDE_FALLA": "", **extra}
+    # El shell de un `run:` de GitHub en Linux.
+    r = subprocess.run(["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", paso["run"]],
+                       cwd=repo, env=env, capture_output=True, text=True)
+    salida = r.stdout + r.stderr
+    resumen_txt = resumen.read_text() if resumen.exists() else ""
+    if not key:
+        assert (r.returncode, OMITIDA in salida) == (0, True), f"sin key: salió {r.returncode}: {salida}"
+        assert not (tmp_path / "claude").exists(), "sin key no tiene que llamar a claude"
+        return
+    assert KEY_FALSA not in salida + resumen_txt, "el step imprimió la key"
+    if esperado == 0:
+        assert r.returncode == 0, f"con key y PASA tenía que pasar y salió {r.returncode}: {salida}"
+        assert "Veredicto: PASA" in resumen_txt
+    else:
+        assert r.returncode != 0, f"tenía que bloquear y salió 0: {salida}"
+    if "RESPUESTA" in extra and KEY_FALSA in extra["RESPUESTA"]:
+        assert not list(repo.glob("revision.*")), "el reporte con el secret quedó en disco"
 
 
 @pytest.mark.parametrize("chequeo", [
