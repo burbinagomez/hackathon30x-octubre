@@ -1,0 +1,83 @@
+"""CLI `buscar`: sin red y sin Postgres. Los falsos viven en tests/, nunca en app/."""
+from datetime import UTC, datetime
+from uuid import uuid4
+
+import pytest
+
+from app.cli import Persistencia, main
+from app.modulos.descubrimiento.dominio.modelos import Actividad, EmpresaCruda
+from tests.falsos import FuenteFalsa, RegistroCostosFalso, RepositorioLeadsFalso
+
+AS_OF = datetime(2026, 10, 1, tzinfo=UTC)
+API_KEY = "clave-croma-falsa-9f3a"
+DB_URL = "postgresql+psycopg://usuario:clave-db-falsa-7c1d@host.invalido:5432/base"
+BUSCAR = ["buscar", "--tenant", str(uuid4()), "--pais", "CO", "--ciiu", "4711", "--departamento", "11"]
+
+
+def _empresa(nit):
+    return EmpresaCruda(pais="CO", nombre="ACME SAS", fuente="croma_supersociedades_co",
+                        url_origen="https://croma.invalido/acme", as_of=AS_OF, actividad=Actividad("4711", "CIIU"),
+                        id_fiscal=nit, tipo_titular="juridica")
+
+
+class FuenteDelCLI(FuenteFalsa):
+    """Acepta los kwargs del constructor que arma el CLI y devuelve 2 empresas con el mismo NIT."""
+
+    def __init__(self, *, meta, registro_costos, lote_id, **kwargs):
+        super().__init__(meta, registro_costos, lote_id, (_empresa("900.123.456-7"), _empresa("900123456")))
+
+
+@pytest.fixture
+def persistencia():
+    return Persistencia(repo=RepositorioLeadsFalso(), costos=RegistroCostosFalso())
+
+
+@pytest.fixture
+def entorno(monkeypatch):
+    monkeypatch.setenv("CROMA_API_KEY", API_KEY)
+    monkeypatch.setenv("DATABASE_URL", DB_URL)
+
+
+def test_buscar_sin_tenant_falla(persistencia, capsys):
+    codigo = main(["buscar", "--pais", "CO", "--ciiu", "4711"], catalogo={}, persistencia=persistencia)
+    assert codigo != 0
+    assert persistencia.repo.busquedas == {}
+
+
+def test_buscar_imprime_resumen(persistencia, entorno, capsys):
+    codigo = main(BUSCAR, catalogo={"croma_supersociedades_co": FuenteDelCLI}, persistencia=persistencia)
+    salida = capsys.readouterr().out
+    assert codigo == 0
+    assert "encontrados 2 · únicos 1 · nuevos 1 · créditos 1" in salida
+    assert "sin_implementacion: croma_dian_trade_co, osm_overpass" in salida
+    assert "sin_fuente_para" not in salida
+
+
+def test_buscar_sin_adaptadores_reporta_sin_fuente_y_sin_implementacion(persistencia, monkeypatch, capsys):
+    monkeypatch.delenv("CROMA_API_KEY", raising=False)
+    codigo = main(BUSCAR, catalogo={}, persistencia=persistencia)
+    salida = capsys.readouterr().out
+    assert codigo == 0
+    assert list(persistencia.repo.busquedas.values()) == ["terminada"]
+    assert "sin_fuente_para: CO" in salida
+    assert "sin_implementacion: croma_dian_trade_co, croma_supersociedades_co, osm_overpass" in salida
+    assert persistencia.costos.filas == []
+    assert persistencia.repo.leads == {}
+
+
+def test_salida_no_contiene_secretos(persistencia, entorno, capsys):
+    main(BUSCAR, catalogo={"croma_supersociedades_co": FuenteDelCLI}, persistencia=persistencia)
+    captura = capsys.readouterr()
+    salida = captura.out + captura.err
+    assert salida
+    assert API_KEY not in salida and "clave-db-falsa-7c1d" not in salida
+
+
+def test_croma_sin_key_falla_sin_secretos(persistencia, monkeypatch, capsys):
+    monkeypatch.delenv("CROMA_API_KEY", raising=False)
+    monkeypatch.setenv("DATABASE_URL", DB_URL)
+    codigo = main(BUSCAR, catalogo={"croma_supersociedades_co": FuenteDelCLI}, persistencia=persistencia)
+    captura = capsys.readouterr()
+    assert codigo != 0
+    assert "CROMA_API_KEY" in captura.err
+    assert "clave-db-falsa-7c1d" not in captura.out + captura.err
