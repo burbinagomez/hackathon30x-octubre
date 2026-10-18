@@ -15,7 +15,7 @@ from app.modulos.intake.dominio.puertos import GeneradorEstructurado
 from app.modulos.intake.dominio.sugerencia import Sugerencia, validar_sugerencia
 
 MAX_FRASE = 500
-MAX_TURNOS = 6  # historial previo: 3 idas y vueltas alcanzan para aclarar a quién le vende
+MAX_TURNOS = 12  # historial previo: 6 idas y vueltas; con 6 turnos el QA cortaba la charla demasiado pronto
 MAX_TEXTO_IA = 240  # pregunta y explicación del modelo: una línea, se muestran tal cual (React escapa)
 INTENTOS = 2  # el primero y un reintento
 ROLES = {"usuario": "Usuario", "asistente": "Asistente"}
@@ -28,6 +28,7 @@ class ResultadoFrase:
     lote_id: UUID
     pregunta: str | None = None  # la IA no tiene claro a quién le vende: lo pregunta en vez de adivinar
     explicacion: str | None = None  # por qué propone esos filtros, en una línea
+    ciiu_descartado: bool = False  # el modelo propuso un CIIU fuera del catálogo y la validación lo dejó en null
 
 
 def _texto_ia(valor) -> str | None:
@@ -62,5 +63,6 @@ class InterpretarFrase:
                     raise
                 continue  # mismo prompt, misma frase: los tokens del primero ya quedaron cobrados
             return ResultadoFrase(sugerencia, self._costos.gasto_busqueda(lote_id), lote_id,
-                                  pregunta=_texto_ia(crudo.get("pregunta")), explicacion=_texto_ia(crudo.get("explicacion")))
+                                  pregunta=_texto_ia(crudo.get("pregunta")), explicacion=_texto_ia(crudo.get("explicacion")),
+                                  ciiu_descartado=bool(str(crudo.get("ciiu") or "").strip()) and sugerencia.ciiu is None)
         raise AssertionError("inalcanzable")  # pragma: no cover
