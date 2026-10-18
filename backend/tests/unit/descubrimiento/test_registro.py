@@ -92,3 +92,9 @@ def test_clave_del_catalogo_ausente_del_yaml_falla(tmp_path):
     ruta = _yaml(tmp_path, f"fuentes_descubrimiento:\n  a:\n    habilitado: true{ENTRADA}")
     with pytest.raises(RegistroInvalido):
         cargar_registro(ruta, {"a": Falsa, "fantasma": Falsa})
+
+
+def test_osm_overpass_carga_con_el_catalogo_real():
+    registro = cargar_registro(FUENTES_YAML, catalogo)
+    assert "osm_overpass" in registro.fuentes
+    assert "osm_overpass" not in registro.sin_implementacion
