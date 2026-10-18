@@ -85,7 +85,10 @@
     "desperdicio_real": "Desperdicio (real)",
     "error": "No se pudo cargar el tablero. Probá de nuevo.",
     "ver_busquedas": "Ver búsquedas",
-    "licencia": "Licencia"
+    "licencia": "Licencia",
+    "calificados": "Calificados",
+    "pct_calificados": "% calificados (de únicos)",
+    "cpql": "CPQL (lista)"
   },
   "idioma": {
     "etiqueta": "Idioma",

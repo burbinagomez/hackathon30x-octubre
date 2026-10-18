@@ -18,8 +18,15 @@ import Tablero from "./Tablero";
 type Idioma = "es" | "en";
 const textos = { es, en };
 
-async function montar(respuesta: Record<string, unknown>, idioma: Idioma = "es") {
-  server.use(http.get("*/tablero/fuentes", () => HttpResponse.json(respuesta)));
+const CPQL_VACIO = { fuentes: [], total: null };
+
+/** `cpql`: la respuesta de /calificaciones/cpql, o un status para simular que falla. Por defecto, vacía. */
+async function montar(respuesta: Record<string, unknown>, idioma: Idioma = "es", cpql: Record<string, unknown> | number = CPQL_VACIO) {
+  server.use(
+    http.get("*/tablero/fuentes", () => HttpResponse.json(respuesta)),
+    http.get("*/calificaciones/cpql", () =>
+      typeof cpql === "number" ? new HttpResponse(null, { status: cpql }) : HttpResponse.json(cpql)),
+  );
   await i18n.changeLanguage(idioma);
   render(<Tablero />);
   await waitFor(() => expect(screen.queryByRole("table")).toBeInTheDocument());
@@ -194,4 +201,77 @@ test("la_atribucion_es_externa_y_dice_licencia", async () => {
   expect(enlace).toHaveAttribute("target", "_blank");
   expect(enlace).toHaveAttribute("rel", expect.stringContaining("noreferrer"));
   expect(enlace).toHaveTextContent("↗");
+});
+
+const filaCpql = (fuente: string, calificados: number, costo: string | null, cpql: string | null) => ({
+  fuente, costo_lista: costo, costo_real: costo, calificados, cpql_lista: cpql, cpql_real: cpql,
+});
+
+/** El tablero de `respuestaTablero` (croma con 4 únicos) más una fuente sin calificados y el CPQL de las dos. */
+function conCpql() {
+  const base = respuestaTablero();
+  const osm = { ...base.fuentes[0], fuente: "osm_overpass" };
+  return {
+    tablero: { ...base, fuentes: [base.fuentes[1], base.fuentes[0], osm] },  // sin_atribuir primero: se pinta al final
+    cpql: {
+      fuentes: [
+        filaCpql("croma_supersociedades_co", 2, "1.35", "0.675"),
+        filaCpql("osm_overpass", 0, "1.35", null),
+        filaCpql("sin_atribuir", 0, "0.999", null),
+      ],
+      total: filaCpql("TOTAL", 2, "3.699", "1.8495"),
+    },
+  };
+}
+
+const fina = (idioma: Idioma, valor: string) =>
+  new Intl.NumberFormat(idioma, { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 6 })
+    .format(Number(valor)).replace(/\s/g, " ");
+const pct = (idioma: Idioma, valor: number) =>
+  new Intl.NumberFormat(idioma, { style: "percent", maximumFractionDigits: 1 }).format(valor).replace(/\s/g, " ");
+
+test.each(["es", "en"] as const)("muestra_calificados_porcentaje_y_cpql_por_fuente[%s]", async (idioma) => {
+  const { tablero, cpql } = conCpql();
+  await montar(tablero, idioma, cpql);
+  const t = textos[idioma].tablero;
+  const croma = textos[idioma].fuentes.croma_supersociedades_co;
+
+  expect(celda(croma, t.calificados)).toBe(numero(idioma, 2));
+  expect(celda(croma, t.pct_calificados)).toBe(pct(idioma, 0.5));  // 2 calificados / 4 únicos
+  expect(celda(croma, t.cpql)).toBe(fina(idioma, "0.675"));
+  expect(celda(t.total, t.calificados)).toBe(numero(idioma, 2));
+  expect(celda(t.total, t.cpql)).toBe(fina(idioma, "1.8495"));
+});
+
+test("fuente_sin_calificados_muestra_cpql_sin_dato_y_nunca_divide_por_cero", async () => {
+  const { tablero, cpql } = conCpql();
+  await montar(tablero, "es", cpql);
+
+  expect(celda("OpenStreetMap", es.tablero.calificados)).toBe("0");
+  expect(celda("OpenStreetMap", es.tablero.cpql)).toBe("—");
+  expect(screen.getByRole("table")).not.toHaveTextContent(/∞|Infinity|NaN/);
+});
+
+test("sin_atribuir_va_al_final_solo_con_costo_y_con_otro_estilo", async () => {
+  const { tablero, cpql } = conCpql();
+  await montar(tablero, "es", cpql);
+
+  const filas = screen.getAllByRole("row").slice(1).map((r) => within(r).getAllByRole("cell")[0].textContent);
+  expect(filas.slice(-2)).toEqual(["Sin atribuir", "Total"]);
+  for (const columna of [es.tablero.calificados, es.tablero.pct_calificados, es.tablero.cpql]) {
+    expect(celda("Sin atribuir", columna)).toBe("");
+  }
+  expect(celda("Sin atribuir", "Costo (lista)")).toBe(monto("es", "1.35"));
+  const fila = screen.getAllByRole("row").find((r) => within(r).queryAllByRole("cell")[0]?.textContent === "Sin atribuir");
+  expect(fila).toHaveClass("sin-atribuir");
+});
+
+test.each([["falla", 500], ["vacio", CPQL_VACIO]] as const)("cpql_%s_el_tablero_se_ve_como_antes", async (_caso, cpql) => {
+  await montar(respuestaTablero(), "es", cpql);
+
+  const encabezados = screen.queryAllByRole("columnheader").map((h) => h.textContent);
+  expect(encabezados).not.toContain(es.tablero.cpql);
+  expect(encabezados).not.toContain(es.tablero.calificados);
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(celda("Supersociedades (Croma)", "Costo (lista)")).toBe(monto("es", "1.35"));
 });
