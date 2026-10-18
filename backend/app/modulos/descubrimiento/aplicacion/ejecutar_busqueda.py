@@ -1,4 +1,5 @@
 import logging
+import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from uuid import UUID
@@ -125,9 +126,15 @@ def _correr_fuentes(
                              omitidas_por_tope=tuple(omitidas), por_fuente=por_fuente)
 
 
+# Del mensaje solo sale un código reconocible; nunca el resto (puede traer nombres, NIT o URLs).
+_CODIGO = re.compile(r"http \d{3}|timeout|ConnectError|respuesta ilegible|sin respuesta")
+
+
 def _loguear_caida(clave: str, error: Exception) -> None:
-    """Solo la clave de la fuente y la clase de la excepción: el mensaje y el traceback pueden traer nombres, NIT o URLs."""
-    logger.warning("fuente_caida fuente=%s error=%s", clave, type(error).__name__)
+    """La clave de la fuente, la clase de la excepción y, si hay, el código (http 429, timeout…); nunca el mensaje."""
+    codigo = _CODIGO.search(str(error))
+    logger.warning("fuente_caida fuente=%s error=%s detalle=%s", clave, type(error).__name__,
+                   codigo.group(0) if codigo else "-")
 
 
 class EjecutarBusqueda:
