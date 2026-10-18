@@ -48,12 +48,41 @@ def test_tenant_de_usuario_devuelve_solo_ese_usuario(rt, usuarios):
     assert _tenant_de_usuario(rt, uuid4()) == []
 
 
-def test_tenant_de_usuario_es_security_definer_con_search_path(rt, usuarios):
+# Las dos funciones SECURITY DEFINER por las que `app_rt` entra a `usuarios`: sin las dos, el login no
+# resuelve el tenant (tenant_de_usuario) o el usuario no puede elegir idioma (fijar_idioma).
+FUNCIONES_DE_ACCESO = ["tenant_de_usuario", "fijar_idioma"]
+
+
+@pytest.mark.parametrize("nombre", FUNCIONES_DE_ACCESO)
+def test_funcion_es_security_definer_con_search_path(rt, usuarios, nombre):
+    # Se busca por proname y no por `::regprocedure`: si la función no está, el test falla en el assert
+    # de la fila faltante y no en un error al resolver el tipo. Una sobrecarga de más también falla acá.
     with rt.connect() as c:
-        definer, config = c.execute(text(
-            "SELECT prosecdef, proconfig FROM pg_proc WHERE oid = 'public.tenant_de_usuario(uuid)'::regprocedure")).one()
-        permisos = {rol: c.execute(text("SELECT has_function_privilege(:rol, 'public.tenant_de_usuario(uuid)', 'EXECUTE')"),
-                                   {"rol": rol}).scalar() for rol in ("app_rt", "anon", "authenticated")}
+        filas = c.execute(text(
+            "SELECT p.oid, p.prosecdef, p.proconfig FROM pg_proc p"
+            " JOIN pg_namespace n ON n.oid = p.pronamespace"
+            " WHERE n.nspname = 'public' AND p.proname = :nombre"), {"nombre": nombre}).all()
+        assert len(filas) == 1, f"public.{nombre} no está (o está sobrecargada)"
+        oid, definer, config = filas[0]
+        privilegio = text("SELECT has_function_privilege(:rol, CAST(:oid AS oid), 'EXECUTE')")
+        permisos = {rol: c.execute(privilegio, {"rol": rol, "oid": oid}).scalar()
+                    for rol in ("app_rt", "anon", "authenticated")}
     assert definer is True
     assert any(x.startswith("search_path=") for x in config or [])
     assert permisos == {"app_rt": True, "anon": False, "authenticated": False}
+
+
+def test_fijar_idioma_no_cruza_tenants(rt, admin, usuarios):
+    """Control positivo y después el mismo usuario con el tenant de B.
+
+    El positivo escribe 'en' sobre el usuario de A que estaba en 'es' (un cambio de verdad, no un UPDATE
+    sobre el mismo valor), así que la llamada de B pide volver a 'es': sin el `AND tenant_id` se verían las
+    dos cosas —la fila de más que devuelve y el idioma cambiado— en vez de una sola.
+    """
+    with db.unidad_de_trabajo(rt, usuarios["tenant_a"]) as c:
+        assert c.execute(text("SELECT fijar_idioma(:uid, 'en')"), {"uid": usuarios["a2"]}).scalar() == 1
+    with db.unidad_de_trabajo(rt, usuarios["tenant_b"]) as c:
+        assert c.execute(text("SELECT fijar_idioma(:uid, 'es')"), {"uid": usuarios["a2"]}).scalar() == 0
+    with admin.connect() as c:
+        assert c.execute(text("SELECT idioma FROM usuarios WHERE auth_user_id = :uid"),
+                         {"uid": usuarios["a2"]}).scalar() == "en"
