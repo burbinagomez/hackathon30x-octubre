@@ -53,5 +53,4 @@ class MetaFuente:  # sale de la entrada de fuentes.yaml, no de la clase
 
 
 def cubre(meta: MetaFuente, criterios: CriteriosICP) -> bool:
-    pais_ok = criterios.pais in meta.paises or "*" in meta.paises
-    return pais_ok and set(criterios.filtros) <= meta.filtros
+    return criterios.pais in meta.paises or "*" in meta.paises
