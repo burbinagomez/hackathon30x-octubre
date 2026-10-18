@@ -17,6 +17,7 @@ from app.modulos.descubrimiento.aplicacion.registro import cargar_registro
 from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, MetaFuente
 from app.modulos.descubrimiento.infraestructura.adaptadores.datos_gov_co_rues import DatosGovCoRues
 from app.modulos.descubrimiento.infraestructura.adaptadores.osm_overpass import OsmOverpass
+from tests.anthropic_falso import CASO, juez
 
 PROVEEDOR = "croma"
 BACKEND = Path(__file__).resolve().parents[2]
@@ -153,3 +154,16 @@ def test_socrata_descarga_escribe_fila_en_costos(rt, admin, tenant):
     assert filas == [(tenant, "socrata_descarga", Decimal(2), Decimal("0.0000070"), "USD", "datos.gov.co",
                       "datos_gov_co_rues", None, lote, False)]
     assert tipo_costo == "numeric"
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="rojo hasta T018")
+def test_juez_escribe_filas_llm_en_costos(rt, admin, tenant):
+    """Principio VIII para el juez: JuezClaude (Messages API falsa) contra el libro real como app_rt deja 2 filas llm."""
+    lote = uuid4()
+    juez(PostgresCostos(rt, tenant), [], lote_id=lote).juzgar("encaje_icp", CASO)
+
+    with admin.connect() as c:
+        filas = c.execute(text("SELECT tenant_id, tipo, unidades, costo_unitario, proveedor, fuente, lote_id "
+                               "FROM costos WHERE tenant_id = :t ORDER BY tipo"), {"t": tenant}).all()
+    assert filas == [(tenant, "llm_tokens_in", Decimal(120), Decimal("0.000002"), "anthropic", "evals", lote),
+                     (tenant, "llm_tokens_out", Decimal(30), Decimal("0.00001"), "anthropic", "evals", lote)]
