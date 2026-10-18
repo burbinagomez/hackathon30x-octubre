@@ -42,7 +42,10 @@ async def lifespan(app: FastAPI):
 
 
 # Sin docs ni esquema públicos: no se anuncia la superficie de la API.
-app = FastAPI(lifespan=lifespan, openapi_url=None)  # sin esquema tampoco se montan /docs ni /redoc
+# Docs apagadas por defecto (sin esquema tampoco se montan /docs ni /redoc). DOCS_HABILITADAS=true las prende
+# desde Railway mientras se desarrolla; el esquema no lleva secretos, pero publica el mapa de la API.
+_DOCS = os.environ.get("DOCS_HABILITADAS") == "true"
+app = FastAPI(lifespan=lifespan, openapi_url="/openapi.json" if _DOCS else None, redoc_url=None)
 # CORS_ORIGINS no es secret: se lee acá, antes de verificar_entorno() en el lifespan.
 app.add_middleware(
     CORSMiddleware,

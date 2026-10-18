@@ -200,6 +200,27 @@ def test_docs_desactivadas(cliente, ruta):
 
 
 @pytest.fixture
+def app_con_docs(monkeypatch):
+    def _armar(valor):
+        if valor is None:
+            monkeypatch.delenv("DOCS_HABILITADAS", raising=False)
+        else:
+            monkeypatch.setenv("DOCS_HABILITADAS", valor)
+        return importlib.reload(importlib.import_module("app.main")).app
+    yield _armar
+    monkeypatch.delenv("DOCS_HABILITADAS", raising=False)
+    importlib.reload(importlib.import_module("app.main"))
+
+
+@pytest.mark.parametrize("ruta", ["/docs", "/openapi.json"])
+def test_docs_se_activan_solo_con_docs_habilitadas_true(app_con_docs, ruta):
+    # Interruptor de Railway: por defecto apagadas; "true" exacto las prende. Sin lifespan: no toca la base.
+    assert TestClient(app_con_docs("true")).get(ruta).status_code == 200
+    for apagado in (None, "", "false", "1", "TRUE "):
+        assert TestClient(app_con_docs(apagado)).get(ruta).status_code == 404, apagado
+
+
+@pytest.fixture
 def app_con_origen(entorno):
     yield importlib.reload(importlib.import_module("app.main")).app
     entorno.undo()
