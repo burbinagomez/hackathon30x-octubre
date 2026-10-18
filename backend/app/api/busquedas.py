@@ -104,7 +104,8 @@ def vista_previa(pedido: PedidoVistaPrevia, request: Request, tenant_id: UUID = 
     if errores:
         return JSONResponse(status_code=422, content={"errores": errores})
     caso = VistaPrevia(_repo(request, tenant_id), _fabrica(request, tenant_id),
-                       actividades_de(request.app.state.actividades_yaml))
+                       actividades_de(request.app.state.actividades_yaml),
+                       PostgresCostos(request.app.state.engine, tenant_id))
     r = caso.ejecutar(_criterios(pedido), pedido.canal_preferido, pedido.tope_gasto_usd, pedido.mensaje_base)
     # [MIN]: sin `contar` no hay conteo ni costo, y el tope no se aplica: todo eso va null, nunca 0 ni true.
     return {
@@ -124,7 +125,8 @@ _MOTIVO_DE_ERROR = {FuenteNoDisponible: "no_disponible", LimiteFuenteAgotado: "l
 @router.post("/busquedas/{busqueda_id}/ejecutar")
 def ejecutar(busqueda_id: UUID, request: Request, tenant_id: UUID = Depends(tenant_actual)):
     repo = _repo(request, tenant_id)
-    caso = EjecutarBorrador(repo, _fabrica(request, tenant_id), actividades_de(request.app.state.actividades_yaml))
+    caso = EjecutarBorrador(repo, _fabrica(request, tenant_id), actividades_de(request.app.state.actividades_yaml),
+                          PostgresCostos(request.app.state.engine, tenant_id))
     try:
         r = caso.ejecutar(busqueda_id)
     except BusquedaNoEncontrada:  # inexistente o de otro tenant: la misma respuesta

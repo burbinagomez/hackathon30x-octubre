@@ -2,6 +2,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from uuid import UUID
 
+from app.modulos.costos.dominio.puertos import RegistroCostos
 from app.modulos.descubrimiento.dominio.errores import (
     BusquedaNoEncontrada,
     BusquedaYaEjecutada,
@@ -25,6 +26,7 @@ class ResultadoBusqueda:
     encontrados: int = 0  # empresas devueltas por las fuentes
     unicos: int = 0  # leads distintos entre ellas
     nuevos: int = 0  # leads creados en esta búsqueda
+    omitidas_por_tope: tuple[str, ...] = ()  # fuentes que no se llamaron porque la llamada pasaba el tope
 
 
 def _correr_fuentes(
@@ -101,10 +103,12 @@ def _estado_api(errores: Mapping[str, Exception], seleccionadas: int) -> str:
 class EjecutarBorrador:
     """Entrada de la API: corre un borrador guardado, con sus criterios congelados y lote_id = busqueda_id."""
 
-    def __init__(self, repo: RepositorioLeads, fabrica: FabricaFuentes, actividades: Mapping[str, tuple[str, ...]]):
+    def __init__(self, repo: RepositorioLeads, fabrica: FabricaFuentes, actividades: Mapping[str, tuple[str, ...]],
+                 costos: RegistroCostos):
         self._repo = repo
         self._fabrica = fabrica
         self._actividades = actividades
+        self._costos = costos  # esqueleto: todavía no se usa para el tope
 
     def ejecutar(self, busqueda_id: UUID) -> ResultadoBusqueda:
         estado = self._repo.estado(busqueda_id)

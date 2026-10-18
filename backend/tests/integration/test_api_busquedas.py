@@ -9,6 +9,7 @@ Sin red: los dos hosts (Overpass y datos.gov.co) los atiende un MockTransport. D
 """
 import json
 import re
+from decimal import Decimal
 from types import SimpleNamespace
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -146,6 +147,36 @@ def test_ejecutar_dos_veces_da_409_y_no_vuelve_a_llamar_ni_a_cobrar(api, admin, 
     assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=busqueda_id) == "completada"
 
 
+# --- tope de gasto (advisor, costos) --------------------------------------------------------------------------
+
+def test_ejecutar_con_costo_maximo_sobre_tope_da_409(api, admin, usuarios):
+    # OSM (0.00042) + datos.gov.co (0.00084) = 0.00126 de peor caso: el tope de 0.0001 no alcanza ni para una.
+    r = _vista_previa(api, usuarios["a"], tope_gasto_usd="0.0001")
+    assert r.status_code == 201
+    assert r.json()["dentro_del_tope"] is False
+    assert r.json()["costo_maximo_usd"] is not None and Decimal(r.json()["costo_maximo_usd"]) == Decimal("0.00126")
+    busqueda_id = r.json()["busqueda_id"]
+    filas_antes = _contar(admin, "SELECT count(*) FROM costos WHERE tenant_id = :a", a=usuarios["tenant_a"])
+
+    ejecutada = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert ejecutada.status_code == 409
+    assert ejecutada.json() == {"detail": "tope_excedido"}  # un código; distinto de "ya_ejecutada"
+    assert api.pedidas == []  # 0 requests a las fuentes
+    assert _contar(admin, "SELECT count(*) FROM costos WHERE tenant_id = :a", a=usuarios["tenant_a"]) == filas_antes
+    assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=busqueda_id) == "borrador"
+    assert _contar(admin, "SELECT count(*) FROM leads WHERE tenant_id = :a", a=usuarios["tenant_a"]) == 0
+
+
+def test_tope_justo_para_el_costo_maximo_ejecuta(api, admin, usuarios):
+    busqueda_id = _crear(api, usuarios["a"], tope_gasto_usd="0.00126")
+
+    r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert r.status_code == 200 and r.json()["estado"] == "completada"
+    assert len(api.pedidas) > 0
+
+
 # --- validación -----------------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("cambios, campo", [
@@ -185,12 +216,14 @@ def test_vista_previa_devuelve_motivos_como_codigo(api, admin, usuarios):
     UUID(cuerpo["busqueda_id"])
     assert [f["fuente"] for f in cuerpo["fuentes"]] == ["datos_gov_co_rues"]
     assert cuerpo["descartadas"] == [{"fuente": "osm_overpass", "motivo": "sin_mapeo_actividad"}]
-    # [MIN]: sin `contar` no hay conteo ni costos, y la API no inventa números: null, nunca 0.
+    # Sin `contar` (Pulido) no hay conteo ni estimado: null, nunca 0. El tope sí se aplica: costo máximo y veredicto.
     assert cuerpo["fuentes"][0] == {"fuente": "datos_gov_co_rues", "conteo": None, "motivo": "sin_conteo",
                                     "ignorados": ["ciudad"], "truncado": False}
-    for clave in ("costo_vista_previa_usd", "costo_estimado_usd", "costo_maximo_usd", "creditos_restantes_mes",
-                  "requests_restantes_24h", "dentro_del_tope"):
-        assert cuerpo[clave] is None, clave  # el tope no se aplica todavía: no se declara "dentro" ni "fuera"
+    for clave in ("costo_vista_previa_usd", "costo_estimado_usd", "creditos_restantes_mes", "requests_restantes_24h"):
+        assert cuerpo[clave] is None, clave
+    assert cuerpo["costo_maximo_usd"] is not None
+    assert Decimal(cuerpo["costo_maximo_usd"]) == Decimal("0.00084")  # solo datos.gov.co: 2 x 2 x 30 s x 0.0000070
+    assert cuerpo["dentro_del_tope"] is True  # tope 5
     assert api.pedidas == []  # la vista previa del [MIN] no sale a ninguna fuente
     assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=cuerpo["busqueda_id"]) == "borrador"
 
