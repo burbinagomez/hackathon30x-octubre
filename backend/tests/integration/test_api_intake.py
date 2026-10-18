@@ -209,3 +209,13 @@ def test_ni_la_frase_ni_la_key_ni_la_respuesta_salen_en_logs(entorno, verificado
 def test_la_key_no_aparece_en_el_repr_de_los_ajustes(entorno, verificador):  # noqa: F811
     with arrancar(entorno, verificador, **OK) as c:
         assert CLAVE_FALSA not in repr(c.app.state.settings)
+
+
+def test_tablero_muestra_costo_de_intake_aparte(entorno, verificador, usuarios, admin):  # noqa: F811
+    with arrancar(entorno, verificador, **OK) as c:
+        assert c.get("/tablero/fuentes", headers=_bearer(usuarios["a"])).json()["costo_intake"] is None
+        _post(c, usuarios["a"])
+        t = c.get("/tablero/fuentes", headers=_bearer(usuarios["a"])).json()
+
+    assert Decimal(t["costo_intake"]) == Decimal(200) * TARIFA_DEL_MODELO["in"] + Decimal(60) * TARIFA_DEL_MODELO["out"]
+    assert t["costo_evals"] is None and t["fuentes"] == [] and t["total"]["costo_lista"] is None  # no es adquisición
