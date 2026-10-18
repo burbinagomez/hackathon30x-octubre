@@ -77,6 +77,8 @@ class SettingsEmail(Settings):
     remitente: str = Field(min_length=1)
     baja_secret: SecretStr = Field(min_length=32)
     api_base_url: str = Field(min_length=1)
+    # Va en el pie de cada mail (Ley 1581): dónde está la política de tratamiento de datos.
+    url_privacidad: str = Field(min_length=1)
     # prueba: solo se manda a email_prueba_destinos. "real" lo cambia solo Daniel en Railway (P1).
     email_modo: Literal["prueba", "real"] = "prueba"
     # NoDecode: en Railway va "a@x.co,b@x.co", no JSON.

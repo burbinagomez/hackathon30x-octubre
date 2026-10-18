@@ -19,6 +19,7 @@ def entorno(monkeypatch):
         "REMITENTE": "Equipo <hola@ejemplo.test>",
         "BAJA_SECRET": BAJA_SECRET,
         "API_BASE_URL": "https://api.ejemplo.test",
+        "URL_PRIVACIDAD": "https://ejemplo.test/privacidad",
     }.items():
         monkeypatch.setenv(nombre, valor)
     monkeypatch.delenv("EMAIL_MODO", raising=False)

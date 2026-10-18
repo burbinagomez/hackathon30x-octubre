@@ -11,7 +11,8 @@ import yaml
 from pydantic import ValidationError
 
 from app.composicion import CONFIG, armador_de_fuente, cargar_tarifas
-from app.config import Settings
+from app.config import Settings, SettingsEmail
+from app.modulos.contacto.dominio.errores import MensajeCambio, SinVistaPrevia
 from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.costos.dominio.puertos import RegistroCostos
 from app.modulos.descubrimiento.aplicacion.ejecutar_busqueda import EjecutarBusqueda
@@ -66,14 +67,68 @@ def _parser() -> argparse.ArgumentParser:
     b.add_argument("--ciiu")
     b.add_argument("--departamento")
     b.add_argument("--ciudad")
+    e = sub.add_parser("enviar", help="Manda el mensaje base a los contactos aprobados por el --dry-run de la búsqueda.")
+    e.add_argument("--tenant", type=UUID, required=True)
+    e.add_argument("--busqueda", type=UUID, required=True)
+    e.add_argument("--dry-run", action="store_true", help="Aprueba los contactos y muestra el resumen; no manda nada.")
+    e.add_argument("--rehacer", action="store_true", help="Con --dry-run: recompone los aprobados si cambió el mensaje.")
     return p
 
 
-def main(argv=None, *, catalogo=catalogo, persistencia=None) -> int:
+def _invalida(error: ValidationError) -> int:
+    """Solo los nombres de las variables, nunca sus valores."""
+    faltan = sorted({str(e["loc"][0]).upper() for e in error.errors() if e["loc"]} or {"SETTINGS"})
+    print(f"configuración inválida: {', '.join(faltan)}", file=sys.stderr)
+    return 2
+
+
+def _hay_ruta_de_baja() -> bool:
+    from app.main import app
+    return any(getattr(r, "path", None) == "/baja/{token}" for r in app.routes)
+
+
+def _armar_envio_postgres(ajustes: SettingsEmail, tenant: UUID):
+    # ponytail: sin adaptador de leads contactables hasta que mergee la 006; el CLI corta acá.
+    raise NotImplementedError("falta el adaptador de leads contactables (spec 006)")
+
+
+def _enviar(args, armar_envio) -> int:
+    try:
+        ajustes = SettingsEmail()
+    except ValidationError as error:
+        return _invalida(error)
+    if ajustes.email_modo == "real" and not _hay_ruta_de_baja():
+        print("EMAIL_MODO=real sin /baja/{token} en la api: no se manda a direcciones reales", file=sys.stderr)
+        return 2
+    try:
+        caso = (armar_envio or _armar_envio_postgres)(ajustes, args.tenant)
+    except NotImplementedError as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    try:
+        if args.dry_run:
+            r = caso.vista_previa(args.busqueda, rehacer=args.rehacer)
+            print(f"modo: {r.modo}\naprobados: {r.aprobados}\na enviar: {r.a_enviar}")
+            if r.asunto is not None:
+                print(f"asunto: {r.asunto}\n\n{r.cuerpo}")
+            return 0
+        print(f"enviados: {caso.enviar(args.busqueda)}")
+        return 0
+    except SinVistaPrevia:
+        print("sin aprobados: corré antes `enviar --dry-run`", file=sys.stderr)
+        return 1
+    except MensajeCambio:
+        print("el mensaje cambió desde el dry-run: corré `enviar --dry-run --rehacer` y revisá", file=sys.stderr)
+        return 1
+
+
+def main(argv=None, *, catalogo=catalogo, persistencia=None, armar_envio=None) -> int:
     try:
         args = _parser().parse_args(argv)
     except SystemExit as salida:
         return int(salida.code or 0)
+    if args.comando == "enviar":
+        return _enviar(args, armar_envio)
 
     @cache
     def ajustes() -> Settings:
@@ -90,10 +145,8 @@ def main(argv=None, *, catalogo=catalogo, persistencia=None) -> int:
                 return 2
         if persistencia is None:
             persistencia = _persistencia_postgres(ajustes(), args.tenant)
-    except ValidationError as error:  # solo los nombres de las variables, nunca sus valores
-        faltan = sorted({str(e["loc"][0]).upper() for e in error.errors()})
-        print(f"configuración inválida: {', '.join(faltan)}", file=sys.stderr)
-        return 2
+    except ValidationError as error:
+        return _invalida(error)
 
     costos = _ContadorDeCreditos(persistencia.costos)
     tarifas = cargar_tarifas()

@@ -21,6 +21,8 @@ APP = BACKEND / "app"
 REPOSITORIO = APP / "modulos" / "descubrimiento" / "infraestructura" / "persistencia" / "repositorio_leads.py"
 # modelos.py y el catálogo nombran columnas, no ejecutan SQL sobre ellas.
 PERMITIDOS = (REPOSITORIO, APP / "modelos.py", APP / "seguridad" / "catalogo_sensibles.py")
+# Leen leads para la elegibilidad legal (tipo_titular), nunca una columna cifrada.
+SIN_CIFRADAS = (APP / "modulos" / "contacto" / "infraestructura" / "repositorio_contactos.py",)
 NOMBRE = "Tienda Doña Rosa"  # sintéticos
 DIRECCION = "Calle 10 # 5-20"
 CLARO = {"nombre_cifrado": NOMBRE, "direccion_cifrada": DIRECCION}  # lo que guarda cada columna cifrada
@@ -153,8 +155,12 @@ def test_el_escaneo_no_se_alarma_con_lo_inocente(codigo):
 
 def test_nombre_solo_se_lee_por_el_repositorio():
     sueltos = [str(f.relative_to(BACKEND)) for carpeta in ("app", "evals", "scripts") for f in (BACKEND / carpeta).rglob("*.py")
-               if f not in PERMITIDOS and menciona_la_tabla_leads(f.read_text())]
+               if f not in PERMITIDOS + SIN_CIFRADAS and menciona_la_tabla_leads(f.read_text())]
     assert sueltos == []
+
+
+def test_los_que_leen_leads_sin_cifrar_no_nombran_columnas_cifradas():
+    assert [str(f.relative_to(BACKEND)) for f in SIN_CIFRADAS if any(c in f.read_text() for c in CLARO)] == []
 
 
 class _FuenteConNombre(FuenteFalsa):

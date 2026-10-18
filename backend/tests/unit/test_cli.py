@@ -158,3 +158,28 @@ def test_datos_gov_co_sin_variables_usa_los_defaults_del_adaptador(persistencia,
     (kwargs,) = _GrabaKwargs.armadas
     assert "url" not in kwargs
     assert kwargs.get("app_token") is None
+
+
+ENTORNO_EMAIL = {"DATABASE_URL": DB_URL, "SMTP_HOST": "smtp.invalido", "SMTP_USUARIO": "u",
+                 "SMTP_CLAVE": "clave-smtp-falsa-4e2b", "REMITENTE": "Ana", "BAJA_SECRET": "b" * 32,
+                 "API_BASE_URL": "https://api.invalido", "URL_PRIVACIDAD": "https://invalido/privacidad"}
+ENVIAR = ["enviar", "--tenant", str(uuid4()), "--busqueda", str(uuid4())]
+
+
+def test_enviar_en_modo_real_sin_ruta_de_baja_no_arma_nada(monkeypatch, capsys):
+    for nombre, valor in (ENTORNO_EMAIL | {"EMAIL_MODO": "real"}).items():
+        monkeypatch.setenv(nombre, valor)
+    armados = []
+    codigo = main(ENVIAR, armar_envio=lambda ajustes, tenant: armados.append(tenant))
+    assert codigo == 2 and armados == []
+    assert "/baja" in capsys.readouterr().err
+
+
+def test_enviar_con_configuracion_invalida_imprime_solo_nombres(monkeypatch, capsys):
+    for nombre, valor in ENTORNO_EMAIL.items():
+        monkeypatch.setenv(nombre, valor)
+    monkeypatch.setenv("BAJA_SECRET", "corta-y-secreta")
+    codigo = main(ENVIAR, armar_envio=lambda ajustes, tenant: pytest.fail("no se arma con config inválida"))
+    err = capsys.readouterr().err
+    assert codigo == 2 and "BAJA_SECRET" in err
+    assert not any(v in err for v in ("corta-y-secreta", "clave-smtp-falsa-4e2b", "clave-db-falsa-7c1d"))

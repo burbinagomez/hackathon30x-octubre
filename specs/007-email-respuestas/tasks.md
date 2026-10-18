@@ -38,18 +38,18 @@
 
 ## Fase 5: Envío (Paso 4) — advisor
 
-- [ ] T040 [Paso 4] `tests/integration/test_envio_email.py` con `LeadsContactablesFalso` y SMTP falso: `::test_aprobado_que_sigue_elegible_se_envia` (camino feliz, usa `busquedas.mensaje_base`), `::test_envio_setea_base_legal`.
-- [ ] T041 [Paso 4] `::test_sin_base_legal_no_envia`: `base_legal` forzada a nula entre reclamo y envío → `SinBaseLegal`, 0 mensajes, `descartado`, la corrida sigue. Mutación `sabotaje_sin_base_legal`: saltar el chequeo. (security)
-- [ ] T042 [Paso 4] `::test_persona_natural_no_se_envia` y `::test_sin_canal_publicado_no_se_envia`. Mutación `sabotaje_natural`: sacar el filtro `tipo_titular`. (security)
-- [ ] T043 [Paso 4] `::test_dos_envios_en_paralelo_mandan_uno` (dos hilos, conexiones distintas) y `::test_limite_diario_deja_el_exceso_aprobado`. Mutación `sabotaje_sin_reclamo`: `UPDATE` sin `WHERE estado='aprobado'`.
-- [ ] T044 [Paso 4] `::test_costo_en_libro_por_envio`: N envíos → N filas `email_envio` con `lote_id = busqueda_id`, también en los que fallaron.
-- [ ] T046 [Paso 4] `::test_enviar_sin_dry_run_falla`: sin `--dry-run` previo → `SinVistaPrevia`, 0 mensajes, 0 costos. `::test_lead_nuevo_despues_del_dry_run_no_sale`. Mutación `sabotaje_enviar_crea_contactos`: que `enviar` cree el contacto si no existe. (security)
-- [ ] T04A [Paso 4] `::test_mensaje_base_cambiado_frena`: `--dry-run`, se edita `busquedas.mensaje_base`, `enviar` → `MensajeCambio`, 0 mensajes, 0 costos; otro `--dry-run` lo destraba. `enviar` recompone con el `mensaje_base` vigente y compara contra `contactos.cuerpo` (sin DDL nuevo). Mutación `sabotaje_sin_chequeo_de_cambio`. (security)
-- [ ] T04B [Paso 4] `::test_dry_run_imprime_resumen_sin_direcciones`: la salida trae cuántos se enviarían, el modo (`prueba`/`real`) y un ejemplo del mensaje con el enlace de baja; ninguna dirección de los leads aparece (ni la de prueba). Mutación `sabotaje_dry_run_con_direccion`. (security)
-- [ ] T047 [Paso 4] `::test_tope_20_por_corrida`: 25 elegibles con dry-run → 20 mensajes, 5 quedan `aprobado`. Mutación `sabotaje_sin_tope`.
-- [ ] T048 [Paso 4] `::test_modo_prueba_solo_destinos_de_prueba`: modo `prueba`, un lead en la lista y otro no → 1 mensaje, el otro `aprobado`, 1 costo. `::test_modo_prueba_lista_vacia_no_manda`. Mutación `sabotaje_prueba_sin_filtro`: ignorar la lista en modo `prueba`. (security)
-- [ ] T049 [Paso 4] `::test_sin_fila_de_cumplimiento_no_envia` y `::test_con_opt_out_no_envia`. Mutación `sabotaje_sin_chequeo_opt_out`. (security)
-- [ ] T045 [Paso 4] Implementar `EnviarABusqueda`, `repositorio_contactos.py` y `app.cli enviar [--dry-run]` hasta verde (también T046–T049, T04A, T04B). `--dry-run` no imprime direcciones.
+- [x] T040 [Paso 4] `tests/integration/test_envio_email.py` con `LeadsContactablesFalso` y SMTP falso: `::test_aprobado_que_sigue_elegible_se_envia` (camino feliz, usa `busquedas.mensaje_base`), `::test_envio_setea_base_legal`.
+- [x] T041 [Paso 4] `::test_sin_base_legal_no_envia`: `base_legal` forzada a nula entre reclamo y envío → `vigente()` falso (sin excepción), 0 mensajes, `descartado`, la corrida sigue. Mutación `sabotaje_sin_base_legal`: saltar el chequeo. (security)
+- [x] T042 [Paso 4] `::test_persona_natural_no_se_envia` y `::test_sin_canal_publicado_no_se_envia`. Mutación `sabotaje_natural`: sacar el filtro `tipo_titular`. (security)
+- [x] T043 [Paso 4] `::test_dos_envios_en_paralelo_mandan_uno` (dos hilos, conexiones distintas) y `::test_limite_diario_deja_el_exceso_aprobado` (esta mitad, recortada: ver Recortes 3). Mutación `sabotaje_sin_reclamo`: ignorar el resultado del reclamo.
+- [x] T044 [Paso 4] `::test_costo_en_libro_por_envio`: N envíos → N filas `email_envio` con `lote_id = busqueda_id`, también en los que fallaron.
+- [x] T046 [Paso 4] `::test_enviar_sin_dry_run_falla`: sin `--dry-run` previo → `SinVistaPrevia`, 0 mensajes, 0 costos. `::test_lead_nuevo_despues_del_dry_run_no_sale`. Mutación `sabotaje_enviar_crea_contactos`: que `enviar` cree el contacto si no existe. (security)
+- [x] T04A [Paso 4] `::test_mensaje_base_cambiado_frena`: `--dry-run`, se edita `busquedas.mensaje_base`, `enviar` → `MensajeCambio`, 0 mensajes, 0 costos; otro `--dry-run --rehacer` lo destraba (el `--dry-run` solo también frena con `MensajeCambio`). `enviar` recompone con el `mensaje_base` vigente y compara contra `contactos.cuerpo` (sin DDL nuevo). Mutación `sabotaje_sin_chequeo_de_cambio`. (security)
+- [x] T04B [Paso 4] `::test_dry_run_imprime_resumen_sin_direcciones`: la salida trae cuántos se enviarían, el modo (`prueba`/`real`) y un ejemplo del mensaje con el enlace de baja; ninguna dirección de los leads aparece (ni la de prueba). Mutación `sabotaje_dry_run_con_direccion`. (security)
+- [x] T047 [Paso 4] `::test_tope_20_por_corrida`: 25 elegibles con dry-run → 20 mensajes, 5 quedan `aprobado`. Mutación `sabotaje_sin_tope`.
+- [x] T048 [Paso 4] `::test_modo_prueba_solo_destinos_de_prueba`: modo `prueba`, un lead en la lista y otro no → 1 mensaje, el otro `aprobado`, 1 costo. `::test_modo_prueba_lista_vacia_no_manda`. Mutación `sabotaje_prueba_sin_filtro`: ignorar la lista en modo `prueba`. (security)
+- [x] T049 [Paso 4] `::test_sin_fila_de_cumplimiento_no_envia` y `::test_con_opt_out_no_envia`. Mutación `sabotaje_sin_chequeo_opt_out`. (security)
+- [x] T045 [Paso 4] Implementar `EnviarABusqueda`, `repositorio_contactos.py` y `app.cli enviar [--dry-run] [--rehacer]` hasta verde; con `EMAIL_MODO=real` y sin `/baja/{token}` en la api, el CLI sale con 2 (`sabotaje_real_sin_baja`) (también T046–T049, T04A, T04B). `--dry-run` no imprime direcciones.
 
 ## Fase 6: Baja (Paso 5) — security
 

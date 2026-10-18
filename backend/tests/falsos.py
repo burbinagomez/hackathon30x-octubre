@@ -3,6 +3,7 @@ from collections.abc import Mapping
 from decimal import Decimal
 from uuid import UUID, uuid4
 
+from app.modulos.contacto.dominio.modelos import LeadContactable
 from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.descubrimiento.dominio.modelos import Borrador, CriteriosICP, EmpresaCruda, MetaFuente, PaginaEmpresas
 
@@ -125,3 +126,13 @@ class FabricaFalsa:
         return {clave: FuenteFalsa(meta, self._costos, lote_id, self._empresas.get(clave, ()), self._errores.get(clave),
                                   self.criterios_por_fuente)
                 for clave, meta in self._metas.items()}
+
+
+class LeadsContactablesFalso:
+    """Stub del puerto de la 006: devuelve lo que se le da, sin filtrar. El filtro legal lo hace `contactos` en SQL."""
+
+    def __init__(self, leads: list[LeadContactable]):
+        self.leads = leads
+
+    def de_busqueda(self, busqueda_id: UUID, canal: str) -> list[LeadContactable]:
+        return list(self.leads) if canal == "email" else []

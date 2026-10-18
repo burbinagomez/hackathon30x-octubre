@@ -32,6 +32,7 @@ def _ajustes(falso: SmtpFalso | None = None, **extra) -> SettingsEmail:
         remitente=f"Ana Pérez <{REMITENTE}>",
         baja_secret="b" * 32,
         api_base_url="https://api.ejemplo.test",
+        url_privacidad="https://agencia-sintetica.test/privacidad",
     )
     return SettingsEmail(**(base | extra))
 
