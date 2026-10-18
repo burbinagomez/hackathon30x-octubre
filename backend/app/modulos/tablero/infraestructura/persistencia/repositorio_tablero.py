@@ -32,9 +32,12 @@ class DatosTablero:
     total: FilaFuente
     atribuciones: tuple[Atribucion, ...]
     costo_evals: Decimal | None = None
+    costo_intake: Decimal | None = None
 
 
-# Costo por fuente desde `costos` (lista = unidades x tarifa; real = 0 si cayó en tier gratis). Lo de evals va aparte.
+# Costo por fuente desde `costos` (lista = unidades x tarifa; real = 0 si cayó en tier gratis). Lo de evals (desarrollo) y
+# lo de intake (calibración: la Puerta B, sin lead ni búsqueda) va aparte y no entra al costo de adquisición.
+# Sin vistas nuevas a propósito: no hay DDL, es SQL inline.
 # La fuente nula es `sin_atribuir`. CPL = costo / únicos: NULLIF evita la división por cero y deja NULL ("sin dato").
 # El tenant lo filtra la RLS de `costos` y de la vista (security_invoker): no hay `WHERE tenant_id`.
 _SQL_FUENTES = text("""
@@ -42,7 +45,7 @@ _SQL_FUENTES = text("""
       SELECT COALESCE(fuente, 'sin_atribuir') AS fuente,
              sum(unidades * costo_unitario) AS lista,
              sum(CASE WHEN gratis THEN 0 ELSE unidades * costo_unitario END) AS real
-      FROM costos WHERE fuente IS DISTINCT FROM 'evals' GROUP BY 1),
+      FROM costos WHERE fuente IS DISTINCT FROM 'evals' AND fuente IS DISTINCT FROM 'intake' GROUP BY 1),
     t AS (SELECT fuente, encontrados, unicos FROM v_tablero_fuentes WHERE fuente <> 'TOTAL'),
     f AS (
       SELECT COALESCE(t.fuente, c.fuente) AS fuente, COALESCE(t.encontrados, 0) AS encontrados,
@@ -55,10 +58,11 @@ _SQL_TOTAL = text("""
     WITH k AS (
       SELECT COALESCE((SELECT encontrados FROM v_tablero_fuentes WHERE fuente = 'TOTAL'), 0) AS encontrados,
              COALESCE((SELECT unicos FROM v_tablero_fuentes WHERE fuente = 'TOTAL'), 0) AS unicos,
-             (SELECT sum(unidades * costo_unitario) FROM costos WHERE fuente IS DISTINCT FROM 'evals') AS lista,
+             (SELECT sum(unidades * costo_unitario) FROM costos WHERE fuente IS DISTINCT FROM 'evals' AND fuente IS DISTINCT FROM 'intake') AS lista,
              (SELECT sum(CASE WHEN gratis THEN 0 ELSE unidades * costo_unitario END) FROM costos
-               WHERE fuente IS DISTINCT FROM 'evals') AS real,
-             (SELECT sum(unidades * costo_unitario) FROM costos WHERE fuente = 'evals') AS evals)
+               WHERE fuente IS DISTINCT FROM 'evals' AND fuente IS DISTINCT FROM 'intake') AS real,
+             (SELECT sum(unidades * costo_unitario) FROM costos WHERE fuente = 'evals') AS evals,
+             (SELECT sum(unidades * costo_unitario) FROM costos WHERE fuente = 'intake') AS intake)
     SELECT *, lista / NULLIF(unicos, 0) AS cpl_lista, real / NULLIF(unicos, 0) AS cpl_real FROM k""")
 
 
@@ -70,4 +74,4 @@ def leer_tablero(engine: Engine, tenant_id: UUID) -> DatosTablero:
         atribuciones = tuple(Atribucion(a.fuente, a.texto, a.url) for a in c.execute(
             text("SELECT fuente, texto, url FROM v_atribuciones ORDER BY orden")))
     total = FilaFuente("TOTAL", t.encontrados, t.unicos, t.lista, t.real, t.cpl_lista, t.cpl_real)
-    return DatosTablero(filas, total, atribuciones, t.evals)
+    return DatosTablero(filas, total, atribuciones, t.evals, t.intake)

@@ -1,7 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { ErrorApi } from "../api/cliente";
 import { navegar } from "../compartido/navegar";
-import { divisionesDe, ejecutar, listarActividades, listarPaises, vistaPrevia } from "./api";
+import {
+  divisionesDe, ejecutar, estadoIntake, listarActividades, listarPaises, sugerirDesdeFrase, vistaPrevia,
+  type EstadoIntake, type Sugerencia,
+} from "./api";
+import IntakeLookalike from "./IntakeLookalike";
 import ResultadoPorFuente from "./ResultadoPorFuente";
 import ResultadoVistaPrevia from "./ResultadoVistaPrevia";
 import type { Actividad, Division, PedidoVistaPrevia, ResultadoEjecucion, VistaPrevia } from "./tipos";
@@ -16,6 +21,23 @@ const INICIAL: Formulario = {
   pais: "CO", ciiu: "", departamento: "", ciudad: "", ingresosMin: "", palabrasClave: "",
   exclusiones: "", canal: "email", tope: "", mensaje: "",
 };
+
+type Pestana = "lookalike" | "frase" | "filtros";
+const MAX_FRASE = 500;
+
+/** La sugerencia de una puerta pisa solo los criterios del ICP; canal, tope y mensaje son del usuario. */
+function conSugerencia(f: Formulario, s: Sugerencia): Formulario {
+  return {
+    ...f,
+    pais: s.pais,
+    ciiu: s.ciiu ?? "",
+    departamento: s.departamento ?? "",
+    ciudad: s.departamento && s.ciudad ? s.ciudad : "",
+    ingresosMin: s.ingresos_min === null ? "" : String(s.ingresos_min),
+    palabrasClave: s.palabras_clave.join(", "),
+    exclusiones: s.exclusiones.join(", "),
+  };
+}
 
 const lista = (texto: string) => texto.split(",").map((p) => p.trim()).filter(Boolean);
 
@@ -52,9 +74,17 @@ export default function NuevaBusqueda() {
   const [paises, setPaises] = useState<string[]>([]);
   const [divisiones, setDivisiones] = useState<Division[]>([]);
   const [fallo, setFallo] = useState(false);
+  const [puertas, setPuertas] = useState<EstadoIntake>({ frase: false, lookalike: false });
+  const [pestana, setPestana] = useState<Pestana>("filtros");
+  const [frase, setFrase] = useState("");
+  const [pensando, setPensando] = useState(false);
+  const [errorFrase, setErrorFrase] = useState<string | null>(null);
+  const [sugerido, setSugerido] = useState(false);
   const [resultado, setResultado] = useState<ResultadoEjecucion | null>(null);
 
   useEffect(() => {
+    // Sin estado (o si falla) solo queda Filtros: las puertas son un atajo, no un requisito.
+    estadoIntake().then(setPuertas).catch(() => undefined);
     listarActividades().then(setActividades).catch(() => undefined);
     // Solo se ofrecen los países que tienen archivo de geografía.
     listarPaises().then((r) => setPaises(r.paises)).catch(() => undefined);
@@ -79,6 +109,29 @@ export default function NuevaBusqueda() {
     setResultado(null);
   }
 
+  // Puerta A: prellena y se queda en su pestaña, porque ahí se ve la explicación (conteos y no resueltos).
+  function aplicarLookalike(sugerencia: Sugerencia) {
+    setForm((f) => conSugerencia(f, sugerencia));
+    setVista(null);
+    setSugerido(true);
+  }
+
+  async function sugerir() {
+    setErrorFrase(null);
+    setPensando(true);
+    try {
+      const { sugerencia } = await sugerirDesdeFrase(frase.trim());
+      setForm((f) => conSugerencia(f, sugerencia));
+      setVista(null);
+      setSugerido(true);
+      setPestana("filtros");  // el usuario revisa y edita antes de gastar en vista previa
+    } catch (e) {
+      setErrorFrase(e instanceof ErrorApi && e.estado === 503 ? "error_no_disponible" : "error_interpretacion");
+    } finally {
+      setPensando(false);
+    }
+  }
+
   async function intentar(accion: () => Promise<void>) {
     setFallo(false);
     try {
@@ -101,12 +154,49 @@ export default function NuevaBusqueda() {
   const exclusiones = entrada("exclusiones", t("busqueda.exclusiones"));
   const tope = entrada("tope", t("busqueda.tope"), "number");
   const nombre = (a: Actividad) => (i18n.language === "en" ? a.nombre_en ?? a.nombre_es : a.nombre_es);
+  const pestanas: Pestana[] = [
+    ...(puertas.lookalike ? (["lookalike"] as const) : []),
+    ...(puertas.frase ? (["frase"] as const) : []),
+    "filtros",
+  ];
   const puedeBuscar = resultado === null && vista !== null && vista.dentro_del_tope !== false && vista.fuentes.length > 0;
 
   return (
     <main className="pantalla">
       <h1>{t("busqueda.titulo")}</h1>
+      {pestanas.length > 1 && (
+        <div role="tablist" className="pestanas">
+          {pestanas.map((p) => (
+            <button key={p} type="button" role="tab" aria-selected={pestana === p} className="pestana"
+              onClick={() => setPestana(p)}>
+              {t(`busqueda.pestanas.${p}`)}
+            </button>
+          ))}
+        </div>
+      )}
+      {pestana === "frase" && (
+        <div className="formulario formulario-ancho" role="tabpanel">
+          <Campo id="frase" etiqueta={t("busqueda.frase.etiqueta")}>
+            <textarea id="frase" maxLength={MAX_FRASE} value={frase} onChange={(e) => setFrase(e.target.value)} />
+          </Campo>
+          <p className="ayuda">{t("busqueda.frase.ayuda")}</p>
+          <div className="acciones">
+            <button type="button" className="boton boton-primario" disabled={!frase.trim() || pensando} onClick={sugerir}>
+              {pensando ? t("busqueda.frase.pensando") : t("busqueda.frase.sugerir")}
+            </button>
+          </div>
+          {errorFrase && <p role="alert" className="error">{t(`busqueda.frase.${errorFrase}`)}</p>}
+        </div>
+      )}
+      {pestana === "lookalike" && (
+        <div className="formulario formulario-ancho" role="tabpanel">
+          {sugerido && <p role="status" className="aviso">{t("busqueda.frase.revisar")}</p>}
+          <IntakeLookalike alSugerir={aplicarLookalike} />
+        </div>
+      )}
+      {pestana === "filtros" && (
       <div className="formulario formulario-ancho">
+      {sugerido && <p role="status" className="aviso">{t("busqueda.frase.revisar")}</p>}
       <Campo id="pais" etiqueta={t("busqueda.pais")}>
         <select id="pais" value={form.pais} onChange={(e) => cambiar("pais", e.target.value)}>
           {paises.map((p) => <option key={p} value={p}>{t(`paises.${p}`)}</option>)}
@@ -194,6 +284,7 @@ export default function NuevaBusqueda() {
       )}
       {fallo && <p role="alert" className="error">{t("busqueda.error")}</p>}
       </div>
+      )}
     </main>
   );
 }

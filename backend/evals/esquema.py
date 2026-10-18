@@ -51,7 +51,7 @@ WHITELIST: dict[str, dict[tuple[str, ...], set[str]]] = {
     "baseline.json": {(): set(EVALS), **{(nombre,): _BASELINE for nombre in EVALS}},
 }
 
-EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+EMAIL = re.compile(r"[^@\s]+@[^@\s.]+(?:\.[^@\s.]+)+")  # sin `.` en las etiquetas: sin backtracking (Sonar)
 # 7+ dígitos con separadores opcionales; la coma no separa ("4711, 4719" es una lista de CIIU).
 TELEFONO = re.compile(r"\d(?:[ .\-()]*\d){6,}")
 FECHA_EN_TEXTO = re.compile(r"\d{4}-\d{2}-\d{2}")

@@ -106,3 +106,31 @@ def test_costos_de_otro_tenant_no_cuentan(rt, admin, fixture10, tenants):
     assert _filas(como_a)[CS].costo_lista == Decimal("1.35") and como_a.costo_evals == Decimal("1.00")
     assert [f.fuente for f in como_b.fuentes] == [CS]  # B solo ve lo suyo
     assert _filas(como_b)[CS].costo_lista == Decimal("999.00")
+
+
+def test_costo_de_intake_va_aparte_y_no_entra_ni_a_las_fuentes_ni_al_total(rt, admin, fixture10):
+    sembrar_costos(admin, fixture10)
+    with admin.begin() as c:  # la Puerta B: lead_id NULL, un lote por corrida, fuente='intake'
+        lote = uuid4()
+        _costo(c, fixture10["tenant"], lote, "intake", 200, "0.0000001")
+        _costo(c, fixture10["tenant"], lote, "intake", 60, "0.0000005")
+
+    datos = leer_tablero(rt, fixture10["tenant"])
+
+    assert datos.costo_intake == Decimal("0.000050")
+    assert datos.costo_evals == Decimal("1.00")  # cada categoría por su lado
+    assert "intake" not in _filas(datos)
+    assert datos.total.costo_lista == Decimal("2.82") and datos.total.costo_real == Decimal("2.42")
+    assert datos.total.cpl_lista == Decimal("0.282")
+
+
+def test_sin_costos_de_intake_es_null_y_no_cero(rt, fixture10):
+    assert leer_tablero(rt, fixture10["tenant"]).costo_intake is None
+
+
+def test_costo_de_intake_de_otro_tenant_no_cuenta(rt, admin, tenants):
+    with admin.begin() as c:
+        _costo(c, tenants["b"], uuid4(), "intake", 100, "9.99")
+
+    assert leer_tablero(rt, tenants["a"]).costo_intake is None
+    assert leer_tablero(rt, tenants["b"]).costo_intake == Decimal("999.00")
