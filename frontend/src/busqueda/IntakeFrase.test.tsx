@@ -258,6 +258,20 @@ test("buscar_ejecuta_y_muestra_el_resultado_por_fuente_sin_cambiar_de_pestana", 
   expect(pestana(es.busqueda.pestanas.frase)).toHaveAttribute("aria-selected", "true");
 });
 
+test("una_sugerencia_nueva_deja_sin_vigencia_la_vista_previa_de_la_anterior", async () => {
+  await montar();
+  escribirYSugerir();
+  await verTarjeta();
+  fireEvent.click(boton("Vista previa"));
+  await screen.findByText(es.busqueda.conteo_antes_de_filtros);
+
+  enviar("mejor ferreterías de Bogotá");
+
+  await waitFor(() => expect(conversacion().getByText("mejor ferreterías de Bogotá")).toBeInTheDocument());
+  await waitFor(() => expect(screen.queryByText(es.busqueda.conteo_antes_de_filtros)).not.toBeInTheDocument());
+  expect(boton("Buscar")).toBeDisabled();
+});
+
 test("empezar_de_nuevo_limpia_la_conversacion_la_tarjeta_y_los_resultados", async () => {
   await montar();
   escribirYSugerir();
