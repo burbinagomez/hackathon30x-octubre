@@ -6,6 +6,7 @@ para entrar. Sirve para validar cuando el deploy no está disponible. Prod no se
 1. `cp local/.env.example local/.env` y completá:
    - `LOCAL_EMAIL` y `LOCAL_PASSWORD`: tu usuario local (el único).
    - `CIFRADO_KEY`: `openssl rand -base64 32` (una nueva, solo local).
+   - `APP_RT_PASSWORD`: `openssl rand -hex 16` (la clave del rol de la api en el Postgres local).
    - Opcionales: `IA_API_KEY` + `IA_MODELO` (Puerta B), `CROMA_API_KEY`, `TYPESAFE_*`.
 2. Desde la raíz del repo:
    `docker compose -f local/docker-compose.yml --env-file local/.env up --build`
