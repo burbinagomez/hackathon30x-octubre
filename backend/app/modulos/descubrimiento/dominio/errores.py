@@ -16,3 +16,7 @@ class RegistroInvalido(ValueError):
 
 class ErrorPersistencia(RuntimeError):
     """La base rechazó una escritura. Mensaje fijo: el de Postgres trae la fila entera (nombre, dirección)."""
+
+
+class BusquedaYaEjecutada(RuntimeError):
+    """La búsqueda no está en `borrador` (ya corrió, está corriendo, o alguien llegó antes)."""

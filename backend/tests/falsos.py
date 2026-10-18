@@ -4,7 +4,7 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from app.modulos.costos.dominio.modelos import OperacionCosto
-from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, EmpresaCruda, MetaFuente, PaginaEmpresas
+from app.modulos.descubrimiento.dominio.modelos import Borrador, CriteriosICP, EmpresaCruda, MetaFuente, PaginaEmpresas
 
 
 class RepositorioLeadsFalso:
@@ -27,6 +27,18 @@ class RepositorioLeadsFalso:
         self.busquedas[busqueda_id] = "borrador"
         self.borradores[busqueda_id] = (criterios, canal_preferido, tope_gasto_usd, mensaje_base)
         return busqueda_id
+
+    def obtener_borrador(self, busqueda_id: UUID) -> Borrador | None:
+        if self.busquedas.get(busqueda_id) != "borrador":
+            return None
+        criterios, canal, tope, mensaje = self.borradores[busqueda_id]
+        return Borrador(busqueda_id, criterios, canal, tope, mensaje)
+
+    def pasar_a_ejecutando(self, busqueda_id: UUID) -> bool:
+        if self.busquedas.get(busqueda_id) != "borrador":
+            return False
+        self.busquedas[busqueda_id] = "ejecutando"
+        return True
 
     def obtener_o_crear_lead(self, e: EmpresaCruda, licencia: str) -> tuple[UUID, bool]:
         clave = (e.pais, e.id_fiscal)
@@ -67,14 +79,18 @@ class FuenteFalsa:
     """Escribe 1 fila de costos con su lote_id y devuelve sus empresas del país pedido en la página 1, o lanza `error`."""
 
     def __init__(self, meta: MetaFuente, costos: RegistroCostosFalso, lote_id: UUID,
-                 empresas: tuple[EmpresaCruda, ...] = (), error: Exception | None = None):
+                 empresas: tuple[EmpresaCruda, ...] = (), error: Exception | None = None,
+                 recibidos: list[CriteriosICP] | None = None):
         self.meta = meta
+        self._recibidos = recibidos
         self._costos = costos
         self._lote_id = lote_id
         self._empresas = empresas
         self._error = error
 
     def buscar(self, criterios: CriteriosICP, pagina: int) -> PaginaEmpresas:
+        if self._recibidos is not None:
+            self._recibidos.append(criterios)
         self._costos.registrar(OperacionCosto(
             tipo="web_fetch", unidades=Decimal(1), costo_unitario=Decimal(0), moneda="USD",
             proveedor=self.meta.proveedor, fuente=self.meta.clave, canal=None, lead_id=None,
@@ -93,6 +109,7 @@ class FabricaFalsa:
                  empresas: Mapping[str, tuple[EmpresaCruda, ...]] | None = None,
                  errores: Mapping[str, Exception] | None = None):
         self.llamadas: list[UUID | None] = []  # lote_id de cada llamada
+        self.criterios_recibidos: list[CriteriosICP] = []  # lo que recibió buscar() de cualquier fuente
         self._costos = costos
         self._metas = metas
         self._empresas = empresas or {}
@@ -100,5 +117,6 @@ class FabricaFalsa:
 
     def __call__(self, lote_id: UUID) -> Mapping[str, FuenteFalsa]:
         self.llamadas.append(lote_id)
-        return {clave: FuenteFalsa(meta, self._costos, lote_id, self._empresas.get(clave, ()), self._errores.get(clave))
+        return {clave: FuenteFalsa(meta, self._costos, lote_id, self._empresas.get(clave, ()), self._errores.get(clave),
+                                  self.criterios_recibidos)
                 for clave, meta in self._metas.items()}

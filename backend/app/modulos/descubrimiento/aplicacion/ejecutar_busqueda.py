@@ -5,7 +5,7 @@ from uuid import UUID
 from app.modulos.descubrimiento.dominio.errores import FuenteNoDisponible, LimiteFuenteAgotado
 from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, MetaFuente
 from app.modulos.descubrimiento.dominio.nit import normalizar_nit
-from app.modulos.descubrimiento.dominio.puertos import FuenteDescubrimiento, RepositorioLeads
+from app.modulos.descubrimiento.dominio.puertos import FabricaFuentes, FuenteDescubrimiento, RepositorioLeads
 from app.modulos.descubrimiento.dominio.seleccion import seleccionar_fuentes
 
 FabricaFuente = Callable[[UUID], FuenteDescubrimiento]  # lote_id -> fuente armada para esa búsqueda
@@ -61,3 +61,15 @@ class EjecutarBusqueda:
 
         self._repo.cerrar_busqueda(busqueda_id, "con_errores" if errores else "terminada")
         return ResultadoBusqueda(busqueda_id, errores=errores, encontrados=encontrados, unicos=len(leads), nuevos=nuevos)
+
+
+class EjecutarBorrador:
+    """Entrada de la API: corre un borrador guardado, con sus criterios congelados y lote_id = busqueda_id."""
+
+    def __init__(self, repo: RepositorioLeads, fabrica: FabricaFuentes, actividades: Mapping[str, tuple[str, ...]]):
+        self._repo = repo
+        self._fabrica = fabrica
+        self._actividades = actividades
+
+    def ejecutar(self, busqueda_id: UUID) -> ResultadoBusqueda:
+        return ResultadoBusqueda(busqueda_id)  # esqueleto T026

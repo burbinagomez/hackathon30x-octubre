@@ -172,6 +172,8 @@
   - `::test_solo_ejecuta_borrador`: `BusquedaYaEjecutada`. **Mutación:** ignorar el `bool` de `pasar_a_ejecutando`.
   - `::test_usa_los_criterios_guardados`, con un `assert` sobre `inspect.signature(ejecutar)`. **Mutación:** aceptar `criterios=None` y usarlo si viene.
   - `::test_filtradas_por_palabras_no_generan_lead_ni_cumplimiento`: el repo falso no recibe `obtener_o_crear_lead` para la filtrada, y el costo de la llamada sigue en el lote. **Mutación:** filtrar después de persistir.
+  *Rojo escrito 2026-10-18, pendiente de advisor (parte [MIN]): `test_ejecutar_con_tope.py` con `test_usa_los_criterios_guardados`, `test_solo_ejecuta_borrador`, más tres que el [MIN] necesita y la tabla no listaba: `test_lote_es_la_busqueda_y_cada_llamada_deja_su_costo_y_cada_lead_su_cumplimiento`, `test_pierde_la_carrera_por_el_borrador_no_llama_a_ninguna_fuente` (mata "ignorar el bool de `pasar_a_ejecutando`", que el secuencial no distingue) y `test_estado_final_completada_si_una_fuente_respondio_y_error_si_fallaron_todas` (P1). Los de tope y palabras clave siguen en Pulido. Esqueleto: clase `EjecutarBorrador` (decisión abierta con el advisor: clase aparte para no romper la CLI y los tests de la 003).*
+
 - [ ] T027 [MIN] [Paso 5] **Verde:** `EjecutarBusqueda` con tope, `lote_id = busqueda.id`, estado final (P1) y `naturales_por_fuente` (011).
 - [ ] T028 [Pulido] [Paso 5] **Rojo (advisor, costos):** `backend/tests/integration/test_costos_repo.py::test_costos_de_descubrimiento_llevan_lote_de_la_busqueda` (spec:141), con transportes falsos y `postgres_costos` real. **Mutación:** construir los adaptadores de la vista previa con `lote_id=None`. Va acá y no en la Fase 3 porque necesita los dos casos de uso.
 
