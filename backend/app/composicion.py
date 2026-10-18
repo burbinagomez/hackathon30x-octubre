@@ -13,6 +13,7 @@ import httpx
 import yaml
 
 from app.config import Settings
+from app.modulos.calificacion.infraestructura.dapta_csv import DaptaCSV
 from app.modulos.costos.dominio.puertos import RegistroCostos
 from app.modulos.descubrimiento.aplicacion.camaras import cargar_camaras
 from app.modulos.descubrimiento.aplicacion.registro import Registro, cargar_registro
@@ -23,11 +24,15 @@ from app.modulos.intake.infraestructura.llm.interpretador_claude import Interpre
 CONFIG = Path(__file__).resolve().parents[1] / "config"
 
 
-def cargar_tarifas() -> dict[str, Decimal]:
-    """Tarifa unitaria por proveedor desde tarifas.yaml; cada valor pasa por str para no arrastrar el error del float."""
-    t = yaml.safe_load((CONFIG / "tarifas.yaml").read_text())
+def cargar_tarifas(ruta: Path = CONFIG / "tarifas.yaml") -> dict[str, Decimal]:
+    """Tarifa unitaria por proveedor desde tarifas.yaml; cada valor pasa por str para no arrastrar el error del float.
+
+    `dapta` puede faltar (`null`): se lee como `None`, nunca como `Decimal(0)` (TarifaPendiente lo distingue)."""
+    t = yaml.safe_load(ruta.read_text())
+    usd_por_minuto = t["dapta"]["usd_por_minuto"]
     return {"croma": Decimal(str(t["croma"]["usd_por_credito"])), "osm": Decimal(str(t["computo_seg_usd"])),
-            "datos.gov.co": Decimal(str(t["computo_seg_usd"]))}
+            "datos.gov.co": Decimal(str(t["computo_seg_usd"])),
+            "dapta": Decimal(str(usd_por_minuto)) if usd_por_minuto is not None else None}
 
 
 def cargar_tarifas_llm() -> dict[str, dict[str, Decimal]]:
@@ -111,3 +116,9 @@ def cargar_geografia(carpeta: Path) -> dict[str, dict]:
             raise ValueError(f"geografía duplicada para {pais}: {ruta.name}")
         archivos[pais] = contenido
     return archivos
+
+
+def calificador_api(ruta_yaml: Path):
+    """`DaptaCSV` si `calificadores.dapta_csv.habilitado` en fuentes.yaml; si no, None (el import responde 503)."""
+    calificadores = (yaml.safe_load(ruta_yaml.read_text()) or {}).get("calificadores") or {}
+    return DaptaCSV() if (calificadores.get("dapta_csv") or {}).get("habilitado") else None

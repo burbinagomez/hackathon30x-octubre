@@ -99,7 +99,10 @@
     "atribucion": "Data attribution",
     "desperdicio_real": "Waste (actual)",
     "ver_busquedas": "View searches",
-    "licencia": "License"
+    "licencia": "License",
+    "calificados": "Qualified",
+    "pct_calificados": "% qualified (of unique)",
+    "cpql": "CPQL (list)"
   },
   "idioma": {
     "etiqueta": "Language",

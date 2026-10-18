@@ -22,3 +22,15 @@ export type Tablero = {
   revisiones_pendientes: number | null;
   atribuciones: { fuente: string; texto: string; url: string }[];
 };
+
+/** Una fila de GET /calificaciones/cpql. Sin calificados el CPQL es null ("sin dato"), nunca una división por cero. */
+export type FilaCpql = {
+  fuente: string;
+  costo_lista: string | null;
+  costo_real: string | null;
+  calificados: number;
+  cpql_lista: string | null;
+  cpql_real: string | null;
+};
+
+export type Cpql = { fuentes: FilaCpql[]; total: FilaCpql | null };

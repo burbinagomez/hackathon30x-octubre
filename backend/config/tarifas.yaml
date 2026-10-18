@@ -27,7 +27,10 @@ whatsapp:
   usd_por_plantilla_co: null        # [VALIDAR] tarifa Meta Colombia de la cuenta que se use; null = canal no disponible
 
 dapta:
-  usd_por_minuto: null              # [MENTORES] costo del agente de voz en el entorno de prueba
+  # docs.dapta.ai, "Billing and credits" (1.000 créditos = US$1). Aprobado por Daniel, 2026-10-18.
+  usd_por_minuto: 0.333             # 333 créditos por minuto contestado, redondeado hacia arriba al minuto entero
+  usd_por_buzon: 0.075              # por llamada. Pendiente: el CSV del mínimo no distingue el resultado de la llamada
+  usd_por_no_contestada: 0.045      # por llamada. Pendiente: igual que el buzón
 
 humano:
   usd_por_minuto: 0.25              # configurable; tarifa de referencia para revisión manual

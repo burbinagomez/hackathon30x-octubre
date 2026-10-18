@@ -209,6 +209,12 @@ thead th {
   font-weight: 500;
 }
 
+/* Costo sin fuente: se ve, pero no es una fuente (sin calificados ni CPQL). */
+tr.sin-atribuir td {
+  font-style: italic;
+  border-top: 1px dashed var(--color-borde);
+}
+
 tr.total td {
   font-weight: 700;
   background: var(--color-acento);

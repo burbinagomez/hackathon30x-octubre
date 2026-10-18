@@ -23,3 +23,8 @@ export function monedaFina(valor: string | number | null): string {
     ? SIN_DATO
     : formatear({ style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 6 }, Number(valor));
 }
+
+/** parte / todo como porcentaje; sin dato o todo 0 es "sin dato", nunca una división por cero. */
+export function porcentaje(parte: number | null, todo: number | null): string {
+  return parte === null || !todo ? SIN_DATO : formatear({ style: "percent", maximumFractionDigits: 1 }, parte / todo);
+}
