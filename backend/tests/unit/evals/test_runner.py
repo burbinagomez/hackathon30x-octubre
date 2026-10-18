@@ -12,6 +12,7 @@ calculó el runner: así no importa `evals.fingerprint` (no existe hasta T012).
 Rojo hasta T012: `run.main` es un stub que devuelve 99 y no imprime nada; cada test falla en su primer assert.
 """
 import json
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -103,15 +104,17 @@ def correr(capsys):
                 entorno: dict = ENTORNO, costos: CostosFalso | None = None) -> Corrida:
         llamadas = []
 
-        def fabrica(nombre):
-            llamadas.append(nombre)
+        def fabrica(nombre_eval, lote_id):
+            llamadas.append((nombre_eval, lote_id))
             return juez
 
         argv = ["--config", str(config), *(["--tenant", tenant] if tenant else []), *flags]
         codigo = run.main(argv, entorno=entorno, fabrica_juez=fabrica,
                           registro_costos=costos if costos is not None else CostosFalso())
-        salida = capsys.readouterr().out
-        return Corrida(codigo, json.loads(salida) if salida.strip() else None, llamadas)
+        out, err = capsys.readouterr()
+        # Ningún valor del entorno sale por stdout ni stderr. Sabotaje: un `print(dict(entorno))` en run.main → rojo acá.
+        assert not [v for v in entorno.values() if v in out + err], "run.main imprimió un valor del entorno"
+        return Corrida(codigo, json.loads(out) if out.strip() else None, llamadas)
     return _correr
 
 
@@ -156,7 +159,18 @@ def test_caso_pasa_solo_si_pasa_las_tres(tmp_path, correr):
 
     assert r.eval()["fallidos"] == [{"id": "a", "motivo": "fallo_corrida"}]
     assert r.eval()["agregado"] == 0.5
+    assert r.eval()["determinacion"] == 0.5  # b: probabilidades distintas, mismo resultado (pasa) → determinista
     _assert_llamadas(juez, ["a", "b"])
+
+
+def test_corte_es_probabilidad_mayor_o_igual(tmp_path, correr):
+    config = _encaje(tmp_path, _caso("a"), _caso("b"), corte=0.8)
+    juez = _juez({"a": [0.8] * 3, "b": [0.79] * 3})
+
+    r = correr(config, juez)
+
+    assert r.eval()["fallidos"] == [{"id": "b", "motivo": "fallo_corrida"}]
+    _assert_llamadas(juez, "ab")
 
 
 def test_agregado_es_fraccion_de_casos_que_pasan(tmp_path, correr):
@@ -228,7 +242,51 @@ def test_salida_invalida_falla_el_caso_con_motivo(tmp_path, correr):
 
     assert r.eval()["fallidos"] == [{"id": "a", "motivo": "juez_salida_invalida"}]
     assert r.eval()["agregado"] == 0.5
+    assert r.eval()["determinacion"] == 0.5  # a: la inválida cuenta como "falla" → [falla, pasa, pasa]
     _assert_llamadas(juez, "ab")
+
+
+@pytest.mark.parametrize("nombre, datos", [
+    (ENCAJE, _dataset({**_caso("a"), "etiqueta": None})),
+    (CALIBRACION, [{**_mensaje("m-a"), "pertinente": None}]),
+], ids=["etiqueta", "pertinente"])
+def test_etiqueta_invalida_es_config_invalida(tmp_path, correr, nombre, datos):
+    config = _config(tmp_path, {nombre: {"datos": datos}})
+    juez = _juez({"a": [SI] * 3, "m-a": [SI] * 3})
+
+    r = correr(config, juez)
+
+    assert r.codigo == 2
+    assert r.fabrica_llamadas == []
+    _assert_llamadas(juez, [], k=0)
+
+
+class JuezEspia(JuezFalso):
+    def __init__(self, secuencias):
+        super().__init__(secuencias)
+        self.recibidos = []
+
+    def juzgar(self, tarea, caso):
+        self.recibidos.append((tarea, caso))
+        return super().juzgar(tarea, caso)
+
+
+def test_juez_recibe_un_caso_con_icp_y_sin_etiqueta(tmp_path, correr):
+    config = _config(tmp_path, {
+        ENCAJE: {"datos": _dataset(_caso("a"))},
+        CALIBRACION: {"datos": [_mensaje("m-a")]},
+    })
+    juez = _juez({"a": [SI] * 3, "m-a": [SI] * 3}, JuezEspia)
+
+    r = correr(config, juez)
+
+    assert r.reporte is not None, f"el runner no imprimió el reporte JSON (codigo {r.codigo})"
+    # Un caso por llamada, como objeto con clave; la etiqueta (ground truth) nunca llega al juez.
+    sin_etiqueta = {k: v for k, v in _caso("a").items() if k != "etiqueta"}
+    sin_pertinente = {k: v for k, v in _mensaje("m-a").items() if k != "pertinente"}
+    recibidos = sorted(juez.recibidos, key=lambda tarea_caso: tarea_caso[1]["id"])  # sin fijar el orden de los evals
+    assert recibidos == [(ENCAJE, {**sin_etiqueta, "icp": ICP})] * 3 + [(CALIBRACION, sin_pertinente)] * 3
+    _assert_llamadas(juez, ["a", "m-a"])
 
 
 def test_reporta_fallidos_con_id_y_motivo(tmp_path, correr):
@@ -249,6 +307,8 @@ def test_reporta_fallidos_con_id_y_motivo(tmp_path, correr):
 # --- k --------------------------------------------------------------------------------------------------------
 
 def test_k_menor_a_3_con_juez_llm_es_config_invalida(tmp_path, correr):
+    # Baseline a k=3 con determinacion 1.0: lo único que impide k=1 es que el juez es LLM.
+    _fijar_baseline(correr, _encaje(tmp_path, _caso("a"), k=3), "a")
     config = _encaje(tmp_path, _caso("a"), k=1)
     juez = _juez({"a": [SI] * 3})  # JuezFalso: determinista_si_se_demuestra = False, como claude
 
@@ -261,7 +321,7 @@ def test_k_menor_a_3_con_juez_llm_es_config_invalida(tmp_path, correr):
 def test_k1_solo_con_determinacion_demostrada(tmp_path, correr):
     ids = "abcd"
     casos = [_caso(i) for i in ids]
-    k1 = lambda: _encaje(tmp_path, *casos, k=1)  # noqa: E731 — k no entra en el fingerprint
+    k1 = lambda **cfg: _encaje(tmp_path, *casos, k=1, **cfg)  # noqa: E731 — k no entra en el fingerprint
     k3 = lambda: _encaje(tmp_path, *casos, k=3)  # noqa: E731
 
     # Sin baseline a k=3: k=1 no vale.
@@ -281,6 +341,11 @@ def test_k1_solo_con_determinacion_demostrada(tmp_path, correr):
         assert r.codigo == 0
         assert r.eval()["estado"] == "ok"
         _assert_llamadas(juez, ids, k=1)
+
+    # Un baseline de determinacion 1.0 pero de otro fingerprint (prompt distinto) no habilita k=1.
+    juez = _juez(_todos(ids, SI, 1), JuezDeterminista)
+    assert correr(k1(prompt="prompt sintetico v2"), juez).codigo == 2
+    _assert_llamadas(juez, [], k=0)
 
     # El baseline solo se fija a k=3: k=1 con --actualizar-baseline sale 2 y no escribe.
     antes = _baseline(k1()).read_bytes()
@@ -306,6 +371,7 @@ def test_igual_al_baseline_sale_0(tmp_path, correr):
 
     assert r.codigo == 0
     assert r.eval()["estado"] == "ok"
+    assert r.reporte["mejora_sin_fijar"] == []
     _assert_llamadas(juez, "abcd")
 
 
@@ -318,6 +384,20 @@ def test_baja_respecto_al_baseline_sale_1(tmp_path, correr):
 
     assert r.codigo == 1
     assert r.eval()["estado"] == "regresion"
+    _assert_llamadas(juez, "abcd")
+
+
+def test_tolerancia_absorbe_una_baja_dentro_del_margen(tmp_path, correr):
+    casos = [_caso(i) for i in "abcd"]
+    _fijar_baseline(correr, _encaje(tmp_path, *casos), "abcd", agregado=0.80)
+    # tolerancia no entra en el fingerprint: cambiarla no vuelve obsoleto el baseline.
+    config = _encaje(tmp_path, *casos, tolerancia=0.05)
+    juez = _juez({"a": [NO] * 3, **_todos("bcd", SI)})  # 0.75 ≥ 0.80 − 0.05 (0.8 − 0.05 en float no da 0.75 exacto)
+
+    r = correr(config, juez)
+
+    assert r.codigo == 0
+    assert r.eval()["estado"] == "ok"
     _assert_llamadas(juez, "abcd")
 
 
@@ -429,12 +509,76 @@ def test_actualizar_baseline_rechaza_regresion_sin_motivo(tmp_path, correr):
     assert (fijado["determinacion"], fijado["motivo"]) == (0.75, "ruido aceptado")
 
 
+def test_actualizar_baseline_obsoleto_no_pide_motivo_aunque_baje(tmp_path, correr):
+    casos = [_caso(i) for i in "abcd"]
+    _fijar_baseline(correr, _encaje(tmp_path, *casos), "abcd", agregado=0.85)
+    viejo = json.loads(_baseline(tmp_path / "evals.yaml").read_text())[ENCAJE]["fingerprint"]
+    config = _encaje(tmp_path, *casos, prompt="prompt sintetico v2")  # otro fingerprint: no hay contra qué bajar
+    juez = _juez({"a": [NO] * 3, **_todos("bcd", SI)})  # 0.75 ≥ umbral 0.70, < 0.85 del baseline viejo
+
+    r = correr(config, juez, "--actualizar-baseline")
+
+    assert r.codigo == 0
+    fijado = json.loads(_baseline(config).read_text())[ENCAJE]
+    assert (fijado["agregado"], fijado["motivo"]) == (0.75, None)
+    assert fijado["fingerprint"] != viejo
+    _assert_llamadas(juez, "abcd")
+
+
+# --- Varios evals y --eval ------------------------------------------------------------------------------------
+
+def _dos_evals(tmp_path: Path, ids_encaje="ab", ids_calibracion=("m1", "m2")) -> Path:
+    return _config(tmp_path, {ENCAJE: {"datos": _dataset(*(_caso(i) for i in ids_encaje))},
+                              CALIBRACION: {"datos": [_mensaje(i) for i in ids_calibracion]}})
+
+
+def test_eval_filtra_un_solo_eval_y_no_toca_los_demas(tmp_path, correr):
+    config = _dos_evals(tmp_path)
+    _fijar_baseline(correr, config, ["a", "b", "m1", "m2"])
+    calibracion_antes = json.loads(_baseline(config).read_text())[CALIBRACION]
+    juez = _juez(_todos("ab", SI))  # sin secuencias de calibración: si las juzga, JuezFalso falla
+
+    r = correr(config, juez, "--eval", ENCAJE, "--actualizar-baseline")
+
+    assert r.codigo == 0
+    assert set(r.reporte["evals"]) == {ENCAJE}
+    assert [nombre for nombre, _ in r.fabrica_llamadas] == [ENCAJE]
+    assert json.loads(_baseline(config).read_text())[CALIBRACION] == calibracion_antes
+    _assert_llamadas(juez, "ab")
+
+
+def test_actualizar_con_un_eval_bajo_umbral_no_escribe_ninguno(tmp_path, correr):
+    config = _dos_evals(tmp_path, ids_calibracion=("m1", "m2", "m3", "m4"))
+    juez = _juez({**_todos("ab", SI), **_todos(["m1", "m2"], SI), **_todos(["m3", "m4"], NO)})  # calibración 0.5
+
+    r = correr(config, juez, "--actualizar-baseline")
+
+    assert r.codigo == 1
+    assert r.eval(CALIBRACION)["estado"] == "bajo_umbral"
+    assert not _baseline(config).exists()
+    _assert_llamadas(juez, ["a", "b", "m1", "m2", "m3", "m4"])
+
+
+def test_lote_id_es_un_uuid_por_corrida(tmp_path, correr):
+    config = _encaje(tmp_path, _caso("a"))
+
+    r1 = correr(config, _juez(_todos("a", SI)))
+    r2 = correr(config, _juez(_todos("a", SI)))
+
+    assert r1.reporte is not None and r2.reporte is not None
+    uuid.UUID(r1.reporte["lote_id"])
+    assert r1.reporte["lote_id"] != r2.reporte["lote_id"]
+    # fabrica_juez(nombre_eval, lote_id): recibe el mismo lote del reporte, una vez por eval.
+    assert [(n, str(lote)) for n, lote in r1.fabrica_llamadas] == [(ENCAJE, r1.reporte["lote_id"])]
+
+
 # --- Entorno --------------------------------------------------------------------------------------------------
 
-def test_sin_api_key_sale_2_sin_llamar(tmp_path, correr):
+@pytest.mark.parametrize("falta", ["ANTHROPIC_API_KEY", "DATABASE_URL"])
+def test_sin_entorno_sale_2_sin_llamar(tmp_path, correr, falta):
     config = _encaje(tmp_path, _caso("a"))
     costos = CostosFalso()
-    entorno = {k: v for k, v in ENTORNO.items() if k != "ANTHROPIC_API_KEY"}
+    entorno = {k: v for k, v in ENTORNO.items() if k != falta}
 
     r = correr(config, _juez(_todos("a", SI)), entorno=entorno, costos=costos)
 
