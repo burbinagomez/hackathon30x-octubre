@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { navegar } from "../compartido/navegar";
 import { entero, moneda, monedaFina } from "../compartido/formato";
@@ -36,10 +37,14 @@ type Props = {
   tope: number;
   /** El pedido tiene lo mínimo para calcular la vista previa (actividad y tope). */
   puedeVista: boolean;
+  /** Botón extra en la misma fila (el chat pone "Editar en Filtros" entre Vista previa y Buscar). */
+  extra?: ReactNode;
+  /** Buscar es el botón primario. El chat lo apaga cuando falta la actividad y lo primario es editar. */
+  buscarPrimario?: boolean;
 };
 
 /** Vista previa, Buscar, píldora de espera y resultado por fuente. Fragmento: los hijos caen en la grilla de quien lo monta. */
-export default function BloqueBusqueda({ busqueda, pedido, tope, puedeVista }: Props) {
+export default function BloqueBusqueda({ busqueda, pedido, tope, puedeVista, extra, buscarPrimario = true }: Props) {
   const { t } = useTranslation();
   const { vista, resultado, ocupado, fallo } = busqueda;
   const puedeBuscar = resultado === null && vista !== null && vista.dentro_del_tope !== false && vista.fuentes.length > 0;
@@ -52,8 +57,9 @@ export default function BloqueBusqueda({ busqueda, pedido, tope, puedeVista }: P
           onClick={() => busqueda.previsualizar(pedido)}>
           {t("busqueda.vista_previa")}
         </button>
-        <button type="button" className="boton boton-primario" disabled={!puedeBuscar || ocupado !== null}
-          aria-busy={ocupado === "buscar"} onClick={busqueda.buscar}>
+        {extra}
+        <button type="button" className={buscarPrimario ? "boton boton-primario" : "boton"}
+          disabled={!puedeBuscar || ocupado !== null} aria-busy={ocupado === "buscar"} onClick={busqueda.buscar}>
           {ocupado === "buscar" && <span className="anillo anillo-chico" aria-hidden="true" />}
           {ocupado === "buscar" ? t("busqueda.trabajando.buscando_boton") : t("busqueda.buscar")}
         </button>

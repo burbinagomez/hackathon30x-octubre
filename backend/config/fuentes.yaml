@@ -34,7 +34,7 @@ fuentes_descubrimiento:                 # puerto: FuenteDescubrimiento · orden 
     sesgo: "solo empresas que reportan estados financieros (medianas/grandes)"
     licencia: "datos públicos vía Croma; no redistribuir"
   croma_dian_trade_co:
-    habilitado: true
+    habilitado: false                    # sin adaptador todavía (no está en adaptadores/__init__.py)
     proveedor: croma
     endpoint: /co/dian-trade/directory-search/v1
     tipo: dataset
@@ -52,9 +52,23 @@ fuentes_descubrimiento:                 # puerto: FuenteDescubrimiento · orden 
     trae: [nombre_comercial, estado, camara]   # detalle: tel, email, web, dirección
     nota: "requiere nombre (substring); descubrimiento parcial"
 
+# OJO: de esta sección solo se lee `rues_datos_gov_co.habilitado` (composicion.verificador_titular). El resto es documental:
+# composicion.py arma los demás enriquecedores en código y cambiar su `habilitado` NO conecta ni desconecta nada.
 enriquecedores:                          # puerto: Enriquecedor
+  rues_datos_gov_co:                     # puerto: VerificadorTitular (006, enmienda 2026-10-18)
+    habilitado: true                     # un flag la desconecta: false y vuelve el stub que siempre dice desconocido
+    puerto: VerificadorTitular
+    adaptador: app.modulos.enriquecimiento.infraestructura.adaptadores.rues_datos_gov.RuesDatosGov
+    proveedor: datos.gov.co
+    dataset: c82u-588k
+    tipo: dataset
+    paises: [CO]
+    regla: "nombre normalizado exacto + misma ciudad + un solo NIT; cualquier otra cosa es desconocido"
+    trae: [tipo_titular]
+    licencia: CC-BY-SA-4.0
   croma_rues_co:
-    habilitado: true
+    habilitado: false                    # reemplazado por rues_datos_gov_co: el endpoint busca por NIT, no por nombre
+    puerto: VerificadorTitular
     adaptador: app.modulos.enriquecimiento.infraestructura.adaptadores.croma_rues.CromaRues
     endpoint: /co/rues/entity-by-nit/v1
     tipo: live
@@ -80,6 +94,9 @@ enriquecedores:                          # puerto: Enriquecedor
 
 canales_contacto:                        # puerto: CanalContacto
   smtp_email:
+    # No hay adaptador SMTP: no se envía ningún email. Este flag solo hace que "email" sea un
+    # canal_preferido válido (api/canales.py) y la pantalla Nueva búsqueda lo usa; en false, la
+    # demo recibiría 422 canal_no_habilitado. El contacto real lo hace la llamada de Dapta.
     habilitado: true
     canal: email                         # lo que el usuario elige como canal_preferido
     proveedor: "SMTP nuevo para el evento"
@@ -96,6 +113,7 @@ calificadores:                           # puerto: Calificador
   dapta_csv:
     habilitado: true                     # respaldo: exportar/importar
 
+# OJO: sección documental, nadie la lee; composicion.py arma el clasificador en código.
 clasificadores:                          # puerto: Clasificador
   jev:
     habilitado: true

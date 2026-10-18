@@ -299,20 +299,23 @@ test("la_conversacion_sobrevive_a_un_paseo_por_filtros", async () => {
   expect(screen.getByRole("region", { name: es.busqueda.frase.voy_a_buscar })).toBeInTheDocument();
 });
 
-test("a_los_seis_turnos_avisa_y_ofrece_empezar_de_nuevo", async () => {
+test("a_los_doce_turnos_avisa_y_ofrece_empezar_de_nuevo", async () => {
   let n = 0;
   await montar({ frase: true, lookalike: false }, () =>
     HttpResponse.json({ sugerencia: { ...SUGERENCIA, ciiu: null }, pregunta: `pregunta ${++n}`, explicacion: null, costo_usd: "0" }));
 
   escribirYSugerir("uno");
   await screen.findByText("pregunta 1");
-  enviar("dos");
-  await screen.findByText("pregunta 2");
-  enviar("tres");
-  await screen.findByText("pregunta 3");
+  for (let i = 2; i <= 5; i++) {
+    enviar(`mensaje ${i}`);
+    await screen.findByText(`pregunta ${i}`);
+  }
+  expect(screen.queryByText(es.busqueda.frase.limite_turnos)).not.toBeInTheDocument();  // 10 turnos: todavía hay lugar
+  enviar("seis");
+  await screen.findByText("pregunta 6");
 
   expect(screen.getByText(es.busqueda.frase.limite_turnos)).toBeInTheDocument();
-  fireEvent.change(campo(es.busqueda.frase.etiqueta), { target: { value: "cuatro" } });
+  fireEvent.change(campo(es.busqueda.frase.etiqueta), { target: { value: "siete" } });
   expect(boton(es.busqueda.frase.enviar)).toBeDisabled();
   fireEvent.click(boton(es.busqueda.frase.empezar_de_nuevo));
   expect(screen.queryByText(es.busqueda.frase.limite_turnos)).not.toBeInTheDocument();
@@ -428,6 +431,91 @@ test("ya_me_compran_prellena_los_filtros_y_muestra_la_explicacion", async () => 
   fireEvent.click(pestana(es.busqueda.pestanas.filtros)!);
   expect(campo("Actividad")).toHaveValue("4631");
   await waitFor(() => expect(campo("Departamento")).toHaveValue("05"));
+});
+
+
+// --- ajustes del QA (010-chat-ajustes) ----------------------------------------------------------------------------
+
+const sinActividad = (extra: object = {}) => () =>
+  HttpResponse.json({ sugerencia: { ...SUGERENCIA, ciiu: null, departamento: null, ciudad: null, ingresos_min: null,
+    exclusiones: [] }, pregunta: null, explicacion: EXPLICACION, costo_usd: "0", ...extra });
+
+test("la_tarjeta_siempre_muestra_pais_y_actividad_y_solo_lo_demas_si_viene", async () => {
+  await montar({ frase: true, lookalike: false }, sinActividad());
+  escribirYSugerir();
+
+  const tarjeta = within(await verTarjeta());
+
+  expect(tarjeta.getByText(es.criterios.pais)).toBeInTheDocument();
+  expect(tarjeta.getByText(es.paises.CO)).toBeInTheDocument();
+  expect(tarjeta.getByText(es.criterios.ciiu)).toBeInTheDocument();
+  const falta = tarjeta.getByText(es.busqueda.frase.actividad_falta);
+  expect(falta).toHaveClass("resumen-aviso");
+  for (const clave of ["departamento", "ciudad", "ingresos_min", "exclusiones"] as const) {
+    expect(tarjeta.queryByText(es.criterios[clave])).not.toBeInTheDocument();
+  }
+  expect(tarjeta.getByText(es.criterios.palabras_clave)).toBeInTheDocument();
+});
+
+test("con_actividad_no_aparece_el_aviso_de_falta", async () => {
+  await montar();
+  escribirYSugerir();
+
+  const tarjeta = within(await verTarjeta());
+
+  expect(tarjeta.queryByText(es.busqueda.frase.actividad_falta)).not.toBeInTheDocument();
+  expect(tarjeta.queryByText(es.busqueda.frase.ciiu_descartado)).not.toBeInTheDocument();
+});
+
+test("ciiu_descartado_avisa_que_la_ia_propuso_una_actividad_fuera_del_catalogo", async () => {
+  await montar({ frase: true, lookalike: false }, sinActividad({ ciiu_descartado: true }));
+  escribirYSugerir();
+
+  await verTarjeta();
+
+  expect(screen.getByText(es.busqueda.frase.ciiu_descartado)).toBeInTheDocument();
+  expect(es.busqueda.frase.ciiu_descartado).toBe("La IA propuso una actividad que no está en el catálogo");
+});
+
+test("editar_en_filtros_va_en_la_misma_fila_que_vista_previa_y_buscar", async () => {
+  await montar();
+  escribirYSugerir();
+  await verTarjeta();
+
+  const fila = boton(es.busqueda.frase.editar_en_filtros).closest(".acciones");
+
+  expect(fila).toHaveClass("acciones-fin");
+  expect(within(fila as HTMLElement).getByRole("button", { name: es.busqueda.vista_previa })).toBeInTheDocument();
+  expect(within(fila as HTMLElement).getByRole("button", { name: es.busqueda.buscar })).toBeInTheDocument();
+  expect(boton(es.busqueda.frase.editar_en_filtros)).not.toHaveClass("boton-primario");
+});
+
+test("sin_actividad_deshabilita_vista_previa_y_buscar_y_editar_pasa_a_primario", async () => {
+  await montar({ frase: true, lookalike: false }, sinActividad());
+  escribirYSugerir();
+  await verTarjeta();
+
+  expect(boton(es.busqueda.vista_previa)).toBeDisabled();
+  expect(boton(es.busqueda.buscar)).toBeDisabled();
+  expect(boton(es.busqueda.frase.editar_en_filtros)).toHaveClass("boton-primario");
+  expect(boton(es.busqueda.buscar)).not.toHaveClass("boton-primario");
+  expect(screen.getByText(es.busqueda.frase.sin_actividad)).toHaveClass("aviso-ancho");
+});
+
+test("el_tope_por_defecto_del_chat_es_el_mismo_que_el_de_filtros", async () => {
+  await montar();
+  const enFiltros = (campo(es.busqueda.tope) as HTMLInputElement).value;
+  escribirYSugerir();
+  await verTarjeta();
+
+  expect(enFiltros).toBe("1");
+  expect((campo(es.busqueda.tope) as HTMLInputElement).value).toBe(enFiltros);
+});
+
+test("textos_nuevos_en_ingles", () => {
+  expect(en.busqueda.frase.actividad_falta).toBeTruthy();
+  expect(en.busqueda.frase.ciiu_descartado).toBeTruthy();
+  expect(en.busqueda.frase.sin_actividad).toBeTruthy();
 });
 
 const ANCHOS: Record<string, string> = {

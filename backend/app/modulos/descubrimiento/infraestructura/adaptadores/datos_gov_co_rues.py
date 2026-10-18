@@ -1,7 +1,9 @@
+import contextvars
+import logging
 import re
 import time
 from dataclasses import dataclass, replace
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from datetime import UTC, datetime
 from decimal import Decimal
 from email.utils import parsedate_to_datetime
@@ -25,6 +27,11 @@ from app.modulos.descubrimiento.dominio.modelos import (
     PaginaEmpresas,
 )
 
+# httpx en INFO loguea la URL completa de cada request, y la de una búsqueda por razón social lleva el nombre del lead.
+# Se calla solo dentro de `_pedir`: un setLevel global callaría al resto de la app.
+_en_pedido = contextvars.ContextVar("datos_gov_co_en_pedido", default=False)
+logging.getLogger("httpx").addFilter(lambda _registro: not _en_pedido.get())
+
 # Dataset público de Confecámaras en datos.gov.co. El override (stub, D9) llega desde settings por la fábrica.
 URL_DATASET = "https://www.datos.gov.co/resource/c82u-588k.json"
 
@@ -44,6 +51,7 @@ LIMITE_COINCIDENCIAS = 100
 # [0-9] y no \d: \d acepta dígitos de otros alfabetos y esos no entran al SoQL ni al NIT.
 _CIIU = re.compile(r"[0-9]{4}")
 _NIT = re.compile(r"[89][0-9]{8}")
+_CAMARA = re.compile(r"[0-9]{1,3}")
 
 
 def _es_juridica_valida(fila: Mapping[str, Any]) -> bool:
@@ -68,6 +76,14 @@ class CoincidenciaRazonSocial:
     ciiu: str | None
     camara: str | None
     estado_matricula: str | None
+    razon_social: str | None = None
+    organizacion_juridica: str | None = None
+
+
+@dataclass(frozen=True)
+class BusquedaRazonSocial:
+    coincidencias: list[CoincidenciaRazonSocial]
+    truncada: bool  # el servidor devolvió el tope de filas: pudo haber más candidatos que los traídos
 
 
 def _literal_like(nombre: str) -> str:
@@ -92,7 +108,11 @@ class DatosGovCoRues:
         url: str = URL_DATASET,
         app_token: str | None = None,
         monotonico: Callable[[], float] = time.monotonic,
+        timeout_seg: float = TIMEOUT_SEG,
+        intentos: int = INTENTOS,
     ) -> None:
+        self._timeout_seg = timeout_seg  # el descubrimiento espera 30 s; verificar un lead no puede retener al worker
+        self._intentos = intentos
         self._transporte = transporte
         self._reloj = reloj  # hora de pared: solo para el as_of
         self._monotonico = (
@@ -163,13 +183,18 @@ class DatosGovCoRues:
     def buscar_coincidencias(
         self, nombre_normalizado: str, contexto_costo: ContextoCosto
     ) -> list[CoincidenciaRazonSocial]:
-        """Todas las jurídicas activas cuya razón social contiene el nombre (Puerta A de la 010).
+        return self.buscar_homonimas(nombre_normalizado, contexto_costo).coincidencias
 
-        El costo de cada request se atribuye al contexto (`fuente='intake'`, `lote_id` de la corrida), no a una búsqueda.
+    def buscar_homonimas(self, nombre_normalizado: str, contexto_costo: ContextoCosto) -> BusquedaRazonSocial:
+        """Todas las jurídicas activas cuya razón social contiene el nombre (Puerta A de la 010 y verificación de titular
+        de la 006).
+
+        El costo de cada request se atribuye al contexto: `fuente='intake'` y el `lote_id` de la corrida, o el `lead_id`
+        que se verifica; nunca a una búsqueda.
         """
         nombre = _literal_like(nombre_normalizado)
         if not nombre:
-            return []
+            return BusquedaRazonSocial([], False)
         where = (
             f"upper(razon_social) like '%{nombre}%'"
             " AND organizacion_juridica != 'PERSONA NATURAL'"
@@ -182,27 +207,67 @@ class DatosGovCoRues:
             contexto_costo,
         )
         try:
-            return [
+            filas = respuesta.json()
+            coincidencias = [
                 CoincidenciaRazonSocial(
                     nit=fila["nit"].strip(),
                     ciiu=fila.get("cod_ciiu_act_econ_pri"),
                     camara=None if fila.get("codigo_camara") is None else str(fila["codigo_camara"]),
                     estado_matricula=fila.get("estado_matricula"),
+                    razon_social=fila.get("razon_social"),
+                    organizacion_juridica=fila.get("organizacion_juridica"),
                 )
-                for fila in respuesta.json()
+                for fila in filas
                 if _es_juridica_valida(fila)
             ]
+            # Sobre las filas crudas: las que el cliente descarta por inválidas también cuentan contra el tope del servidor.
+            return BusquedaRazonSocial(coincidencias, len(filas) >= LIMITE_COINCIDENCIAS)
         except (ValueError, TypeError, AttributeError, KeyError):
             raise FuenteNoDisponible(f"{self.meta.clave}: respuesta ilegible") from None
+
+    def contar_naturales(self, nombre_normalizado: str, camaras: Collection[str], contexto_costo: ContextoCosto) -> int:
+        """Cuántas personas naturales matriculadas tienen una razón social que contiene el nombre, en esas cámaras.
+
+        Solo un `count(*)`: ningún nombre de persona sale del servidor (principio VII). Sirve para no ascender a jurídica
+        un lead que también podría ser la persona natural homónima. Escribe su costo como cualquier request.
+        """
+        nombre = _literal_like(nombre_normalizado)
+        # Códigos de cámara de 1 a 3 dígitos: lo que venga de fuera de ese formato no entra al SoQL.
+        codigos = sorted({str(c) for c in camaras if _CAMARA.fullmatch(str(c))})
+        if not nombre or not codigos:
+            return 0
+        enlista = ",".join(f"'{c}'" for c in codigos)
+        where = (
+            f"upper(razon_social) like '%{nombre}%'"
+            " AND organizacion_juridica = 'PERSONA NATURAL'"
+            f" AND codigo_camara in({enlista})"
+        )
+        respuesta = self._pedir({"$select": "count(*)", "$where": where}, contexto_costo)
+        try:
+            (fila,) = respuesta.json()
+            cuenta = int(fila["count"])
+            if cuenta < 0:
+                raise ValueError
+        except (ValueError, TypeError, AttributeError, KeyError):
+            raise FuenteNoDisponible(f"{self.meta.clave}: respuesta ilegible") from None
+        return cuenta
 
     def _pedir(self, params: Mapping[str, str], contexto: ContextoCosto | None = None) -> httpx.Response:
         """GET con hasta 2 intentos. Cada intento deja su fila en costos antes de decidir."""
         cabeceras = {"X-App-Token": self._app_token} if self._app_token else {}
+        marca = _en_pedido.set(True)
+        try:
+            return self._pedir_con_reintentos(params, contexto, cabeceras)
+        finally:
+            _en_pedido.reset(marca)
+
+    def _pedir_con_reintentos(self, params: Mapping[str, str], contexto: ContextoCosto | None,
+                              cabeceras: Mapping[str, str]) -> httpx.Response:
         estado: int | str = "timeout"
         with httpx.Client(
-            transport=self._transporte, timeout=TIMEOUT_SEG, headers=cabeceras
+            transport=self._transporte, timeout=self._timeout_seg, headers=cabeceras
         ) as cliente:
-            for intento in range(INTENTOS):
+            for intento in range(self._intentos):
                 if intento:
                     self._dormir(ESPERA_REINTENTO_SEG)  # la espera no se cobra
                 inicio = self._monotonico()
@@ -239,7 +304,7 @@ class DatosGovCoRues:
                 proveedor=self.meta.proveedor,
                 fuente=self.meta.clave if contexto is None else contexto.fuente,
                 canal=None,
-                lead_id=None,
+                lead_id=None if contexto is None else contexto.lead_id,
                 lote_id=self._lote_id if contexto is None else contexto.lote_id,
                 gratis=False,
             )

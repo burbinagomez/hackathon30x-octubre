@@ -380,3 +380,75 @@ test("exportar_para_dapta_baja_el_csv", async () => {
   await waitFor(() => expect(pedido).toBe(true));
   await waitFor(() => expect(crear).toHaveBeenCalledTimes(1));
 });
+
+const RESUMEN = { importadas: 3, duplicadas: 1, conflictos: 0, no_cumple: 0, ref_desconocida: 0, rechazadas: [{ fila: 5, motivo: "telefono_invalido" }] };
+const archivoCsv = () => new File(["lead_id,estado\nabc,calificado\n"], "resultados.csv", { type: "text/csv" });
+
+/** Monta el tablero con el endpoint de importar; devuelve lo que llegó y cuántas veces se pidió el CPQL. */
+async function montarImportar(importar: () => Response | Promise<Response>, idioma: Idioma = "es") {
+  const visto = { ruta: "", tipo: "", cuerpo: "", cpql: 0 };
+  server.use(
+    http.get("*/tablero/fuentes", () => HttpResponse.json(respuestaTablero())),
+    http.get("*/calificaciones/cpql", () => { visto.cpql += 1; return HttpResponse.json(CPQL_VACIO); }),
+    http.post("*/calificaciones/importar", async ({ request }) => {
+      visto.ruta = new URL(request.url).pathname;
+      visto.tipo = request.headers.get("content-type") ?? "";
+      visto.cuerpo = await request.text();
+      return importar();
+    }),
+  );
+  await i18n.changeLanguage(idioma);
+  render(<Tablero />);
+  await waitFor(() => expect(screen.queryByRole("table")).toBeInTheDocument());
+  return visto;
+}
+
+test("importar_sube_el_csv_a_la_ruta_correcta", async () => {
+  const visto = await montarImportar(() => HttpResponse.json(RESUMEN));
+  fireEvent.change(screen.getByLabelText(es.tablero.importar_dapta), { target: { files: [archivoCsv()] } });
+  await waitFor(() => expect(visto.ruta).toBe("/calificaciones/importar"));
+  expect(visto.tipo).toMatch(/^text\/csv/);
+  expect(visto.cuerpo).toBe("lead_id,estado\nabc,calificado\n");
+});
+
+test("importar_muestra_el_resumen_y_recarga_el_cpql", async () => {
+  const visto = await montarImportar(() => HttpResponse.json(RESUMEN));
+  expect(visto.cpql).toBe(1);
+  fireEvent.change(screen.getByLabelText(es.tablero.importar_dapta), { target: { files: [archivoCsv()] } });
+  const aviso = await screen.findByText(/Listo/);
+  expect(aviso).toHaveTextContent("Listo: importamos 3 resultados de Dapta");
+  expect(aviso).toHaveTextContent("1 ya estaba");
+  expect(aviso).toHaveTextContent("1 fila no se importó");
+  await waitFor(() => expect(visto.cpql).toBe(2));
+});
+
+test("importar_muestra_la_pildora_mientras_sube", async () => {
+  let soltar: () => void = () => {};
+  const espera = new Promise<void>((r) => { soltar = r; });
+  await montarImportar(async () => { await espera; return HttpResponse.json(RESUMEN); });
+  fireEvent.change(screen.getByLabelText(es.tablero.importar_dapta), { target: { files: [archivoCsv()] } });
+  expect(await screen.findByText(es.tablero.importando)).toBeInTheDocument();
+  soltar();
+  await waitFor(() => expect(screen.queryByText(es.tablero.importando)).not.toBeInTheDocument());
+});
+
+test.each([
+  [422, "archivo_invalido"],
+  [413, "archivo_muy_grande"],
+  [409, "tarifa_pendiente"],
+  [503, "calificador_deshabilitado"],
+])("importar_con_error_%i_muestra_un_aviso_claro", async (estado, codigo) => {
+  const visto = await montarImportar(() => HttpResponse.json({ codigo }, { status: estado }));
+  fireEvent.change(screen.getByLabelText(es.tablero.importar_dapta), { target: { files: [archivoCsv()] } });
+  const alerta = await screen.findByRole("alert");
+  expect(alerta.textContent).toBe(es.tablero[`error_importar_${estado}` as keyof typeof es.tablero]);
+  expect(alerta).not.toHaveTextContent(codigo);
+  expect(visto.cpql).toBe(1);
+});
+
+test("importar_funciona_en_ingles", async () => {
+  await montarImportar(() => HttpResponse.json({ ...RESUMEN, duplicadas: 0, rechazadas: [] }), "en");
+  fireEvent.change(screen.getByLabelText(en.tablero.importar_dapta), { target: { files: [archivoCsv()] } });
+  const aviso = await screen.findByText(/Done/);
+  expect(aviso).toHaveTextContent("Done: we imported 3 Dapta results.");
+});

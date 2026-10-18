@@ -5,9 +5,11 @@ export type Formulario = Record<
   "pais" | "ciiu" | "departamento" | "ciudad" | "ingresosMin" | "palabrasClave" | "exclusiones" | "canal" | "tope" | "mensaje",
   string
 >;
+/** El mismo tope inicial en Filtros y en el chat. */
+export const TOPE_POR_DEFECTO = "1";
 export const INICIAL: Formulario = {
   pais: "CO", ciiu: "", departamento: "", ciudad: "", ingresosMin: "", palabrasClave: "",
-  exclusiones: "", canal: "email", tope: "", mensaje: "",
+  exclusiones: "", canal: "email", tope: TOPE_POR_DEFECTO, mensaje: "",
 };
 
 /** La sugerencia de una puerta pisa solo los criterios del ICP; canal, tope y mensaje son del usuario. */

@@ -113,6 +113,12 @@ def test_datos_gov_co_rues_del_yaml_real_se_carga():
     assert entrada["licencia"] == "CC-BY-SA-4.0"
 
 
+def test_toda_fuente_habilitada_del_yaml_real_tiene_adaptador():
+    # Un flag en true sin adaptador afirma algo falso al jurado: o hay clase o el flag va en false.
+    registro = cargar_registro(FUENTES_YAML, catalogo)
+    assert registro.sin_implementacion == frozenset()
+
+
 def test_las_fuentes_gratuitas_van_antes_que_croma():
     """PRD §2: OSM y datos.gov.co son las fuentes de la verdad; Croma es la tercera. La búsqueda llama en el orden
     del registro y saltea por tope a las últimas: las gratuitas no pueden quedar detrás de Croma."""

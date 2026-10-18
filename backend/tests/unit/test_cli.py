@@ -71,7 +71,7 @@ def test_buscar_imprime_resumen(persistencia, entorno, capsys):
     salida = capsys.readouterr().out
     assert codigo == 0
     assert "encontrados 2 · únicos 1 · nuevos 1 · créditos 1" in salida
-    assert "sin_implementacion: croma_dian_trade_co, datos_gov_co_rues, osm_overpass" in salida
+    assert "sin_implementacion: datos_gov_co_rues, osm_overpass" in salida
     assert "sin_fuente_para" not in salida
 
 
@@ -82,7 +82,7 @@ def test_buscar_sin_adaptadores_reporta_sin_fuente_y_sin_implementacion(persiste
     assert codigo == 0
     assert list(persistencia.repo.busquedas.values()) == ["terminada"]
     assert "sin_fuente_para: CO" in salida
-    assert "sin_implementacion: croma_dian_trade_co, croma_supersociedades_co, datos_gov_co_rues, osm_overpass" in salida
+    assert "sin_implementacion: croma_supersociedades_co, datos_gov_co_rues, osm_overpass" in salida
     assert persistencia.costos.filas == []
     assert persistencia.repo.leads == {}
 
@@ -264,7 +264,7 @@ class RepoParaEnriquecer(RepositorioLeadsFalso):
 
 def _lead_con_web():
     return LeadParaEnriquecer(id=uuid4(), tipo_titular="juridica", nombre="Transportes Andinos", ciudad="Bogotá",
-                              web="andinos.invalid", actividad="4923", descripcion_icp="transporte de carga")
+                              web="andinos.invalid", actividad="4923", descripcion_icp="transporte de carga", pais="CO")
 
 
 def _enriquecer(persistencia, argv=None):
@@ -313,4 +313,4 @@ def test_verificador_bloqueado_no_asciende_a_juridica(entorno, monkeypatch):
     # P1 abierto: ascender sin consultar pasaría el nombre de una persona natural a claro.
     monkeypatch.setenv("CIFRADO_KEY", base64.b64encode(b"k" * 32).decode())
     verificador, *_ = _adaptadores_enriquecer(Settings(), RegistroCostosFalso(), cargar_tarifas())
-    assert verificador.verificar(uuid4(), "doña rosa gomez", None).tipo_titular == "desconocido"
+    assert verificador.verificar(uuid4(), "doña rosa gomez", None, "CO").tipo_titular == "desconocido"

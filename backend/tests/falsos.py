@@ -206,7 +206,7 @@ class VerificadorFalso:
         self._cortar_en = cortar_en
         self.llamadas = 0
 
-    def verificar(self, lead_id: UUID, nombre_normalizado: str, ciudad: str | None) -> VerificacionTitular:
+    def verificar(self, lead_id: UUID, nombre_normalizado: str, ciudad: str | None, pais: str) -> VerificacionTitular:
         self.llamadas += 1
         if self.llamadas == self._cortar_en:
             raise LimiteFuenteAgotado("croma")

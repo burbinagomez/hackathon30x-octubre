@@ -1,5 +1,7 @@
 # Traspaso: Reto Dapta (30X)
 
+> **Histórico:** describe el `main` del 2026-10-17 (walking skeleton + 002 base). Hoy el estado verificado está en la tabla "Estado" del `README.md`.
+
 Este documento es para el dev que sigue el trabajo. Antes de tocar nada, leé `CLAUDE.md`, `.specify/memory/constitution.md` y `docs/prd.md`, en ese orden.
 
 El estado que se describe acá es el del 2026-10-17. `main` está en `168f4b9`: el walking skeleton más la 002 base (#22).

@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.modulos.intake.aplicacion.interpretar_frase import MAX_FRASE, InterpretarFrase
+from app.modulos.intake.aplicacion.interpretar_frase import MAX_FRASE, MAX_TURNOS, InterpretarFrase
 from app.modulos.intake.dominio.errores import ErrorGeneracion, FraseFueraDeRango, SalidaIntakeInvalida
 from app.modulos.intake.dominio.sugerencia import Sugerencia
 from app.modulos.intake.infraestructura.llm.interpretador_claude import InterpretadorClaude
@@ -181,4 +181,22 @@ def test_el_historial_viaja_como_conversacion_delimitada_en_un_solo_dato():
 
 def test_el_historial_tiene_tope():
     with pytest.raises(FraseFueraDeRango):
-        caso(GeneradorFalso(VALIDA)).ejecutar("x", historial=[("usuario", "y")] * 7)
+        caso(GeneradorFalso(VALIDA)).ejecutar("x", historial=[("usuario", "y")] * (MAX_TURNOS + 1))
+
+
+def test_el_tope_de_turnos_es_12_y_12_pasan():
+    assert MAX_TURNOS == 12
+    assert caso(GeneradorFalso(VALIDA)).ejecutar("x", historial=[("usuario", "y")] * 12).sugerencia.pais == "CO"
+
+
+def test_ciiu_fuera_del_catalogo_marca_ciiu_descartado():
+    r = caso(GeneradorFalso({**VALIDA, "ciiu": "8521"})).ejecutar(FRASE)
+
+    assert r.sugerencia.ciiu is None and r.ciiu_descartado is True
+
+
+@pytest.mark.parametrize("ciiu,descartado", [("4752", False), (None, False), ("", False)], ids=["valido", "null", "vacio"])
+def test_ciiu_valido_o_ausente_no_marca_descartado(ciiu, descartado):
+    r = caso(GeneradorFalso({**VALIDA, "ciiu": ciiu})).ejecutar(FRASE)
+
+    assert r.ciiu_descartado is descartado

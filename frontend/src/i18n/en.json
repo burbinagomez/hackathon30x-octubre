@@ -67,7 +67,9 @@
       "editar_en_filtros": "Edit in Filters",
       "empezar_de_nuevo": "Start over",
       "limite_turnos": "This conversation is already long. Tap \"Start over\" to set up another search.",
-      "sin_actividad": "The activity is missing, so the preview cannot be calculated. Tap \"Edit in Filters\" and pick one."
+      "sin_actividad": "The activity is missing, so the preview cannot be calculated. Tap \"Edit in Filters\" and pick one.",
+      "actividad_falta": "Missing: pick it in Filters",
+      "ciiu_descartado": "The AI suggested an activity that is not in the catalog"
     },
     "trabajando": {
       "buscando": "Searching companies in the sources",
@@ -136,7 +138,21 @@
     "embudo_calificados": "Qualified",
     "embudo_ayuda": "Each bar is measured against the source's unique leads.",
     "exportar_dapta": "Export for Dapta (CSV)",
-    "error_exportar": "Export failed. Try again."
+    "error_exportar": "Export failed. Try again.",
+    "importar_dapta": "Import Dapta results (CSV)",
+    "importando": "Importing the Dapta results…",
+    "importar_listo_one": "Done: we imported {{count}} Dapta result.",
+    "importar_listo_other": "Done: we imported {{count}} Dapta results.",
+    "importar_repetidas_one": "{{count}} was already loaded.",
+    "importar_repetidas_other": "{{count}} were already loaded.",
+    "importar_omitidas_one": "{{count}} row was not imported: check the file and upload it again.",
+    "importar_omitidas_other": "{{count}} rows were not imported: check the file and upload it again.",
+    "error_importar_422": "We could not read the file. Upload the CSV you downloaded from Dapta, unchanged.",
+    "error_importar_415": "The file is not a CSV. Upload the CSV you downloaded from Dapta.",
+    "error_importar_413": "The file is too large (1 MB maximum). Split it and upload the parts one by one.",
+    "error_importar_409": "The Dapta rate is not set yet, so we cannot work out the cost. Tell the team and try again.",
+    "error_importar_503": "Dapta import is switched off right now. Tell the team.",
+    "error_importar": "The file could not be imported. Try again."
   },
   "idioma": {
     "etiqueta": "Language",
