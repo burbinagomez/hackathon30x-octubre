@@ -23,3 +23,5 @@ frontend/playwright-report/
 # Supabase CLI
 supabase/.temp
 supabase/.branches
+# evals: candidatos sin etiquetar, con datos de una búsqueda real
+backend/evals/dataset.candidatos.json

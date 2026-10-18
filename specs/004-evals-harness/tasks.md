@@ -99,10 +99,10 @@
   Hecho: `componer(entorno, transporte, *, tenant, evals, carpeta, registro_costos)` en `run.py` y `main(..., transporte=None)`; tests en `tests/unit/evals/test_composicion.py` y `tests/integration/test_costos_repo.py::test_evals_run_compuesto_escribe_en_costos`. **Pendiente:** conectar `__main__` a `main(sys.argv[1:])`. El job `evals` del CI lo corre sin `ANTHROPIC_API_KEY` ni `--tenant` y espera 0: conectarlo lo deja en 2. Decide el dueño (cambiar el job o el `__main__`).
 
 ### Exportación de candidatos
-- [ ] T020 [P] [US1] 🤖 **Rojo:** `backend/tests/unit/evals/test_exportar_candidatos.py` con un repositorio falso que sigue la forma de `RepositorioLeads` del 002 (D4):
+- [x] T020 [P] [US1] 🤖 **Rojo:** `backend/tests/unit/evals/test_exportar_candidatos.py` con un repositorio falso que sigue la forma de `RepositorioLeads` del 002 (D4):
   - `::test_aplica_whitelist` (sin email, teléfono, web ni NIT; Croma sin `nombre`, `id = c-` + 12 hex distinto de `sha256(pais:nit)[:12]` y distinto en dos exportaciones; OSM `juridica` con `nombre`; OSM `desconocido` sin `nombre`);
   - `::test_candidatos_estan_gitignored`.
-- [ ] T021 [US1] 🤖 **Verde:** `backend/evals/exportar_candidatos.py` (`--tenant`, `--busqueda`; escribe `backend/evals/dataset.candidatos.json` con `etiqueta: null`; `id` con `secrets.token_hex(6)`; `rango_ingresos` como bucket, nunca la cifra) y la línea `backend/evals/dataset.candidatos.json` en `.gitignore`.
+- [x] T021 [US1] 🤖 **Verde:** `backend/evals/exportar_candidatos.py` (`--tenant`, `--busqueda`; escribe `backend/evals/dataset.candidatos.json` con `etiqueta: null`; `id` con `secrets.token_hex(6)`; `rango_ingresos` como bucket, nunca la cifra) y la línea `backend/evals/dataset.candidatos.json` en `.gitignore`.
 - [ ] T022 [US1] 🤖 `backend/evals/evals.yaml`, entrada `encaje_icp`: `juez: claude`, `modelo: claude-sonnet-5-5`, `prompt: jueces/encaje_v1.md`, `casos: dataset.json`, `k: 3`, `corte: 0.5`, `umbral: 0.70`, `tolerancia: 0`.
 
 ### Datos y primera corrida

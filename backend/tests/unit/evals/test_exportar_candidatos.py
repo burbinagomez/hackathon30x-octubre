@@ -10,8 +10,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID, uuid4
 
-import pytest
-
 from app.modulos.descubrimiento.dominio.modelos import Lead
 from evals import esquema
 from evals.exportar_candidatos import Origen, main
@@ -25,7 +23,6 @@ WEB = "https://ferreteria-sintetica.invalid"
 EMAIL = "compras@ferreteria-sintetica.invalid"
 TELEFONO = "+57 604 555 0101"
 INGRESOS = 12_000_000_000  # COP: bucket "mediana"
-ROJO_T021 = pytest.mark.xfail(strict=True, raises=AssertionError, reason="rojo hasta T021")
 
 
 @dataclass(frozen=True)
@@ -76,7 +73,6 @@ def _por_fuente(casos):
     return croma, osm
 
 
-@ROJO_T021
 def test_aplica_whitelist(tmp_path):
     codigo, texto = _exportar(tmp_path, "uno.json")
     _, texto_2 = _exportar(tmp_path, "dos.json")
@@ -107,6 +103,5 @@ def test_aplica_whitelist(tmp_path):
         == ["icp:$.icp", "n_casos:$.casos", "min_por_etiqueta:encaja", "min_por_etiqueta:no_encaja"]  # solo lo del humano
 
 
-@ROJO_T021
 def test_candidatos_estan_gitignored():
     assert "backend/evals/dataset.candidatos.json" in (RAIZ / ".gitignore").read_text().splitlines()
