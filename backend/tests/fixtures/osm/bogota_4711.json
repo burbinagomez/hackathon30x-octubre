@@ -1,0 +1,41 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API (respuesta sintetica para tests, datos inventados)",
+  "osm3s": {
+    "timestamp_osm_base": "2026-10-01T12:00:00Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+    {
+      "type": "node",
+      "id": 123,
+      "lat": 4.6100,
+      "lon": -74.0800,
+      "tags": {
+        "name": "Supermercado Ficticio La Prueba",
+        "shop": "supermarket",
+        "addr:street": "Calle Inventada",
+        "addr:housenumber": "12-34",
+        "addr:city": "Bogotá D.C."
+      }
+    },
+    {
+      "type": "way",
+      "id": 456,
+      "center": {"lat": 4.6200, "lon": -74.0700},
+      "tags": {
+        "name": "Tienda Ejemplo 24 Horas",
+        "shop": "convenience"
+      }
+    },
+    {
+      "type": "node",
+      "id": 789,
+      "lat": 4.6300,
+      "lon": -74.0600,
+      "tags": {
+        "shop": "convenience"
+      }
+    }
+  ]
+}

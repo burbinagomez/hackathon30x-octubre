@@ -21,9 +21,16 @@
 - **`fuentes_descubrimiento.croma_supersociedades_co`**: solo suma el mapeo de `geo` (que ya declara en `trae`); su salida pasa por la normalización común y el dedup nuevo.
 - **`fuentes_descubrimiento.croma_dian_trade_co`**: sigue en `sin_implementacion`. Es extensión opcional si sobra tiempo (PRD §9) y no entra en "terminado cuando".
 - **`limites.overpass_req_por_seg`** (1): lo hace cumplir un limitador en el adaptador.
-- **`RegistroCostos` ← `postgres_costos`**: nuevo tipo de operación `overpass_query`.
-- **`EmpresaCruda`** (del 002) suma `telefono_canal` y `email_canal`, opcionales con default `None`; los adaptadores del 002 no cambian de firma.
-- **`RepositorioLeads`** (puerto del 002) suma `por_dominio`, `por_telefono` y `candidatos_por_nombre` (los tres devuelven lista) y `registrar_revision`.
+- **`RegistroCostos` ← `postgres_costos`**: escribe filas `overpass_query`. El tipo ya está en el `CHECK` de `costos.tipo` de la `0002` (plan 002, sección Datos); la `0003` no toca `costos`.
+- **`EmpresaCruda`** (del 002) suma `telefono`, `email`, `geo: Geo | None` (`Geo(lat: float, lon: float)`, `NamedTuple` de dominio), `telefono_canal` y `email_canal`, todos opcionales con default `None`; los adaptadores del 002 no cambian de firma. `licencia` no va en la empresa: queda en `MetaFuente.licencia` (del 002).
+- **`PaginaEmpresas`** (del 002, `empresas` + `total`) suma `truncado: bool = False` y `descartados_sin_nombre: int = 0`. Son campos con default: el puerto `buscar(criterios, pagina) -> PaginaEmpresas` no cambia de firma y Croma no los toca.
+- **`CriteriosICP`** (del 002, `pais` + `filtros: Mapping[str, str | tuple[str, ...]]`) no cambia. Un criterio **presente** es una clave de `filtros`; uno ausente no está en el mapeo (nunca una clave con `None`). `ciudad` es `str`; `tipo_negocio` es `tuple[str, ...]` de etiquetas OSM (`("shop=supermarket", "shop=convenience")`).
+- **`RepositorioLeads`** (puerto del 002) suma:
+  - la entidad de dominio `Lead` (`id`, `creado_en`, `pais`, `id_fiscal`, `nombre`, `tipo_titular`, `ciudad_normalizada`, `dominio`, `geo`, `telefono`, `telefono_canal`, `email`, `email_canal`; contacto en claro: el repositorio descifra al leer);
+  - `por_id_fiscal(pais, id_fiscal) -> Lead | None` (el `UNIQUE (tenant_id, pais, id_fiscal)` del 002 garantiza uno);
+  - `por_dominio`, `por_telefono` y `candidatos_por_nombre` (los tres devuelven `list[Lead]`; `candidatos_por_nombre` con su similitud);
+  - `registrar_revision`;
+  - `aplicar_fusion(lead_id, cambios: CambiosLead) -> None`: `CambiosLead` lo calcula la función pura `fusionar(lead, empresa)` del dominio y trae solo lo que cambia. El `UPDATE` escribe los campos simples con `coalesce(columna, :valor)` (nunca pisa un no nulo). Los pares (dato cifrado + `telefono_hmac` + canal) no van con `coalesce`: si `CambiosLead` trae un par es porque `fusionar` decidió que completa un nulo o sube de confianza, y entonces se **reemplaza** completo (dato, hmac y canal juntos, nunca uno solo). `tipo_titular` solo si sube. `lead_fuentes` se suma con `agregar_lead_fuente` del 002; `cumplimiento` no se toca.
 - **Archivo nuevo `config/actividades.yaml`**: tabla de equivalencias CIIU → etiquetas OSM. No es un registro de adaptadores; es dato de dominio que vive en config para cambiarlo sin tocar código.
 - **Archivo nuevo `config/dedup.yaml`**: `hosts_compartidos`, los hosts que no identifican a una empresa y quedan fuera de la regla 2. Mismo criterio que `actividades.yaml`: se agrega un host sin tocar código.
 
@@ -38,11 +45,11 @@ Ninguno: este slice no usa IA. Las empresas de OSM + Supersociedades alimentan `
 
 ## Flujo principal
 1. `uv run python -m app.cli buscar --tenant <id> --pais CO --ciiu 4711 --departamento 11 --ciudad "Bogotá"` crea la `busqueda`.
-2. `seleccionar_fuentes(registro, criterios, actividades)` (dominio, puro) decide, por cada fuente habilitada e implementada:
+2. `seleccionar_fuentes(metas: Iterable[MetaFuente], criterios, actividades) -> tuple[dict[str, CriteriosICP], dict[str, str]]` (dominio, puro; `Registro` es de `aplicacion` y el contrato `layers` del 002 no deja que el dominio lo vea, así que `EjecutarBusqueda` le pasa `[m for _, m in registro.fuentes]`) devuelve `(seleccionadas, ignoradas)`: por clave, los criterios ya filtrados para esa fuente, o el motivo por el que se ignoró. `sin_fuente_para` del 002 es "`seleccionadas` vacío" y lo deriva `EjecutarBusqueda`, así que `test_sin_fuente_para_el_pais_se_reporta` sigue en verde. Decide, por cada fuente habilitada e implementada:
    - **País:** está en `paises` o `paises` incluye `"*"`.
    - **Actividad:** si la fuente filtra por `ciiu`, va directo. Si filtra por `tipo_negocio`, se traduce con `config/actividades.yaml`; sin mapeo, la fuente se ignora con motivo `sin_mapeo_actividad`.
    - **Geografía:** al menos una de las del ICP (`departamento`, `ciudad`) está en `filtros`; si no, se ignora con motivo `sin_geografia`.
-   - Los criterios del ICP que la fuente no declara (p. ej. `departamento` para OSM, `ciudad` para Supersociedades) no se le pasan y quedan en `ignorados` del reporte.
+   - Los criterios del ICP que la fuente no declara (p. ej. `departamento` para OSM, `ciudad` para Supersociedades) no se le pasan y quedan en `ignorados` del reporte. Los criterios ignorados de una fuente no viajan aparte: son las claves del ICP que faltan en `seleccionadas[clave].filtros` (con `ciiu` → `tipo_negocio` contado como traducido, no ignorado), y el reporte los deriva.
    - Resultado con el ICP del ejemplo: Supersociedades recibe `ciiu + departamento`; OSM recibe `ciudad + tipo_negocio=[shop=supermarket, shop=convenience]`.
 3. El adaptador OSM:
    - espera lo que pida el limitador (≤1 req/s);
@@ -74,11 +81,12 @@ Ninguno: este slice no usa IA. Las empresas de OSM + Supersociedades alimentan `
   - `::test_icp_colombia_completo_usa_las_dos_fuentes`: el ICP del flujo da Supersociedades con `{ciiu, departamento}` y OSM con `{ciudad, tipo_negocio}`; `departamento` queda en `ignorados` de OSM y `ciudad` en los de Supersociedades.
   - `::test_icp_sin_ciudad_ignora_osm_por_geografia`: con solo `departamento`, OSM queda ignorada con `sin_geografia` y Supersociedades corre.
   - `::test_ciiu_sin_mapeo_ignora_osm`: un CIIU que no está en `actividades.yaml` deja OSM ignorada con `sin_mapeo_actividad`.
-  - `::test_icp_brasil_solo_usa_osm`: `pais=BR` + ciudad + CIIU mapeado → solo OSM; Supersociedades ignorada por país.
+  - `::test_icp_fuera_de_colombia_solo_usa_osm[BR|PE]`: parametrizado sobre `["BR", "PE"]`, con las `MetaFuente` del `fuentes.yaml` real; `pais` + ciudad + CIIU mapeado → `seleccionadas.keys() == {"osm_overpass"}` e `ignoradas == {"croma_supersociedades_co": "pais"}`. Las fuentes deshabilitadas o sin implementación no llegan a `seleccionar_fuentes` (`Registro.fuentes` solo trae las habilitadas e implementadas, 002 plan:144-146), así que no aparecen en `ignoradas`.
   - `::test_criterio_no_declarado_no_llega_al_adaptador`: `ingresos_min` en el ICP llega a Supersociedades y no a OSM. El adaptador falso de OSM lanza `CriterioNoSoportado` si lo recibe, así que el test falla si el filtro no ocurre.
 
 **Contrato del puerto** (`backend/tests/contratos/test_fuente_descubrimiento.py`)
-- Los tres tests del 002 corren también con `[osm_overpass]`, con transporte falso. Lo único nuevo es el parámetro; la suite no se toca.
+- Los tres tests del 002 corren también con `[osm_overpass]`, con transporte falso. La suite se parametriza sobre el catálogo (plan 002, Suite de contrato), así que no se toca: lo nuevo es la clave en el catálogo y su fábrica en `backend/tests/contratos/fabricas.py`. Sumar la clave al catálogo pone en rojo `::test_hay_fabrica_para_cada_clave_del_catalogo`; la fábrica lo pone en verde. `::test_rechaza_criterio_no_soportado[osm_overpass]` usa la clave centinela `"__criterio_inexistente__"` del 002.
+- `backend/tests/arquitectura/test_costos_por_adaptador.py::test_todo_adaptador_de_registro_recibe_registro_costos` (del 002) cubre `OsmOverpass` en cuanto la clase existe: nace con `RegistroCostos` en el constructor. `test_registro_adaptadores.py::test_todo_adaptador_de_registro_esta_declarado` (del 002) exige que esté en el catálogo.
 
 **Adaptador OSM** (`backend/tests/unit/descubrimiento/test_osm_overpass.py`, fixture **sintética** con teléfonos CO válidos para `phonenumbers`)
 - `::test_query_acotada_con_timeout_y_tope`: el cuerpo enviado contiene `[out:json][timeout:25]`, `"ISO3166-1"="CO"`, `"name"="Bogotá"`, una rama por etiqueta (`["shop"="supermarket"]`, `["shop"="convenience"]`), el filtro `["name"]` y `out center tags 500`.
@@ -88,13 +96,13 @@ Ninguno: este slice no usa IA. Las empresas de OSM + Supersociedades alimentan `
   - `telefono` en E.164 desde `phone` → `contact:phone` → `mobile` → `contact:mobile`, separando por `;` y quedándose con el primero válido: `"601 234 5678; 300 123 4567"` → `"+576012345678"`;
   - `ciudad` = `addr:city` y, si falta, la ciudad buscada;
   - `url_origen == "https://www.openstreetmap.org/node/123"` (y `way/…` para un `way`, con `center` como geo);
-  - `licencia == "ODbL"`, `as_of` = `osm3s.timestamp_osm_base`, `tipo_titular == "desconocido"`, `actividad == ("shop=supermarket", "OSM")`, `id_fiscal is None`;
+  - `adaptador.meta.licencia == "ODbL"` (la licencia vive en `MetaFuente`, no en la empresa), `as_of` = `osm3s.timestamp_osm_base`, `tipo_titular == "desconocido"`, `actividad == ("shop=supermarket", "OSM")`, `id_fiscal is None`;
   - `telefono_canal == "osm_contacto"` y `email_canal == "osm_contacto"`; sin teléfono o sin correo, el canal respectivo es `None`.
-- `::test_elemento_sin_nombre_se_descarta_y_se_cuenta`: 3 elementos, 1 sin `name` → 2 empresas y `descartados_sin_nombre == 1`.
+- `::test_elemento_sin_nombre_se_descarta_y_se_cuenta`: 3 elementos, 1 sin `name` → 2 empresas y `pagina.descartados_sin_nombre == 1`.
 - `::test_telefono_invalido_queda_nulo`: `phone="123"` → `telefono is None`, la empresa se devuelve igual.
 - `::test_web_en_host_compartido_no_se_guarda`: `website="https://facebook.com/latienda"` → `web is None`.
 - `::test_web_wa_me_pasa_a_telefono`: `website="https://wa.me/573001234567"` y sin `phone` → `web is None`, `telefono == "+573001234567"` y `telefono_canal == "whatsapp_osm"`; con `phone="123"` (inválido) → igual, gana el de `wa.me` con `whatsapp_osm`; con un `phone` válido, el `phone` gana con `osm_contacto` y el número de `wa.me` se descarta.
-- `::test_quinientos_elementos_marca_truncado`: con 500 elementos, `truncado is True`; con 499, `False`.
+- `::test_quinientos_elementos_marca_truncado`: con 500 elementos, `pagina.truncado is True`; con 499, `False`.
 - `::test_limitador_espera_un_segundo_entre_requests`: con reloj y `sleep` falsos, dos búsquedas seguidas hacen que el segundo request espere ≥ 1 s; si pasaron 1,5 s, no espera.
 - `::test_registra_segundos_de_cada_intento`: un 429 con `Retry-After: 5` seguido de un 200. El transporte falso avanza el reloj 2 s y 3 s durante cada request, y el `sleep` falso lo avanza lo que se le pide (5 s de `Retry-After` + lo del limitador). Resultado: 2 requests y 2 filas con `tipo="overpass_query"`, `unidades` **2 y 3** (no 7 ni 8: la espera no se cobra como cómputo), `costo_unitario == Decimal("0.0000070")`, `proveedor="osm"`, `fuente="osm_overpass"`, `lead_id=None`, `gratis=False` y el `lote_id` de la corrida; el `sleep` recibió 5.
 - `::test_retry_after_tiene_tope_de_diez_segundos`: `Retry-After: 120` → el `sleep` recibe 10.
@@ -124,14 +132,14 @@ Ninguno: este slice no usa IA. Las empresas de OSM + Supersociedades alimentan `
 - `::test_id_fiscal_distinto_nunca_fusiona`: mismo dominio y mismo teléfono, pero NIT distinto en los dos → `nuevo`, sin fila en revisión.
 - `::test_veto_excluye_candidato_y_sigue_con_la_regla_siguiente`: el dominio coincide con A (NIT distinto) y el teléfono con B (sin NIT) → `fusionar(B, regla=3)`.
 - `::test_veto_sigue_con_el_siguiente_candidato_de_la_misma_regla`: `por_dominio` devuelve [A (NIT distinto), C (sin NIT)] → `fusionar(C, regla=2)`.
-- `::test_desempate_por_creado_en`: `por_telefono` devuelve dos leads sin NIT → se fusiona con el de `creado_en` menor, sin importar el orden en que el repo falso los devuelva.
+- `::test_desempate_por_creado_en`: `por_telefono` devuelve dos leads sin NIT → se fusiona con el de `creado_en` menor. Parametrizado con los dos órdenes en que el repo falso los devuelve (`[viejo, nuevo]` y `[nuevo, viejo]`), para que "toma el primero" falle en uno de los dos.
 - `::test_homonimo_cercano_fusiona`: lead de Supersociedades (con NIT y geo) + OSM homónimo (sin NIT) a 120 m, similitud 1.0 → `fusionar(lead, regla=4)`.
 - `::test_homonimo_lejano_va_a_revision`: el mismo par a 3 km → `revisar`, aunque la similitud sea 1.0.
 - `::test_homonimo_sin_geo_va_a_revision`: el mismo par con `geo` nulo en cualquiera de los dos → `revisar`.
 - `::test_borde_de_distancia`: 250 m → `fusionar`; 251 m → `revisar`.
 - `::test_homonimos_osm_lejanos_van_a_revision`: dos leads OSM sin NIT, similitud 1.0, a 3 km → `revisar`; el mismo par a 100 m → `fusionar(lead, regla=4)`.
 - `::test_regla_4_prefiere_candidato_fusionable_sobre_revision`: A (similitud 1.0, con NIT, a 3 km) y B (0.93, sin NIT, a 80 m) → `fusionar(B, regla=4)`.
-- `::test_regla_4_ordena_por_similitud_y_despues_creado_en`: dos candidatos fusionables con la misma similitud → gana el de `creado_en` menor; con similitudes 0.95 y 0.97 → gana el de 0.97, sin importar el orden en que los devuelva el repo falso. Si ninguno es fusionable (0.97 y 0.90, los dos a 3 km, devueltos al revés), la revisión apunta al de 0.97.
+- `::test_regla_4_ordena_por_similitud_y_despues_creado_en`: dos candidatos fusionables con la misma similitud → gana el de `creado_en` menor; con similitudes 0.95 y 0.97 → gana el de 0.97. Los dos casos van parametrizados con los dos órdenes en que los devuelve el repo falso, para que "toma el primero" falle en uno de los dos. Si ninguno es fusionable (0.97 y 0.90, los dos a 3 km, devueltos al revés), la revisión apunta al de 0.97.
 - `::test_sin_ciudad_salta_regla_4`: empresa sin ciudad y nombre idéntico a un lead → `nuevo`, y el repo falso no recibió `candidatos_por_nombre`.
 - `::test_misma_ciudad_es_requisito_de_regla_4`: el repo falso recibe la ciudad normalizada; el filtro real se prueba en integración.
 - `::test_bordes_de_similitud`: `clasificar_similitud(0.92) == CANDIDATO_FUSION` (candidato: la regla 4 todavía exige geo y ≤ 250 m), `(0.9199) == REVISION`, `(0.85) == REVISION`, `(0.8499) == NUEVO`.
@@ -143,7 +151,7 @@ Ninguno: este slice no usa IA. Las empresas de OSM + Supersociedades alimentan `
 
 **Cifrado (principio VI)** (`backend/tests/arquitectura/test_cifrado.py`, contra Postgres de prueba)
 - `::test_columnas_sensibles_cifradas`: por cada `(tabla, columna)` de `backend/app/seguridad/catalogo_sensibles.py`, guarda un valor vía repositorio, lo lee crudo con SQL y verifica que no contiene el texto en claro y que `Cifrador.descifrar` devuelve el original.
-- `::test_ninguna_columna_de_contacto_fuera_del_catalogo`: recorre `information_schema.columns`; toda columna cuyo nombre contenga `telefono`, `email`, `correo`, `contacto` o `respuesta` está en el catálogo, termina en `_hmac`, o es una de las columnas de canal de una lista cerrada (`leads.telefono_canal`, `leads.email_canal`: etiqueta de origen con `CHECK`, no el dato). Una `contacto_canal` nueva falla. Falla si alguien agrega `leads.telefono` en claro.
+- `::test_ninguna_columna_de_contacto_fuera_del_catalogo`: recorre `information_schema.columns`; toda columna cuyo nombre contenga `telefono`, `email`, `correo`, `contacto` o `respuesta` está en el catálogo, termina en `_hmac`, o es una de una lista cerrada de columnas que no guardan el dato de contacto: `leads.telefono_canal`, `leads.email_canal` (etiqueta de origen con `CHECK`), `leads.idioma_contacto` (columna generada del país, de la `0002`) y `fuente_cache.respuesta` (respuesta cruda de Croma, de la `0002`: Supersociedades no trae teléfono ni correo, y OSM no se cachea). Estas dos últimas las deja a la 003 el plan del 002 (sección Datos). Una `contacto_canal` nueva falla. Falla si alguien agrega `leads.telefono` en claro.
 - `::test_contacto_no_aparece_en_logs`: corre `EjecutarBusqueda` con la fixture OSM (`phone="300 123 4567"`, `website="https://wa.me/573009876543"`, `email="ventas@ejemplo.co"`) y `caplog` en `DEBUG` sobre todos los loggers (incluido `httpx`), y verifica que ninguna de estas formas aparece en ningún registro: `+573001234567`, `3001234567`, `300 123 4567`, `573009876543`, `ventas@ejemplo.co`.
 - `::test_contacto_no_queda_en_claro_en_columnas_no_catalogadas`: tras la misma corrida, el SQL crudo de `leads.web`, `leads.direccion` y `leads.nombre` no contiene `3001234567` ni `3009876543`. Cubre el `wa.me` que el test de catálogo no ve porque la columna se llama `web`.
 - `backend/tests/unit/seguridad/test_cifrador.py`:
@@ -166,9 +174,10 @@ Ninguno: este slice no usa IA. Las empresas de OSM + Supersociedades alimentan `
   - `::test_por_telefono_encuentra_por_hmac`: el lead guardado con `+573001234567` se encuentra por ese número y no por `+573001234568`.
   - `::test_por_dominio_devuelve_todos_los_que_coinciden`: dos leads con el mismo dominio → los dos, para que el dominio aplique veto y desempate.
   - `::test_par_de_revision_no_se_duplica_invertido`: registrar `(A, B)` y después `(B, A)` deja una sola fila.
+  - `::test_aplicar_fusion_simple_no_pisa_y_par_que_sube_reemplaza`: dos casos contra Postgres. (a) Campo simple: lead con `dominio` lleno + `CambiosLead` con otro `dominio` → el `dominio` original queda. (b) Par que sube: lead con teléfono `whatsapp_osm` + `CambiosLead` con otro teléfono `osm_contacto` → `telefono_cifrado` descifra al nuevo, `telefono_hmac` es el del nuevo y `telefono_canal == "osm_contacto"`. Con `coalesce` sobre el par, (b) falla.
   - Los valores de los pares salen de una emulación de `pg_trgm`; el test fija la **banda**, no el número exacto. Si Postgres real los ubica distinto, se cambia el par, no el umbral.
 - `backend/tests/integration/test_busqueda_dos_fuentes.py`:
-  - `::test_supersociedades_y_osm_dan_un_lead`: `"SUPERMERCADO LA ECONOMÍA S.A.S."` en `"BOGOTÁ D.C."` (Supersociedades, NIT 900123456, geo de la fixture) + `"Supermercado La Economía"` en Bogotá a 120 m (OSM, con teléfono) → 1 lead con 2 `lead_fuentes`, `tipo_titular='juridica'`, `id_fiscal='900123456'`, `telefono_cifrado` no nulo y 1 `cumplimiento`.
+  - `::test_supersociedades_y_osm_dan_un_lead`: `"SUPERMERCADO LA ECONOMÍA S.A.S."` en `"BOGOTÁ D.C."` (Supersociedades, NIT 900123456, geo de la fixture) + `"Supermercado La Economía"` en Bogotá a 120 m (OSM, con teléfono) → 1 lead con 2 `lead_fuentes`, `tipo_titular='juridica'`, `id_fiscal='900123456'`, `telefono_cifrado` no nulo y 1 `cumplimiento`, y esa única fila sigue con `fuente='croma_supersociedades_co'` y la licencia original: prueba contra Postgres que el `UPDATE` de `aplicar_fusion` no toca `cumplimiento` (el repo falso de `test_fusion_no_toca_cumplimiento` no tiene esa tabla).
   - `::test_orden_de_fuentes_no_cambia_el_resultado`: OSM primero y Supersociedades después da el mismo lead (fusión por regla 4, NIT completado, `tipo_titular` sube a `juridica`).
   - `::test_homonimo_lejano_no_hereda_el_telefono`: el mismo par con el nodo OSM a 3 km → 2 leads y 1 `revision_dedup` pendiente; el lead `juridica` queda con `telefono_cifrado` nulo.
   - `::test_osm_caido_no_pierde_supersociedades`: el transporte OSM devuelve 504 dos veces → los leads de Supersociedades se persisten y el resumen marca `osm_overpass` como caída.
@@ -227,7 +236,7 @@ Ninguno: este slice no usa IA. Las empresas de OSM + Supersociedades alimentan `
 
 **Sin caché para Overpass:** la respuesta cruda trae teléfonos y correos, y `fuente_cache` los dejaría en claro (principio VI). Overpass es gratis y la regla de 1 req/s la cumple el limitador. `# ponytail:` si Overpass nos limita en la demo, caché con `respuesta_cifrada`.
 
-**Selección de fuentes:** función pura que lee `paises`/`filtros` del registro, no un método nuevo en cada adaptador. El adaptador sigue lanzando `CriterioNoSoportado` (contrato del 002) como red de seguridad. El cargador de `config/actividades.yaml` vive en `aplicacion/`, junto a `cargar_registro` (como en el 002); el dominio recibe solo el `dict`.
+**Selección de fuentes:** función pura que recibe `Iterable[MetaFuente]` y lee `paises`/`filtros`, no un método nuevo en cada adaptador. No recibe `Registro`: es un tipo de `aplicacion` y el dominio no lo importa (contrato `layers`, 002 plan:31); `EjecutarBusqueda` le pasa `[m for _, m in registro.fuentes]`. Reemplaza el `cubre()` estricto del 002 en el orquestador (el plan 002 deja la traducción de criterios a la 003). `cubre()` sigue en el dominio pero pierde la parte de filtros: queda solo el país (`pais ∈ paises` o `"*" ∈ paises`), y `seleccionar_fuentes` lo usa para el primer paso. El caso "falso con un filtro fuera de `meta.filtros`" de `test_dominio.py::test_cubre` (002) se reemplaza por "verdadero con un filtro fuera de `meta.filtros`": ese filtro ahora lo descarta la selección. El adaptador sigue lanzando `CriterioNoSoportado` (contrato del 002) como red de seguridad. El cargador de `config/actividades.yaml` vive en `aplicacion/registro.py`, junto a `cargar_registro` (como en el 002); el dominio recibe solo el `dict`.
 
 **`config/actividades.yaml`:**
 ```yaml
@@ -296,7 +305,7 @@ Ninguno: este slice no usa IA. Las empresas de OSM + Supersociedades alimentan `
 
 **Geo de Supersociedades:** `fuentes.yaml` declara `geo` en `trae`, pero el 002 no lo mapeó. Este slice suma `lat/lon` al mapeo del adaptador del 002 (si Croma los trae) y a la fixture. Si la corrida real del paso 10 muestra que Croma no trae geo, todo cruce por regla 4 cae a revisión: es el lado seguro y se reporta.
 
-**Costos:** `overpass_query` con `unidades` = segundos **del request** (desde antes del `POST` hasta tener la respuesta), medidos con el reloj inyectable. La espera del limitador y la de `Retry-After` **no** se cuentan: es tiempo sin cómputo, y contarla haría el costo dependiente de la carga del servidor público. `costo_unitario = tarifas.computo_seg_usd`, `gratis=false` (el cómputo es nuestro aunque Overpass no cobre). Los intentos fallidos también registran sus segundos. El cargador de `tarifas.yaml` convierte con `Decimal(str(valor))`, para que el test compare `Decimal` con `Decimal` y no un float.
+**Costos:** `overpass_query` con `unidades` = segundos **del request** (desde antes del `POST` hasta tener la respuesta), medidos con el reloj inyectable. La espera del limitador y la de `Retry-After` **no** se cuentan: es tiempo sin cómputo, y contarla haría el costo dependiente de la carga del servidor público. `costo_unitario = tarifas.computo_seg_usd`, `gratis=false` (el cómputo es nuestro aunque Overpass no cobre). Los intentos fallidos también registran sus segundos. La raíz de composición del 002 (`app/cli.py`) ya convierte `tarifas.yaml` con `Decimal(str(valor))`, así que el test compara `Decimal` con `Decimal` y no un float. Como en el 002, `lote_id = busqueda_id` llega por el constructor y `ts` lo pone la base.
 
 **Cumplimiento de un lead OSM:** `fuente='osm_overpass'`, `licencia='ODbL'`, `url_origen` del elemento, `as_of` de la base OSM, `base_legal` nula hasta el 007. La atribución "© OpenStreetMap contributors", con enlace a `/copyright`, se muestra en el tablero (005, en cuanto OSM aporta un lead) y en el README (013).
 

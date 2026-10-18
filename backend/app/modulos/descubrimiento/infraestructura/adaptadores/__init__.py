@@ -1,2 +1,6 @@
 # Único lugar que nombra clases concretas de adaptadores. clave de fuentes.yaml -> clase.
-catalogo: dict[str, type] = {}
+from app.modulos.descubrimiento.infraestructura.adaptadores.osm_overpass import OsmOverpass
+
+catalogo: dict[str, type] = {
+    "osm_overpass": OsmOverpass,
+}
