@@ -63,6 +63,41 @@ export function respuestaVistaPrevia(cambios: Record<string, unknown> = {}) {
   };
 }
 
+/** Lo que devuelve la API del [MIN]: sin `contar` ni costos, y el tope todavía no se aplica (null, nunca 0). */
+export function respuestaVistaPreviaMinima(cambios: Record<string, unknown> = {}) {
+  return respuestaVistaPrevia({
+    fuentes: [
+      { fuente: "osm_overpass", conteo: null, motivo: "sin_conteo", ignorados: ["palabras_clave", "exclusiones"], truncado: false },
+      { fuente: "datos_gov_co_rues", conteo: null, motivo: "sin_conteo", ignorados: ["ciudad"], truncado: false },
+    ],
+    descartadas: [],
+    costo_vista_previa_usd: null,
+    costo_estimado_usd: null,
+    costo_maximo_usd: null,
+    creditos_restantes_mes: null,
+    requests_restantes_24h: null,
+    dentro_del_tope: null,
+    ...cambios,
+  });
+}
+
+/** El tablero del [MIN]: solo encontrados y únicos; todo lo demás, null. */
+export function respuestaTableroMinima(cambios: Record<string, unknown> = {}) {
+  const fila = {
+    icp: null, costo_lista: null, costo_real: null, desperdicio_lista: null, desperdicio_real: null,
+    cpl_lista: null, cpl_real: null, cuenta_naturales: false, naturales_no_contactables: null,
+  };
+  return {
+    fuentes: [{ ...fila, fuente: "osm_overpass", encontrados: 3, unicos: 2 }],
+    total: { ...fila, fuente: "TOTAL", encontrados: 3, unicos: 2 },
+    costo_evals: null,
+    cobertura: null,
+    revisiones_pendientes: null,
+    atribuciones: [] as { fuente: string; texto: string; url: string }[],
+    ...cambios,
+  };
+}
+
 const filaTablero = {
   encontrados: 4,
   unicos: 4,

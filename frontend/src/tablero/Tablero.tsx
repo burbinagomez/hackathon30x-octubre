@@ -66,7 +66,7 @@ export default function Tablero() {
       </div>
       <h2>{t("tablero.cobertura")}</h2>
       <ul className="lista">
-        {datos.cobertura.map((c) => (
+        {(datos.cobertura ?? []).map((c) => (
           <li key={c.pais}>{c.pais}: {c.fuentes.map((f) => t(`fuentes.${f}`)).join(", ")}</li>
         ))}
       </ul>

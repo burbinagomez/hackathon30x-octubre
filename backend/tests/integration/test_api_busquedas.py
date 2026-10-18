@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 import httpx
 import pytest
 import yaml
+from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 # Los fixtures de auth (app real, JWKS local, usuarios de A y B) se reusan tal cual.
@@ -253,6 +254,20 @@ def test_tablero_devuelve_encontrados_y_unicos_del_tenant(api, admin, usuarios):
     assert minimo(como_b["total"]) == {"fuente": "TOTAL", "encontrados": 1, "unicos": 1}
 
 
+def test_tablero_completa_con_null_lo_que_el_minimo_no_calcula(api, admin, usuarios):
+    _sembrar(admin, usuarios["tenant_a"], [(uuid4(), uuid4(), "osm_overpass")])
+
+    t = _tablero(api, usuarios["a"])
+
+    for clave in ("costo_evals", "cobertura", "revisiones_pendientes"):
+        assert t[clave] is None, clave  # null = "sin dato"; nunca [] ni 0
+    for fila in [*t["fuentes"], t["total"]]:
+        for clave in ("icp", "costo_lista", "costo_real", "desperdicio_lista", "desperdicio_real", "cpl_lista", "cpl_real",
+                      "naturales_no_contactables"):
+            assert fila[clave] is None, clave
+        assert fila["cuenta_naturales"] is False
+
+
 # --- de punta a punta -----------------------------------------------------------------------------------------
 
 def test_flujo_completo_deja_leads_costos_y_cumplimiento_del_tenant(api, admin, usuarios):
@@ -265,17 +280,30 @@ def test_flujo_completo_deja_leads_costos_y_cumplimiento_del_tenant(api, admin, 
     assert cuerpo["busqueda_id"] == busqueda_id
     assert cuerpo["estado"] == "completada"
     assert cuerpo["errores"] == [] and cuerpo["sin_fuente_para"] is None
-    assert cuerpo["nuevos"] > 0 and cuerpo["encontrados"] >= cuerpo["unicos"] >= cuerpo["nuevos"]
+    assert cuerpo["errores"] == [] and cuerpo["sin_fuente_para"] is None
 
-    # Toda operación de salida escribió su costo, en el lote de la búsqueda y del tenant de A.
-    costos = admin.connect().execute(text(
-        "SELECT tenant_id, lote_id, lead_id, proveedor FROM costos")).all()
+    # Cuentas exactas, derivadas del fixture: OSM trae N elementos con nombre y datos.gov.co, sus filas jurídicas.
+    esperados_osm = sum(1 for e in OSM["elements"] if e.get("tags", {}).get("name"))
+    esperados_datos = sum(1 for f in FILAS if "NATURAL" not in f["organizacion_juridica"])
+    assert cuerpo["encontrados"] == esperados_osm + esperados_datos
+    assert cuerpo["nuevos"] == cuerpo["unicos"] == cuerpo["encontrados"]  # fixtures sin NIT repetido entre fuentes
+
+    # Toda operación de salida escribió su costo, en el lote de la búsqueda y del tenant de A: una fila por request.
+    with admin.connect() as c:
+        costos = c.execute(text("SELECT tenant_id, lote_id, lead_id, proveedor FROM costos")).all()
+    assert len(costos) == len(api.pedidas) == 2
     assert {c.proveedor for c in costos} == {"osm", "datos.gov.co"}
     assert {(c.tenant_id, str(c.lote_id), c.lead_id) for c in costos} == {(usuarios["tenant_a"], busqueda_id, None)}
-    # Cada lead de A trae su fila de cumplimiento, y nada quedó en B.
+
+    # Cada lead de A trae su cumplimiento completo, una sola vez; y nada quedó en B.
     leads_a = _contar(admin, "SELECT count(*) FROM leads WHERE tenant_id = :a", a=usuarios["tenant_a"])
     assert leads_a == cuerpo["nuevos"]
-    assert _contar(admin, "SELECT count(*) FROM cumplimiento WHERE tenant_id = :a", a=usuarios["tenant_a"]) == leads_a
+    assert _contar(admin, "SELECT count(*) FROM leads l WHERE l.tenant_id = :a AND NOT EXISTS ("
+                          "SELECT 1 FROM cumplimiento c WHERE c.lead_id = l.id)", a=usuarios["tenant_a"]) == 0
+    assert _contar(admin, "SELECT count(*) FROM cumplimiento WHERE tenant_id = :a AND (base_legal IS NULL OR licencia IS NULL "
+                          "OR url_origen IS NULL OR as_of IS NULL)", a=usuarios["tenant_a"]) == 0
+    assert _contar(admin, "SELECT count(DISTINCT lead_id) = count(*) FROM cumplimiento WHERE tenant_id = :a",
+                   a=usuarios["tenant_a"]) is True
     assert _contar(admin, "SELECT count(*) FROM leads WHERE tenant_id = :b", b=usuarios["tenant_b"]) == 0
 
     # ...y el tablero de A lo muestra, con la misma cuenta; el de B, vacío.
@@ -283,3 +311,83 @@ def test_flujo_completo_deja_leads_costos_y_cumplimiento_del_tenant(api, admin, 
     assert tablero["total"]["encontrados"] == cuerpo["encontrados"]
     assert tablero["total"]["unicos"] == cuerpo["unicos"]
     assert _tablero(api, usuarios["b"])["fuentes"] == []
+
+
+def test_fuente_caida_no_tumba_la_busqueda_y_el_error_es_un_codigo(api, admin, usuarios):
+    pedidas = []
+
+    def responder(request):
+        pedidas.append(request)
+        if request.url.host == "www.datos.gov.co":
+            return httpx.Response(500, json={"message": "Texto en español con datos del servidor"})
+        return httpx.Response(200, json=OSM)
+
+    api.app.state.transporte_http = httpx.MockTransport(responder)  # la fábrica lo lee en CADA request
+    busqueda_id = _crear(api, usuarios["a"])
+
+    r = _ejecutar(api, usuarios["a"], busqueda_id)
+
+    assert r.status_code == 200
+    cuerpo = r.json()
+    assert cuerpo["estado"] == "completada"  # OSM respondió
+    assert cuerpo["errores"] == [{"fuente": "datos_gov_co_rues", "motivo": "no_disponible"}]  # código, no frase
+    assert "servidor" not in r.text and "español" not in r.text
+    assert cuerpo["encontrados"] > 0
+    with admin.connect() as c:
+        costos = c.execute(text("SELECT proveedor FROM costos WHERE tenant_id = :a"), {"a": usuarios["tenant_a"]}).all()
+    assert len(costos) == len(pedidas)  # el intento fallido también gastó cómputo y quedó en el libro
+    assert sorted({c.proveedor for c in costos}) == ["datos.gov.co", "osm"]
+    assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=busqueda_id) == "completada"
+
+
+# --- composición: lo inyectable se lee por request y se re-fija en cada arranque -------------------------------
+
+def test_la_fabrica_lee_el_transporte_en_cada_request_no_al_arrancar(api, usuarios):
+    quien = {"n": 0}
+
+    def contar_en(nombre):
+        def responder(request):
+            quien[nombre] = quien.get(nombre, 0) + 1
+            return httpx.Response(200, json=OSM if request.url.host != "www.datos.gov.co" else FILAS,
+                                  headers={"X-SODA2-Truth-Last-Modified": HEADER_AS_OF})
+        return httpx.MockTransport(responder)
+
+    api.app.state.transporte_http = contar_en("primero")
+    assert _ejecutar(api, usuarios["a"], _crear(api, usuarios["a"])).status_code == 200
+    api.app.state.transporte_http = contar_en("segundo")
+    assert _ejecutar(api, usuarios["a"], _crear(api, usuarios["a"], ciiu="4752")).status_code == 200
+
+    assert quien["primero"] >= 1 and quien["segundo"] >= 1  # el segundo request usó el transporte nuevo
+
+
+def test_el_lifespan_re_fija_transporte_y_actividades_en_cada_arranque(entorno):
+    import importlib
+
+    app = importlib.import_module("app.main").app
+    with TestClient(app):
+        app.state.transporte_http = "pisado por un test"
+        app.state.actividades_yaml = {"pisado": {}}
+    with TestClient(app):  # un arranque nuevo no hereda lo que dejó el anterior
+        assert isinstance(app.state.transporte_http, httpx.BaseTransport)
+        assert not isinstance(app.state.transporte_http, httpx.MockTransport)
+        real = yaml.safe_load((BACKEND / "config" / "actividades.yaml").read_text())
+        assert app.state.actividades_yaml == real
+
+
+# --- palabras clave y exclusiones: se guardan y se dice que no se aplican ---------------------------------------
+
+def test_palabras_clave_y_exclusiones_se_guardan_y_figuran_como_ignoradas(api, admin, usuarios):
+    r = _vista_previa(api, usuarios["a"], palabras_clave=["pan"], exclusiones=["industrial"])
+
+    assert r.status_code == 201
+    for fuente in r.json()["fuentes"]:
+        assert {"palabras_clave", "exclusiones"} <= set(fuente["ignorados"]), fuente["fuente"]  # ninguna las aplica aún
+    guardado = _contar(admin, "SELECT criterios FROM busquedas WHERE id = :id", id=r.json()["busqueda_id"])
+    assert guardado["palabras_clave"] == ["pan"] and guardado["exclusiones"] == ["industrial"]
+
+
+def test_sin_palabras_clave_ni_exclusiones_no_hay_nada_que_ignorar(api, usuarios):
+    r = _vista_previa(api, usuarios["a"])
+    assert r.status_code == 201
+    for fuente in r.json()["fuentes"]:
+        assert not {"palabras_clave", "exclusiones"} & set(fuente["ignorados"])

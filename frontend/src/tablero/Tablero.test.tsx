@@ -10,6 +10,7 @@ import {
   monto,
   numero,
   respuestaTablero,
+  respuestaTableroMinima,
 } from "../test/fixtures";
 import { server } from "../test/servidor";
 import Tablero from "./Tablero";
@@ -114,4 +115,18 @@ test.each<Idioma>(["es", "en"])("muestra_naturales_encontradas_no_contactables[%
   expect(celda(f.datos_gov_co_rues, t.naturales)).toBe(numero(idioma, 26304));
   expect(celda(f.osm_overpass, t.naturales)).toBe("—");
   expect(celda(f.croma_supersociedades_co, t.naturales)).toBe(t.no_aplica);
+});
+
+test("el_minimo_pinta_encontrados_y_unicos_y_no_las_columnas_de_costo_ni_las_secciones_sin_dato", async () => {
+  await montar(respuestaTableroMinima({ atribuciones: [atribucionOsm] }) as ReturnType<typeof respuestaTablero>);
+
+  const encabezados = screen.queryAllByRole("columnheader").map((h) => h.textContent);
+  expect(encabezados).toEqual(["Fuente", "Encontrados", "Únicos"]);
+  expect(celda("OpenStreetMap", "Encontrados")).toBe("3");
+  expect(celda("Total", "Únicos")).toBe("2");
+  expect(screen.queryByText(/evals/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Revisiones pendientes/)).not.toBeInTheDocument();
+  expect(screen.queryByText(es.tablero.cobertura)).not.toBeInTheDocument();
+  expect(document.body).not.toHaveTextContent(/NaN|—|No aplica/);
+  expect(screen.queryByRole("link", { name: atribucionOsm.texto })).toBeInTheDocument();  // la atribución sí
 });

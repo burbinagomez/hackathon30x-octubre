@@ -14,6 +14,7 @@ import {
   iniciarSesion,
   monto,
   respuestaVistaPrevia,
+  respuestaVistaPreviaMinima,
 } from "../test/fixtures";
 import { server } from "../test/servidor";
 import NuevaBusqueda from "./NuevaBusqueda";
@@ -216,4 +217,27 @@ test("un_error_en_la_vista_previa_se_avisa", async () => {
   fireEvent.click(boton("Vista previa"));
 
   await waitFor(() => expect(screen.queryByRole("alert")).toHaveTextContent("No se pudo completar la operación. Probá de nuevo."));
+});
+
+test("vista_previa_sin_costos_habilita_buscar_y_no_muestra_costos_ni_tope", async () => {
+  await previsualizar(respuestaVistaPreviaMinima());
+
+  await waitFor(() => expect(fila("OpenStreetMap")).toBeDefined());
+  // dentro_del_tope null = el tope no se evalúa: no bloquea (solo `false` bloquea).
+  expect(boton("Buscar")).toBeEnabled();
+  expect(fila("OpenStreetMap")).toHaveTextContent(es.motivos.sin_conteo);
+  for (const clave of ["Costo estimado", "Costo máximo", "Tope:", "Créditos de Croma", "Consultas de Croma"]) {
+    expect(screen.queryByText(new RegExp(clave))).not.toBeInTheDocument();
+  }
+  expect(screen.queryByText(es.busqueda.se_compara_el_maximo)).not.toBeInTheDocument();
+  expect(document.body).not.toHaveTextContent(/NaN|—/);  // ni "sin dato" ni basura: las líneas no se pintan
+});
+
+test("los_ignorados_de_palabras_clave_exclusiones_y_ciudad_salen_con_su_nombre", async () => {
+  await previsualizar(respuestaVistaPreviaMinima());
+
+  await waitFor(() => expect(fila("OpenStreetMap")).toBeDefined());
+  expect(fila("OpenStreetMap")).toHaveTextContent("Palabras clave, Exclusiones");
+  expect(fila("RUES")).toHaveTextContent("Ciudad");
+  expect(en.criterios.palabras_clave && en.criterios.exclusiones && en.criterios.ciudad).toBeTruthy();
 });
