@@ -72,6 +72,10 @@ class SettingsApi(Settings):
     # registrar, principio VIII). Solo backend, nunca VITE_.
     ia_api_key: SecretStr | None = None
     ia_modelo: str | None = None
+    # Proveedor de la Puerta B: anthropic (por defecto) u openrouter. Con openrouter, IA_MODELO_PROVEEDOR es el nombre
+    # exacto del modelo allá (ej. anthropic/claude-...); IA_MODELO sigue siendo la clave de la tarifa en tarifas.yaml.
+    ia_proveedor: str | None = None
+    ia_modelo_proveedor: str | None = None
 
 
 class SecretProhibido(RuntimeError):
