@@ -114,7 +114,13 @@
     "licencia": "Licencia",
     "calificados": "Calificados",
     "pct_calificados": "% calificados (de únicos)",
-    "cpql": "CPQL (lista)"
+    "cpql": "CPQL (lista)",
+    "embudo": "Embudo por fuente",
+    "embudo_enriquecidos": "Enriquecidos",
+    "embudo_contactables": "Contactables",
+    "embudo_con_telefono": "Con teléfono",
+    "embudo_calificados": "Calificados",
+    "embudo_ayuda": "Cada barra se mide contra los leads únicos de la fuente."
   },
   "idioma": {
     "etiqueta": "Idioma",

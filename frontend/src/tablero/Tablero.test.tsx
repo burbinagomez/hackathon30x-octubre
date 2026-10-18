@@ -282,7 +282,7 @@ test.each([["falla", 500], ["vacio", CPQL_VACIO]] as const)("cpql_%s_el_tablero_
 function pasosEmbudo(nombre: string): string[][] {
   const grupo = within(screen.getByRole("region", { name: /embudo|funnel/i })).getByRole("group", { name: nombre });
   return within(grupo).getAllByRole("listitem").map((li) =>
-    [...li.querySelectorAll("[data-paso]")].map((e) => (e.textContent ?? "").replace(/\s/g, " ")));
+    Array.from(li.querySelectorAll("[data-paso]")).map((e) => (e.textContent ?? "").replace(/\s/g, " ")));
 }
 
 test.each<[Idioma, string[]]>([
@@ -314,7 +314,7 @@ test("embudo_incluye_el_total_y_deja_fuera_sin_atribuir", async () => {
 test("embudo_la_barra_es_proporcional_a_unicos_y_usa_solo_tokens", async () => {
   await montar(respuestaTablero());
   const grupo = within(screen.getByRole("region", { name: "Embudo por fuente" })).getByRole("group", { name: "Supersociedades (Croma)" });
-  const anchos = [...grupo.querySelectorAll<HTMLElement>(".embudo-barra")].map((b) => b.style.width);
+  const anchos = Array.from(grupo.querySelectorAll<HTMLElement>(".embudo-barra")).map((b) => b.style.width);
   expect(anchos).toEqual(["100%", "100%", "75%", "50%", "50%", "25%"]);
   expect(grupo.querySelector("[style*='#'], [style*='rgb']")).toBeNull();
 });
@@ -332,7 +332,7 @@ test("embudo_sin_unicos_no_divide_por_cero_ni_pinta_barras", async () => {
   const region = screen.getByRole("region", { name: "Embudo por fuente" });
   expect(region).not.toHaveTextContent(/NaN|Infinity|∞/);
   expect(pasosEmbudo("Supersociedades (Croma)").map((p) => p[2])).toEqual(Array(6).fill("—"));
-  expect([...region.querySelectorAll<HTMLElement>(".embudo-barra")].every((b) => b.style.width === "0%")).toBe(true);
+  expect(Array.from(region.querySelectorAll<HTMLElement>(".embudo-barra")).every((b) => b.style.width === "0%")).toBe(true);
 });
 
 test("embudo_sin_fuentes_ni_campos_no_rompe_la_pantalla", async () => {
@@ -342,10 +342,15 @@ test("embudo_sin_fuentes_ni_campos_no_rompe_la_pantalla", async () => {
   expect(screen.queryByRole("region", { name: "Embudo por fuente" })).not.toBeInTheDocument();
 });
 
-test("embudo_con_campos_ausentes_muestra_sin_dato_y_nunca_cero", async () => {
+test("embudo_sin_ningun_campo_de_la_api_no_pinta_la_seccion", async () => {
   await montar(respuestaTableroMinima());
-  const pasos = pasosEmbudo("OpenStreetMap");
-  expect(pasos.slice(2).map((p) => p[1])).toEqual(["—", "—", "—", "—"]);
+  expect(screen.queryByRole("region", { name: "Embudo por fuente" })).not.toBeInTheDocument();
+});
+
+test("embudo_una_fuente_sin_dato_muestra_sin_dato_y_nunca_cero", async () => {
+  const sinDato = { ...respuestaTablero().fuentes[0], fuente: "osm_overpass", enriquecidos: null, contactables: null, con_telefono: null, calificados: null };
+  await montar(respuestaTablero({ fuentes: [respuestaTablero().fuentes[0], sinDato] }));
+  expect(pasosEmbudo("OpenStreetMap").slice(2).map((p) => p[1])).toEqual(["—", "—", "—", "—"]);
 });
 
 test("embudo_cada_paso_tiene_texto_visible_ademas_de_la_barra", async () => {
