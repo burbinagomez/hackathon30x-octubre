@@ -106,7 +106,7 @@ export default function NuevaBusqueda() {
   const [pensando, setPensando] = useState(false);
   const [ocupado, setOcupado] = useState<Ocupado>(null);
   const [errorFrase, setErrorFrase] = useState<string | null>(null);
-  const [sugerido, setSugerido] = useState(false);
+  const [sugerido, setSugerido] = useState<"clientes" | "frase" | null>(null);
   const [resultado, setResultado] = useState<ResultadoEjecucion | null>(null);
 
   useEffect(() => {
@@ -140,7 +140,7 @@ export default function NuevaBusqueda() {
   function aplicarLookalike(sugerencia: Sugerencia) {
     setForm((f) => conSugerencia(f, sugerencia));
     setVista(null);
-    setSugerido(true);
+    setSugerido("clientes");
   }
 
   async function sugerir() {
@@ -150,7 +150,7 @@ export default function NuevaBusqueda() {
       const { sugerencia } = await sugerirDesdeFrase(frase.trim());
       setForm((f) => conSugerencia(f, sugerencia));
       setVista(null);
-      setSugerido(true);
+      setSugerido("frase");
       setPestana("filtros");  // el usuario revisa y edita antes de gastar en vista previa
     } catch (e) {
       setErrorFrase(e instanceof ErrorApi && e.estado === 503 ? "error_no_disponible" : "error_interpretacion");
@@ -185,6 +185,7 @@ export default function NuevaBusqueda() {
   const tope = entrada("tope", t("busqueda.tope"), "number");
   const nombreFuente = (clave: string) => t(`fuentes.${clave}`, { defaultValue: clave });
   const nombre = (a: Actividad) => (i18n.language === "en" ? a.nombre_en ?? a.nombre_es : a.nombre_es);
+  const avisoSugerencia = sugerido === "clientes" ? t("busqueda.revisar_clientes") : t("busqueda.frase.revisar");
   const pestanas: Pestana[] = [
     ...(puertas.lookalike ? (["lookalike"] as const) : []),
     ...(puertas.frase ? (["frase"] as const) : []),
@@ -206,12 +207,12 @@ export default function NuevaBusqueda() {
         </div>
       )}
       {pestana === "frase" && (
-        <div className="formulario panel-intake" role="tabpanel">
+        <div className="tarjeta panel-intake" role="tabpanel">
           <Campo id="frase" etiqueta={t("busqueda.frase.etiqueta")}>
             <textarea id="frase" maxLength={MAX_FRASE} value={frase} onChange={(e) => setFrase(e.target.value)} />
           </Campo>
           <p className="ayuda">{t("busqueda.frase.ayuda")}</p>
-          <div className="acciones">
+          <div className="acciones acciones-fin">
             <button type="button" className="boton boton-primario" disabled={!frase.trim() || pensando} aria-busy={pensando} onClick={sugerir}>
               {pensando && <span className="anillo anillo-chico" aria-hidden="true" />}
               {pensando ? t("busqueda.frase.pensando") : t("busqueda.frase.sugerir")}
@@ -223,13 +224,17 @@ export default function NuevaBusqueda() {
       )}
       {pestana === "lookalike" && (
         <div className="panel-intake" role="tabpanel">
-          {sugerido && <p role="status" className="aviso">{t("busqueda.frase.revisar")}</p>}
-          <IntakeLookalike alSugerir={aplicarLookalike} />
+          {sugerido && <p role="status" className="aviso aviso-ancho">{avisoSugerencia}</p>}
+          <IntakeLookalike
+            alSugerir={aplicarLookalike}
+            nombreActividad={(c) => { const a = actividades.find((x) => x.codigo === c); return a && nombre(a); }}
+            nombreDivision={(c) => { const d = divisiones.find((x) => x.codigo_nativo === c); return d && (i18n.language === "en" ? d.nombre_en : d.nombre_es); }}
+          />
         </div>
       )}
       {pestana === "filtros" && (
       <div className="formulario formulario-ancho">
-      {sugerido && <p role="status" className="aviso">{t("busqueda.frase.revisar")}</p>}
+      {sugerido && <p role="status" className="aviso aviso-ancho">{avisoSugerencia}</p>}
       <Campo id="pais" etiqueta={t("busqueda.pais")}>
         <select id="pais" value={form.pais} onChange={(e) => cambiar("pais", e.target.value)}>
           {paises.map((p) => <option key={p} value={p}>{t(`paises.${p}`)}</option>)}
