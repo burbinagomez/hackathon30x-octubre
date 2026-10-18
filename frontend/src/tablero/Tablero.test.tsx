@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import i18n from "../i18n";
 import en from "../i18n/en.json";
 import es from "../i18n/es.json";
@@ -274,4 +274,23 @@ test.each([["falla", 500], ["vacio", CPQL_VACIO]] as const)("cpql_%s_el_tablero_
   expect(encabezados).not.toContain(es.tablero.calificados);
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(celda("Supersociedades (Croma)", "Costo (lista)")).toBe(monto("es", "1.35"));
+});
+
+test("exportar_para_dapta_baja_el_csv", async () => {
+  let pedido = false;
+  server.use(
+    http.get("*/calificaciones/exportar", () => {
+      pedido = true;
+      return new HttpResponse("to_number,first_name,lead_id\n", { headers: { "Content-Type": "text/csv" } });
+    }),
+  );
+  // jsdom no trae createObjectURL: se define solo para este test (reemplazar URL entero rompe los fetch de msw).
+  const crear = vi.fn(() => "blob:local");
+  Object.assign(URL, { createObjectURL: crear, revokeObjectURL: vi.fn() });
+  await montar(respuestaTablero());
+
+  fireEvent.click(await screen.findByRole("button", { name: es.tablero.exportar_dapta }));
+
+  await waitFor(() => expect(pedido).toBe(true));
+  await waitFor(() => expect(crear).toHaveBeenCalledTimes(1));
 });
