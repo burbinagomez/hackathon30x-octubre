@@ -174,9 +174,9 @@ Son dos puertos y no un `Enriquecedor` genérico porque los dos adaptadores reci
 
 **Front.** `Tablero.tsx` suma `con_telefono · contactables` y el % `no_contactables_politica / icp` con un decimal entero ("14 %"). Muestra "sin dato" con `icp=0`. El front formatea y no cuenta.
 
-## Migración 0008 — PENDIENTE DE APROBACIÓN DE DANIEL
+## Migración 0007 — APROBADA POR DANIEL (2026-10-18)
 
-> **PENDIENTE DE APROBACIÓN DE DANIEL.** Esto es una propuesta dentro del plan. No se crea `supabase/migrations/0008_enriquecimiento.sql` hasta que Daniel apruebe este DDL. La spec dice `0005`. En `main` están 0001, 0002, 0003, 0005 y 0006, y la **0007 queda reservada para la 012**. Si al momento de T001 hay otra migración mergeada, se usa el siguiente número libre.
+> **Aprobada** con dos cambios: `email_canal` admite solo `sitio_web` y `osm_contacto`, y el número es el siguiente libre en `main` al momento del merge (hoy **0007**; si entra otra antes, se renombra al que siga). El archivo `supabase/migrations/0007_enriquecimiento.sql` es este bloque byte a byte (`test_migracion_0007.py`).
 
 - `costos.tipo` **no cambia**: su CHECK ya admite las tres operaciones (D2). P9 no suma columnas a `costos`.
 - Las columnas de contacto y `v_leads_icp` entran acá porque Daniel aprobó P3 y P2.
@@ -184,7 +184,7 @@ Son dos puertos y no un `Enriquecedor` genérico porque los dos adaptadores reci
 - Igual que la 0006, sin `BEGIN`/`COMMIT` propios.
 
 ```sql
--- 0008_enriquecimiento.sql — PENDIENTE DE APROBACIÓN DE DANIEL
+-- 0007_enriquecimiento.sql — aprobada por Daniel (2026-10-18)
 
 -- encaje y contactable viven en leads: son uno por lead, igual que tipo_titular.
 ALTER TABLE public.leads
@@ -215,9 +215,11 @@ ALTER TABLE public.leads
     CHECK (telefono_cifrado IS NULL OR octet_length(telefono_cifrado) > 28),
   ADD CONSTRAINT leads_email_cifrado_ck
     CHECK (email_cifrado IS NULL OR octet_length(email_cifrado) > 28),
-  ADD CONSTRAINT leads_canal_enum
-    CHECK (telefono_canal IN ('whatsapp_comercial','sitio_web','osm_contacto','whatsapp_osm')
-       AND email_canal    IN ('whatsapp_comercial','sitio_web','osm_contacto','whatsapp_osm')),
+  ADD CONSTRAINT leads_telefono_canal_enum
+    CHECK (telefono_canal IN ('whatsapp_comercial','sitio_web','osm_contacto','whatsapp_osm')),
+  -- Un email solo sale del sitio propio o de un tag de OSM: los canales whatsapp no aplican.
+  ADD CONSTRAINT leads_email_canal_enum
+    CHECK (email_canal IN ('sitio_web','osm_contacto')),
   -- La etiqueta sin dato (o el dato sin etiqueta) es un estado roto.
   ADD CONSTRAINT leads_canal_con_dato
     CHECK ((telefono_canal IS NULL) = (telefono_cifrado IS NULL)
@@ -286,7 +288,7 @@ $$;
 
 `catalogo_sensibles` (`seguridad/cifrado.py`) suma `telefono` y `email` a `CIFRADAS` en el mismo PR (P3). No es DDL: es código de la app.
 
-Si Daniel aprueba, entra también `backend/tests/arquitectura/test_migracion_0008.py` con el patrón de `test_migracion_0006.py`: el archivo contiene los CHECKs, repite `security_invoker` en cada vista, no toca `costos` y no reordena las columnas de `v_tablero_fuentes`.
+Entra también `backend/tests/arquitectura/test_migracion_0007.py` con el patrón de `test_migracion_0006.py`: el archivo contiene los CHECKs, repite `security_invoker` en cada vista, no toca `costos` y no reordena las columnas de `v_tablero_fuentes`.
 
 ## Fases y dueños
 
