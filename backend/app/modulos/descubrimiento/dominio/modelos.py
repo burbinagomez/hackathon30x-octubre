@@ -120,7 +120,7 @@ class ResumenBusqueda:
 
 @dataclass(frozen=True)
 class LeadListado:
-    """Fila de la pantalla "Leads de la búsqueda". Sin dirección y sin valores de contacto: solo si existen.
+    """Fila de la pantalla "Leads de la búsqueda". Sin dirección; el contacto solo de una jurídica.
     `nombre` es None salvo para una jurídica. `tiene_telefono`/`tiene_email`: bool solo para una jurídica; None para natural o desconocido (no se expone)."""
     id: UUID
     nombre: str | None
@@ -131,6 +131,10 @@ class LeadListado:
     tiene_web: bool
     tiene_telefono: bool | None = None
     tiene_email: bool | None = None
+    # Valores de contacto, solo de una jurídica (canal que la empresa publica); natural o desconocido: siempre None.
+    telefono: str | None = None
+    email: str | None = None
+    web: str | None = None
 
 
 @dataclass(frozen=True)

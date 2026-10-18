@@ -1,4 +1,4 @@
-/** Contrato de GET /busquedas y GET /busquedas/{id}/leads. `tiene_telefono`/`tiene_email` null = sin dato; nunca el valor. */
+/** Contrato de GET /busquedas y GET /busquedas/{id}/leads. `tiene_*` null = sin dato; telefono/email/web solo de una jurídica. */
 export type Busqueda = {
   id: string;
   creada_en: string;
@@ -19,6 +19,10 @@ export type LeadListado = {
   tiene_web: boolean;
   tiene_telefono: boolean | null;
   tiene_email: boolean | null;
+  // Solo de una jurídica: el canal que la empresa publica. Natural o sin dato: null.
+  telefono?: string | null;
+  email?: string | null;
+  web?: string | null;
 };
 
 export type PaginaLeads = {

@@ -58,15 +58,23 @@ test("muestra fuentes, ciudad, licencia y web, y no pinta columnas de contacto s
   expect(encabezados).toContain("Sitio web");
 });
 
-test("con contacto booleano pinta Si o guion, nunca un valor", async () => {
-  await montar(pagina([lead(1, { tiene_telefono: true, tiene_email: false })]));
+test("muestra el telefono, el correo y la web de la juridica como enlaces", async () => {
+  // Daniel, 2026-10-18: "esto me debería mostrar los datos de los contactos, no mostrarme la palabra sí".
+  await montar(pagina([lead(1, { tiene_telefono: true, tiene_email: false, tiene_web: true,
+    telefono: "+57 601 555 0101", email: null, web: "https://lumea.example" })]));
   const encabezados = screen.getAllByRole("columnheader").map((h) => h.textContent);
   expect(encabezados).toContain("Teléfono");
   expect(encabezados).toContain("Correo");
   const celdas = within(screen.getAllByRole("row")[1]).getAllByRole("cell");
-  const de = (etiqueta: string) => celdas.find((c) => c.getAttribute("data-etiqueta") === etiqueta)?.textContent;
-  expect(de("Teléfono")).toBe("Sí");
-  expect(de("Correo")).toBe("—");
+  const de = (etiqueta: string) => celdas.find((c) => c.getAttribute("data-etiqueta") === etiqueta)!;
+  expect(within(de("Teléfono")).getByRole("link", { name: "+57 601 555 0101" })).toHaveAttribute("href", "tel:+576015550101");
+  expect(de("Correo").textContent).toBe("—");
+  expect(within(de("Sitio web")).getByRole("link", { name: "lumea.example" })).toHaveAttribute("href", "https://lumea.example");
+});
+
+test("un correo se muestra como mailto", async () => {
+  await montar(pagina([lead(1, { tiene_email: true, email: "hola@lumea.example" })]));
+  expect(screen.getByRole("link", { name: "hola@lumea.example" })).toHaveAttribute("href", "mailto:hola@lumea.example");
 });
 
 test("la natural (contacto null) no pinta Si ni guion en contacto", async () => {

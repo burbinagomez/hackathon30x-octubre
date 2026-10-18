@@ -18,6 +18,10 @@ router = APIRouter()
 TAMANO_MAXIMO = 100
 
 
+# La respuesta trae teléfonos y correos: ni el navegador ni un proxy la guardan.
+SIN_CACHE = {"Cache-Control": "no-store"}
+
+
 def _repo(request: Request, tenant_id: UUID) -> RepositorioLeadsPostgres:
     estado = request.app.state
     return RepositorioLeadsPostgres(estado.engine, tenant_id, estado.cifrador)
@@ -27,7 +31,8 @@ def _item(l: LeadListado) -> dict:
     return {
         "id": str(l.id), "nombre": l.nombre, "tipo_titular": l.tipo_titular, "fuentes": list(l.fuentes),
         "licencias": list(l.licencias), "ciudad": l.ciudad, "tiene_web": l.tiene_web,
-        "tiene_telefono": l.tiene_telefono, "tiene_email": l.tiene_email,  # bool solo de jurídicas; None = no se expone. Nunca el valor
+        "tiene_telefono": l.tiene_telefono, "tiene_email": l.tiene_email,  # bool solo de jurídicas; None = no se expone
+        "telefono": l.telefono, "email": l.email, "web": l.web,  # solo de jurídicas: el canal que la empresa publica
     }
 
 
@@ -62,7 +67,7 @@ def listar_leads(
     r = _repo(request, tenant_id).listar_leads(busqueda_id, pagina, tamano, con_contacto)
     if r is None:  # inexistente o de otro tenant: la misma respuesta
         raise HTTPException(status_code=404, detail="no_encontrada")
-    return _cuerpo(r)
+    return JSONResponse(_cuerpo(r), headers=SIN_CACHE)
 
 
 @router.get("/leads")
@@ -77,4 +82,5 @@ def listar_leads_de_fuente(
     """Los leads de una fuente en todas las búsquedas del tenant (el tablero enlaza acá); sin `fuente`, todos."""
     if fuente is not None and fuente not in _fuentes_conocidas(request):
         return JSONResponse(status_code=422, content={"errores": [{"campo": "fuente", "codigo": "desconocida"}]})
-    return _cuerpo(_repo(request, tenant_id).listar_leads_de_fuente(fuente, pagina, tamano, con_contacto))
+    return JSONResponse(_cuerpo(_repo(request, tenant_id).listar_leads_de_fuente(fuente, pagina, tamano, con_contacto)),
+                        headers=SIN_CACHE)

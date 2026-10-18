@@ -143,11 +143,16 @@ def test_contacto_booleano_solo_de_juridica(mundo):
     assert (p[mundo["n"]].tiene_telefono, p[mundo["n"]].tiene_email) == (None, None)
 
 
-def test_contacto_nunca_aparece_en_el_resultado(mundo):
-    _con_contacto(mundo)
+def test_la_juridica_muestra_su_contacto_y_la_natural_nunca(mundo):
+    # Daniel, 2026-10-18: "esto me debería mostrar los datos de los contactos, no mostrarme la palabra sí".
+    g = _con_contacto(mundo)
 
-    assert TELEFONO not in repr(mundo["repo"].listar_leads(mundo["b1"], 1, 25))
-    assert CORREO not in repr(mundo["repo"].listar_leads_de_fuente(None, 1, 25, con_contacto=True))
+    p = _por_id(mundo["repo"].listar_leads(mundo["b1"], 1, 25))
+
+    assert (p[mundo["j"]].telefono, p[mundo["j"]].email, p[mundo["j"]].web) == (TELEFONO, None, "https://acme.invalid")
+    assert (p[g].telefono, p[g].email) == (None, CORREO)
+    n = p[mundo["n"]]  # natural con teléfono y correo cifrados: nunca se descifra ni se expone
+    assert (n.telefono, n.email, n.web) == (None, None, None)
 
 
 def test_filtro_con_contacto_solo_juridicas_con_telefono_o_correo(mundo):

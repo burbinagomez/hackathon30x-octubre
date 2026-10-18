@@ -18,7 +18,7 @@ from tests.integration.test_auth import _bearer, cliente, entorno, usuarios, ver
 NOMBRE_NATURAL = "Juan Pérez Natural"
 DIRECCION_NATURAL = "Calle Secreta 123"
 CLAVES_DEL_ITEM = {"id", "nombre", "tipo_titular", "fuentes", "licencias", "ciudad", "tiene_telefono", "tiene_email",
-                   "tiene_web"}
+                   "tiene_web", "telefono", "email", "web"}
 
 
 def _empresa(nombre, fuente, id_fiscal, titular="juridica", direccion=None, web=None):
@@ -67,7 +67,7 @@ def test_nunca_nombre_de_natural_ni_contacto(datos):
     items = {i["id"]: i for i in r.json()["items"]}
     natural = next(i for i in items.values() if i["tipo_titular"] == "natural")
     assert natural["nombre"] is None
-    assert all(set(i) == CLAVES_DEL_ITEM for i in items.values())  # ningún campo de más (teléfono, email, dirección)
+    assert all(set(i) == CLAVES_DEL_ITEM for i in items.values())  # ningún campo de más (dirección)
     assert {i["nombre"] for i in items.values() if i["tipo_titular"] == "juridica"} >= {"Acme SAS"}
 
 
@@ -180,16 +180,16 @@ def _dar_contacto(datos, nombre, titular="juridica", telefono=None, email=None):
         titular == "juridica", None if titular == "juridica" else "persona_natural", None))
 
 
-def test_contacto_es_booleano_y_el_valor_nunca_sale(datos):
+def test_la_juridica_trae_su_contacto_sin_cache_y_otro_tenant_no_lo_ve(datos):
     _dar_contacto(datos, "Acme SAS", telefono=TELEFONO, email=CORREO)
 
     r = _leads(datos, "a", datos["ba"], tamano=100)
 
     acme = next(i for i in r.json()["items"] if i["nombre"] == "Acme SAS")
-    assert (acme["tiene_telefono"], acme["tiene_email"]) == (True, True)
-    assert TELEFONO not in r.text and CORREO not in r.text
+    assert (acme["tiene_telefono"], acme["tiene_email"], acme["telefono"], acme["email"]) == (True, True, TELEFONO, CORREO)
     assert all(set(i) == CLAVES_DEL_ITEM for i in r.json()["items"])
-    assert TELEFONO not in datos["api"].get("/leads", headers=_bearer(datos["u"]["a"])).text
+    assert "no-store" in r.headers.get("cache-control", "")
+    assert TELEFONO not in datos["api"].get("/leads", headers=_bearer(datos["u"]["b"])).text
 
 
 def test_con_contacto_filtra_en_las_dos_rutas(datos):
