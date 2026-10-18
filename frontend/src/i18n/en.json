@@ -67,7 +67,9 @@
       "editar_en_filtros": "Edit in Filters",
       "empezar_de_nuevo": "Start over",
       "limite_turnos": "This conversation is already long. Tap \"Start over\" to set up another search.",
-      "sin_actividad": "The activity is missing, so the preview cannot be calculated. Tap \"Edit in Filters\" and pick one."
+      "sin_actividad": "The activity is missing, so the preview cannot be calculated. Tap \"Edit in Filters\" and pick one.",
+      "actividad_falta": "Missing: pick it in Filters",
+      "ciiu_descartado": "The AI suggested an activity that is not in the catalog"
     },
     "trabajando": {
       "buscando": "Searching companies in the sources",

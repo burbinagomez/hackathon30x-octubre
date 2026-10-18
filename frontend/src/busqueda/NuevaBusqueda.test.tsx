@@ -231,6 +231,9 @@ test("vista_previa_exige_actividad_y_tope", async () => {
   await waitFor(() => expect(screen.queryByRole("option", { name: actividades[0].nombre_es })).toBeInTheDocument());
   expect(boton("Vista previa")).toBeDisabled();
 
+  // El tope arranca en 1 (el mismo valor que en el chat): sin actividad no alcanza.
+  expect(campo("Tope de gasto (USD)")).toHaveValue(1);
+  fireEvent.change(campo("Tope de gasto (USD)"), { target: { value: "" } });
   fireEvent.change(campo("Actividad"), { target: { value: "1081" } });
   expect(boton("Vista previa")).toBeDisabled();
   fireEvent.change(campo("Tope de gasto (USD)"), { target: { value: "5" } });

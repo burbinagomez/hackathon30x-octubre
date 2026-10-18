@@ -67,7 +67,9 @@
       "editar_en_filtros": "Editar en Filtros",
       "empezar_de_nuevo": "Empezar de nuevo",
       "limite_turnos": "Esta conversación ya es larga. Tocá «Empezar de nuevo» para armar otra búsqueda.",
-      "sin_actividad": "Falta elegir la actividad para calcular la vista previa. Tocá «Editar en Filtros» y elegila."
+      "sin_actividad": "Falta elegir la actividad para calcular la vista previa. Tocá «Editar en Filtros» y elegila.",
+      "actividad_falta": "Falta: elegila en Filtros",
+      "ciiu_descartado": "La IA propuso una actividad que no está en el catálogo"
     },
     "trabajando": {
       "buscando": "Buscando empresas en las fuentes",

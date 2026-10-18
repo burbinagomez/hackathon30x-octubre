@@ -18,6 +18,7 @@
   --color-cabecera-texto: var(--color-blanco);
   --color-foco: var(--color-oscuro);
   --color-sobre-acento: var(--color-oscuro); /* texto sobre lima: oscuro en ambos temas */
+  --color-aviso: #B45309; /* aviso: texto de algo que falta; contraste AA sobre blanco */
 }
 
 /* Tema oscuro: sigue la preferencia del sistema, sin selector. */
@@ -30,6 +31,7 @@
     --color-cabecera-fondo: var(--color-oscuro);
     --color-cabecera-texto: var(--color-acento);
     --color-foco: var(--color-acento);
+    --color-aviso: #FBBF24; /* AA sobre el fondo oscuro */
   }
 }
 

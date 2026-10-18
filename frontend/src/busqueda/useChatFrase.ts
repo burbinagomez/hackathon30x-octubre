@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { ErrorApi } from "../api/cliente";
 import { sugerirDesdeFrase, type Sugerencia, type Turno } from "./api";
+import { TOPE_POR_DEFECTO } from "./formulario";
 
 export const MAX_MENSAJE = 500;
-/** El back acepta hasta 6 turnos de historial: con 6 en pantalla la conversación se cierra y se empieza de nuevo. */
-export const MAX_TURNOS = 6;
-export const TOPE_POR_DEFECTO = "1";
+/** El back acepta hasta 12 turnos de historial: con 12 en pantalla la conversación se cierra y se empieza de nuevo. */
+export const MAX_TURNOS = 12;
 
 export type AvisoChat = "error_no_disponible" | "error_interpretacion";
 
@@ -15,6 +15,7 @@ export function useChatFrase() {
   const [texto, setTexto] = useState("");
   const [sugerencia, setSugerencia] = useState<Sugerencia | null>(null);
   const [pensando, setPensando] = useState(false);
+  const [ciiuDescartado, setCiiuDescartado] = useState(false);
   const [aviso, setAviso] = useState<AvisoChat | null>(null);
   const [tope, setTope] = useState(TOPE_POR_DEFECTO);
 
@@ -35,6 +36,7 @@ export function useChatFrase() {
       const respuesta = r.pregunta ?? r.explicacion;
       setMensajes((m) => (respuesta ? [...m, { rol: "asistente", texto: respuesta }] : m));
       setSugerencia(r.pregunta ? null : r.sugerencia);
+      setCiiuDescartado(!r.pregunta && r.ciiu_descartado === true);
     } catch (e) {
       setMensajes(previos);
       setTexto(frase);
@@ -48,12 +50,13 @@ export function useChatFrase() {
     setMensajes([]);
     setTexto("");
     setSugerencia(null);
+    setCiiuDescartado(false);
     setAviso(null);
     setTope(TOPE_POR_DEFECTO);
   }
 
   return {
-    mensajes, texto, setTexto, sugerencia, pensando, aviso, limite, tope, setTope,
+    mensajes, texto, setTexto, sugerencia, ciiuDescartado, pensando, aviso, limite, tope, setTope,
     topeEditado: tope !== TOPE_POR_DEFECTO,
     enviar, empezarDeNuevo,
   };
