@@ -214,6 +214,8 @@
   - `::test_actividades_trae_ambos_nombres`. **Mutación:** omitir la clave `nombre_en` cuando es `null`.
   - `::test_tablero_atribucion_solo_de_fuentes_presentes[caso]` (advisor, cumplimiento). **Mutación:** sin el `EXISTS` → `solo_croma` trae dos.
   - `::test_tablero_trae_naturales_por_fuente`. **viene de 011 (D7)** (T047 de la 011). Definición en la 011 spec (c64c5f8):135. Las dos búsquedas se siembran con `creado_en` **explícito y distinto**. Con `DEFAULT now()`, dentro de una misma transacción empatan: `DISTINCT ON` elegiría al azar, y la mutación ASC no daría rojo. **Mutación:** `COALESCE(naturales, 0)` → OSM trae `0` en lugar de `null`; o `ORDER BY fuente, creado_en ASC` → toma el conteo viejo.
+  *Rojo escrito 2026-10-18, pendiente de advisor (RLS y cumplimiento) (parte [MIN]): `test_api_busquedas.py`, 21 casos en rojo por assert (`501 == 201/200/422`; `['4711', '5611', '4752'] == []` para el YAML de actividades). Más lo que el [MIN] necesita y la tabla no listaba: 404 frente a 409 entre tenants (ajena indistinguible de inexistente, sin requests ni costos), `test_validacion_ciiu_devuelve_el_nombre_de_la_regla`, `test_actividades_yaml_real_tiene_nombre_es_en_todas_las_entradas`, y `test_flujo_completo_deja_leads_costos_y_cumplimiento_del_tenant` (vista previa -> ejecutar -> tablero con fuentes reales y transporte falso: costos con `lote_id` = búsqueda y `lead_id` null, un `cumplimiento` por lead, nada en B). Contrato del verde: `app.state.transporte_http` y `app.state.actividades_yaml`; vista previa 201, ejecutar 200; errores 422 como `{errores: [{campo, codigo}]}`.*
+
 - [ ] T032 [MIN] [Paso 7] **Verde:**
   - routers `busquedas`, `tablero`, `actividades`;
   - `repositorio_tablero.py`;
