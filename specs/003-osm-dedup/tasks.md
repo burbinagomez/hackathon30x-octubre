@@ -149,7 +149,9 @@ Va después del [MIN], en este orden de bloques. **El bloque P1 entra entero o n
 
 ### P3: OSM completo (Paso 7)
 
-- [ ] T041p [Paso 7] **Rojo:** `::test_limitador_espera_un_segundo_entre_requests`, `::test_retry_after_tiene_tope_de_diez_segundos`, `::test_segundo_fallo_se_reporta_sin_tragarlo`, `::test_quinientos_elementos_marca_truncado`, y el conteo de `descartados_sin_nombre`.
+- [ ] T041p [Paso 7] **Rojo:** `::test_limitador_espera_un_segundo_entre_requests`, `::test_retry_after_tiene_tope_de_diez_segundos`, `::test_segundo_fallo_se_reporta_sin_tragarlo`, `::test_quinientos_elementos_marca_truncado`, y el conteo de `descartados_sin_nombre`. Además, `::test_timeout_tambien_escribe_su_fila`: un `httpx.TimeoutException` deja su fila de `overpass_query` (el `finally` de T044 ya la escribe) y sale como `FuenteNoDisponible`, sin propagar el error de `httpx`.
+- [ ] T041q [Paso 7] **Rojo + Verde** (advisor 5a): test del escape del QL en `armar_query`. Una `ciudad` con `"` y con `\` queda como literal escapado y no cierra el string de la query.
+- [ ] T015p [Paso 2] (advisor 5d): `seleccion.py` usa `cubre(...)` para el país cuando T016b lo deje solo con el país; si no, se borra el comentario de `seleccion.py:17`.
 - [ ] T044p [Paso 7] **Verde:** limitador con reloj y `sleep` inyectables, un reintento ante 429/504, `PaginaEmpresas` con `truncado` y `descartados_sin_nombre` (con default).
 - [ ] T052p [Paso 10] Resumen por fuente completo en la CLI (fusionados por regla, en revisión, descartados, truncado, "0 elementos: revisar `--ciudad`").
 
