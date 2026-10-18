@@ -1,6 +1,28 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Request
 
-from app.api._501 import sin_implementar
+from app.api.sesion import tenant_actual
+from app.modulos.tablero.infraestructura.persistencia.repositorio_tablero import FilaFuente, leer_tablero
 
 router = APIRouter()
-router.add_api_route("/tablero/fuentes", sin_implementar, methods=["GET"])  # esqueleto T004
+
+
+def _fila(f: FilaFuente) -> dict:
+    # [MIN]: solo encontrados y únicos. Lo que todavía no se calcula va null ("sin dato"), nunca 0.
+    return {
+        "fuente": f.fuente, "encontrados": f.encontrados, "unicos": f.unicos, "icp": None,
+        "costo_lista": None, "costo_real": None, "desperdicio_lista": None, "desperdicio_real": None,
+        "cpl_lista": None, "cpl_real": None, "cuenta_naturales": False, "naturales_no_contactables": None,
+    }
+
+
+@router.get("/tablero/fuentes")
+def tablero_fuentes(request: Request, tenant_id=Depends(tenant_actual)):
+    datos = leer_tablero(request.app.state.engine, tenant_id)
+    return {
+        "fuentes": [_fila(f) for f in datos.fuentes],
+        "total": _fila(datos.total),
+        "costo_evals": None,
+        "cobertura": None,
+        "revisiones_pendientes": None,
+        "atribuciones": [{"fuente": a.fuente, "texto": a.texto, "url": a.url} for a in datos.atribuciones],
+    }

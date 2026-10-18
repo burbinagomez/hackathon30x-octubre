@@ -300,8 +300,13 @@ def test_flujo_completo_deja_leads_costos_y_cumplimiento_del_tenant(api, admin, 
     assert leads_a == cuerpo["nuevos"]
     assert _contar(admin, "SELECT count(*) FROM leads l WHERE l.tenant_id = :a AND NOT EXISTS ("
                           "SELECT 1 FROM cumplimiento c WHERE c.lead_id = l.id)", a=usuarios["tenant_a"]) == 0
-    assert _contar(admin, "SELECT count(*) FROM cumplimiento WHERE tenant_id = :a AND (base_legal IS NULL OR licencia IS NULL "
+    assert _contar(admin, "SELECT count(*) FROM cumplimiento WHERE tenant_id = :a AND (fuente IS NULL OR licencia IS NULL "
                           "OR url_origen IS NULL OR as_of IS NULL)", a=usuarios["tenant_a"]) == 0
+    # base_legal la setea AprobarMensaje en el 007 (0002 migración:68, 003 spec:344): hasta entonces es NULL en todos, y
+    # sin ella el 007 no puede enviar. Si alguien la rellena acá (por ejemplo con 'persona_juridica...' a un lead de OSM,
+    # que es 'desconocido' = natural), este assert lo delata.
+    assert _contar(admin, "SELECT count(*) FROM cumplimiento WHERE tenant_id = :a AND base_legal IS NOT NULL",
+                   a=usuarios["tenant_a"]) == 0
     assert _contar(admin, "SELECT count(DISTINCT lead_id) = count(*) FROM cumplimiento WHERE tenant_id = :a",
                    a=usuarios["tenant_a"]) is True
     assert _contar(admin, "SELECT count(*) FROM leads WHERE tenant_id = :b", b=usuarios["tenant_b"]) == 0
