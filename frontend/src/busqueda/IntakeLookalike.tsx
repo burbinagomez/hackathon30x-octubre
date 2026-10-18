@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ErrorApi } from "../api/cliente";
+import Trabajando from "../compartido/Trabajando";
 import { lookalike, type RespuestaLookalike, type SugerenciaIntake } from "./apiLookalike";
 import { EMPRESAS_DE_EJEMPLO } from "./ejemploLookalike";
 
@@ -53,10 +54,12 @@ export default function IntakeLookalike({ alSugerir }: Props) {
         <button type="button" className="boton" onClick={() => setTexto(EMPRESAS_DE_EJEMPLO.join("\n"))}>
           {t("intake.lookalike.ejemplo")}
         </button>
-        <button type="button" className="boton boton-primario" disabled={enviando} onClick={sugerir}>
+        <button type="button" className="boton boton-primario" disabled={enviando} aria-busy={enviando} onClick={sugerir}>
+          {enviando && <span className="anillo anillo-chico" aria-hidden="true" />}
           {enviando ? t("intake.lookalike.enviando") : t("intake.lookalike.sugerir")}
         </button>
       </div>
+      {enviando && <Trabajando texto={t("busqueda.trabajando.lookalike")} />}
       {error && <p role="alert" className="error">{t(`intake.lookalike.${error}`)}</p>}
       {respuesta && (
         <div>

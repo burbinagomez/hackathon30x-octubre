@@ -61,6 +61,14 @@
       "revisar": "We prefilled the filters from your sentence. Review and adjust them before the preview.",
       "error_no_disponible": "AI suggestions are not available right now. Use the filters directly.",
       "error_interpretacion": "We could not interpret the sentence. Try rewording it or use the filters."
+    },
+    "trabajando": {
+      "buscando": "Searching companies in the sources",
+      "buscando_boton": "Searching…",
+      "consultando": "Querying {{fuente}}",
+      "vista_previa": "Calculating count and cost",
+      "frase": "The AI is reading your sentence",
+      "lookalike": "Looking up your customers in RUES"
     }
   },
   "fuentes": {
@@ -199,5 +207,8 @@
     },
     "ninguna_respondio": "No source responded. Try again later.",
     "ver_tablero": "View the dashboard"
+  },
+  "comun": {
+    "cargando": "Loading…"
   }
 }

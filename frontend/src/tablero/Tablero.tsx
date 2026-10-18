@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import Atribuciones from "../compartido/Atribuciones";
+import Esqueleto from "../compartido/Esqueleto";
 import Enlace from "../compartido/Enlace";
 import { RUTA_BUSQUEDAS, RUTA_LEADS } from "../compartido/rutas";
 import { entero, moneda, monedaFina, porcentaje } from "../compartido/formato";
@@ -77,7 +78,7 @@ export default function Tablero() {
     return (
       <main className="pantalla pantalla-ancha">
         <h1>{t("tablero.titulo")}</h1>
-        {fallo && <p role="alert" className="error">{t("tablero.error")}</p>}
+        {fallo ? <p role="alert" className="error">{t("tablero.error")}</p> : <Esqueleto filas={5} />}
       </main>
     );
   }
