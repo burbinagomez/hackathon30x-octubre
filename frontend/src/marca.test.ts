@@ -40,6 +40,43 @@ describe("tokens.css", () => {
   });
 });
 
+describe("tema oscuro", () => {
+  const bloqueOscuro = () => {
+    const m = leerTokens().match(
+      /@media\s*\(prefers-color-scheme:\s*dark\)\s*\{\s*:root\s*\{([^}]*)\}/,
+    );
+    expect(m, "falta @media (prefers-color-scheme: dark) con :root").not.toBeNull();
+    return m![1];
+  };
+
+  test("define --color-blanco y los tokens semánticos del tema claro en :root", () => {
+    const root = leerTokens().match(/:root\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(root).toMatch(/--color-blanco:\s*#ffffff\s*;/i);
+    for (const t of ["superficie", "texto", "borde", "acento-texto"]) {
+      expect(root, t).toMatch(new RegExp(`--color-${t}:`));
+    }
+    expect(root).toMatch(/color-scheme:\s*light dark\s*;/);
+  });
+
+  test("el bloque oscuro redefine fondo (#1A1A1C) y texto (#FFFFFF)", () => {
+    const oscuro = bloqueOscuro();
+    expect(oscuro).toMatch(/--color-superficie:\s*var\(--color-oscuro\)\s*;/);
+    expect(oscuro).toMatch(/--color-texto:\s*var\(--color-blanco\)\s*;/);
+    expect(oscuro).toMatch(/--color-acento-texto:\s*var\(--color-acento\)\s*;/);
+  });
+
+  test("body usa los tokens semánticos", () => {
+    const body = leerTokens().match(/\bbody\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(body).toMatch(/background:\s*var\(--color-superficie\)/);
+    expect(body).toMatch(/color:\s*var\(--color-texto\)/);
+  });
+
+  test("index.html declara meta color-scheme light dark", () => {
+    const meta = leerHtml().querySelector('meta[name="color-scheme"]');
+    expect(meta?.getAttribute("content")).toBe("light dark");
+  });
+});
+
 // Compara el hostname parseado: un `includes` sobre la URL aceptaría cualquier host que lo contenga.
 const esDominioOsubdominio = (h: string, dominio: string) => h === dominio || h.endsWith(`.${dominio}`);
 
