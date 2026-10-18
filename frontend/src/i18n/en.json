@@ -10,7 +10,8 @@
   "motivos": {
     "sin_mapeo_actividad": "The activity has no equivalent in this source",
     "pais": "The source does not cover this country",
-    "sin_geografia": "The source needs a state or city"
+    "sin_geografia": "The source needs a state or city",
+    "sin_conteo": "No count yet: the number of companies is not queried"
   },
   "config": {
     "incompleta": "Incomplete configuration"
@@ -23,7 +24,9 @@
     "pais": "Country",
     "actividad": "Activity",
     "actividad_vacia": "Pick an activity",
-    "departamento": "State",
+    "departamento": "Department",
+    "ciudad": "City (optional)",
+    "departamento_vacio": "All states",
     "ingresos_min": "Minimum revenue (USD)",
     "palabras_clave": "Keywords (comma separated)",
     "exclusiones": "Exclusions (comma separated)",
@@ -37,6 +40,8 @@
     "ninguna_fuente_cubre": "No source covers this search.",
     "costo_estimado": "Estimated cost: {{monto}}",
     "costo_maximo": "Maximum cost: {{monto}}",
+    "dentro_del_tope": "Within the cap: the search can run.",
+    "fuera_del_tope": "Over the cap: raise the cap or narrow the search.",
     "tope_linea": "Cap: {{monto}}",
     "creditos_restantes": "Croma credits left this month: {{n}}",
     "requests_restantes": "Croma requests left in 24 h: {{n}}",
@@ -55,7 +60,10 @@
     "pais": "Country",
     "ciiu": "Activity",
     "departamento": "State",
-    "ingresos_min": "Minimum revenue"
+    "ingresos_min": "Minimum revenue",
+    "ciudad": "City",
+    "palabras_clave": "Keywords",
+    "exclusiones": "Exclusions"
   },
   "tablero": {
     "error": "The dashboard could not be loaded. Try again.",
@@ -75,7 +83,9 @@
     "cobertura": "Coverage by country",
     "revisiones_pendientes": "Pending reviews: {{n}}",
     "atribucion": "Data attribution",
-    "desperdicio_real": "Waste (actual)"
+    "desperdicio_real": "Waste (actual)",
+    "ver_busquedas": "View searches",
+    "licencia": "License"
   },
   "idioma": {
     "etiqueta": "Language",
@@ -90,5 +100,55 @@
   },
   "canales": {
     "email": "Email"
+  },
+  "geografia": {
+    "division": {
+      "CO": "Department",
+      "MX": "State",
+      "BR": "State",
+      "PE": "Region"
+    }
+  },
+  "leads": {
+    "titulo_busquedas": "Searches",
+    "titulo_leads": "Leads of the search",
+    "sin_busquedas": "There are no searches yet.",
+    "sin_leads": "This search brought no leads.",
+    "error_busquedas": "The searches could not be loaded.",
+    "error_leads": "The leads could not be loaded. Try again.",
+    "no_encontrada": "The search was not found.",
+    "resumen_busqueda": "{{pais}} · {{lugar}} · {{fecha}} · {{estado}} · {{total}} leads",
+    "departamento": "Dept. {{codigo}}",
+    "todo_el_pais": "Whole country",
+    "volver": "Back to searches",
+    "natural_protegida": "Individual (protected data)",
+    "nombre": "Name",
+    "tipo": "Type",
+    "fuentes": "Sources",
+    "ciudad": "City",
+    "web": "Website",
+    "telefono": "Phone",
+    "email": "Email",
+    "licencia": "License",
+    "si": "Yes",
+    "no": "No",
+    "anterior": "Previous",
+    "siguiente": "Next",
+    "pagina_de": "Page {{pagina}} of {{paginas}}",
+    "total": "{{total}} leads",
+    "tipo_titular": {
+      "juridica": "Legal entity",
+      "natural": "Individual",
+      "desconocido": "Undetermined"
+    },
+    "estado": {
+      "creada": "Created",
+      "borrador": "Draft",
+      "ejecutando": "Running",
+      "terminada": "Completed",
+      "con_errores": "With errors"
+    },
+    "titulo_de_fuente": "Leads from {{fuente}}",
+    "titulo_todos": "All leads"
   }
 }

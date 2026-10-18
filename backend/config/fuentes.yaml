@@ -79,9 +79,11 @@ enriquecedores:                          # puerto: Enriquecedor
 canales_contacto:                        # puerto: CanalContacto
   smtp_email:
     habilitado: true
+    canal: email                         # lo que el usuario elige como canal_preferido
     proveedor: "SMTP nuevo para el evento"
     primer_toque: true
   whatsapp_meta:
+    canal: whatsapp
     habilitado: false                    # [VALIDAR] por el dueño; mientras tanto no existe
     solo_numeros_comerciales_publicados: true
     tasa_bloqueo_max: 0.01

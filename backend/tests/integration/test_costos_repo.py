@@ -3,7 +3,7 @@ import os
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
@@ -17,6 +17,9 @@ from app.modulos.descubrimiento.aplicacion.registro import cargar_registro
 from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, MetaFuente
 from app.modulos.descubrimiento.infraestructura.adaptadores.datos_gov_co_rues import DatosGovCoRues
 from app.modulos.descubrimiento.infraestructura.adaptadores.osm_overpass import OsmOverpass
+from evals import run
+from tests.anthropic_falso import CASO, CLAVE_FALSA, juez, transporte
+from tests.evals_falso import CASOS, K, config
 
 PROVEEDOR = "croma"
 BACKEND = Path(__file__).resolve().parents[2]
@@ -155,6 +158,36 @@ def test_socrata_descarga_escribe_fila_en_costos(rt, admin, tenant):
     assert tipo_costo == "numeric"
 
 
+def test_evals_run_compuesto_escribe_en_costos(admin, tenant, tmp_path, capsys):
+    """T019: la rama por defecto de evals.run arma PostgresCostos (DATABASE_URL del mapeo) + JuezClaude, sin red."""
+    capturados = []
+    entorno = {"ANTHROPIC_API_KEY": CLAVE_FALSA, "DATABASE_URL": _url("TEST_DATABASE_URL")}
+    codigo = run.main(["--config", str(config(tmp_path)), "--tenant", str(tenant)], entorno=entorno,
+                      transporte=transporte(capturados))
+    out, err = capsys.readouterr()
+
+    assert CLAVE_FALSA not in out + err and entorno["DATABASE_URL"] not in out + err
+    reporte = json.loads(out)
+    assert (codigo, reporte["evals"]["encaje_icp"]["estado"]) == (1, "sin_baseline")
+    assert len(capturados) == K * len(CASOS)
+    with admin.connect() as c:
+        filas = c.execute(text("SELECT tipo, lote_id, fuente FROM costos WHERE tenant_id = :t"), {"t": tenant}).all()
+    assert sorted(filas) == sorted([("llm_tokens_in", UUID(reporte["lote_id"]), "evals"),
+                                    ("llm_tokens_out", UUID(reporte["lote_id"]), "evals")] * K * len(CASOS))
+
+
+def test_juez_escribe_filas_llm_en_costos(rt, admin, tenant):
+    """Principio VIII para el juez: JuezClaude (Messages API falsa) contra el libro real como app_rt deja 2 filas llm."""
+    lote = uuid4()
+    juez(PostgresCostos(rt, tenant), [], lote_id=lote).juzgar("encaje_icp", CASO)
+
+    with admin.connect() as c:
+        filas = c.execute(text("SELECT tenant_id, tipo, unidades, costo_unitario, proveedor, fuente, lote_id "
+                               "FROM costos WHERE tenant_id = :t ORDER BY tipo"), {"t": tenant}).all()
+    assert filas == [(tenant, "llm_tokens_in", Decimal(120), Decimal("0.000002"), "anthropic", "evals", lote),
+                     (tenant, "llm_tokens_out", Decimal(30), Decimal("0.00001"), "anthropic", "evals", lote)]
+
+
 def _fila_de_lote(admin, tenant, lote, unidades, costo_unitario, gratis):
     with admin.begin() as c:
         c.execute(text("INSERT INTO costos (tenant_id, tipo, unidades, costo_unitario, moneda, proveedor, gratis, lote_id) "
@@ -179,3 +212,24 @@ def test_gasto_busqueda_sin_filas_es_cero(rt, tenant):
 
     assert type(gasto) is Decimal
     assert gasto == Decimal("0")
+
+
+def test_croma_consulta_escribe_fila_en_costos_y_entra_al_gasto_del_lote(rt, tenant):
+    from app.modulos.descubrimiento.infraestructura.adaptadores.croma_supersociedades import CromaSupersociedadesCo
+
+    meta = cargar_registro(BACKEND / "config" / "fuentes.yaml",
+                           {"croma_supersociedades_co": CromaSupersociedadesCo}).fuentes["croma_supersociedades_co"][1]
+    lote, libro = uuid4(), PostgresCostos(rt, tenant)
+    adaptador = CromaSupersociedadesCo(
+        meta=meta, registro_costos=libro, transporte=httpx.MockTransport(lambda r: httpx.Response(200, json={"data": [], "total": 0})),
+        costo_unitario=Decimal("0.00099"), lote_id=lote, api_key="clave-de-prueba",
+        limites={"croma_requests_por_24h": 100, "croma_creditos_gratis_mes": 1500})
+
+    adaptador.buscar(CriteriosICP("CO", {"ciiu": "4711"}), 1)
+
+    with db.unidad_de_trabajo(rt, tenant) as c:
+        filas = c.execute(text("SELECT tipo, unidades, costo_unitario, proveedor, fuente, gratis, lote_id, lead_id, tenant_id "
+                               "FROM costos")).all()
+    assert filas == [("croma_consulta", Decimal(1), Decimal("0.00099"), "croma", "croma_supersociedades_co", True, lote, None, tenant)]
+    assert libro.gasto_busqueda(lote) == Decimal("0.00099")  # lo que el tope ve
+    assert (libro.requests_24h("croma"), libro.creditos_mes("croma")) == (1, Decimal(1))

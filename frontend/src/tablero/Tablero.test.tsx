@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { expect, test } from "vitest";
 import i18n from "../i18n";
@@ -10,6 +10,7 @@ import {
   monto,
   numero,
   respuestaTablero,
+  respuestaTableroMinima,
 } from "../test/fixtures";
 import { server } from "../test/servidor";
 import Tablero from "./Tablero";
@@ -17,7 +18,7 @@ import Tablero from "./Tablero";
 type Idioma = "es" | "en";
 const textos = { es, en };
 
-async function montar(respuesta: ReturnType<typeof respuestaTablero>, idioma: Idioma = "es") {
+async function montar(respuesta: Record<string, unknown>, idioma: Idioma = "es") {
   server.use(http.get("*/tablero/fuentes", () => HttpResponse.json(respuesta)));
   await i18n.changeLanguage(idioma);
   render(<Tablero />);
@@ -114,4 +115,83 @@ test.each<Idioma>(["es", "en"])("muestra_naturales_encontradas_no_contactables[%
   expect(celda(f.datos_gov_co_rues, t.naturales)).toBe(numero(idioma, 26304));
   expect(celda(f.osm_overpass, t.naturales)).toBe("—");
   expect(celda(f.croma_supersociedades_co, t.naturales)).toBe(t.no_aplica);
+});
+
+test("el_minimo_pinta_encontrados_y_unicos_y_no_las_columnas_de_costo_ni_las_secciones_sin_dato", async () => {
+  await montar(respuestaTableroMinima({ atribuciones: [atribucionOsm] }));
+
+  const encabezados = screen.queryAllByRole("columnheader").map((h) => h.textContent);
+  expect(encabezados).toEqual(["Fuente", "Encontrados", "Únicos"]);
+  expect(celda("OpenStreetMap", "Encontrados")).toBe("3");
+  expect(celda("Total", "Únicos")).toBe("2");
+  expect(screen.queryByText(/evals/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Revisiones pendientes/)).not.toBeInTheDocument();
+  expect(screen.queryByText(es.tablero.cobertura)).not.toBeInTheDocument();
+  expect(document.body).not.toHaveTextContent(/NaN|—|No aplica/);
+  expect(screen.queryByRole("link", { name: atribucionOsm.texto })).toBeInTheDocument();  // la atribución sí
+});
+
+const sinDesperdicio = { desperdicio_lista: null, desperdicio_real: null };
+
+test("con_costos_y_sin_desperdicio_muestra_costo_y_cpl_y_no_columnas_vacias", async () => {
+  const base = respuestaTablero();
+  await montar({
+    ...base,
+    fuentes: base.fuentes.map((f) => ({ ...f, ...sinDesperdicio })),
+    total: { ...base.total, ...sinDesperdicio },
+  });
+
+  const encabezados = screen.queryAllByRole("columnheader").map((h) => h.textContent);
+  expect(encabezados).toEqual(["Fuente", "Encontrados", "Únicos", "Costo (lista)", "Costo (real)", "CPL (lista)", "CPL (real)"]);
+  expect(celda("Total", "CPL (lista)")).toBe(monto("es", "0.3375"));
+});
+
+test("fuente_sin_costo_registrado_muestra_sin_dato_y_nunca_cero", async () => {
+  const base = respuestaTablero();
+  const sinCosto = { ...base.fuentes[0], fuente: "osm_overpass", costo_lista: null, costo_real: null, cpl_lista: null, cpl_real: null };
+  await montar({ ...base, fuentes: [base.fuentes[0], sinCosto] });
+
+  for (const columna of ["Costo (lista)", "Costo (real)", "CPL (lista)", "CPL (real)"]) {
+    expect(celda("OpenStreetMap", columna)).toBe("—");
+  }
+  expect(celda("OpenStreetMap", "CPL (lista)")).not.toMatch(/0[.,]00/);
+});
+
+test("costo_y_cpl_en_ingles_con_moneda_del_idioma", async () => {
+  await montar(respuestaTablero(), "en");
+  const t = en.tablero;
+  expect(celda(en.fuentes.croma_supersociedades_co, t.costo_lista)).toBe(monto("en", "1.35"));
+  expect(celda(en.fuentes.croma_supersociedades_co, t.cpl_real)).toBe(monto("en", "0.2375"));
+  expect(celda(en.fuentes.sin_atribuir, t.cpl_lista)).toBe("—");
+});
+
+test("enlaza_a_ver_busquedas", async () => {
+  await montar(respuestaTablero());
+  expect(screen.getByRole("link", { name: "Ver búsquedas" })).toHaveAttribute("href", "/busquedas");
+});
+
+test("cada_fila_de_fuente_lleva_a_sus_leads_y_el_total_a_todos", async () => {
+  await montar(respuestaTablero());
+  expect(screen.getByRole("link", { name: "Supersociedades (Croma)" })).toHaveAttribute("href", "/leads?fuente=croma_supersociedades_co");
+  expect(screen.getByRole("link", { name: "Total" })).toHaveAttribute("href", "/leads");
+  // sin_atribuir son costos sin lead: no hay lista a la que llevar.
+  expect(screen.queryByRole("link", { name: "Sin atribuir" })).not.toBeInTheDocument();
+});
+
+test("el_clic_en_una_fila_navega_sin_recargar", async () => {
+  await montar(respuestaTablero());
+  const antes = window.location.href;
+  fireEvent.click(screen.getByRole("link", { name: "Supersociedades (Croma)" }));
+  expect(window.location.pathname + window.location.search).toBe("/leads?fuente=croma_supersociedades_co");
+  expect(antes).not.toBe(window.location.href);
+});
+
+test("la_atribucion_es_externa_y_dice_licencia", async () => {
+  await montar(respuestaTablero({ atribuciones: [atribucionOsm] }));
+  const pie = screen.getByLabelText("Atribución de datos");
+  expect(pie).toHaveTextContent("Licencia");
+  const enlace = within(pie).getByRole("link", { name: atribucionOsm.texto });
+  expect(enlace).toHaveAttribute("target", "_blank");
+  expect(enlace).toHaveAttribute("rel", expect.stringContaining("noreferrer"));
+  expect(enlace).toHaveTextContent("↗");
 });

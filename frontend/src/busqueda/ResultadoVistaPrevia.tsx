@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { entero, moneda } from "../compartido/formato";
+import { entero, moneda, monedaFina } from "../compartido/formato";
 import type { VistaPrevia } from "./tipos";
 
 type Props = { vista: VistaPrevia; tope: number };
@@ -31,12 +31,26 @@ export default function ResultadoVistaPrevia({ vista, tope }: Props) {
           </ul>
         </>
       )}
-      <p>{t("busqueda.costo_estimado", { monto: moneda(vista.costo_estimado_usd) })}</p>
-      <p>{t("busqueda.costo_maximo", { monto: moneda(vista.costo_maximo_usd) })}</p>
-      <p>{t("busqueda.tope_linea", { monto: moneda(tope) })}</p>
-      <p className="nota">{t("busqueda.se_compara_el_maximo")}</p>
-      <p>{t("busqueda.creditos_restantes", { n: entero(vista.creditos_restantes_mes) })}</p>
-      <p>{t("busqueda.requests_restantes", { n: entero(vista.requests_restantes_24h) })}</p>
+      {/* null = la API no lo calcula todavía: la línea no se pinta (ni "—", ni 0). Sin costo máximo no hay tope que comparar. */}
+      {vista.costo_estimado_usd !== null && (
+        <p>{t("busqueda.costo_estimado", { monto: moneda(vista.costo_estimado_usd) })}</p>
+      )}
+      {vista.costo_maximo_usd !== null && (
+        <>
+          <p>{t("busqueda.costo_maximo", { monto: monedaFina(vista.costo_maximo_usd) })}</p>
+          <p>{t("busqueda.tope_linea", { monto: monedaFina(tope) })}</p>
+          {vista.dentro_del_tope !== null && (
+            <p role="status">{t(vista.dentro_del_tope ? "busqueda.dentro_del_tope" : "busqueda.fuera_del_tope")}</p>
+          )}
+          <p className="nota">{t("busqueda.se_compara_el_maximo")}</p>
+        </>
+      )}
+      {vista.creditos_restantes_mes !== null && (
+        <p>{t("busqueda.creditos_restantes", { n: entero(vista.creditos_restantes_mes) })}</p>
+      )}
+      {vista.requests_restantes_24h !== null && (
+        <p>{t("busqueda.requests_restantes", { n: entero(vista.requests_restantes_24h) })}</p>
+      )}
     </section>
   );
 }

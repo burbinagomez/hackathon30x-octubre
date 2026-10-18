@@ -16,3 +16,15 @@ class RegistroInvalido(ValueError):
 
 class ErrorPersistencia(RuntimeError):
     """La base rechazó una escritura. Mensaje fijo: el de Postgres trae la fila entera (nombre, dirección)."""
+
+
+class BusquedaYaEjecutada(RuntimeError):
+    """La búsqueda no está en `borrador` (ya corrió, está corriendo, o alguien llegó antes)."""
+
+
+class BusquedaNoEncontrada(LookupError):
+    """No existe, o es de otro tenant (RLS no deja distinguirlo, a propósito)."""
+
+
+class TopeExcedido(RuntimeError):
+    """Lo ya gastado más el costo máximo de las fuentes a llamar supera el tope de la búsqueda. No se llamó a nadie."""

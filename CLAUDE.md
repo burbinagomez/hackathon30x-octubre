@@ -31,7 +31,8 @@ scripts/migrar_local.sh postgresql://postgres@localhost:5432/postgres   # supaba
 # front
 cd frontend && npm ci && npm test && npx playwright test
 # evals
-cd backend && uv run python -m evals.run
+cd backend && uv run python -m evals.run --validar   # costo cero, sin key
+uv run python -m evals.run --tenant <uuid>   # eval real: ANTHROPIC_API_KEY y DATABASE_URL en entorno
 ```
 
 ## Agentes
