@@ -75,7 +75,7 @@ export default function ChatFrase({ chat, busqueda, actividades, alEditarEnFiltr
   const pedido = sugerencia ? aPedido({ ...conSugerencia(INICIAL, sugerencia), tope: chat.tope }) : null;
 
   return (
-    <div className="panel-intake chat" role="tabpanel">
+    <div className="tarjeta panel-intake chat" role="tabpanel">
       <div role="log" aria-live="polite" aria-label={t("busqueda.frase.conversacion")} className="chat-mensajes">
         {chat.mensajes.length === 0 && !chat.aviso && <p className="ayuda">{t("busqueda.frase.ayuda")}</p>}
         {chat.mensajes.map((m, i) => (

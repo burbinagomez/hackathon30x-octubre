@@ -11,11 +11,16 @@ const MAXIMO = 50;
 type Props = {
   /** Recibe la sugerencia para prellenar el formulario; la pantalla que lo monta decide qué pestaña muestra. */
   alSugerir: (sugerencia: SugerenciaIntake) => void;
+  /** Nombre legible de un CIIU o de una división; si no lo conoce (undefined), se muestra el código. */
+  nombreActividad?: (codigo: string) => string | undefined;
+  nombreDivision?: (codigo: string) => string | undefined;
 };
+
+const sinNombre = () => undefined;
 
 const MENSAJE_DE_ERROR: Record<number, "no_disponible" | "rango"> = { 503: "no_disponible", 422: "rango" };
 
-export default function IntakeLookalike({ alSugerir }: Props) {
+export default function IntakeLookalike({ alSugerir, nombreActividad = sinNombre, nombreDivision = sinNombre }: Props) {
   const { t } = useTranslation();
   const [texto, setTexto] = useState("");
   const [respuesta, setRespuesta] = useState<RespuestaLookalike | null>(null);
@@ -43,17 +48,19 @@ export default function IntakeLookalike({ alSugerir }: Props) {
   }
 
   return (
-    <section className="formulario panel-intake">
+    <section className="tarjeta panel-intake">
       <h2>{t("intake.lookalike.titulo")}</h2>
-      <p>{t("intake.lookalike.ayuda")}</p>
+      <p className="ayuda">{t("intake.lookalike.ayuda")}</p>
       <div className="campo">
-        <label htmlFor="lookalike-nombres">{t("intake.lookalike.nombres")}</label>
+        <div className="campo-cabecera">
+          <label htmlFor="lookalike-nombres">{t("intake.lookalike.nombres")}</label>
+          <button type="button" className="boton boton-chico" onClick={() => setTexto(EMPRESAS_DE_EJEMPLO.join("\n"))}>
+            {t("intake.lookalike.ejemplo")}
+          </button>
+        </div>
         <textarea id="lookalike-nombres" rows={8} value={texto} onChange={(e) => setTexto(e.target.value)} />
       </div>
-      <div className="acciones">
-        <button type="button" className="boton" onClick={() => setTexto(EMPRESAS_DE_EJEMPLO.join("\n"))}>
-          {t("intake.lookalike.ejemplo")}
-        </button>
+      <div className="acciones acciones-fin">
         <button type="button" className="boton boton-primario" disabled={enviando} aria-busy={enviando} onClick={sugerir}>
           {enviando && <span className="anillo anillo-chico" aria-hidden="true" />}
           {enviando ? t("intake.lookalike.enviando") : t("intake.lookalike.sugerir")}
@@ -63,15 +70,15 @@ export default function IntakeLookalike({ alSugerir }: Props) {
       {error && <p role="alert" className="error">{t(`intake.lookalike.${error}`)}</p>}
       {respuesta && (
         <div>
-          <p>{t("intake.lookalike.resueltos", { n: respuesta.resueltos })}</p>
+          <p>{t("intake.lookalike.resueltos", { count: respuesta.resueltos, n: respuesta.resueltos })}</p>
           <h3>{t("intake.lookalike.explicacion")}</h3>
           <h4>{t("intake.lookalike.ciiu")}</h4>
           <ul>
-            {respuesta.explicacion.ciiu.map(([codigo, n]) => <li key={codigo}>{`${codigo}: ${n}`}</li>)}
+            {respuesta.explicacion.ciiu.map(([codigo, n]) => <li key={codigo}>{`${nombreActividad(codigo) ?? codigo}: ${n}`}</li>)}
           </ul>
           <h4>{t("intake.lookalike.departamento")}</h4>
           <ul>
-            {respuesta.explicacion.departamento.map(([codigo, n]) => <li key={codigo}>{`${codigo}: ${n}`}</li>)}
+            {respuesta.explicacion.departamento.map(([codigo, n]) => <li key={codigo}>{`${nombreDivision(codigo) ?? codigo}: ${n}`}</li>)}
           </ul>
           {respuesta.no_resueltos.length > 0 && (
             <>

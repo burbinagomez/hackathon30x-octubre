@@ -36,7 +36,7 @@ export default function NuevaBusqueda() {
   const [divisiones, setDivisiones] = useState<Division[]>([]);
   const [puertas, setPuertas] = useState<EstadoIntake>({ frase: false, lookalike: false });
   const [pestana, setPestana] = useState<Pestana>("filtros");
-  const [sugerido, setSugerido] = useState(false);
+  const [sugerido, setSugerido] = useState<"clientes" | "frase" | null>(null);
 
   useEffect(() => {
     // Sin estado (o si falla) solo queda Filtros: las puertas son un atajo, no un requisito.
@@ -68,14 +68,14 @@ export default function NuevaBusqueda() {
   function aplicarLookalike(sugerencia: Sugerencia) {
     setForm((f) => conSugerencia(f, sugerencia));
     filtros.soltarVista();
-    setSugerido(true);
+    setSugerido("clientes");
   }
 
   // Del chat a Filtros: prellena los criterios y salta, para ajustarlos a mano. El tope viaja solo si la persona lo cambió.
   function editarEnFiltros(sugerencia: Sugerencia) {
     setForm((f) => ({ ...conSugerencia(f, sugerencia), ...(chat.topeEditado ? { tope: chat.tope } : {}) }));
     filtros.reiniciar();
-    setSugerido(true);
+    setSugerido("frase");
     setPestana("filtros");  // el usuario revisa y edita antes de gastar en vista previa
   }
 
@@ -92,6 +92,7 @@ export default function NuevaBusqueda() {
   const exclusiones = entrada("exclusiones", t("busqueda.exclusiones"));
   const tope = entrada("tope", t("busqueda.tope"), "number");
   const nombre = (a: Actividad) => (i18n.language === "en" ? a.nombre_en ?? a.nombre_es : a.nombre_es);
+  const avisoSugerencia = sugerido === "clientes" ? t("busqueda.revisar_clientes") : t("busqueda.frase.revisar");
   const pestanas: Pestana[] = [
     ...(puertas.lookalike ? (["lookalike"] as const) : []),
     ...(puertas.frase ? (["frase"] as const) : []),
@@ -116,13 +117,17 @@ export default function NuevaBusqueda() {
       )}
       {pestana === "lookalike" && (
         <div className="panel-intake" role="tabpanel">
-          {sugerido && <p role="status" className="aviso">{t("busqueda.frase.revisar")}</p>}
-          <IntakeLookalike alSugerir={aplicarLookalike} />
+          {sugerido && <p role="status" className="aviso aviso-ancho">{avisoSugerencia}</p>}
+          <IntakeLookalike
+            alSugerir={aplicarLookalike}
+            nombreActividad={(c) => { const a = actividades.find((x) => x.codigo === c); return a && nombre(a); }}
+            nombreDivision={(c) => { const d = divisiones.find((x) => x.codigo_nativo === c); return d && (i18n.language === "en" ? d.nombre_en : d.nombre_es); }}
+          />
         </div>
       )}
       {pestana === "filtros" && (
       <div className="formulario formulario-ancho">
-      {sugerido && <p role="status" className="aviso">{t("busqueda.frase.revisar")}</p>}
+      {sugerido && <p role="status" className="aviso aviso-ancho">{avisoSugerencia}</p>}
       <Campo id="pais" etiqueta={t("busqueda.pais")}>
         <select id="pais" value={form.pais} onChange={(e) => cambiar("pais", e.target.value)}>
           {paises.map((p) => <option key={p} value={p}>{t(`paises.${p}`)}</option>)}

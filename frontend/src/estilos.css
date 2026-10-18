@@ -592,15 +592,6 @@ table.tabla-leads {
   display: grid;
   gap: 1rem;
 }
-.aviso-ancho {
-  margin: 0;
-  text-align: left;
-  grid-column: 1 / -1;
-}
-.acciones-fin {
-  justify-content: end;
-  grid-template-columns: repeat(auto-fit, minmax(8rem, max-content));
-}
 .resumen {
   display: grid;
   gap: 0.5rem;
@@ -620,4 +611,46 @@ table.tabla-leads {
     grid-template-columns: 11rem 1fr;
     gap: 0.5rem;
   }
+/* Tarjeta de las puertas, como las de Dapti: borde sutil, esquinas redondeadas, acciones agrupadas a la derecha. */
+.tarjeta {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 0.75rem;
+  background: var(--color-superficie);
+}
+.tarjeta h2 { margin: 0; }
+.tarjeta .ayuda { margin: 0; }
+.campo-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.4rem;
+}
+.campo-cabecera label { margin: 0; }
+.boton-chico {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.85rem;
+  min-height: 0;
+}
+.acciones-fin {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+/* El aviso de "prellenamos los filtros" ocupa la fila entera, también dentro de la grilla de dos columnas. */
+.aviso-ancho,
+.formulario-ancho > .aviso-ancho {
+  grid-column: 1 / -1;
+  text-align: left;
+  margin: 0 0 0.5rem;
+}
+.aviso-ancho {
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid var(--color-acento);
+  border-radius: 0.4rem;
+  background: var(--color-superficie);
 }
