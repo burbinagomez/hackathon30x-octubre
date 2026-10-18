@@ -74,6 +74,8 @@ def test_lote_es_la_busqueda_y_cada_llamada_deja_su_costo_y_cada_lead_su_cumplim
         assert repo.cumplimiento[lead_id] == (e.fuente, f"lic_{e.fuente}", e.url_origen, AS_OF)
     assert set(repo.cumplimiento) == set(repo.leads.values())
     assert {lote for _, _, lote in repo.lead_fuentes} == {borrador_id}
+    assert {fuente: lic for (_, fuente, _), lic in repo.licencia_lead_fuente.items()} == {
+        "croma_supersociedades_co": "lic_croma_supersociedades_co", "osm_overpass": "lic_osm_overpass"}
 
 
 def test_mismo_nit_en_dos_fuentes_es_un_lead_con_un_cumplimiento_y_dos_lead_fuentes():
@@ -147,3 +149,13 @@ def test_ninguna_fuente_cubre_el_icp_termina_completada_sin_llamar_a_nadie():
     assert r.sin_fuente_para == ("PE", pe.filtros)
     assert costos.filas == [] and fabrica.criterios_por_fuente == {}
     assert repo.leads == {}
+
+
+def test_error_inesperado_deja_la_busqueda_en_error_y_no_se_traga():
+    caso, repo, _, _, borrador_id = _caso(errores={"osm_overpass": RuntimeError("bug"),
+                                                   "croma_supersociedades_co": RuntimeError("bug")})
+
+    with pytest.raises(RuntimeError):
+        caso.ejecutar(borrador_id)
+
+    assert repo.busquedas[borrador_id] == "error"  # no se queda en `ejecutando` para siempre

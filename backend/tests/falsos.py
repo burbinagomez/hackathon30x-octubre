@@ -13,6 +13,7 @@ class RepositorioLeadsFalso:
         self.leads: dict[tuple[str, str | None], UUID] = {}  # (pais, id_fiscal) -> id
         self.cumplimiento: dict[UUID, tuple] = {}  # lead_id -> (fuente, licencia, url_origen, as_of)
         self.lead_fuentes: set[tuple[UUID, str, UUID]] = set()  # (lead_id, fuente, busqueda_id)
+        self.licencia_lead_fuente: dict[tuple[UUID, str, UUID], str] = {}  # la licencia con que se anotó cada fila
         self.borradores: dict[UUID, tuple] = {}  # id -> (criterios, canal_preferido, tope_gasto_usd, mensaje_base)
 
     def crear_busqueda(self, criterios: CriteriosICP) -> UUID:
@@ -54,6 +55,7 @@ class RepositorioLeadsFalso:
 
     def agregar_lead_fuente(self, lead_id: UUID, busqueda_id: UUID, e: EmpresaCruda, licencia: str) -> None:
         self.lead_fuentes.add((lead_id, e.fuente, busqueda_id))
+        self.licencia_lead_fuente[(lead_id, e.fuente, busqueda_id)] = licencia
 
     def cerrar_busqueda(self, busqueda_id: UUID, estado: str) -> None:
         self.busquedas[busqueda_id] = estado

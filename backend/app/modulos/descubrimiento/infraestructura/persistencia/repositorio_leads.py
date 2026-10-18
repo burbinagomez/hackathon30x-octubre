@@ -53,7 +53,8 @@ class RepositorioLeadsPostgres:
             ).scalar_one()
 
     def estado(self, busqueda_id: UUID) -> str | None:
-        return None  # esqueleto T027
+        with self._uow() as c:  # RLS: la de otro tenant no aparece
+            return c.execute(text("SELECT estado FROM busquedas WHERE id = :id"), {"id": busqueda_id}).scalar_one_or_none()
 
     def obtener_borrador(self, busqueda_id: UUID) -> Borrador | None:
         with self._uow() as c:
