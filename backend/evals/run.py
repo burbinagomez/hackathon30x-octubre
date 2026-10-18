@@ -104,7 +104,7 @@ def _preparar(args) -> tuple[dict[str, dict], dict]:
 def _k_valido(ev: dict, juez, b: dict | None) -> bool:
     # k < 3 solo con un juez que puede demostrar determinación y un baseline vigente a k=3 con determinacion 1.0.
     return ev["k"] >= 3 or bool(juez.determinista_si_se_demuestra and b and b.get("fingerprint") == ev["fingerprint"]
-                                and b.get("k") == 3 and b.get("determinacion") == 1.0)
+                                and b.get("k") == 3 and (b.get("determinacion") or 0) >= 1.0)
 
 
 def _correr(nombre: str, ev: dict, juez) -> dict:
