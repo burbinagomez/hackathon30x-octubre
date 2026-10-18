@@ -139,6 +139,25 @@ class RelojFalso:
         return self.ahora
 
 
+# Distinta de computo_seg_usd (0.0000070): la fila tiene que traer la tarifa del constructor, no una fija.
+TARIFA = Decimal("0.0000099")
+
+
+def _fila(segundos: int, lote_id) -> OperacionCosto:
+    return OperacionCosto(
+        tipo="overpass_query",
+        unidades=Decimal(segundos),
+        costo_unitario=TARIFA,
+        moneda="USD",
+        proveedor="osm",
+        fuente="osm_overpass",
+        canal=None,
+        lead_id=None,
+        lote_id=lote_id,
+        gratis=False,
+    )
+
+
 def _adaptador_con_reloj(meta, respuesta: httpx.Response, segundos: float):
     """El transporte avanza el reloj `segundos` durante el request, como un request real."""
     reloj, costos, lote_id = RelojFalso(), RegistroCostosFalso(), uuid4()
@@ -151,7 +170,7 @@ def _adaptador_con_reloj(meta, respuesta: httpx.Response, segundos: float):
         meta=meta,
         registro_costos=costos,
         transporte=httpx.MockTransport(responder),
-        costo_unitario=Decimal("0.0000070"),
+        costo_unitario=TARIFA,
         lote_id=lote_id,
         repo_url=REPO_URL,
         reloj=reloj,
@@ -165,33 +184,24 @@ def test_registra_segundos_de_cada_intento(meta):
 
     adaptador.buscar(ICP_BOGOTA, 1)
 
-    assert costos.filas == [
-        OperacionCosto(
-            tipo="overpass_query",
-            unidades=Decimal(2),
-            costo_unitario=Decimal("0.0000070"),
-            moneda="USD",
-            proveedor="osm",
-            fuente="osm_overpass",
-            canal=None,
-            lead_id=None,
-            lote_id=lote_id,
-            gratis=False,
-        )
-    ]
+    assert costos.filas == [_fila(2, lote_id)]
     assert isinstance(costos.filas[0].unidades, Decimal)
 
 
 def test_fallo_se_reporta_sin_tragarlo(meta):
-    caido = httpx.Response(500, text="CUERPO-INTERNO-DEL-SERVIDOR")
-    adaptador, costos, _ = _adaptador_con_reloj(meta, caido, segundos=3)
+    cuerpo = "CUERPO-INTERNO-DEL-SERVIDOR"
+    adaptador, costos, lote_id = _adaptador_con_reloj(meta, httpx.Response(500, text=cuerpo), segundos=3)
 
-    with pytest.raises(Exception) as error:
-        adaptador.buscar(ICP_BOGOTA, 1)
+    # finally: la fila se exige aunque buscar() lance otra cosa; así el rojo es este assert.
+    try:
+        with pytest.raises(FuenteNoDisponible) as error:
+            adaptador.buscar(ICP_BOGOTA, 1)
+    finally:
+        assert costos.filas == [_fila(3, lote_id)]
 
-    assert [(f.tipo, f.unidades) for f in costos.filas] == [("overpass_query", Decimal(3))]
-    assert isinstance(error.value, FuenteNoDisponible)
-    assert "CUERPO-INTERNO-DEL-SERVIDOR" not in str(error.value)
+    assert cuerpo not in str(error.value)
+    assert cuerpo not in repr(error.value)
+    assert cuerpo not in repr(error.value.__cause__)
 
 
 def test_rechaza_criterio_no_soportado_sin_request(adaptador, enviados):
