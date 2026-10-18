@@ -152,8 +152,23 @@ def _hay_ruta_de_baja(ajustes: SettingsEmail, tenant: UUID, transporte: httpx.Ba
 
 
 def _armar_envio_postgres(ajustes: SettingsEmail, tenant: UUID):
-    # ponytail: sin adaptador de leads contactables hasta que mergee la 006; el CLI corta acá.
-    raise NotImplementedError("falta el adaptador de leads contactables (spec 006)")
+    from app import db
+    from app.modulos.contacto.aplicacion.envio import EnviarABusqueda
+    from app.modulos.contacto.infraestructura.leads_contactables import LeadsContactablesPostgres
+    from app.modulos.contacto.infraestructura.repositorio_contactos import RepositorioContactosPostgres
+    from app.modulos.contacto.infraestructura.smtp_email import SmtpEmail
+    from app.modulos.costos.infraestructura.postgres_costos import PostgresCostos
+    from app.seguridad.cifrado import Cifrador
+
+    engine = db.crear_engine(ajustes.database_url)
+    tarifa = Decimal(str(yaml.safe_load((CONFIG / "tarifas.yaml").read_text())["email"]["usd_por_mensaje"]))
+    return EnviarABusqueda(
+        tenant, RepositorioContactosPostgres(engine, tenant),
+        LeadsContactablesPostgres(engine, tenant, Cifrador(ajustes.cifrado_key.get_secret_value())),
+        SmtpEmail(ajustes, PostgresCostos(engine, tenant), tarifa),
+        clave_baja=ajustes.baja_secret.get_secret_value().encode(), remitente=ajustes.remitente,
+        url_api=ajustes.api_base_url, url_privacidad=ajustes.url_privacidad, modo=ajustes.email_modo,
+        destinos_prueba=ajustes.email_prueba_destinos)
 
 
 def _enviar(args, armar_envio) -> int:

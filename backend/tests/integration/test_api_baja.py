@@ -111,7 +111,7 @@ def test_opt_out_es_monotonico(cliente, admin, contacto):
     assert len(solicitudes) == 2
 
 
-# T052 (desvío: `canal` solo admite 'email' y no hay adaptador de leads contactables de la 006. El cierre de todos los
+# T052 (desvío: `canal` solo admite 'email' y LeadsContactablesPostgres solo sirve email. El cierre de todos los
 # canales se prueba por el opt-out del lead, que es lo que mira la elegibilidad SQL de cualquier canal).
 def test_baja_cierra_todos_los_canales(cliente, rt, admin, contacto):
     t, lead, _ = contacto
