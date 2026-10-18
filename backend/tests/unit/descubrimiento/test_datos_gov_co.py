@@ -234,12 +234,6 @@ def test_descartados_no_se_loguean(caplog):
             assert secreto not in texto, record.name
 
 
-def _criterios(**filtros: str | tuple[str, ...]) -> CriteriosICP:
-    return CriteriosICP(
-        pais="CO", filtros={"ciiu": "4711", "departamento": "11", **filtros}
-    )
-
-
 def test_departamento_25_se_traduce_a_cuatro_camaras():
     adaptador, capturadas = _adaptador()
 
@@ -249,23 +243,25 @@ def test_departamento_25_se_traduce_a_cuatro_camaras():
     assert "codigo_camara in('04','14','47','58')" in where
 
 
+def _criterios(**filtros: str | tuple[str, ...]) -> CriteriosICP:
+    return CriteriosICP(
+        pais="CO", filtros={"ciiu": "4711", "departamento": "11", **filtros}
+    )
+
+
 @pytest.mark.parametrize(
-    "filtros",
+    "criterios",
     [
-        {"departamento": "99"},  # fuera del YAML
-        {"ciiu": "47' OR '1'='1"},  # inyección SoQL
-        {"ciiu": "471"},
-        {"ciiu": "47111"},
-        {"ciiu": ("4711", "4712")},  # tupla: varios valores no se soportan
-        {"departamento": None},  # departamento obligatorio (se quita la clave abajo)
+        _criterios(departamento="99"),  # fuera del YAML
+        _criterios(ciiu="47' OR '1'='1"),  # inyección SoQL
+        _criterios(ciiu="471"),
+        _criterios(ciiu="47111"),
+        _criterios(ciiu=("4711", "4712")),  # tupla: varios valores no se soportan
+        CriteriosICP(pais="CO", filtros={"ciiu": "4711"}),  # departamento obligatorio
     ],
 )
-def test_criterio_invalido_lanza_sin_requests(filtros):
+def test_criterio_invalido_lanza_sin_requests(criterios):
     adaptador, capturadas = _adaptador()
-
-    criterios = _criterios(**filtros)
-    if criterios.filtros["departamento"] is None:
-        criterios = CriteriosICP(pais="CO", filtros={"ciiu": "4711"})
 
     with pytest.raises(CriterioNoSoportado):
         adaptador.buscar(criterios, 1)
@@ -327,9 +323,6 @@ def test_pagina_2_vacia_sin_request():
 
 
 LOTE = UUID("00000000-0000-4000-8000-000000000011")
-ROJO_T029 = pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="rojo T029; verde en T030"
-)
 
 
 def _buscar_sin_propagar(
@@ -343,7 +336,6 @@ def _buscar_sin_propagar(
     return None
 
 
-@ROJO_T029
 def test_registra_segundos_de_cada_intento():
     adaptador, capturadas = _adaptador(pasos=[(503, 2), (200, 3)], lote_id=LOTE)
 
@@ -367,7 +359,6 @@ def test_registra_segundos_de_cada_intento():
     # La tercera fila (conteo de naturales, 1 s) se suma en T021 (Pulido).
 
 
-@ROJO_T029
 @pytest.mark.parametrize("fallo", [503, "timeout"])
 def test_segundo_fallo_lanza_fuente_no_disponible(fallo):
     adaptador, capturadas = _adaptador(pasos=[(fallo, 2), (fallo, 3)])

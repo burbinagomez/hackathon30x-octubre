@@ -104,13 +104,13 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`.
 - [X] T025 [MIN] [P] [Paso 6] **Rojo:** `::test_as_of_sale_del_header`, con el header y sin él (reloj inyectable). *[MIN: `test_habilitada_por_yaml_temporal_da_leads_cc_by_sa` (T043) exige el `as_of` del header en el lead.]*
 - [X] T027 [MIN] [P] [Paso 6] **Rojo:** `::test_pagina_2_vacia_sin_request`. Afirma 0 requests y 0 filas de costo. *[MIN: sin `$offset`, una página 2 traería otra vez las mismas filas y las mismas filas de costo.]*
 - [X] T028 [MIN] [Paso 6] **Verde** de T023, T024, T025 y T027.
-- [ ] T029 [MIN] [Paso 6] **Rojo (advisor):** dos tests de costos. *[MIN: principio de costos, todo adaptador de salida escribe su fila antes de devolver.]*
+- [X] T029 [MIN] [Paso 6] **Rojo (advisor):** dos tests de costos. *[MIN: principio de costos, todo adaptador de salida escribe su fila antes de devolver.]*
   - `::test_registra_segundos_de_cada_intento`, con 503 → 200 en filas a 2 s y 3 s. En el mínimo quedan 2 filas `socrata_descarga` con `unidades` 2 y 3, `Decimal(str(computo_seg_usd))`, `proveedor="datos.gov.co"`, `gratis=False`, `lead_id=None` y el `lote_id`. La tercera fila, la del conteo a 1 s, se suma en T021 (Pulido).
   - `::test_segundo_fallo_lanza_fuente_no_disponible`: dos 503 (y la variante con dos `httpx.TimeoutException`) dan `FuenteNoDisponible`, 2 filas y un `str(exc)` que no contiene el cuerpo de la respuesta (un marcador `"CUERPO-SECRETO"`). El assert de "0 requests de conteo" se suma en T021.
   - El advisor revisa antes del verde, hasta APRUEBA.
   - **Rojo escrito** con `xfail(strict, raises=AssertionError)` y el helper `_buscar_sin_propagar`, para que el rojo sea un assert y no un `HTTPStatusError`. El `xfail` se saca en T030.
   - **Decisión (advisor):** `departamento` es obligatorio: sin él, `CriterioNoSoportado` y 0 requests (lo cubre `if not codigos`, porque `camaras_de` no encuentra cámaras). El NIT se valida con `^[89]\d{8}$`, como dice la spec.
-- [ ] T030 [MIN] [Paso 6] **Verde:** el bucle de 2 intentos.
+- [X] T030 [MIN] [Paso 6] **Verde:** el bucle de 2 intentos.
   - Registra la fila **antes** de decidir.
   - La espera pasa por `dormir`, que no se mide.
   - `FuenteNoDisponible` lleva solo el status.

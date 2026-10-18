@@ -1,15 +1,20 @@
 import re
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
+from decimal import Decimal
 from email.utils import parsedate_to_datetime
 from typing import Any
 from uuid import UUID
 
 import httpx
 
+from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.costos.dominio.puertos import RegistroCostos
 from app.modulos.descubrimiento.aplicacion.camaras import Camara, camaras_de
-from app.modulos.descubrimiento.dominio.errores import CriterioNoSoportado
+from app.modulos.descubrimiento.dominio.errores import (
+    CriterioNoSoportado,
+    FuenteNoDisponible,
+)
 from app.modulos.descubrimiento.dominio.modelos import (
     Actividad,
     CriteriosICP,
@@ -23,6 +28,9 @@ URL_DATASET = "https://www.datos.gov.co/resource/c82u-588k.json"
 
 LIMITE_FILAS = 5000
 TIMEOUT_SEG = 30.0
+INTENTOS = 2
+ESPERA_REINTENTO_SEG = 1.0
+REINTENTABLES = frozenset({502, 503, 504, "timeout"})
 # Lista blanca: nunca se piden nombres, apellidos ni representante legal (principio VII).
 SELECT_FILAS = (
     "nit,digito_verificacion,razon_social,cod_ciiu_act_econ_pri,"
@@ -101,19 +109,9 @@ class DatosGovCoRues:
             f" AND codigo_camara in({enlista})"
             " AND nit IS NOT NULL"
         )
-        cabeceras = {"X-App-Token": self._app_token} if self._app_token else {}
-        with httpx.Client(
-            transport=self._transporte, timeout=TIMEOUT_SEG, headers=cabeceras
-        ) as cliente:
-            respuesta = cliente.get(
-                self._url,
-                params={
-                    "$select": SELECT_FILAS,
-                    "$where": where,
-                    "$limit": str(LIMITE_FILAS),
-                },
-            )
-        respuesta.raise_for_status()
+        respuesta = self._pedir(
+            {"$select": SELECT_FILAS, "$where": where, "$limit": str(LIMITE_FILAS)}
+        )
         as_of = self._as_of(respuesta)
         empresas = tuple(
             EmpresaCruda(
@@ -131,6 +129,46 @@ class DatosGovCoRues:
             if _es_juridica_valida(fila)
         )
         return PaginaEmpresas(empresas=empresas, total=None)
+
+    def _pedir(self, params: Mapping[str, str]) -> httpx.Response:
+        """GET con hasta 2 intentos. Cada intento deja su fila en costos antes de decidir."""
+        cabeceras = {"X-App-Token": self._app_token} if self._app_token else {}
+        estado: int | str = "timeout"
+        with httpx.Client(
+            transport=self._transporte, timeout=TIMEOUT_SEG, headers=cabeceras
+        ) as cliente:
+            for intento in range(INTENTOS):
+                if intento:
+                    self._dormir(ESPERA_REINTENTO_SEG)  # la espera no se cobra
+                inicio = self._reloj()
+                try:
+                    respuesta = cliente.get(self._url, params=params)
+                    estado = respuesta.status_code
+                except httpx.TimeoutException:
+                    respuesta, estado = None, "timeout"
+                self._registrar_costo((self._reloj() - inicio).total_seconds())
+                if respuesta is not None and respuesta.status_code == 200:
+                    return respuesta
+                if estado not in REINTENTABLES:
+                    break
+        # Solo el status: el cuerpo de la respuesta no sale en el mensaje.
+        raise FuenteNoDisponible(f"{self.meta.clave}: {estado}") from None
+
+    def _registrar_costo(self, segundos: float) -> None:
+        self._costos.registrar(
+            OperacionCosto(
+                tipo="socrata_descarga",
+                unidades=Decimal(str(segundos)),
+                costo_unitario=Decimal(str(self._tarifas["computo_seg_usd"])),
+                moneda="USD",
+                proveedor=self.meta.proveedor,
+                fuente=self.meta.clave,
+                canal=None,
+                lead_id=None,
+                lote_id=self._lote_id,
+                gratis=False,
+            )
+        )
 
     def _as_of(self, respuesta: httpx.Response) -> datetime:
         """Última modificación del dataset según SODA; sin header, la hora de la consulta."""
