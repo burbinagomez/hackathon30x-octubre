@@ -9,7 +9,16 @@ from sqlalchemy.exc import DBAPIError
 
 from app.db import unidad_de_trabajo
 from app.modulos.descubrimiento.dominio.errores import ErrorPersistencia
-from app.modulos.descubrimiento.dominio.modelos import Borrador, CriteriosICP, EmpresaCruda, Lead
+from app.modulos.descubrimiento.dominio.modelos import (
+    Borrador,
+    CriteriosICP,
+    EmpresaCruda,
+    AtribucionFuente,
+    Lead,
+    LeadListado,
+    PaginaLeads,
+    ResumenBusqueda,
+)
 from app.seguridad.cifrado import Cifrador
 
 _INSERT_LEAD = text(
@@ -23,6 +32,24 @@ _INSERT_CUMPLIMIENTO = text(
     "INSERT INTO cumplimiento (tenant_id, lead_id, fuente, licencia, url_origen, as_of) "
     "VALUES (:t, :lead_id, :fuente, :licencia, :url_origen, :as_of)"
 )
+
+# Lectura para la pantalla de leads. Departamento y ciudad de la búsqueda salen de los criterios guardados.
+_SQL_BUSQUEDAS = text("""
+    SELECT b.id, b.creado_en, b.estado, b.pais, b.criterios->>'departamento' AS departamento,
+           b.criterios->>'ciudad' AS ciudad,
+           (SELECT count(DISTINCT lf.lead_id) FROM lead_fuentes lf WHERE lf.busqueda_id = b.id) AS total_leads
+    FROM busquedas b ORDER BY b.creado_en DESC, b.id""")
+_SQL_TOTAL_LEADS = text("SELECT count(DISTINCT lead_id) FROM lead_fuentes WHERE busqueda_id = :b")
+_SQL_LEADS = text("""
+    SELECT l.id, CASE WHEN l.tipo_titular = 'juridica' THEN l.nombre END AS nombre, l.tipo_titular, l.ciudad,
+           l.web IS NOT NULL AS tiene_web, array_agg(lf.fuente ORDER BY lf.fuente) AS fuentes,
+           array_agg(lf.licencia ORDER BY lf.fuente) AS licencias
+    FROM leads l JOIN lead_fuentes lf ON lf.lead_id = l.id
+    WHERE lf.busqueda_id = :b
+    GROUP BY l.id ORDER BY l.creado_en, l.id LIMIT :limite OFFSET :desde""")
+_SQL_ATRIBUCIONES = text("""
+    SELECT a.fuente, a.texto, a.url FROM v_atribuciones a
+    WHERE a.fuente IN (SELECT fuente FROM lead_fuentes WHERE busqueda_id = :b) ORDER BY a.orden""")
 
 
 class RepositorioLeadsPostgres:
@@ -142,3 +169,25 @@ class RepositorioLeadsPostgres:
     def cerrar_busqueda(self, busqueda_id: UUID, estado: str) -> None:
         with self._uow() as c:
             c.execute(text("UPDATE busquedas SET estado = :estado WHERE id = :id"), {"estado": estado, "id": busqueda_id})
+
+    def listar_busquedas(self) -> list[ResumenBusqueda]:
+        """Solo lectura; el tenant lo filtra la RLS (sin WHERE tenant_id a propósito: el test lo sabotea)."""
+        with self._uow() as c:
+            filas = c.execute(_SQL_BUSQUEDAS).all()
+        return [ResumenBusqueda(id=f.id, creada_en=f.creado_en, estado=f.estado, pais=f.pais, departamento=f.departamento,
+                                ciudad=f.ciudad, total_leads=f.total_leads) for f in filas]
+
+    def listar_leads(self, busqueda_id: UUID, pagina: int, tamano: int) -> PaginaLeads | None:
+        """None si la búsqueda no existe para este tenant. Nunca lee las columnas cifradas ni descifra: el nombre sale
+        solo de una jurídica (el CASE lo repite aunque el CHECK ya lo garantice), y no hay dirección ni contacto."""
+        with self._uow() as c:
+            if c.execute(text("SELECT 1 FROM busquedas WHERE id = :id"), {"id": busqueda_id}).first() is None:
+                return None
+            total = c.execute(_SQL_TOTAL_LEADS, {"b": busqueda_id}).scalar_one()
+            filas = c.execute(_SQL_LEADS, {"b": busqueda_id, "limite": tamano, "desde": (pagina - 1) * tamano}).all()
+            atribuciones = c.execute(_SQL_ATRIBUCIONES, {"b": busqueda_id}).all()
+        items = tuple(LeadListado(
+            id=f.id, nombre=f.nombre, tipo_titular=f.tipo_titular, fuentes=tuple(f.fuentes), licencias=tuple(f.licencias),
+            ciudad=f.ciudad, tiene_web=f.tiene_web) for f in filas)
+        return PaginaLeads(items=items, total=total, pagina=pagina, tamano=tamano, atribuciones=tuple(
+            AtribucionFuente(a.fuente, a.texto, a.url) for a in atribuciones))
