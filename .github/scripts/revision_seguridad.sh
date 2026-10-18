@@ -5,7 +5,7 @@ set -euo pipefail
 
 # Pendiente humano (spec 012, Fuera del alcance): con el secret cargado, esto vuelve a ser exit 1.
 # Sin este corte, `grep -qF ""` de abajo coincide con todo y el job falla por "fuga".
-if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
   echo "::warning::falta el secret ANTHROPIC_API_KEY, revisión omitida"
   exit 0
 fi

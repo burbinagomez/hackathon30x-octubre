@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from contextlib import AbstractContextManager
 from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
@@ -32,6 +33,14 @@ class RepositorioLeads(Protocol):
 
     def pasar_a_ejecutando(self, busqueda_id: UUID) -> bool:
         """`UPDATE … WHERE estado = 'borrador'`: True solo para quien hizo la transición (una sola ejecución)."""
+        ...
+
+    def transaccion(self) -> AbstractContextManager[None]:
+        """Una sola transacción para todas las escrituras de adentro (lead, cumplimiento, lead_fuentes); confirma al salir."""
+        ...
+
+    def savepoint(self) -> AbstractContextManager[None]:
+        """Solo dentro de `transaccion()`. Si lo de adentro lanza, se deshace SOLO lo escrito ahí y la excepción sigue."""
         ...
 
     def obtener_o_crear_lead(self, e: EmpresaCruda, licencia: str) -> tuple[UUID, bool]:

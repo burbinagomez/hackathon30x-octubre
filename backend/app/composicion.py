@@ -19,6 +19,7 @@ from app.modulos.descubrimiento.aplicacion.camaras import cargar_camaras
 from app.modulos.descubrimiento.aplicacion.registro import Registro, cargar_registro
 from app.modulos.descubrimiento.dominio.modelos import MetaFuente
 from app.modulos.descubrimiento.dominio.puertos import FabricaFuentes, FuenteDescubrimiento
+from app.modulos.intake.infraestructura.llm.interpretador_claude import InterpretadorClaude
 
 CONFIG = Path(__file__).resolve().parents[1] / "config"
 
@@ -32,6 +33,28 @@ def cargar_tarifas(ruta: Path = CONFIG / "tarifas.yaml") -> dict[str, Decimal]:
     return {"croma": Decimal(str(t["croma"]["usd_por_credito"])), "osm": Decimal(str(t["computo_seg_usd"])),
             "datos.gov.co": Decimal(str(t["computo_seg_usd"])),
             "dapta": Decimal(str(usd_por_minuto)) if usd_por_minuto is not None else None}
+
+
+def cargar_tarifas_llm() -> dict[str, dict[str, Decimal]]:
+    """modelo -> {in_usd_por_M, out_usd_por_M} desde tarifas.yaml. Decimal(str(v)): el float 0.10 arrastra error al costo."""
+    llm = yaml.safe_load((CONFIG / "tarifas.yaml").read_text()).get("llm") or {}
+    return {modelo: {k: Decimal(str(v)) for k, v in t.items()} for modelo, t in llm.items()}
+
+
+def ia_configurada(ajustes, tarifas_llm: Mapping[str, Mapping]) -> bool:
+    """Key + modelo + tarifa de ese modelo. Cualquier falta = la Puerta B no está disponible."""
+    key, modelo = ajustes.ia_api_key, (ajustes.ia_modelo or "").strip()
+    return bool(key and key.get_secret_value().strip() and modelo in tarifas_llm)
+
+
+def generador_de_frase(ajustes, tarifas_llm: Mapping[str, Mapping], costos: RegistroCostos,
+                       transporte: httpx.BaseTransport) -> InterpretadorClaude | None:
+    """El adaptador de la Puerta B atado a este tenant (por `costos`), o None si la IA no está disponible."""
+    if not ia_configurada(ajustes, tarifas_llm):
+        return None
+    modelo = ajustes.ia_modelo.strip()
+    http = httpx.Client(base_url="https://api.anthropic.com", transport=transporte, timeout=30)
+    return InterpretadorClaude(costos, dict(tarifas_llm[modelo]), modelo, ajustes.ia_api_key.get_secret_value(), http)
 
 
 def registro_api(ruta_yaml: Path, catalogo: dict[str, type]) -> Registro:

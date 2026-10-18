@@ -10,9 +10,9 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app import db
-from app.api import actividades, busquedas, calificaciones, geografia, leads, tablero, usuarios
+from app.api import actividades, busquedas, calificaciones, geografia, intake, intake_lookalike, leads, tablero, usuarios
 from app.api.sesion import tenant_actual
-from app.composicion import CONFIG, calificador_api, cargar_geografia, cargar_tarifas, registro_api
+from app.composicion import CONFIG, calificador_api, cargar_geografia, cargar_tarifas, cargar_tarifas_llm, registro_api
 from app.config import SettingsApi, verificar_entorno
 from app.modulos.acceso.infraestructura.verificador_jwks import VerificadorJwks, cliente_jwks
 from app.modulos.descubrimiento.infraestructura.adaptadores import catalogo
@@ -41,6 +41,7 @@ async def lifespan(app: FastAPI):
     app.state.canales_contacto = fuentes_yaml.get("canales_contacto") or {}
     app.state.tarifas = cargar_tarifas()
     app.state.calificador = calificador_api(CONFIG / "fuentes.yaml")
+    app.state.tarifas_llm = cargar_tarifas_llm()
     # Un archivo por país en config/geografia/: la estructura admite MX/PE/BR sin tocar código; sin archivo, no se ofrece.
     app.state.geografia = cargar_geografia(CONFIG / "geografia")
     app.state.camaras_yaml = CONFIG / "camaras_co.yaml"
@@ -83,5 +84,5 @@ def health(request: Request):
 
 # La dependencia va en el include: una ruta nueva no puede quedar sin auth por olvido.
 for _router in (busquedas.router, leads.router, tablero.router, actividades.router, geografia.router, usuarios.router,
-                calificaciones.router):
+                calificaciones.router, intake.router, intake_lookalike.router):
     app.include_router(_router, dependencies=[Depends(tenant_actual)])

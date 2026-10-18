@@ -382,3 +382,34 @@ table.tabla-leads {
     padding: 16px 32px 0;
   }
 }
+
+/* Pestañas de Nueva búsqueda (puertas de intake): solo tokens, sirven en claro y oscuro. */
+.pestanas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--color-borde);
+}
+.pestana {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--color-texto);
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  cursor: pointer;
+}
+.pestana[aria-selected="true"] {
+  border-bottom-color: var(--color-acento);
+  font-weight: 600;
+}
+.pestana:focus-visible {
+  outline: 2px solid var(--color-foco);
+  outline-offset: 2px;
+}
+.ayuda {
+  color: var(--color-texto);
+  opacity: 0.8;
+  font-size: 0.9rem;
+}

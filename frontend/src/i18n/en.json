@@ -47,7 +47,21 @@
     "requests_restantes": "Croma requests left in 24 h: {{n}}",
     "descartadas": "Discarded sources",
     "ignorados": "ignored: {{lista}}",
-    "error": "The operation could not be completed. Try again."
+    "error": "The operation could not be completed. Try again.",
+    "pestanas": {
+      "lookalike": "Already buying from me",
+      "frase": "In one sentence",
+      "filtros": "Filters"
+    },
+    "frase": {
+      "etiqueta": "Who do you sell to and what do you offer?",
+      "ayuda": "One or two sentences. Example: I sell accounting software to mid-sized hardware stores in Antioquia.",
+      "sugerir": "Suggest filters",
+      "pensando": "Thinking…",
+      "revisar": "We prefilled the filters from your sentence. Review and adjust them before the preview.",
+      "error_no_disponible": "AI suggestions are not available right now. Use the filters directly.",
+      "error_interpretacion": "We could not interpret the sentence. Try rewording it or use the filters."
+    }
   },
   "fuentes": {
     "croma_supersociedades_co": "Supersociedades (Croma)",
@@ -153,5 +167,37 @@
     },
     "titulo_de_fuente": "Leads from {{fuente}}",
     "titulo_todos": "All leads"
+  },
+  "intake": {
+    "lookalike": {
+      "titulo": "They already buy from me",
+      "ayuda": "Paste one company per line (5 to 50) and we will suggest filters to find similar ones.",
+      "nombres": "Companies that already buy from you",
+      "ejemplo": "Use example",
+      "sugerir": "Suggest filters",
+      "enviando": "Searching…",
+      "resueltos": "{{n}} companies found",
+      "explicacion": "Why these filters",
+      "ciiu": "Activity (CIIU)",
+      "departamento": "Department (code)",
+      "no_resueltos": "We could not identify these companies (they are left out of the suggestion)",
+      "rango": "Paste between 5 and 50 companies, one per line.",
+      "no_disponible": "Company lookup is not available right now. Try again or use the filters.",
+      "error": "We could not suggest filters. Try again or use the filters."
+    }
+  },
+  "ejecucion": {
+    "titulo": "Result by source",
+    "estado": {
+      "con_resultados_one": "{{n}} company",
+      "con_resultados_other": "{{n}} companies",
+      "sin_resultados": "no results for this filter",
+      "no_disponible": "not available right now",
+      "no_soporta_criterio": "does not support this search criterion",
+      "limite_agotado": "source limit reached",
+      "omitida_por_tope": "not queried, it would exceed the spending cap"
+    },
+    "ninguna_respondio": "No source responded. Try again later.",
+    "ver_tablero": "View the dashboard"
   }
 }

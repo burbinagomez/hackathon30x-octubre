@@ -30,6 +30,7 @@ def tablero_fuentes(request: Request, tenant_id=Depends(tenant_actual)):
         "fuentes": [_fila(f) for f in datos.fuentes],
         "total": _fila(datos.total),
         "costo_evals": _monto(datos.costo_evals),
+        "costo_intake": _monto(datos.costo_intake),
         "cobertura": None,
         "revisiones_pendientes": None,
         "atribuciones": [{"fuente": a.fuente, "texto": a.texto, "url": a.url} for a in datos.atribuciones],
