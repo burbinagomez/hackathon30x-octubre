@@ -2,7 +2,6 @@ import json
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
-from uuid import uuid4
 
 import httpx
 import pytest
@@ -20,18 +19,6 @@ BACKEND = Path(__file__).resolve().parents[2]
 FIXTURE = json.loads((BACKEND / "tests" / "fixtures" / "osm" / "bogota_4711.json").read_text())
 TARIFA = Decimal("0.0000070")
 ICP = CriteriosICP("CO", {"ciiu": "4711", "ciudad": "Bogotá"})
-
-
-@pytest.fixture
-def tenants(admin):
-    ids = {"a": uuid4(), "b": uuid4()}
-    with admin.begin() as c:
-        c.execute(text("INSERT INTO tenants (id, nombre) VALUES (:a, 'A'), (:b, 'B')"), ids)
-    yield ids
-    with admin.begin() as c:
-        for t in ["lead_fuentes", "cumplimiento", "leads", "busquedas", "costos"]:
-            c.execute(text(f"DELETE FROM {t} WHERE tenant_id IN (:a, :b)"), ids)
-        c.execute(text("DELETE FROM tenants WHERE id IN (:a, :b)"), ids)
 
 
 def _buscar(rt, tenant):

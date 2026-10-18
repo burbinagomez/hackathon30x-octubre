@@ -43,9 +43,9 @@ def datos():
             c.execute(text("INSERT INTO tenants (id, nombre) VALUES (:a, 'A'), (:b, 'B')"), ids)
             c.execute(text("INSERT INTO busquedas (id, tenant_id, pais, criterios) VALUES "
                            "(:busquedas, :a, 'CO', '{}'), (:busqueda_b, :b, 'CO', '{}')"), ids)
-            c.execute(text("INSERT INTO leads (id, tenant_id, pais, nombre) VALUES "
-                           "(:leads, :a, 'CO', 'A1'), (:lead_sin_cumplimiento, :a, 'CO', 'A2'), "
-                           "(:lead_b, :b, 'CO', 'B1')"), ids)
+            c.execute(text("INSERT INTO leads (id, tenant_id, pais, nombre, tipo_titular) VALUES "
+                           "(:leads, :a, 'CO', 'A1', 'juridica'), (:lead_sin_cumplimiento, :a, 'CO', 'A2', 'juridica'), "
+                           "(:lead_b, :b, 'CO', 'B1', 'juridica')"), ids)
             c.execute(text("INSERT INTO lead_fuentes (id, tenant_id, lead_id, busqueda_id, fuente, url_origen, licencia) "
                            "VALUES (:lead_fuentes, :a, :leads, :busquedas, 'f', 'u', 'l')"), ids)
             c.execute(text("INSERT INTO cumplimiento (id, tenant_id, lead_id, fuente, licencia, url_origen, as_of) "
@@ -66,7 +66,7 @@ def datos():
 INSERT_CON_TENANT_DE_A = {
     "tenants": "INSERT INTO tenants (nombre) VALUES ('intruso')",
     "busquedas": "INSERT INTO busquedas (tenant_id, pais, criterios) VALUES (:a, 'CO', '{}')",
-    "leads": "INSERT INTO leads (tenant_id, pais, nombre) VALUES (:a, 'CO', 'intruso')",
+    "leads": "INSERT INTO leads (tenant_id, pais, nombre, tipo_titular) VALUES (:a, 'CO', 'intruso', 'juridica')",
     "lead_fuentes": "INSERT INTO lead_fuentes (tenant_id, lead_id, busqueda_id, fuente, url_origen, licencia) "
                     "VALUES (:a, :lead_sin_cumplimiento, :busquedas, 'otra', 'u', 'l')",
     "cumplimiento": "INSERT INTO cumplimiento (tenant_id, lead_id, fuente, licencia, url_origen, as_of) "
