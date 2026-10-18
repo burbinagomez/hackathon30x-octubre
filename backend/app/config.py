@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     database_url: str
     # SecretStr: no sale en repr ni en logs. Solo la CLI de búsqueda la usa.
     croma_api_key: SecretStr | None = None
+    # Overpass: None = la constante del adaptador. repo_url va en el User-Agent (política de Overpass).
+    overpass_url: str | None = None
+    repo_url: str = "https://github.com/burbinagomez/hackathon30x-octubre"
 
 
 class SecretProhibido(RuntimeError):
