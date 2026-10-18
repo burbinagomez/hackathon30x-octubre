@@ -733,3 +733,27 @@ def test_actividades_devuelve_el_catalogo_real_ampliado(api, usuarios):
     for codigo in ("4711", "5611", "4752", "4773", "4771", "9602", "4520", "6201", "4923"):
         assert codigo in por_codigo, codigo
     assert por_codigo["6201"]["nombre_es"] and por_codigo["6201"]["nombre_en"]
+
+
+def test_tablero_devuelve_el_embudo_por_fuente_y_total_solo_con_conteos(api, admin, usuarios):
+    tenant, lead, busqueda = usuarios["tenant_a"], uuid4(), uuid4()
+    with admin.begin() as c:
+        c.execute(text("INSERT INTO busquedas (id, tenant_id, pais, criterios) VALUES (:b, :t, 'CO', '{}')"),
+                  {"b": busqueda, "t": tenant})
+        c.execute(text("INSERT INTO leads (id, tenant_id, pais, nombre, tipo_titular, enriquecido_en, contactable, "
+                       "telefono_cifrado, telefono_canal) VALUES (:l, :t, 'CO', 'Z', 'juridica', now(), true, :x, 'sitio_web')"),
+                  {"l": lead, "t": tenant, "x": b"x" * 40})
+        c.execute(text("INSERT INTO lead_fuentes (tenant_id, lead_id, busqueda_id, fuente, url_origen, licencia) "
+                       "VALUES (:t, :l, :b, 'osm_overpass', 'u', 'l')"), {"t": tenant, "l": lead, "b": busqueda})
+        c.execute(text("INSERT INTO calificaciones (tenant_id, lead_id, calificado, calificado_en, minutos) "
+                       "VALUES (:t, :l, true, now(), 1)"), {"t": tenant, "l": lead})
+    _costo(admin, tenant, None, 1, "0.07")
+
+    t = _tablero(api, usuarios["a"])
+
+    campos = ("enriquecidos", "contactables", "con_telefono", "calificados")
+    osm = next(f for f in t["fuentes"] if f["fuente"] == "osm_overpass")
+    assert [osm[k] for k in campos] == [1, 1, 1, 1] and [t["total"][k] for k in campos] == [1, 1, 1, 1]
+    sin = next(f for f in t["fuentes"] if f["fuente"] == "sin_atribuir")
+    assert [sin[k] for k in campos] == [None] * 4  # costo sin lead: no aplica, no un 0 inventado
+    assert all(isinstance(osm[k], int) for k in campos)
