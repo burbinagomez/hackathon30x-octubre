@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app import db
-from app.api import actividades, busquedas, geografia, leads, tablero, usuarios
+from app.api import actividades, busquedas, geografia, intake_lookalike, leads, tablero, usuarios
 from app.api.sesion import tenant_actual
 from app.composicion import CONFIG, cargar_geografia, cargar_tarifas, registro_api
 from app.config import SettingsApi, verificar_entorno
@@ -81,5 +81,6 @@ def health(request: Request):
 
 
 # La dependencia va en el include: una ruta nueva no puede quedar sin auth por olvido.
-for _router in (busquedas.router, leads.router, tablero.router, actividades.router, geografia.router, usuarios.router):
+for _router in (busquedas.router, leads.router, tablero.router, actividades.router, geografia.router, usuarios.router,
+                intake_lookalike.router):
     app.include_router(_router, dependencies=[Depends(tenant_actual)])
