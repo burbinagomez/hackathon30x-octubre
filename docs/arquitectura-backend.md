@@ -39,5 +39,5 @@ Envío del `mensaje_base` de una búsqueda a leads jurídicos con canal publicad
 - CLI: `enviar [--dry-run] [--rehacer]`, `baja` (via humano), `respondio`, `tasa-respuesta` (vista `v_tasa_respuesta_canal`).
 - `RUTAS_PUBLICAS` (`app/api/__init__.py`) = `/health` y `/baja/{token}`: el enlace llega por mail, sin sesión. GET confirma, POST da de baja
   (también one-click RFC 8058). Sin `BAJA_SECRET`, 404. Toda ruta nueva fuera de esa lista exige sesión, y un test lo fija.
-- Migración `0008_contactos.sql`: tabla `contactos` (sin DELETE para `app_rt`), vistas `v_leads_con_opt_out` y `v_tasa_respuesta_canal`
+- Migración `0009_contactos.sql`: tabla `contactos` (sin DELETE para `app_rt`), vistas `v_leads_con_opt_out` y `v_tasa_respuesta_canal`
   (SELECT a `app_rt`, nada a `anon`/`authenticated`).
