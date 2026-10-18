@@ -396,7 +396,7 @@ Corre en el job de front de CI como parte de `npm test`, sin step aparte.
   - un `opt_out_at` en el `cumplimiento` de cualquier lead absorbido bloquea al superviviente. El opt-out se busca por la cadena `fusionado_en`, no solo por el `lead_id` del superviviente.
 - Mientras una revisión está pendiente, los dos leads cuentan como únicos. El tablero muestra cuántas hay, porque inflan los únicos.
 
-**Migración `supabase/migrations/0004_libro_costos_busqueda.sql`** (a mano, con `GRANT SELECT` de las vistas a `app_rt`):
+**Migración `supabase/migrations/0006_libro_costos_busqueda.sql`** (a mano, con `GRANT SELECT` de las vistas a `app_rt`):
 
 | Objeto | Cambio |
 |---|---|

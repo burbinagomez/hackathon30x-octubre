@@ -160,7 +160,7 @@ Va un único archivo, `supabase/migrations/NNNN_libro_costos_busqueda.sql` (el n
 
 ### DDL de la 0004 v2 (APROBADO 2026-10-18)
 
-Es el contenido exacto de `supabase/migrations/0004_libro_costos_busqueda.sql`. Basado en el v1 (que queda abajo como superseded): mismo `CHECK` de estados, vistas y `REVOKE`; cambia `usuarios` (`auth_user_id`, sin FK) y la función de acceso `tenant_de_usuario(uuid)`, y suma el `REVOKE` global de `EXECUTE` a `PUBLIC` en funciones nuevas. El dueño lo aprobó tal cual (2026-10-18, con security OK). `backend/tests/arquitectura/test_migracion_0004.py` compara el archivo con este bloque byte a byte.
+Es el contenido exacto de `supabase/migrations/0006_libro_costos_busqueda.sql`. Basado en el v1 (que queda abajo como superseded): mismo `CHECK` de estados, vistas y `REVOKE`; cambia `usuarios` (`auth_user_id`, sin FK) y la función de acceso `tenant_de_usuario(uuid)`, y suma el `REVOKE` global de `EXECUTE` a `PUBLIC` en funciones nuevas. El dueño lo aprobó tal cual (2026-10-18, con security OK). `backend/tests/arquitectura/test_migracion_0006.py` compara el archivo con este bloque byte a byte.
 
 ```sql
 -- 0004: libro de costos y búsqueda [MIN]. SQL a mano. Corre como postgres (dueño). Va después de la 0003.
@@ -249,7 +249,7 @@ $$;
 
 ### DDL de la 0004 (APROBADO 2026-10-18; SUPERSEDIDO por el login con Supabase Auth, no se usa)
 
-Es el contenido exacto de `supabase/migrations/0004_libro_costos_busqueda.sql` ([MIN]); `backend/tests/arquitectura/test_migracion_0004.py` compara el archivo con este bloque. Va entre la 0003 y la 0005.
+Es el contenido exacto de `supabase/migrations/0006_libro_costos_busqueda.sql` ([MIN]); `backend/tests/arquitectura/test_migracion_0006.py` compara el archivo con este bloque. Va entre la 0003 y la 0005.
 
 ```sql
 -- 0004: libro de costos y búsqueda [MIN]. SQL a mano. Corre como postgres (dueño). Va después de la 0003.
@@ -429,6 +429,7 @@ Ninguna se resuelve en este plan. Cada fila dice qué tareas bloquea.
 - **P4 aprobada con el default:** la fábrica de cada adaptador calcula `costo_maximo_llamada` con la tarifa resuelta; el YAML no lo declara.
 - **T001 sin la 004:** la 004 (evals) no es requisito para arrancar la 005; `v_costo_evals` lee una tabla vacía hasta que la 004 escriba.
 - **P5:** la migración de la 005 es la `0004`; la `0003` queda para el cifrado de `nombre`/`direccion` de la 003.
+  _Reemplazado 2026-10-18: el archivo pasa a `0006_libro_costos_busqueda.sql` sin cambiar una línea de SQL, porque la `0005` de la 003 ya estaba aplicada en prod y `supabase db push` no inserta una versión anterior a la última remota. El texto "0004" del DDL de abajo es el aprobado y no se toca._
 - **Bloquea la puerta T001: P1.** La decide el dueño.
 - **P13 queda sin efecto:** el dueño decidió login con Supabase Auth (2026-10-18); `email_hmac` desaparece. Preguntas nuevas: P15 a P18.
 - **P2 y P4** tienen default, pero falta que el dueño lo apruebe.

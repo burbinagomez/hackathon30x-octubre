@@ -80,7 +80,7 @@
   - `AUTH_JWKS_URL` y `AUTH_ISSUER` en `Settings`, `.env.example` y `docs/referencia-configuracion.md` si existe;
   - `backend/scripts/crear_usuario.py` con `getpass`: inserta la fila de `usuarios` (`--auth-user-id`, `--tenant`);
   - se borran `acceso/dominio/email.py` y `hmac_email`.
-  - **El `.sql` final de la 0004 es el bloque aprobado de plan.md**, con `backend/tests/arquitectura/test_migracion_0004.py` que lo compara (rojo antes: el archivo es el esqueleto).
+  - **El `.sql` final de la 0004 es el bloque aprobado de plan.md**, con `backend/tests/arquitectura/test_migracion_0006.py` que lo compara (rojo antes: el archivo es el esqueleto).
   - **Procedimiento de baja** (LOW): se borra la fila de `usuarios` (la cuenta de Supabase se deshabilita aparte, paso humano); queda escrito en `docs/arquitectura-backend.md` (T049) y en el docstring de `crear_usuario.py`.
 
 **Checkpoint**: vistas, RLS, privilegios y usuarios verdes.
