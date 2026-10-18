@@ -18,6 +18,8 @@ from app.modulos.intake.dominio.errores import ErrorGeneracion, FraseFueraDeRang
 
 router = APIRouter()
 
+FUENTE_LOOKALIKE = "datos_gov_co_rues"  # la misma que usa POST /intake/lookalike
+
 
 class PedidoFrase(BaseModel):
     model_config = ConfigDict(extra="forbid")  # un tenant_id en el body es un 422, no un campo ignorado
@@ -27,9 +29,9 @@ class PedidoFrase(BaseModel):
 
 @router.get("/intake/estado")
 def estado(request: Request):
-    """Qué puertas están disponibles; el front oculta las que no. `lookalike` lo enciende la rama de la Puerta A."""
+    """Qué puertas están disponibles; el front oculta las que no. Lookalike = su fuente está conectada por config."""
     e = request.app.state
-    return {"frase": ia_configurada(e.settings, e.tarifas_llm), "lookalike": False}
+    return {"frase": ia_configurada(e.settings, e.tarifas_llm), "lookalike": FUENTE_LOOKALIKE in e.registro.fuentes}
 
 
 @router.post("/intake/frase")

@@ -37,7 +37,8 @@ def _arbol_modulos(raiz: Path, archivo: str, contenido: str) -> None:
                 *(f"app/modulos/intake/{c}" for c in ("dominio", "aplicacion", "infraestructura")),
                 *(f"app/modulos/descubrimiento/{c}" for c in ("dominio", "aplicacion", "infraestructura")),
                 *(f"app/modulos/costos/{c}" for c in ("dominio", "infraestructura")),
-                *(f"app/modulos/acceso/{c}" for c in ("dominio", "infraestructura"))]
+                *(f"app/modulos/acceso/{c}" for c in ("dominio", "infraestructura")),
+                *(f"app/modulos/intake/{c}" for c in ("dominio", "aplicacion", "infraestructura"))]
     for p in paquetes:
         (raiz / p).mkdir(parents=True, exist_ok=True)
         (raiz / p / "__init__.py").touch()
@@ -105,6 +106,7 @@ def test_acceso_dominio_no_importa_su_infraestructura(tmp_path):
 
 
 SIN_ENRIQUECIMIENTO = "Intake no importa enriquecimiento"
+AISLADO = "Intake no importa descubrimiento ni la infraestructura de costos"
 
 
 def test_intake_no_importa_enriquecimiento(tmp_path):
@@ -117,8 +119,36 @@ def test_intake_no_importa_enriquecimiento(tmp_path):
     assert f"{SIN_ENRIQUECIMIENTO} BROKEN" in r.stdout
 
 
+def test_intake_no_importa_descubrimiento(tmp_path):
+    # Intake pide sus puertos por estructura (Protocol): quien cumple se enchufa en la raíz de composición.
+    _arbol_modulos(tmp_path, "app/modulos/intake/aplicacion/x.py", "import app.modulos.descubrimiento.dominio\n")
+
+    r = lint_imports(tmp_path)
+
+    assert r.returncode != 0
+    assert f"{AISLADO} BROKEN" in r.stdout
+
+
+def test_intake_no_importa_costos_infraestructura(tmp_path):
+    _arbol_modulos(tmp_path, "app/modulos/intake/aplicacion/x.py", "import app.modulos.costos.infraestructura\n")
+
+    r = lint_imports(tmp_path)
+
+    assert r.returncode != 0
+    assert f"{AISLADO} BROKEN" in r.stdout
+
+
 def test_intake_dominio_no_importa_su_infraestructura(tmp_path):
     _arbol_modulos(tmp_path, "app/modulos/intake/dominio/x.py", "import app.modulos.intake.infraestructura\n")
+
+    r = lint_imports(tmp_path)
+
+    assert r.returncode != 0
+    assert f"{CAPAS} BROKEN" in r.stdout
+
+
+def test_intake_respeta_las_capas(tmp_path):
+    _arbol_modulos(tmp_path, "app/modulos/intake/dominio/x.py", "import app.modulos.intake.aplicacion\n")
 
     r = lint_imports(tmp_path)
 

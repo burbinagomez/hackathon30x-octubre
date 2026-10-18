@@ -58,7 +58,8 @@ def test_estado_dice_si_la_puerta_b_esta_disponible(entorno, verificador, usuari
     with arrancar(entorno, verificador, **env) as c:
         r = c.get("/intake/estado", headers=_bearer(usuarios["a"]))
 
-    assert (r.status_code, r.json()) == (200, {"frase": frase, "lookalike": False})
+    # lookalike: datos_gov_co_rues está habilitada en config/fuentes.yaml (la Puerta A la usa).
+    assert (r.status_code, r.json()) == (200, {"frase": frase, "lookalike": True})
 
 
 # --- 503: la API arranca igual, la ruta dice que no -----------------------------------------------------------------

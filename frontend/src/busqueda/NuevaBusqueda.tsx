@@ -6,6 +6,7 @@ import {
   divisionesDe, ejecutar, estadoIntake, listarActividades, listarPaises, sugerirDesdeFrase, vistaPrevia,
   type EstadoIntake, type Sugerencia,
 } from "./api";
+import IntakeLookalike from "./IntakeLookalike";
 import ResultadoVistaPrevia from "./ResultadoVistaPrevia";
 import type { Actividad, Division, PedidoVistaPrevia, VistaPrevia } from "./tipos";
 
@@ -105,6 +106,13 @@ export default function NuevaBusqueda() {
     setVista(null);
   }
 
+  // Puerta A: prellena y se queda en su pestaña, porque ahí se ve la explicación (conteos y no resueltos).
+  function aplicarLookalike(sugerencia: Sugerencia) {
+    setForm((f) => conSugerencia(f, sugerencia));
+    setVista(null);
+    setSugerido(true);
+  }
+
   async function sugerir() {
     setErrorFrase(null);
     setPensando(true);
@@ -177,7 +185,12 @@ export default function NuevaBusqueda() {
           {errorFrase && <p role="alert" className="error">{t(`busqueda.frase.${errorFrase}`)}</p>}
         </div>
       )}
-      {pestana === "lookalike" && <div className="formulario formulario-ancho" role="tabpanel" />}
+      {pestana === "lookalike" && (
+        <div className="formulario formulario-ancho" role="tabpanel">
+          {sugerido && <p role="status" className="aviso">{t("busqueda.frase.revisar")}</p>}
+          <IntakeLookalike alSugerir={aplicarLookalike} />
+        </div>
+      )}
       {pestana === "filtros" && (
       <div className="formulario formulario-ancho">
       {sugerido && <p role="status" className="aviso">{t("busqueda.frase.revisar")}</p>}

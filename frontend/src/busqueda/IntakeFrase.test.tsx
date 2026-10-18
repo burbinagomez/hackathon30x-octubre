@@ -187,3 +187,24 @@ test("textos_en_ingles", async () => {
   fireEvent.click(boton(en.busqueda.frase.sugerir));
   await waitFor(() => expect(screen.queryByRole("status")).toHaveTextContent(en.busqueda.frase.revisar));
 });
+
+test("ya_me_compran_prellena_los_filtros_y_muestra_la_explicacion", async () => {
+  await montar({ frase: true, lookalike: true });
+  server.use(
+    http.post("*/intake/lookalike", () =>
+      HttpResponse.json({
+        sugerencia: { pais: "CO", ciiu: "4631", departamento: "05", ciudad: null, ingresos_min: null, palabras_clave: [], exclusiones: [] },
+        explicacion: { ciiu: [["4631", 4]], departamento: [["05", 3]] },
+        resueltos: 5, no_resueltos: [], costo_usd: "0.0001",
+      })),
+  );
+
+  fireEvent.click(pestana(es.busqueda.pestanas.lookalike)!);
+  fireEvent.change(screen.getByRole("textbox"), { target: { value: "A\nB\nC\nD\nE" } });
+  fireEvent.click(screen.getAllByRole("button").find((b) => b.textContent === es.intake.lookalike.sugerir)!);
+
+  await waitFor(() => expect(screen.queryByRole("status")).toHaveTextContent(es.busqueda.frase.revisar));
+  fireEvent.click(pestana(es.busqueda.pestanas.filtros)!);
+  expect(campo("Actividad")).toHaveValue("4631");
+  await waitFor(() => expect(campo("Departamento")).toHaveValue("05"));
+});

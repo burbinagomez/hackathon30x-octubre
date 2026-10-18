@@ -16,3 +16,7 @@ class ErrorGeneracion(IntakeError):
     def __init__(self, codigo: str):
         super().__init__(codigo)
         self.codigo = codigo
+
+
+class IntakeFueraDeRango(IntakeError):
+    """La lista pegada no trae de 5 a 50 nombres."""

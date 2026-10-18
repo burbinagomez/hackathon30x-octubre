@@ -54,6 +54,13 @@ source_modules = ["app.modulos.descubrimiento"]
 forbidden_modules = ["app.modulos.costos.infraestructura"]
 
 [[tool.importlinter.contracts]]
+name = "Intake no importa descubrimiento ni la infraestructura de costos"
+type = "forbidden"
+# Los puertos de intake son Protocol: los adaptadores los cumplen por estructura y solo la composición los une.
+source_modules = ["app.modulos.intake"]
+forbidden_modules = ["app.modulos.descubrimiento", "app.modulos.costos.infraestructura"]
+
+[[tool.importlinter.contracts]]
 name = "Cifrado fuera del dominio"
 type = "forbidden"
 # El dominio maneja texto en claro; cifrar y llamar por HTTP son adaptadores (principio I).

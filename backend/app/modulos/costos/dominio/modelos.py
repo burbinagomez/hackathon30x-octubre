@@ -17,3 +17,11 @@ class OperacionCosto:  # skill libro-costos + gratis
     lote_id: UUID | None
     gratis: bool
     ts: datetime | None = None  # None = now() de la base
+
+
+@dataclass(frozen=True)
+class ContextoCosto:
+    """A quién se le atribuye el costo de una consulta que no pertenece a una búsqueda (p. ej. `fuente='intake'`)."""
+
+    fuente: str
+    lote_id: UUID
