@@ -17,7 +17,7 @@ fuentes_descubrimiento:                 # puerto: FuenteDescubrimiento
     sesgo: "solo empresas que reportan estados financieros (medianas/grandes)"
     licencia: "datos públicos vía Croma; no redistribuir"
   croma_dian_trade_co:
-    habilitado: true
+    habilitado: false                    # sin adaptador todavía (no está en adaptadores/__init__.py)
     proveedor: croma
     endpoint: /co/dian-trade/directory-search/v1
     tipo: dataset
@@ -52,9 +52,11 @@ fuentes_descubrimiento:                 # puerto: FuenteDescubrimiento
     trae: [nit, nombre, ciiu, ciudad_camara]
     licencia: CC-BY-SA-4.0
 
+# OJO: esta sección es documental. Nadie la lee: composicion.py arma los enriquecedores en código.
+# Cambiar un `habilitado` de acá NO conecta ni desconecta nada.
 enriquecedores:                          # puerto: Enriquecedor
   croma_rues_co:
-    habilitado: true
+    habilitado: true                     # hoy NO verifica: el adaptador es un stub que falla cerrado y devuelve "desconocido"
     adaptador: app.modulos.enriquecimiento.infraestructura.adaptadores.croma_rues.CromaRues
     endpoint: /co/rues/entity-by-nit/v1
     tipo: live
@@ -80,6 +82,9 @@ enriquecedores:                          # puerto: Enriquecedor
 
 canales_contacto:                        # puerto: CanalContacto
   smtp_email:
+    # No hay adaptador SMTP: no se envía ningún email. Este flag solo hace que "email" sea un
+    # canal_preferido válido (api/canales.py) y la pantalla Nueva búsqueda lo usa; en false, la
+    # demo recibiría 422 canal_no_habilitado. El contacto real lo hace la llamada de Dapta.
     habilitado: true
     canal: email                         # lo que el usuario elige como canal_preferido
     proveedor: "SMTP nuevo para el evento"
@@ -96,6 +101,7 @@ calificadores:                           # puerto: Calificador
   dapta_csv:
     habilitado: true                     # respaldo: exportar/importar
 
+# OJO: sección documental, nadie la lee; composicion.py arma el clasificador en código.
 clasificadores:                          # puerto: Clasificador
   jev:
     habilitado: true
