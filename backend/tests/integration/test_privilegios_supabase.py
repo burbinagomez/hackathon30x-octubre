@@ -82,6 +82,19 @@ def test_default_privileges_no_conceden_a_anon_ni_authenticated(admin):
         transaccion.rollback()
 
 
+def test_default_privileges_no_dan_execute_en_funciones_nuevas(admin):
+    # Gemelo del de tablas: una función nueva de postgres no hereda EXECUTE de PUBLIC (default global de Postgres)
+    # ni de los default privileges de Supabase para anon/authenticated. "public" es el pseudo-rol PUBLIC.
+    transaccion = admin.begin()
+    try:
+        admin.execute(text("CREATE FUNCTION public.x() RETURNS int LANGUAGE sql AS 'SELECT 1'"))
+        permisos = {rol: admin.execute(text("SELECT has_function_privilege(:rol, 'public.x()', 'EXECUTE')"),
+                                       {"rol": rol}).scalar() for rol in (*ROLES_SUPABASE, "public")}
+    finally:
+        transaccion.rollback()
+    assert permisos == {"anon": False, "authenticated": False, "public": False}
+
+
 def test_anon_y_authenticated_sin_execute_en_funciones_de_public(admin):
     # Supabase da EXECUTE en funciones nuevas a anon/authenticated (default privileges) y Postgres a PUBLIC:
     # cualquier función de public tiene que cerrarse a mano. Las de extensiones (pg_trgm) viven en extensions.
