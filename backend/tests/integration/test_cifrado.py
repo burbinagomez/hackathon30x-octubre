@@ -23,7 +23,8 @@ REPOSITORIO = APP / "modulos" / "descubrimiento" / "infraestructura" / "persiste
 # tipo_titular e id, nunca nombre/direccion/nombre_cifrado/direccion_cifrada.
 CALIFICACIONES = APP / "modulos" / "calificacion" / "infraestructura" / "persistencia" / "postgres_calificaciones.py"
 # modelos.py y el catálogo nombran columnas, no ejecutan SQL sobre ellas.
-PERMITIDOS = (REPOSITORIO, CALIFICACIONES, APP / "modelos.py", APP / "seguridad" / "catalogo_sensibles.py")
+LEADS_CONTACTABLES = APP / "modulos" / "contacto" / "infraestructura" / "leads_contactables.py"
+PERMITIDOS = (REPOSITORIO, CALIFICACIONES, LEADS_CONTACTABLES, APP / "modelos.py", APP / "seguridad" / "catalogo_sensibles.py")
 # Leen leads para la elegibilidad legal (tipo_titular), nunca una columna cifrada.
 SIN_CIFRADAS = (APP / "modulos" / "contacto" / "infraestructura" / "repositorio_contactos.py",)
 NOMBRE = "Tienda Doña Rosa"  # sintéticos
@@ -238,3 +239,9 @@ def test_el_repo_de_calificaciones_no_lee_nombre_ni_direccion():
     """Está en PERMITIDOS porque toca `leads`, pero solo para filtrar juridica + cumplimiento: nunca el contacto."""
     sql = CALIFICACIONES.read_text()
     assert "nombre" not in sql and "direccion" not in sql
+
+
+def test_leads_contactables_solo_lee_el_email_cifrado():
+    """Está en PERMITIDOS para descifrar la dirección a la que se manda; ninguna otra columna cifrada."""
+    texto = LEADS_CONTACTABLES.read_text()
+    assert [c for c in CLARO if c in texto] == ["email_cifrado"]
