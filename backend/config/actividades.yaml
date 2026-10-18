@@ -1,11 +1,15 @@
 # CIIU Rev. 4 A.C. (DANE) → equivalentes por sistema. Una fuente que filtra
 # por tipo_negocio sin mapeo para el CIIU del ICP se ignora y se reporta.
+# nombre_es: CIIU Rev. 4 A.C. (DANE). nombre_en: ISIC Rev. 4 (ONU); puede faltar y entonces la UI cae a nombre_es.
 "4711":
-  descripcion: "Comercio al por menor en establecimientos no especializados, surtido principalmente de alimentos"
+  nombre_es: "Comercio al por menor en establecimientos no especializados, con surtido compuesto principalmente de alimentos, bebidas o tabaco"
+  nombre_en: "Retail sale in non-specialized stores with food, beverages or tobacco predominating"
   osm: ["shop=supermarket", "shop=convenience"]
 "5611":
-  descripcion: "Expendio a la mesa de comidas preparadas"
+  nombre_es: "Expendio a la mesa de comidas preparadas"
+  nombre_en: "Restaurants and mobile food service activities"
   osm: ["amenity=restaurant"]
 "4752":
-  descripcion: "Comercio al por menor de artículos de ferretería, pinturas y vidrios"
+  nombre_es: "Comercio al por menor de artículos de ferretería, pinturas y productos de vidrio en establecimientos especializados"
+  nombre_en: "Retail sale of hardware, paints and glass in specialized stores"
   osm: ["shop=hardware"]

@@ -31,12 +31,23 @@ export default function ResultadoVistaPrevia({ vista, tope }: Props) {
           </ul>
         </>
       )}
-      <p>{t("busqueda.costo_estimado", { monto: moneda(vista.costo_estimado_usd) })}</p>
-      <p>{t("busqueda.costo_maximo", { monto: moneda(vista.costo_maximo_usd) })}</p>
-      <p>{t("busqueda.tope_linea", { monto: moneda(tope) })}</p>
-      <p className="nota">{t("busqueda.se_compara_el_maximo")}</p>
-      <p>{t("busqueda.creditos_restantes", { n: entero(vista.creditos_restantes_mes) })}</p>
-      <p>{t("busqueda.requests_restantes", { n: entero(vista.requests_restantes_24h) })}</p>
+      {/* null = la API no lo calcula todavía: la línea no se pinta (ni "—", ni 0). Sin costo máximo no hay tope que comparar. */}
+      {vista.costo_estimado_usd !== null && (
+        <p>{t("busqueda.costo_estimado", { monto: moneda(vista.costo_estimado_usd) })}</p>
+      )}
+      {vista.costo_maximo_usd !== null && (
+        <>
+          <p>{t("busqueda.costo_maximo", { monto: moneda(vista.costo_maximo_usd) })}</p>
+          <p>{t("busqueda.tope_linea", { monto: moneda(tope) })}</p>
+          <p className="nota">{t("busqueda.se_compara_el_maximo")}</p>
+        </>
+      )}
+      {vista.creditos_restantes_mes !== null && (
+        <p>{t("busqueda.creditos_restantes", { n: entero(vista.creditos_restantes_mes) })}</p>
+      )}
+      {vista.requests_restantes_24h !== null && (
+        <p>{t("busqueda.requests_restantes", { n: entero(vista.requests_restantes_24h) })}</p>
+      )}
     </section>
   );
 }

@@ -45,6 +45,33 @@ export const actividades = [
   { codigo: "4631", nombre_es: "Comercio al por mayor de alimentos", nombre_en: null },
 ];
 
+/** GET /geografia (países con archivo) y GET /geografia?pais=XX (divisiones con código común, código nativo y municipios). */
+const division = (iso: string, nativo: string, es: string, en: string, municipios: [string, string][] = []) => ({
+  iso_3166_2: iso, codigo_nativo: nativo, nombre_es: es, nombre_en: en,
+  municipios: municipios.map(([codigo_nativo, nombre]) => ({ codigo_nativo, nombre })),
+});
+export const geografiaPaises = { paises: ["CO"] };
+export const geografiaPorPais: Record<string, object> = {
+  CO: {
+    pais: "CO",
+    divisiones: [
+      division("CO-ANT", "05", "Antioquia", "Antioquia", [["05001", "Medellín"]]),
+      division("CO-DC", "11", "Bogotá, D.C.", "Bogotá, D.C.", [["11001", "Bogotá, D.C."]]),
+      division("CO-TOL", "73", "Tolima", "Tolima", [["73001", "Ibagué"], ["73449", "Melgar"]]),
+      division("CO-SAP", "88", "San Andrés y Providencia", "San Andrés and Providencia"),
+    ],
+  },
+  PE: { pais: "PE", divisiones: [division("PE-LIM", "15", "Lima", "Lima", [["1501", "Lima"]])] },
+};
+
+/** El handler de /geografia: sin ?pais devuelve los países con archivo (por defecto solo CO). */
+export function manejarGeografia(paises: string[] = ["CO"]) {
+  return http.get("*/geografia", ({ request }) => {
+    const pais = new URL(request.url).searchParams.get("pais");
+    return pais ? HttpResponse.json(geografiaPorPais[pais]) : HttpResponse.json({ paises });
+  });
+}
+
 export function respuestaVistaPrevia(cambios: Record<string, unknown> = {}) {
   return {
     busqueda_id: "b-1",
@@ -59,6 +86,41 @@ export function respuestaVistaPrevia(cambios: Record<string, unknown> = {}) {
     creditos_restantes_mes: 288,
     requests_restantes_24h: 63,
     dentro_del_tope: true,
+    ...cambios,
+  };
+}
+
+/** Lo que devuelve la API del [MIN]: sin `contar` ni costos, y el tope todavía no se aplica (null, nunca 0). */
+export function respuestaVistaPreviaMinima(cambios: Record<string, unknown> = {}) {
+  return respuestaVistaPrevia({
+    fuentes: [
+      { fuente: "osm_overpass", conteo: null, motivo: "sin_conteo", ignorados: ["palabras_clave", "exclusiones"], truncado: false },
+      { fuente: "datos_gov_co_rues", conteo: null, motivo: "sin_conteo", ignorados: ["ciudad"], truncado: false },
+    ],
+    descartadas: [],
+    costo_vista_previa_usd: null,
+    costo_estimado_usd: null,
+    costo_maximo_usd: null,
+    creditos_restantes_mes: null,
+    requests_restantes_24h: null,
+    dentro_del_tope: null,
+    ...cambios,
+  });
+}
+
+/** El tablero del [MIN]: solo encontrados y únicos; todo lo demás, null. */
+export function respuestaTableroMinima(cambios: Record<string, unknown> = {}) {
+  const fila = {
+    icp: null, costo_lista: null, costo_real: null, desperdicio_lista: null, desperdicio_real: null,
+    cpl_lista: null, cpl_real: null, cuenta_naturales: false, naturales_no_contactables: null,
+  };
+  return {
+    fuentes: [{ ...fila, fuente: "osm_overpass", encontrados: 3, unicos: 2 }],
+    total: { ...fila, fuente: "TOTAL", encontrados: 3, unicos: 2 },
+    costo_evals: null,
+    cobertura: null,
+    revisiones_pendientes: null,
+    atribuciones: [] as { fuente: string; texto: string; url: string }[],
     ...cambios,
   };
 }

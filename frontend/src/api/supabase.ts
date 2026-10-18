@@ -8,4 +8,4 @@ const url: string = import.meta.env.VITE_SUPABASE_URL ?? "";
 
 export const configuracionValida: boolean = key.startsWith("sb_publishable_") && url !== "";
 
-export const supabase: SupabaseClient | null = configuracionValida ? createClient(url, key) : null;
+export const supabase: SupabaseClient | null = configuracionValida ? createClient(url, key, { auth: { storage: sessionStorage } }) : null;

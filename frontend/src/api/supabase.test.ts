@@ -47,3 +47,12 @@ test("acepta_una_key_publishable", async () => {
   expect(modulo.configuracionValida).toBe(true);
   expect(modulo.supabase).not.toBeNull();
 });
+
+// En sessionStorage el token muere al cerrar la pestaña: un XSS o un equipo compartido no lo heredan.
+test("la_sesion_va_a_sessionStorage", async () => {
+  await cargar("sb_publishable_abcdefghijkl");
+  const { createClient } = await import("@supabase/supabase-js");
+  const opciones = vi.mocked(createClient).mock.calls[0]?.[2];
+  // Por identidad: dos Storage vacíos de jsdom son iguales en profundidad, y localStorage pasaría.
+  expect(opciones?.auth?.storage).toBe(sessionStorage);
+});
