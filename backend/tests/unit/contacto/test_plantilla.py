@@ -70,3 +70,13 @@ def test_menos_de_100_palabras():
     with pytest.raises(PlantillaInvalida, match="palabras"):
         validar(_cuerpo(base=BASE + " " + relleno), REMITENTE, URL_BAJA, PRIVACIDAD)
     validar(_cuerpo(base=BASE + " " + relleno.rsplit(" ", 1)[0]), REMITENTE, URL_BAJA, PRIVACIDAD)
+
+
+def test_validar_es_lineal_con_una_palabra_enorme():
+    """Sonar S8786: `\\S*/baja/\\S*` hacía backtracking cuadrático; 40k caracteres sin espacio tardaban segundos."""
+    import time
+
+    cuerpo = _cuerpo() + " " + "x" * 40_000
+    inicio = time.perf_counter()
+    validar(cuerpo, REMITENTE, URL_BAJA, PRIVACIDAD)
+    assert time.perf_counter() - inicio < 0.5

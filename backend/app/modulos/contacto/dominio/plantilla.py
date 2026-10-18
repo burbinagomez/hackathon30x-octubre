@@ -1,5 +1,4 @@
 """Mensaje de primer contacto con el pie de la regla 7 (identificación, origen del dato, baja, privacidad)."""
-import re
 
 from app.modulos.contacto.dominio.errores import PlantillaInvalida
 
@@ -7,7 +6,6 @@ ORIGENES = {
     "sitio_web": "encontramos su contacto en su sitio web",
     "osm_contacto": "encontramos su contacto en un directorio público (OpenStreetMap)",
 }
-_URL_BAJA = re.compile(r"\S*/baja/\S*")
 
 
 def componer(mensaje_base: str, remitente: str, canal_origen: str, url_baja: str,
@@ -31,7 +29,7 @@ def validar(cuerpo: str, remitente: str, url_baja: str, url_privacidad: str) -> 
         raise PlantillaInvalida("identificacion")
     if not any(o in cuerpo for o in ORIGENES.values()):
         raise PlantillaInvalida("origen")
-    if "BAJA" not in cuerpo or set(_URL_BAJA.findall(cuerpo)) != {url_baja}:
+    if "BAJA" not in cuerpo or {p for p in cuerpo.split() if "/baja/" in p} != {url_baja}:
         raise PlantillaInvalida("baja")
     if url_privacidad not in cuerpo:
         raise PlantillaInvalida("privacidad")
