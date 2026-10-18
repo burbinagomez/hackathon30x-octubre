@@ -38,11 +38,17 @@ def rt():
 
 @pytest.fixture
 def datos():
-    """Tenant A con una fila en cada tabla, y tenant B con una búsqueda y un lead propios. Sembrado como postgres."""
+    """Tenant A con una fila en cada tabla, y tenant B con una búsqueda y dos leads propios. Sembrado como postgres.
+
+    Los dos leads de B son el control positivo de `test_tenant_b_no_fusiona_con_lead_de_a`: sin una fila de B a la
+    que apuntar, el rojo de la FK se confundiría con un UPDATE sin efecto.
+    """
     a, b = uuid4(), uuid4()
     ids = {"tenants": a, "busquedas": uuid4(), "leads": uuid4(), "lead_fuentes": uuid4(),
            "cumplimiento": uuid4(), "costos": uuid4(), "contactos": uuid4(), "lead_sin_cumplimiento": uuid4(),
-           "busqueda_b": uuid4(), "lead_b": uuid4(), "a": a, "b": b}
+           "busqueda_b": uuid4(), "lead_b": uuid4(), "lead_b2": uuid4(), "a": a, "b": b,
+           # Una fila de `costos` por camino de las vistas de costo (ver el INSERT de abajo).
+           "costo_lote": uuid4(), "costo_canal": uuid4(), "costo_evals": uuid4(), "lote_evals": uuid4()}
     admin = create_engine(_url("TEST_ADMIN_DATABASE_URL"))
     try:
         with admin.begin() as c:
@@ -51,7 +57,7 @@ def datos():
                            "(:busquedas, :a, 'CO', '{}'), (:busqueda_b, :b, 'CO', '{}')"), ids)
             c.execute(text("INSERT INTO leads (id, tenant_id, pais, nombre, tipo_titular) VALUES "
                            "(:leads, :a, 'CO', 'A1', 'juridica'), (:lead_sin_cumplimiento, :a, 'CO', 'A2', 'juridica'), "
-                           "(:lead_b, :b, 'CO', 'B1', 'juridica')"), ids)
+                           "(:lead_b, :b, 'CO', 'B1', 'juridica'), (:lead_b2, :b, 'CO', 'B2', 'juridica')"), ids)
             c.execute(text("INSERT INTO lead_fuentes (id, tenant_id, lead_id, busqueda_id, fuente, url_origen, licencia) "
                            "VALUES (:lead_fuentes, :a, :leads, :busquedas, 'osm_overpass', 'u', 'l')"), ids)
             # opt_out_at: control positivo de v_leads_con_opt_out.
@@ -59,14 +65,25 @@ def datos():
                            "VALUES (:cumplimiento, :a, :leads, 'f', 'l', 'u', now(), now())"), ids)
             c.execute(text("INSERT INTO contactos (id, tenant_id, lead_id, busqueda_id, canal, asunto, cuerpo) "
                            "VALUES (:contactos, :a, :leads, :busquedas, 'email', 'a', 'c')"), ids)
-            c.execute(text("INSERT INTO costos (id, tenant_id, tipo, unidades, costo_unitario, moneda, proveedor, gratis) "
-                           "VALUES (:costos, :a, 'croma_consulta', 1, 0, 'USD', 'croma', true)"), ids)
+            # El libro de A, una fila por camino de las vistas de costo: la de lote (`lead_id` nulo) sobre la fuente de
+            # la `lead_fuentes` de A —es la que se prorratea sobre su lead y la que le da una `parte` a
+            # `v_costo_por_lead`—, una con canal, una de `evals` (aparte del libro) y la de siempre, sin fuente ni lote,
+            # que cubre `sin_atribuir` y el desperdicio. `lote_evals` no es la búsqueda: el lote de evals es la corrida.
+            c.execute(text("INSERT INTO costos (id, tenant_id, tipo, unidades, costo_unitario, moneda, proveedor, "
+                           "fuente, canal, lead_id, lote_id, gratis) VALUES "
+                           "(:costos, :a, 'croma_consulta', 1, 0, 'USD', 'croma', NULL, NULL, NULL, NULL, true), "
+                           "(:costo_lote, :a, 'overpass_query', 3, 0.10, 'USD', 'osm', 'osm_overpass', NULL, NULL, :busquedas, false), "
+                           "(:costo_canal, :a, 'email_envio', 1, 0.05, 'USD', 'osm', 'osm_overpass', 'email', :leads, NULL, false), "
+                           "(:costo_evals, :a, 'llm_tokens_in', 1, 1.00, 'USD', 'anthropic', 'evals', NULL, NULL, :lote_evals, false)"), ids)
             c.execute(text("INSERT INTO calificaciones (tenant_id, lead_id, calificado, calificado_en, minutos) "
                            "VALUES (:a, :leads, true, now(), 1)"), ids)
         ids["calificaciones"] = ids["leads"]
         yield ids
     finally:
         with admin.begin() as c:
+            # El control positivo de la FK de `fusionado_en` deja un lead de B apuntando a otro: se suelta antes de
+            # borrar, para que el orden de las filas no tenga que decidir si la FK se satisface.
+            c.execute(text("UPDATE leads SET fusionado_en = NULL WHERE tenant_id IN (:a, :b)"), ids)
             for t in ["contactos", "calificaciones", "lead_fuentes", "cumplimiento", "costos", "leads", "busquedas"]:
                 c.execute(text(f"DELETE FROM {t} WHERE tenant_id IN (:a, :b)"), ids)
             c.execute(text("DELETE FROM tenants WHERE id IN (:a, :b)"), ids)
@@ -158,8 +175,23 @@ def test_tenant_b_no_cuelga_filas_de_un_lead_de_a(rt, datos, tabla):
     _rechazado(rt, datos, COLGAR_DE_LEAD_DE_A[tabla], FK_VIOLADA)
 
 
-# Vistas. Con datos solo de A (la siembra trae costos, un lead, una lead_fuentes de osm_overpass, un opt-out y un contacto).
-VISTAS = ["v_tablero_fuentes", "v_atribuciones", "v_leads_icp", "v_cpql", "v_leads_con_opt_out", "v_tasa_respuesta_canal"]
+def test_tenant_b_no_fusiona_con_lead_de_a(rt, datos):
+    """La FK de `fusionado_en` tiene que ser compuesta, `(tenant_id, fusionado_en) → leads (tenant_id, id)`.
+
+    Una FK simple no pasa por RLS —el chequeo de integridad corre como el dueño de la tabla— y la fila del lead de A
+    existe, así que hoy el UPDATE de B entra. Con la compuesta, el par (tenant de B, lead de A) no existe.
+    """
+    # Control positivo: el mismo UPDATE hacia otro lead de B sí funciona (si no, el rojo de abajo sería un UPDATE
+    # sin efecto por privilegio o por política, no la FK).
+    assert _como_b(rt, datos, "UPDATE leads SET fusionado_en = :lead_b2 WHERE id = :lead_b").rowcount == 1
+    _rechazado(rt, datos, "UPDATE leads SET fusionado_en = :leads WHERE id = :lead_b", FK_VIOLADA)
+
+
+# Vistas: las 6 de los slices anteriores y las 6 del libro de costos (0010). Con datos solo de A: la siembra trae
+# costos (uno de lote sobre `osm_overpass`, uno con canal, uno de evals y uno sin fuente), un lead con su
+# `lead_fuentes` de osm_overpass y su calificación, un opt-out y un contacto.
+VISTAS = ["v_tablero_fuentes", "v_atribuciones", "v_leads_icp", "v_cpql", "v_leads_con_opt_out", "v_tasa_respuesta_canal",
+          "v_costos", "v_costo_evals", "v_prorrateo", "v_desperdicio", "v_costo_por_lead", "v_costo_por_canal"]
 
 
 def _filas_de_la_vista(rt, tenant, vista):
@@ -169,9 +201,19 @@ def _filas_de_la_vista(rt, tenant, vista):
 
 @pytest.mark.parametrize("vista", VISTAS)
 def test_tenant_b_no_accede_a_datos_de_a_en_vistas(rt, datos, vista):
+    """(El nombre del card es `::test_tenant_b_no_accede_a_datos_de_a[vista]`; `[tabla]` ya es de la tabla.)
+
+    La mutación que pone este test en rojo es sacarle `security_invoker` a la vista **que lee la tabla base**
+    (`v_costos`, `v_costo_evals`, `v_leads_icp`, `v_tablero_fuentes`, `v_atribuciones`, `v_cpql`,
+    `v_leads_con_opt_out`, `v_tasa_respuesta_canal`): una vista anidada solo sobre otras vistas conserva su
+    protección, porque las vistas de abajo siguen corriendo como `app_rt`. `v_prorrateo` es el caso extremo —sus
+    dos entradas son vistas— y para que B vea una fila suya hay que sacarle la opción a `v_costos` **y** a
+    `v_leads_icp` (comprobado en la base aparte `sab_t009`).
+    """
     # Control positivo: sin él, el 0 de B no probaría nada.
     assert len(_filas_de_la_vista(rt, datos["a"], vista)) >= 1
-    # También la fila TOTAL de v_tablero_fuentes y de v_cpql: solo existe si el tenant tiene datos.
+    # También la fila TOTAL de `v_tablero_fuentes`: con `security_invoker` y sin datos de B, `HAVING count(*) > 0`
+    # es lo único que la deja fuera, y un `count(*)` de 0 la agregaría con ceros.
     assert _filas_de_la_vista(rt, datos["b"], vista) == []
 
 
