@@ -22,6 +22,11 @@
   --color-pista: var(--color-gris); /* pista de las barras del embudo; la barra es --color-acento */
   --color-sobre-acento: var(--color-oscuro); /* texto sobre lima: oscuro en ambos temas */
   --color-aviso: #B45309; /* aviso: texto de algo que falta; contraste AA sobre blanco */
+  /* Landing (deck de la presentación): violeta secundario, fondo de página, borde y texto suave. */
+  --color-acento-2: #6D3FD6; /* AA sobre el fondo claro de la landing */
+  --color-fondo-landing: #F5F5F3;
+  --color-borde-suave: #D4D4D8;
+  --color-texto-suave: #52525B;
 }
 
 /* Tema oscuro: sigue la preferencia del sistema, sin selector. */
@@ -35,6 +40,10 @@
     --color-cabecera-texto: var(--color-acento);
     --color-foco: var(--color-acento);
     --color-aviso: #FBBF24; /* AA sobre el fondo oscuro */
+    --color-acento-2: #B58FFF;
+    --color-fondo-landing: #0F0F0F;
+    --color-borde-suave: #343437;
+    --color-texto-suave: var(--color-gris);
   }
 }
 

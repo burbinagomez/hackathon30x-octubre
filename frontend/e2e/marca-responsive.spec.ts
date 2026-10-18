@@ -1,9 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
 // Cada slice con UI suma acá sus rutas (regla responsive, docs/decisiones.md).
-// `listo` es el elemento propio de la pantalla que se espera antes de medir; "/" espera el /^API:/ de health.
+// `listo` es el elemento propio de la pantalla que se espera antes de medir; "/salud" (ruta desconocida) espera el /^API:/ de health.
 const RUTAS = [
-  { ruta: "/", listo: (page: Page) => page.getByText(/^API:/) },
+  { ruta: "/", listo: (page: Page) => page.getByRole("heading", { level: 1 }) },
+  { ruta: "/salud", listo: (page: Page) => page.getByText(/^API:/) },
   { ruta: "/login", listo: (page: Page) => page.getByRole("heading", { level: 1 }) },
   { ruta: "/busqueda/nueva", listo: (page: Page) => page.getByRole("heading", { level: 1 }) },
   { ruta: "/tablero", listo: (page: Page) => page.getByRole("heading", { level: 1 }) },

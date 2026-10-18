@@ -289,5 +289,50 @@
     "trabajando": "Buscando contacto en los sitios web",
     "resumen": "{{procesados}} procesados · {{contactables}} con contacto · quedan {{pendientes}}",
     "error": "No se pudo completar. Probá de nuevo."
+  },
+  "landing": {
+    "etiqueta": "RETO DAPTA · 30X",
+    "titulo": "Más leads, menor costo",
+    "bajada": "Encontramos y medimos leads de empresas desde fuentes públicas y gratuitas, con el costo por lead calificado a la vista.",
+    "empezar": "Empezar",
+    "ver_tablero": "Ver el tablero",
+    "problema": {
+      "titulo": "El problema",
+      "c1": {
+        "cifra": "$80–500",
+        "texto": "USD por lead pagando pauta"
+      },
+      "c2": {
+        "cifra": "¿CPL?",
+        "texto": "No saben qué canal les sirve ni cuánto les cuesta cada lead"
+      },
+      "c3": {
+        "cifra": "3 de 5",
+        "texto": "clientes le piden a Dapta que les consiga leads"
+      }
+    },
+    "solucion": {
+      "titulo": "La solución",
+      "p1": {
+        "titulo": "1. Encontrar",
+        "texto": "Del perfil de cliente ideal a fuentes públicas y gratuitas (RUES, Supersociedades, OpenStreetMap). Sin duplicados y solo empresas."
+      },
+      "p2": {
+        "titulo": "2. Contactar",
+        "texto": "Buscamos el teléfono y el correo que la empresa publica en su propio sitio, y Dapta la llama para calificarla."
+      },
+      "p3": {
+        "titulo": "3. Medir",
+        "texto": "CPL y CPQL por fuente, sacados de un libro de costos real."
+      }
+    },
+    "diferencial": {
+      "titulo": "Lo que nadie más te muestra",
+      "d1": "Fuentes gratuitas",
+      "d2": "El costo antes de buscar (vista previa con costo máximo y tope)",
+      "d3": "CPQL cerrado con Dapta"
+    },
+    "viabilidad": "Arquitectura hexagonal: cada fuente es un adaptador que se conecta por configuración · RLS, cifrado y libro de cumplimiento.",
+    "cta": "Más leads, menor costo. Y medido."
   }
 }

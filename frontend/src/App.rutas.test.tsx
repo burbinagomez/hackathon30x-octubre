@@ -71,3 +71,17 @@ test("/costos?busqueda_id= muestra el libro filtrado; un id invalido no se manda
   await waitFor(() => expect(pedidos).toHaveLength(2));
   expect(pedidos[1]).toBe("?pagina=1");
 });
+
+test("/ muestra la landing, sin la barra de idioma duplicada", () => {
+  history.replaceState(null, "", "/");
+  render(<App />);
+  expect(screen.getByRole("heading", { level: 1, name: "Más leads, menor costo" })).toBeInTheDocument();
+  expect(screen.getAllByLabelText("Idioma")).toHaveLength(1);
+});
+
+test("una ruta desconocida sigue mostrando el estado de la API", async () => {
+  server.use(http.get("*/health", () => HttpResponse.json({ status: "ok", db: "ok" })));
+  history.replaceState(null, "", "/no-existe");
+  render(<App />);
+  expect(await screen.findByText("API: ok · DB: ok")).toBeInTheDocument();
+});
