@@ -8,20 +8,17 @@
 - **Mutación** = el cambio de una línea en el código que tiene que poner ese test en rojo. Si un test nace verde, se acepta solo si su mutación lo pone en rojo; la mutación se aplica, se ve el rojo y se revierte.
 - **Decimal**: todo costo se asierta con `type(v) is Decimal` y contra `Decimal("…")` construido desde string, con esperados no enteros.
 - **(advisor)** / **(security)**: el test lo revisa ese agente **antes** de aceptarlo. Ningún verde de esa fase arranca sin su APROBADO.
-- **Bloqueada por: Dn**: la D de `plan.md` → "Dependencias externas" tiene que estar en `main`, o Daniel tiene que haber aprobado la propuesta (Pn) que la resuelve dentro de la 006. Si no, la tarea no arranca y no se reimplementa acá.
-- **Propuesta Pn**: las respuestas de la columna "Propuesta" de `plan.md` son **propuestas pendientes de Daniel**. Una tarea que se apoya en una propuesta no arranca hasta que Daniel la apruebe.
+- **Bloqueada por: Dn**: la D de `plan.md` → "Dependencias externas" tiene que estar en `main`, o la resuelve dentro de la 006 la decisión Pn de Daniel. Si no, la tarea no arranca y no se reimplementa acá.
+- **Decisión Pn**: la columna "Decisión" de `plan.md` es la versión final de Daniel (2026-10-17). El DDL de la 0008 sigue PENDIENTE DE APROBACIÓN DE DANIEL (T005).
 - **Los nombres de los tests** son los de `spec.md:52-110`. Si un nombre cambia, cambia en la spec en el mismo commit.
 - **[MIN]** / **[Pulido]**: ver "Estrategia: primero que funcione" al final.
 
 ## Fase 1: Puerta y setup (Paso 0)
 
-- [ ] T001 [MIN] [Paso 0] 🤖 **Puerta.** `git fetch origin`. Verificar D1–D11 contra `origin/main` con `git show origin/main:<ruta>`, no contra los planes, y anotar el estado en la tabla de `plan.md`. Elegir el número de migración: el siguiente libre en `supabase/migrations/` (hoy **0008**: la 0007 queda reservada para la 012). Se frena en tres casos:
-  - P1 (propuesta: por NIT si el lead lo tiene, por nombre si no) sin aprobar: frena la Fase 4;
-  - P2/P3 (propuesta: la 006 crea `v_leads_icp` y las columnas de contacto) sin aprobar y D4/D6 ausentes: frena las Fases 6–8;
-  - P7 (propuesta: paso a claro al confirmarse jurídica, con UPDATE de la fila de `cumplimiento`) sin aprobar: frena T028.
+- [ ] T001 [MIN] [Paso 0] 🤖 **Puerta.** `git fetch origin`. Verificar D1–D11 contra `origin/main` con `git show origin/main:<ruta>`, no contra los planes, y anotar el estado en la tabla de `plan.md`. Elegir el número de migración: el siguiente libre en `supabase/migrations/` (hoy **0008**: la 0007 queda reservada para la 012). P1, P2, P3 y P7 ya están decididas (por NIT si lo hay; la 006 crea `v_leads_icp` y las columnas de contacto; paso a claro con UPDATE de `cumplimiento`). Se frena si otra rama ya mergeó `v_leads_icp`, las columnas de contacto o la 0008: se avisa a Daniel antes de seguir.
 
   Las Fases 2, 3 y 5 arrancan igual.
-- [ ] T002 [MIN] [P] [Paso 0] 🤖 **Config.** En `backend/config/fuentes.yaml`, `sitio_web` y `croma_rues_co` pasan a `adaptador:` del módulo `enriquecimiento`. El endpoint de Croma **no se toca** hasta P1. `croma_supersociedades_detalle_co` pasa a `habilitado: false` si Daniel aprueba P4 (propuesta: apagado). `cli.py:_cargar_tarifas` suma `web_fetch_usd` y `jev.in_usd_por_M` como `Decimal(str(…))`.
+- [ ] T002 [MIN] [P] [Paso 0] 🤖 **Config.** En `backend/config/fuentes.yaml`, `sitio_web` y `croma_rues_co` pasan a `adaptador:` del módulo `enriquecimiento`. El endpoint de Croma **no se toca** hasta P1. `croma_supersociedades_detalle_co` pasa a `habilitado: false` (P4). `cli.py:_cargar_tarifas` suma `web_fetch_usd` y `jev.in_usd_por_M` como `Decimal(str(…))`.
 - [ ] T003 [MIN] [Paso 0] 🤖 **Esqueletos.** Las firmas de `plan.md` → "Cambios de puerto", con valores equivocados:
   - `calcular_contactable` → `(True, None)` siempre;
   - `es_contacto_nominal` → `False`;
@@ -33,11 +30,11 @@
   - `EnriquecerLead` / `ClasificarEncajeICP` → no hacen nada;
   - `sin_enriquecer` → `[]` y `guardar_enriquecimiento` → no-op en el repo Postgres.
 - [ ] T004 [MIN] [Paso 0] 🤖 **Contrato import-linter.** Se suma a `pyproject.toml`: `enriquecimiento.dominio` no importa `httpx` ni `infraestructura`. **Rojo:** primero un canario temporal en `dominio/` que importa `httpx`, y `lint-imports` falla. **Mutación:** sacar el contrato. Se borra el canario.
-- [ ] T005 [Paso 0] 🧑 **Aprobar o pedir cambios al DDL 0008** de `plan.md` → "Migración 0008", junto con las propuestas P2, P3, P5 y P9 que lo afectan. Hasta ese OK no existe `supabase/migrations/0008_enriquecimiento.sql`. Bloquea T024–T026 y la Fase 7.
+- [ ] T005 [Paso 0] 🧑 **Aprobar o pedir cambios al DDL 0008** de `plan.md` → "Migración 0008", que ya incluye lo decidido en P2, P3 y P5. Hasta ese OK no existe `supabase/migrations/0008_enriquecimiento.sql`. Bloquea T024–T026 y la Fase 7.
 
 ## Fase 2: Dominio puro (Paso 1) — advisor
 
-`tests/unit/enriquecimiento/test_contactable.py`, 8 tests (`spec.md:52-62`). `CanalPublicado` lo define la 006 si se aprueba P3; si no, espera a D4.
+`tests/unit/enriquecimiento/test_contactable.py`, 8 tests (`spec.md:52-62`). `CanalPublicado` lo define la 006 (P3).
 
 - [ ] T006 [MIN] [Paso 1] 🤖 **Rojo** (advisor) de los 8 tests contra los esqueletos de T003:
   - juridica + teléfono → contactable;
@@ -73,12 +70,13 @@
 - [ ] T011 [MIN] [P] [Paso 2] 🤖 **Rojo**, extracción y costo:
   - HTML con `mailto:`, `wa.me/57…` y un teléfono plano → email + `whatsapp_comercial` gana al plano;
   - un `web_fetch` registrado por request real con `lead_id` set, `fuente=None`, `lote_id=None` y `type(monto) is Decimal`;
+  - un fetch cortado por SSRF no hace request y deja 0 filas en `costos` (P9);
   - `caplog` no contiene ni el email ni el teléfono extraídos.
 
   **Mutaciones:** registrar con `fuente="sitio_web"`; `logger.info(contacto)`; sacar `wa.me` de la regex.
 - [ ] T012 [MIN] [Paso 2] 🛡 Security revisa T009–T011. **APROBADO antes de T013.** Foco: rebinding DNS (se resuelve una vez y se conecta a esa IP), IPv6 mapeado (`::ffff:127.0.0.1`), timeout corto, UA fijo, nada de contacto en logs.
 - [ ] T013 [MIN] [Paso 2] 🤖 **Verde:** `infraestructura/adaptadores/sitio_web.py`.
-- [ ] T014 [Paso 2] 🧑 Aprueba P9 (propuesta: fila en `costos` con costo 0 y el motivo cuando robots o SSRF cortan). `costos` no tiene columna `motivo`: Daniel decide si entra en la 0008 o dónde va. Si la respuesta cambia lo que asierta T011, el test cambia antes que el código.
+- [x] T014 [Paso 2] 🧑 Daniel decidió P9 (2026-10-17): solo se registra `web_fetch` cuando hay request real, robots.txt incluido; el corte por SSRF no registra nada; sin columna nueva en `costos`. T011 lo asierta: un SSRF cortado deja 0 filas en `costos`.
 
 **Checkpoint 2:** los 7 tests verdes sin red.
 
@@ -117,7 +115,7 @@
 
 ## Fase 6: Migración 0008 (columnas), repo y casos de uso (Paso 5) — advisor + security
 
-**Bloqueada por:** P2, P3 y T005 (DDL aprobado). D5 solo para `web_canal`; mientras no llegue, `sitio_web` usa `leads.web`.
+**Bloqueada por:** T005 (DDL aprobado). D5 solo para `web_canal`; mientras no llegue, `sitio_web` usa `leads.web`.
 
 - [ ] T023 [MIN] [Paso 5] 🤖 Re-verificar que `v_tablero_fuentes` en `main` sigue igual al SELECT de la 0006 que ya está copiado en la propuesta de `plan.md`, y que nadie creó `v_leads_icp`. Si cambió, se actualiza la propuesta. 🧑 Daniel aprueba el texto completo. Recién ahí sigue T024.
 - [ ] T024 [MIN] [Paso 5] 🤖 **Rojo:** `tests/arquitectura/test_migracion_0008.py` con el patrón de `test_migracion_0006.py`. El archivo tiene los CHECKs, repite `security_invoker = true` en cada vista (`CREATE VIEW` y `CREATE OR REPLACE VIEW`), no menciona `costos` y deja `fuente, encontrados, unicos` como primeras columnas de `v_tablero_fuentes`. Falla porque el archivo no existe: es **por aserción** sobre `Path.exists()`, no un error de import. **Mutación:** sacar un `security_invoker`.
@@ -139,7 +137,7 @@
 
 ## Fase 7: Vistas y guarda de catálogo (Paso 6) — security + advisor
 
-`tests/integration/test_vistas_tablero.py`, 3 tests (`spec.md:102-106`). **Bloqueada por:** P2 y T026.
+`tests/integration/test_vistas_tablero.py`, 3 tests (`spec.md:102-106`). **Bloqueada por:** T026.
 
 - [ ] T031 [MIN] [Paso 6] 🐝 Datos sintéticos de la fixture A–J (`spec.md:104`): 10 leads repartidos en `croma_supersociedades` y `osm`, con un lead en las dos fuentes. Solo datos dummy.
 - [ ] T032 [MIN] [Paso 6] 🤖 **Rojo** (advisor), contra la fixture:
@@ -167,7 +165,7 @@
 
 ## Fase 9: Eval `encaje_icp` con jev (Paso 8)
 
-**Bloqueada por:** D8 y D10, y P6.
+**Bloqueada por:** D8 y D10. Piso = `umbral` 0.70 (P6).
 
 - [ ] T040 [Paso 8] 🤖 **Rojo:** `evals/tests/test_runner.py::test_encaje_icp_con_jev_iguala_o_supera_baseline_004`. Con un juez falso que puntúa por debajo del baseline, el runner sale ≠ 0. Sin `--motivo`, `--actualizar-baseline` sale ≠ 0. **Mutaciones:** comparar con `>` en vez de `>=` contra el umbral 0.70; aceptar `--actualizar-baseline` sin `--motivo`.
 - [ ] T041 [Paso 8] 🧠 Advisor revisa T040. **APROBADO antes de T042.** Foco: el umbral no baja, k=3, y k=1 solo con `determinacion == 1.0`.
@@ -187,14 +185,14 @@
 
 - T001 → todo. T003 → todos los rojos. T005 (Daniel) → T024–T026 y la Fase 7.
 - Las Fases 2, 3 y 5 son independientes entre sí: tres leads en paralelo, en worktrees distintos.
-- La Fase 4 espera a P1 (vía NIT). La vía por nombre espera además a D5 y D11. Si no llegan, se corta (ver el orden de corte).
-- La Fase 6 necesita las Fases 2, 3 y 5 en verde (y la 4, si no se cortó), más P2, P3 y T005.
+- La Fase 4 vía NIT ya tiene P1. La vía por nombre espera además a D5 y D11. Si no llegan, se corta (ver el orden de corte).
+- La Fase 6 necesita las Fases 2, 3 y 5 en verde (y la 4, si no se cortó), más T005.
 - La Fase 7 necesita T026. La Fase 8 necesita la Fase 7 y D9. La Fase 9 solo necesita D8, D10 y la Fase 5 (hasta D10, `JevFalso` por P8).
 - Dentro de cada fase, los rojos marcados [P] se escriben en paralelo. El verde arranca después del APROBADO.
 
 ## Orden de corte (`spec.md:165-170`)
 
-Si no alcanza el tiempo, se corta en este orden. P11 (propuesta: sí, se mantiene) está pendiente de Daniel.
+Si no alcanza el tiempo, se corta en este orden. P11: Daniel decidió mantenerlo.
 
 1. **`sitio_web` (Fase 3).** Sin él, `contactable` sale solo de los canales que ya trajo la 003.
 2. **`croma_rues_co` (Fase 4).** Sin él, ningún `desconocido` sube a `juridica`. Más leads quedan `persona_natural`, que es lo seguro.

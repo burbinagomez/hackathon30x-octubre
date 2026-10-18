@@ -2,7 +2,7 @@
 
 **Branch**: `feature/006-enriquecedor-contactable` | **Date**: 2026-10-17 | **Spec**: [spec.md](./spec.md)
 
-> Re-verificado contra `origin/main` en **550928d** (merge del PR #40, `feature/005-api`), que es posterior al 5584710 (#39) que se pidió. Entre los dos solo entraron la autenticación con Supabase Auth y `GET /usuarios/me`; no entró ninguna migración. La spec da por hechas cosas de la 002, la 003, la 004 y la 005 que **todavía no están en `main`**. Cada una tiene un ID (D1…D11) en "Dependencias externas", con el estado leído del árbol, no de los planes. Una tarea que depende de una D ausente queda bloqueada hasta que llegue la D o hasta que Daniel apruebe la propuesta que la resuelve dentro de la 006. No se reimplementa acá lo que es de otro slice.
+> Re-verificado contra `origin/main` en **550928d** (merge del PR #40, `feature/005-api`), que es posterior al 5584710 (#39) que se pidió. Entre los dos solo entraron la autenticación con Supabase Auth y `GET /usuarios/me`; no entró ninguna migración. La spec da por hechas cosas de la 002, la 003, la 004 y la 005 que **todavía no están en `main`**. Cada una tiene un ID (D1…D11) en "Dependencias externas", con el estado leído del árbol, no de los planes. Una tarea que depende de una D ausente queda bloqueada hasta que llegue la D o salvo que una decisión de Daniel (Pn) la resuelva dentro de la 006. No se reimplementa acá lo que es de otro slice.
 >
 > **La migración es la 0008.** La spec (`spec.md:151` y `:158`) nombra `0005_enriquecimiento.sql`, pero ese número quedó viejo. En `main` están la 0001, 0002, 0003, 0005 (`validar_checks_leads`) y 0006 (`libro_costos_busqueda`, #38). La 0007 queda reservada para la 012. El DDL de abajo es una **propuesta**: no existe ningún archivo en `supabase/migrations/` hasta que Daniel lo apruebe.
 >
@@ -46,7 +46,7 @@ Estado verificado con `git show origin/main:<ruta>` y `rg` sobre **550928d**, mi
 | ID | Qué necesita la 006 | De qué slice | ¿En `main`? | Evidencia | Qué bloquea |
 |---|---|---|---|---|---|
 | D1 | Puerto `RepositorioLeads` y tabla `leads` con `tipo_titular` | 002/003 | ✅ Sí | `descubrimiento/dominio/puertos.py`; 0002 y 0003 | Nada: se extiende |
-| D2 | `RegistroCostos` y `costos.tipo` con `web_fetch`, `jev_tokens`, `croma_consulta` | 002 | ✅ Sí | `costos/dominio/puertos.py`; CHECK de 0002 | Nada: no hace falta tocar el CHECK de `tipo` (P9 sí pide una columna, ver abajo) |
+| D2 | `RegistroCostos` y `costos.tipo` con `web_fetch`, `jev_tokens`, `croma_consulta` | 002 | ✅ Sí | `costos/dominio/puertos.py`; CHECK de 0002 | Nada: no hace falta tocar el CHECK de `tipo` ni sumar columnas (P9) |
 | D3 | `Cifrador` y `catalogo_sensibles` | 003 | ⚠ Parcial | `seguridad/cifrado.py`. El catálogo solo tiene `nombre`/`direccion` | Fase 6. Se resuelve si se aprueba P3 (la 0008 suma `telefono`/`email` al catálogo) |
 | D4 | Columnas de contacto cifradas, `telefono_canal` / `email_canal` y el tipo `CanalPublicado` | 003 | ❌ No | `leads` en `main` no tiene ninguna; el `Lead` del dominio tampoco | Fases 6, 7 y 8. Se resuelve si se aprueba P3 |
 | D5 | `nombre_normalizado` y `web_canal` (`normalizar_dominio`) | 003 | ❌ No | `leads` tiene `web`, pero no `web_canal` ni `nombre_normalizado` | Fase 4 por nombre. Fase 6 usa `web` mientras tanto |
@@ -145,7 +145,7 @@ Son dos puertos y no un `Enriquecedor` genérico porque los dos adaptadores reci
 - `follow_redirects=False` con un loop manual de hasta 3 saltos; el 4.º lanza `DemasiadasRedirecciones`.
 - Lee el stream por chunks y corta en 2 MB.
 - Extrae `mailto:`, `wa.me/` y teléfonos con regex. `wa.me` entra como `whatsapp_comercial` y gana sobre el teléfono plano.
-- Registra `web_fetch` por request real, robots incluido. Cuando el SSRF o robots cortan, la propuesta P9 (pendiente de Daniel) es una fila con costo 0 y el motivo.
+- Registra `web_fetch` solo por request real, robots incluido (P9). El corte por SSRF no hace request y no registra costo; no hay fila con costo 0 ni columna nueva en `costos`.
 
 **`croma_rues_co`.**
 - Busca por `nombre_normalizado`, filtra por ciudad en local y agrupa por NIT.
@@ -175,8 +175,8 @@ Son dos puertos y no un `Enriquecedor` genérico porque los dos adaptadores reci
 
 > **PENDIENTE DE APROBACIÓN DE DANIEL.** Esto es una propuesta dentro del plan. No se crea `supabase/migrations/0008_enriquecimiento.sql` hasta que Daniel apruebe este DDL. La spec dice `0005`. En `main` están 0001, 0002, 0003, 0005 y 0006, y la **0007 queda reservada para la 012**. Si al momento de T001 hay otra migración mergeada, se usa el siguiente número libre.
 
-- `costos.tipo` **no cambia**: su CHECK ya admite las tres operaciones (D2). La columna `motivo` de P9 no está en este DDL; ver la nota de P9.
-- Las columnas de contacto y `v_leads_icp` entran acá **solo si se aprueban P3 y P2**. Sin esa aprobación, esas partes se sacan y vuelven a depender de D4/D6.
+- `costos.tipo` **no cambia**: su CHECK ya admite las tres operaciones (D2). P9 no suma columnas a `costos`.
+- Las columnas de contacto y `v_leads_icp` entran acá porque Daniel aprobó P3 y P2.
 - `con_telefono` cuenta la **etiqueta** `telefono_canal`, nunca el dato.
 - Igual que la 0006, sin `BEGIN`/`COMMIT` propios.
 
@@ -189,7 +189,7 @@ ALTER TABLE public.leads
   ADD COLUMN razon_no_contactable text        NULL,
   ADD COLUMN encaje               text        NULL,
   ADD COLUMN enriquecido_en       timestamptz NULL,
-  -- P3 (propuesta): contacto cifrado como nombre/direccion en la 0003. La app cifra (AES-GCM); SQL no.
+  -- P3 (decidido): contacto cifrado como nombre/direccion en la 0003. La app cifra (AES-GCM); SQL no.
   ADD COLUMN telefono_cifrado     bytea       NULL,
   ADD COLUMN email_cifrado        bytea       NULL,
   ADD COLUMN telefono_canal       text        NULL,
@@ -220,13 +220,13 @@ ALTER TABLE public.leads
     CHECK ((telefono_canal IS NULL) = (telefono_cifrado IS NULL)
        AND (email_canal    IS NULL) = (email_cifrado    IS NULL));
 
--- P5 (propuesta): la descripción del ICP vive en la búsqueda.
+-- P5 (decidido): la descripción del ICP vive en la búsqueda.
 ALTER TABLE public.busquedas ADD COLUMN descripcion_icp text NULL;
 
 -- sin_enriquecer() filtra por esto en cada corrida.
 CREATE INDEX leads_sin_enriquecer ON public.leads (tenant_id) WHERE enriquecido_en IS NULL;
 
--- P2 (propuesta): v_leads_icp la crea la 006. Una fila por aparición del lead en una fuente.
+-- P2 (decidido): v_leads_icp la crea la 006. Una fila por aparición del lead en una fuente.
 -- encaje IS NULL (sin enriquecer) sigue entrando: la 006 solo resta lo que jev marcó no_encaja.
 CREATE VIEW public.v_leads_icp WITH (security_invoker = true) AS
   SELECT lf.fuente, lf.lead_id, lf.busqueda_id
@@ -349,18 +349,18 @@ supabase/migrations/0008_enriquecimiento.sql                   # SOLO después d
 
 ## Preguntas de producto abiertas
 
-Cada una dice qué bloquea. La columna "Propuesta" es **una propuesta pendiente de Daniel**, no una decisión: nada de lo que depende de ella se implementa hasta que Daniel la apruebe. Los "Ojo" marcan dónde la propuesta choca con el árbol actual.
+Cada una dice qué bloquea. Daniel las decidió el 2026-10-17 ("sí a todo", con P6 y P9 precisadas); la columna "Decisión" es la versión final. Los "Ojo" marcan dónde la decisión toca el árbol actual. El DDL de la 0008 sigue PENDIENTE DE APROBACIÓN DE DANIEL (T005).
 
-| # | Pregunta | Bloquea | Propuesta (pendiente de Daniel) |
+| # | Pregunta | Bloquea | Decisión (Daniel, 2026-10-17) |
 |---|---|---|---|
 | P1 | `fuentes.yaml` configura `croma_rues_co` con `/co/rues/entity-by-nit/v1` (búsqueda por NIT). La spec busca por `nombre_normalizado` porque los leads de OSM no traen NIT. ¿Croma expone un endpoint de RUES por nombre? ¿Se cambia el endpoint, o el adaptador solo verifica leads que ya tienen NIT? | Fase 4 | Por NIT cuando el lead lo tiene; por nombre si no. La vía por nombre espera a D5 y a confirmar que Croma tiene un endpoint de RUES por nombre. |
 | P2 | `v_leads_icp` y la columna `icp` son de la 005 y no están en `main`. ¿La 006 espera a que lleguen, o crea `v_leads_icp` ella misma (y entonces con qué definición de ICP)? | Fases 6 y 7 | `v_leads_icp` la crea la 006, en la 0008 (ver DDL). ICP = lead cuyo `encaje` no es `no_encaja`. |
 | P3 | Las columnas de contacto cifradas, `telefono_canal`/`email_canal` y `CanalPublicado` son de la 003 y no están en `main`. ¿Se espera a la 003, o la 006 las agrega en la 0008? | Fases 2, 6, 7 y 8 | Las columnas de contacto las agrega la 006 en la 0008, cifradas como en la 0003 (`bytea`, AES-GCM en la app, CHECK de `octet_length > 28`). |
 | P4 | `croma_supersociedades_detalle_co` está `habilitado: true` en `fuentes.yaml`, y la spec dice que sigue OFF y fuera de alcance. ¿Cuál vale? | Fase 1 (config) | `croma_supersociedades_detalle_co` apagado (`habilitado: false`) en T001. |
 | P5 | ¿Dónde vive la descripción del ICP que recibe `jev_classify`? `busquedas` tiene solo `criterios jsonb`. ¿Es una clave dentro de `criterios`, una columna nueva o algo que escribe el operador en el front? | Fase 5 (caso de uso) | La descripción del ICP vive en `busquedas`: columna `descripcion_icp text NULL` en la 0008. |
-| P6 | El baseline de `encaje_icp` de la 004 no existe en `main` (no hay dataset etiquetado ni `baseline.json`). ¿La 006 espera al baseline del juez Claude, o fija directamente el primero con jev, y contra qué piso se compara entonces? | Fase 9 | Piso provisional = el corte de `evals.yaml` (0.5) hasta la corrida real. **Ojo:** en el diseño de evals, 0.5 es el `corte` (probabilidad a partir de la cual se cuenta `encaja`), no el piso; el piso agregado es `umbral` (0.70). Y `evals.yaml` todavía no existe en `main` (D8). Daniel confirma cuál de los dos quiso decir. |
+| P6 | El baseline de `encaje_icp` de la 004 no existe en `main` (no hay dataset etiquetado ni `baseline.json`). ¿La 006 espera al baseline del juez Claude, o fija directamente el primero con jev, y contra qué piso se compara entonces? | Fase 9 | El piso es el `umbral` 0.70 (no el `corte` 0.5, que es la probabilidad a partir de la cual se cuenta `encaja`). **Ojo:** `evals.yaml` todavía no existe en `main` (D8). |
 | P7 | Subir un lead de `desconocido` a `juridica` obliga, por los CHECKs de 0003/0005, a guardar `nombre` y `direccion` en claro. Es una decisión de privacidad: ¿se acepta el paso a claro automático por un match único de RUES, o se requiere otra señal? | Fase 6 | Sí, en claro al confirmarse jurídica, con registro en `cumplimiento`. **Ojo:** `cumplimiento` tiene `UNIQUE(lead_id)` y el descubrimiento ya inserta la fila de cada lead (`repositorio_leads.py:21`): es un UPDATE de esa fila en la misma transacción, no una fila nueva. |
 | P8 | ¿Cómo se invoca `jev-code` en producción (Railway): binario en la imagen, servicio HTTP de TypeSafe, o solo local? ¿Qué credencial usa y quién la carga? | Fase 9 y despliegue | `JevFalso` hasta que Daniel defina el acceso real. Fase 9 sigue bloqueada por D10. |
-| P9 | ¿Se registra un `web_fetch` cuando el SSRF o robots.txt cortan el fetch del sitio? robots.txt es un request real; el corte por SSRF no hace ningún request. | Fase 3 (costos) | Fila en `costos` con costo 0 y el motivo. **Ojo:** `costos` no tiene columna `motivo`. Hace falta sumarla a la 0008 (`motivo text NULL`) o elegir otro lugar; Daniel decide antes de T011/T014. |
+| P9 | ¿Se registra un `web_fetch` cuando el SSRF o robots.txt cortan el fetch del sitio? robots.txt es un request real; el corte por SSRF no hace ningún request. | Fase 3 (costos) | Solo se registra costo cuando hay request real, robots.txt incluido. El corte por SSRF no registra nada. Sin columna nueva en `costos`. |
 | P10 | ¿`sitio_web` corre también para leads `natural`/`desconocido`? No los vuelve contactables, pero gasta un request y guarda contacto cifrado de una persona natural. | Fase 6 | No: `sitio_web` corre solo para jurídicas (también las que suben a jurídica en la misma corrida). |
 | P11 | Si no alcanza el tiempo, la spec propone cortar en el orden `sitio_web`, después `croma_rues_co`, después `jev` y `contactable` sobre lo que haya. ¿Se mantiene ese orden para la demo, dado que D4–D6 tampoco están? | Orden de corte | Sí, se mantiene el orden de corte. |
