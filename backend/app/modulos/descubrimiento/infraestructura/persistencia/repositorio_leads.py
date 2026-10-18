@@ -39,17 +39,31 @@ _SQL_BUSQUEDAS = text("""
            b.criterios->>'ciudad' AS ciudad,
            (SELECT count(DISTINCT lf.lead_id) FROM lead_fuentes lf WHERE lf.busqueda_id = b.id) AS total_leads
     FROM busquedas b ORDER BY b.creado_en DESC, b.id""")
-_SQL_TOTAL_LEADS = text("SELECT count(DISTINCT lead_id) FROM lead_fuentes WHERE busqueda_id = :b")
-_SQL_LEADS = text("""
+# Una sola consulta con tres alcances (una búsqueda, una fuente en todas las búsquedas, o todo): cambia solo el filtro.
+# Los filtros son constantes de este módulo, nunca texto del request; el valor viaja como parámetro.
+_FILTRO_BUSQUEDA = "lf.busqueda_id = :b"
+_FILTRO_FUENTE = "l.id IN (SELECT lead_id FROM lead_fuentes WHERE fuente = :f)"
+_FILTRO_TODOS = "TRUE"
+_DESDE = "FROM leads l JOIN lead_fuentes lf ON lf.lead_id = l.id WHERE "
+
+
+def _sql_total(filtro: str):
+    return text(f"SELECT count(DISTINCT l.id) {_DESDE}{filtro}")
+
+
+def _sql_leads(filtro: str):
+    return text(f"""
     SELECT l.id, CASE WHEN l.tipo_titular = 'juridica' THEN l.nombre END AS nombre, l.tipo_titular, l.ciudad,
            l.web IS NOT NULL AS tiene_web, array_agg(lf.fuente ORDER BY lf.fuente) AS fuentes,
            array_agg(lf.licencia ORDER BY lf.fuente) AS licencias
-    FROM leads l JOIN lead_fuentes lf ON lf.lead_id = l.id
-    WHERE lf.busqueda_id = :b
+    {_DESDE}{filtro}
     GROUP BY l.id ORDER BY l.creado_en, l.id LIMIT :limite OFFSET :desde""")
-_SQL_ATRIBUCIONES = text("""
+
+
+def _sql_atribuciones(filtro: str):
+    return text(f"""
     SELECT a.fuente, a.texto, a.url FROM v_atribuciones a
-    WHERE a.fuente IN (SELECT fuente FROM lead_fuentes WHERE busqueda_id = :b) ORDER BY a.orden""")
+    WHERE a.fuente IN (SELECT lf.fuente {_DESDE}{filtro}) ORDER BY a.orden""")
 
 
 class RepositorioLeadsPostgres:
@@ -178,14 +192,26 @@ class RepositorioLeadsPostgres:
                                 ciudad=f.ciudad, total_leads=f.total_leads) for f in filas]
 
     def listar_leads(self, busqueda_id: UUID, pagina: int, tamano: int) -> PaginaLeads | None:
-        """None si la búsqueda no existe para este tenant. Nunca lee las columnas cifradas ni descifra: el nombre sale
-        solo de una jurídica (el CASE lo repite aunque el CHECK ya lo garantice), y no hay dirección ni contacto."""
+        """None si la búsqueda no existe para este tenant."""
         with self._uow() as c:
             if c.execute(text("SELECT 1 FROM busquedas WHERE id = :id"), {"id": busqueda_id}).first() is None:
                 return None
-            total = c.execute(_SQL_TOTAL_LEADS, {"b": busqueda_id}).scalar_one()
-            filas = c.execute(_SQL_LEADS, {"b": busqueda_id, "limite": tamano, "desde": (pagina - 1) * tamano}).all()
-            atribuciones = c.execute(_SQL_ATRIBUCIONES, {"b": busqueda_id}).all()
+            return self._pagina(c, _FILTRO_BUSQUEDA, {"b": busqueda_id}, pagina, tamano)
+
+    def listar_leads_de_fuente(self, fuente: str | None, pagina: int, tamano: int) -> PaginaLeads:
+        """Leads de una fuente en todas las búsquedas del tenant; sin fuente, todos. Que la fuente exista lo valida la API."""
+        with self._uow() as c:
+            if fuente is None:
+                return self._pagina(c, _FILTRO_TODOS, {}, pagina, tamano)
+            return self._pagina(c, _FILTRO_FUENTE, {"f": fuente}, pagina, tamano)
+
+    @staticmethod
+    def _pagina(c: Connection, filtro: str, params: dict, pagina: int, tamano: int) -> PaginaLeads:
+        """Nunca lee las columnas cifradas ni descifra: el nombre sale solo de una jurídica (el CASE lo repite aunque el
+        CHECK ya lo garantice), y no hay dirección ni contacto. El tenant lo filtra la RLS."""
+        total = c.execute(_sql_total(filtro), params).scalar_one()
+        filas = c.execute(_sql_leads(filtro), {**params, "limite": tamano, "desde": (pagina - 1) * tamano}).all()
+        atribuciones = c.execute(_sql_atribuciones(filtro), params).all()
         items = tuple(LeadListado(
             id=f.id, nombre=f.nombre, tipo_titular=f.tipo_titular, fuentes=tuple(f.fuentes), licencias=tuple(f.licencias),
             ciudad=f.ciudad, tiene_web=f.tiene_web) for f in filas)

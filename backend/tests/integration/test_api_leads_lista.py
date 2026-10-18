@@ -122,3 +122,39 @@ def test_sin_logs_de_datos_de_leads(datos, caplog):
     _leads(datos, "a", datos["ba"], tamano=100)
 
     assert "Acme" not in caplog.text and NOMBRE_NATURAL not in caplog.text
+
+
+def _de_fuente(d, quien, **query):
+    return d["api"].get("/leads", params=query, headers=_bearer(d["u"][quien]))
+
+
+def test_leads_de_una_fuente(datos):
+    r = _de_fuente(datos, "a", fuente="osm_overpass", tamano=100)
+
+    assert r.status_code == 200
+    j = r.json()
+    assert j["total"] == 4 and "Ajena SAS" not in r.text  # los 4 jurídicos de A; el de B no
+    assert NOMBRE_NATURAL not in r.text and DIRECCION_NATURAL not in r.text
+    assert all(set(i) == CLAVES_DEL_ITEM for i in j["items"])
+    assert all(i["tipo_titular"] == "juridica" for i in j["items"])
+
+
+def test_leads_sin_fuente_son_todos_los_del_tenant_y_sin_naturales_con_nombre(datos):
+    r = _de_fuente(datos, "a", tamano=100)
+
+    assert r.status_code == 200 and r.json()["total"] == 5
+    assert "Ajena SAS" not in r.text and NOMBRE_NATURAL not in r.text
+    assert next(i for i in r.json()["items"] if i["tipo_titular"] == "natural")["nombre"] is None
+    assert _de_fuente(datos, "b").json()["total"] == 1  # B ve lo suyo
+
+
+def test_fuente_desconocida_es_422(datos):
+    r = _de_fuente(datos, "a", fuente="google_places")
+
+    assert r.status_code == 422
+    assert r.json() == {"errores": [{"campo": "fuente", "codigo": "desconocida"}]}
+
+
+@pytest.mark.parametrize("query", [{"tamano": 101}, {"pagina": 0}])
+def test_leads_de_fuente_parametros_fuera_de_rango_son_422(datos, query):
+    assert _de_fuente(datos, "a", fuente="osm_overpass", **query).status_code == 422

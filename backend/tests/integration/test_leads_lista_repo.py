@@ -113,3 +113,31 @@ def test_atribuciones_solo_de_la_busqueda(mundo):
     assert [a.fuente for a in p.atribuciones] == [OSM, RUES]  # CS no tiene atribución; orden de la vista
     assert p.atribuciones[0].texto == "© OpenStreetMap contributors"
     assert p.atribuciones[0].url == "https://www.openstreetmap.org/copyright"
+
+
+def test_leads_de_una_fuente_de_todas_las_busquedas_del_tenant(mundo):
+    r = mundo["repo"]
+    # Un lead de OSM en la segunda búsqueda: aparece en /leads?fuente=osm aunque venga de otra búsqueda.
+    e = _empresa("Gamma SAS", OSM, "900000005")
+    lead, _ = r.obtener_o_crear_lead(e, "lic-" + OSM)
+    r.agregar_lead_fuente(lead, mundo["b2"], e, "lic-" + OSM)
+
+    p = r.listar_leads_de_fuente(OSM, 1, 25)
+
+    assert p.total == 2 and {i.id for i in p.items} == {mundo["j"], lead}  # no la natural, no CS, no el tenant B
+    assert set(_por_id(p)[mundo["j"]].fuentes) == {OSM, RUES}  # el lead conserva todas sus fuentes
+    assert [a.fuente for a in p.atribuciones] == [OSM, RUES]
+
+
+def test_sin_fuente_son_todos_los_leads_del_tenant(mundo):
+    p = mundo["repo"].listar_leads_de_fuente(None, 1, 2)
+
+    assert (p.total, len(p.items)) == (3, 2)  # el lead de B no cuenta
+    assert NOMBRE_NATURAL not in repr(p) and DIRECCION_NATURAL not in repr(p)
+    assert mundo["otro"].listar_leads_de_fuente(None, 1, 25).total == 1
+
+
+def test_fuente_sin_leads_es_pagina_vacia(mundo):
+    p = mundo["repo"].listar_leads_de_fuente("croma_siem_mx", 1, 25)
+
+    assert (p.total, p.items, p.atribuciones) == (0, (), ())
