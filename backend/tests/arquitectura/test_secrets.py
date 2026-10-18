@@ -82,8 +82,9 @@ def test_app_arranca_con_entorno_limpio(entorno, database_url):
     _arrancar()
 
 
-def test_dockerfile_web_solo_recibe_vite_api_url():
+def test_dockerfile_web_solo_recibe_variables_publicas():
     # Railway solo pasa al build lo declarado como ARG: lo único que puede llegar al bundle.
+    # La publishable key de Supabase es pública por diseño (spec 005); la service_role nunca.
     lineas = DOCKERFILE_WEB.read_text().splitlines()
     args = {l.split()[1].split("=")[0] for l in lineas if l.strip().upper().startswith("ARG ")}
-    assert args == {"VITE_API_URL"}
+    assert args == {"VITE_API_URL", "VITE_SUPABASE_URL", "VITE_SUPABASE_PUBLISHABLE_KEY"}
