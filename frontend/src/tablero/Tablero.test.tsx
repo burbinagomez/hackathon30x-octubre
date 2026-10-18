@@ -164,3 +164,8 @@ test("costo_y_cpl_en_ingles_con_moneda_del_idioma", async () => {
   expect(celda(en.fuentes.croma_supersociedades_co, t.cpl_real)).toBe(monto("en", "0.2375"));
   expect(celda(en.fuentes.sin_atribuir, t.cpl_lista)).toBe("—");
 });
+
+test("enlaza_a_ver_busquedas", async () => {
+  await montar(respuestaTablero());
+  expect(screen.getByRole("link", { name: "Ver búsquedas" })).toHaveAttribute("href", "/busquedas");
+});

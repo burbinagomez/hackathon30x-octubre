@@ -82,7 +82,8 @@
     "revisiones_pendientes": "Revisiones pendientes: {{n}}",
     "atribucion": "Atribución de datos",
     "desperdicio_real": "Desperdicio (real)",
-    "error": "No se pudo cargar el tablero. Probá de nuevo."
+    "error": "No se pudo cargar el tablero. Probá de nuevo.",
+    "ver_busquedas": "Ver búsquedas"
   },
   "idioma": {
     "etiqueta": "Idioma",
@@ -104,6 +105,46 @@
       "MX": "Estado",
       "BR": "Estado",
       "PE": "Departamento"
+    }
+  },
+  "leads": {
+    "titulo_busquedas": "Búsquedas",
+    "titulo_leads": "Leads de la búsqueda",
+    "sin_busquedas": "Todavía no hay búsquedas.",
+    "sin_leads": "Esta búsqueda no trajo leads.",
+    "error_busquedas": "No se pudieron cargar las búsquedas.",
+    "error_leads": "No se pudieron cargar los leads. Probá de nuevo.",
+    "no_encontrada": "No se encontró la búsqueda.",
+    "resumen_busqueda": "{{pais}} · {{lugar}} · {{fecha}} · {{estado}} · {{total}} leads",
+    "departamento": "Dpto. {{codigo}}",
+    "todo_el_pais": "Todo el país",
+    "volver": "Volver a búsquedas",
+    "natural_protegida": "Persona natural (datos protegidos)",
+    "nombre": "Nombre",
+    "tipo": "Tipo",
+    "fuentes": "Fuentes",
+    "ciudad": "Ciudad",
+    "web": "Sitio web",
+    "telefono": "Teléfono",
+    "email": "Correo",
+    "licencia": "Licencia",
+    "si": "Sí",
+    "no": "No",
+    "anterior": "Anterior",
+    "siguiente": "Siguiente",
+    "pagina_de": "Página {{pagina}} de {{paginas}}",
+    "total": "{{total}} leads",
+    "tipo_titular": {
+      "juridica": "Persona jurídica",
+      "natural": "Persona natural",
+      "desconocido": "Sin determinar"
+    },
+    "estado": {
+      "creada": "Creada",
+      "borrador": "Borrador",
+      "ejecutando": "Ejecutando",
+      "terminada": "Terminada",
+      "con_errores": "Con errores"
     }
   }
 }

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import Enlace from "../compartido/Enlace";
+import { RUTA_BUSQUEDAS } from "../compartido/rutas";
 import { entero, moneda } from "../compartido/formato";
 import { obtenerTablero } from "./api";
 import type { FilaTablero, Tablero as DatosTablero } from "./tipos";
@@ -63,6 +65,7 @@ export default function Tablero() {
   return (
     <main className="pantalla pantalla-ancha">
       <h1>{t("tablero.titulo")}</h1>
+      <Enlace a={RUTA_BUSQUEDAS}>{t("tablero.ver_busquedas")}</Enlace>
       <div className="tabla-scroll">
       <table>
         <thead>

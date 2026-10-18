@@ -1,8 +1,10 @@
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useState, type ComponentType, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import Login from "./acceso/Login";
 import { configuracionValida } from "./api/supabase";
 import NuevaBusqueda from "./busqueda/NuevaBusqueda";
+import LeadsDeBusqueda from "./leads/LeadsDeBusqueda";
+import ListaBusquedas from "./leads/ListaBusquedas";
 import { aplicarIdioma } from "./compartido/idioma";
 import SelectorIdioma from "./compartido/SelectorIdioma";
 import Tablero from "./tablero/Tablero";
@@ -13,7 +15,18 @@ const RUTAS: Record<string, ComponentType> = {
   "/login": Login,
   "/busqueda/nueva": NuevaBusqueda,
   "/tablero": Tablero,
+  "/busquedas": ListaBusquedas,
 };
+
+// Solo un uuid: lo que no lo es no es una ruta (el id acaba en la URL de la API).
+const LEADS_DE_BUSQUEDA = /^\/busquedas\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/leads$/;
+
+function resolver(ruta: string): ReactElement | null {
+  const Pantalla = RUTAS[ruta];
+  if (Pantalla) return <Pantalla />;
+  const id = LEADS_DE_BUSQUEDA.exec(ruta)?.[1];
+  return id ? <LeadsDeBusqueda key={id} id={id} /> : null;
+}
 
 function Salud() {
   const { t } = useTranslation();
@@ -45,8 +58,8 @@ export default function App() {
   }, []);
 
   if (!configuracionValida) return <main className="pantalla pantalla-tarjeta aviso" role="alert">{t("config.incompleta")}</main>;
-  const Pantalla = RUTAS[ruta];
-  if (!Pantalla) return <Salud />;
+  const pantalla = resolver(ruta);
+  if (!pantalla) return <Salud />;
   return (
     <>
       {/* Login lleva su propio selector. */}
@@ -55,7 +68,7 @@ export default function App() {
           <SelectorIdioma />
         </div>
       )}
-      <Pantalla />
+      {pantalla}
     </>
   );
 }

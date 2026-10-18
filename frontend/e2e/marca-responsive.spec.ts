@@ -7,6 +7,8 @@ const RUTAS = [
   { ruta: "/login", listo: (page: Page) => page.getByRole("heading", { level: 1 }) },
   { ruta: "/busqueda/nueva", listo: (page: Page) => page.getByRole("heading", { level: 1 }) },
   { ruta: "/tablero", listo: (page: Page) => page.getByRole("heading", { level: 1 }) },
+  { ruta: "/busquedas", listo: (page: Page) => page.getByRole("heading", { level: 1 }) },
+  { ruta: "/busquedas/11111111-1111-4111-8111-111111111111/leads", listo: (page: Page) => page.getByRole("heading", { level: 1 }) },
 ];
 
 // Sin spread de devices[...]: traen defaultBrowserType "webkit" y el único proyecto es chromium.
