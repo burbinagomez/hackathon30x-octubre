@@ -9,7 +9,7 @@ Para fijar un baseline con valores que el runner no dejaría escribir (agregado 
 lo fija con `--actualizar-baseline` y después reescribe `agregado`/`determinacion` dejando el fingerprint que
 calculó el runner: así no importa `evals.fingerprint` (no existe hasta T012).
 
-Rojo hasta T012: `run.main` es un stub que devuelve 99 y no imprime nada; cada test falla en su primer assert.
+Nacieron en rojo contra el stub de T009 (devolvía 99 sin imprimir); verdes desde T012.
 """
 import json
 import uuid
@@ -22,9 +22,6 @@ import yaml
 from evals import run
 from evals.jueces.falso import JuezFalso
 from evals.jueces.puerto import SalidaJuezInvalida
-
-pytestmark = pytest.mark.xfail(strict=True, raises=AssertionError,
-                               reason="rojo hasta T012: run.main es un stub que devuelve 99")
 
 ENTORNO = {"ANTHROPIC_API_KEY": "falsa-no-real", "DATABASE_URL": "postgresql://localhost/sintetica"}
 ENCAJE = "encaje_icp"
