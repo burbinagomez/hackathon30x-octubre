@@ -106,7 +106,7 @@ Arma el ciclo de PRD §6b: casos → agente → scorers → baseline → verde/r
 - `::test_actualizar_baseline_solo_si_pasa_umbrales`: con un eval bajo su umbral, `--actualizar-baseline` sale 1 y no escribe.
 - `::test_actualizar_baseline_rechaza_regresion_sin_motivo`: baseline 0.85, corrida 0.75, umbral 0.70, mismo fingerprint → `--actualizar-baseline` sale 1 y no escribe. Con `--motivo "…"` escribe, y el baseline guarda el motivo. Lo mismo si baja la `determinacion`.
 - `::test_determinacion_excluye_casos_fallidos_por_forma`: 2 casos fallan por forma y 2 corren el juez con resultados `[pasa, pasa, pasa]` y `[pasa, falla, pasa]` → `determinacion == 0.5` (denominador = casos juzgados) y `agregado == 0.25` (denominador = todos los casos). Sin casos juzgados, `determinacion` es `null` y no habilita k=1.
-- `::test_sin_api_key_sale_2_sin_llamar` y `::test_sin_tenant_sale_2_sin_llamar`: la fábrica del juez no se invoca y `costos` no recibe filas.
+- `::test_sin_entorno_sale_2_sin_llamar` (parametrizado: sin `ANTHROPIC_API_KEY` y sin `DATABASE_URL`) y `::test_sin_tenant_sale_2_sin_llamar`: la fábrica del juez no se invoca y `costos` no recibe filas.
 
 **Exportación** (`backend/tests/unit/evals/test_exportar_candidatos.py`, con repositorio falso)
 - `::test_aplica_whitelist`: un lead con email, teléfono, web y NIT sale sin ninguno; un lead de Croma sale sin `nombre`, con `id = c-` + 12 hex, y ese id **no** es `sha256(pais:nit)[:12]`. Exportar dos veces el mismo lead da dos ids distintos, lo que prueba que el id no sale del NIT; un lead de OSM con `tipo_titular == "juridica"` sale con `nombre`; uno de OSM con `desconocido` sale sin `nombre`.
@@ -143,10 +143,10 @@ Arma el ciclo de PRD §6b: casos → agente → scorers → baseline → verde/r
 - `tipo_titular` se guarda en el caso solo para esa regla.
 
 **Juez:**
-- `JuezClaude` usa el SDK `anthropic` con `http_client` de `httpx` (inyectable para `MockTransport`), el modelo `claude-sonnet-5-5` pineado en `evals.yaml` y salida forzada por herramienta (`tool_choice` con `input_schema`). Temperatura 0; el ruido que queda lo absorbe PASS^3.
+- `JuezClaude(registro_costos, tarifa, modelo, prompt, lote_id, api_key, http_client)` habla `httpx` directo contra `POST /v1/messages`, sin SDK (decisión del dueño en T017). El `httpx.Client` es inyectable para `MockTransport`, y el juez pone `x-api-key` y `anthropic-version` en cada request. Usa el modelo `claude-sonnet-5-5` pineado en `evals.yaml` y salida forzada por herramienta (`tool_choice` con `input_schema`). Temperatura 0; el ruido que queda lo absorbe PASS^3.
 - Los prompts son archivos `.md` versionados (`encaje_v1.md`, `mensaje_v1.md`). Cambiar un prompt es crear `_v2` o editar el archivo; cualquiera de las dos cambia el fingerprint.
 - Los datos del caso van en el mensaje de usuario dentro de `<caso>…</caso>`, con `<` y `>` escapados. El system prompt dice que lo de adentro es dato. Los nombres de OSM son entrada no confiable.
-- `ANTHROPIC_API_KEY` sale del entorno; nunca se loguea.
+- `ANTHROPIC_API_KEY` la lee la composición (T019) del mapeo `entorno` de `main()` (default `os.environ`) y la pasa por constructor; el juez nunca lee el entorno. La key no aparece en logs, stdout/stderr, `repr` del juez ni en las excepciones (incluidas `__cause__`/`__context__`).
 
 **Mensaje para calibración y para la 007:** forma `{asunto, cuerpo, adjuntos: []}`. La 007 produce esa misma forma. Los scorers de forma del mensaje se mueven al dominio en la 007 (`plantilla`), porque la regla 7 es de producto; el scorer queda como un envoltorio. Una regla, un lugar.
 
@@ -159,13 +159,13 @@ Arma el ciclo de PRD §6b: casos → agente → scorers → baseline → verde/r
 
 **`baseline.json`** (por eval): `agregado`, `determinacion`, `k` (siempre 3), `n`, `fingerprint`, `fecha`, `motivo` (null salvo que se haya bajado el baseline).
 
-**Dependencias nuevas:** `anthropic` en el grupo `dev` (`evals/` no entra en la imagen de `api`); `pyyaml` en `dependencies` (la misma línea que declaran la 002 y la 012; el choque en `pyproject.toml`/`uv.lock` se resuelve en el merge).
+**Dependencias nuevas:** ninguna para el juez (`httpx` ya está; el SDK `anthropic` se sacó en T017); `pyyaml` en `dependencies` (la misma línea que declaran la 002 y la 012; el choque en `pyproject.toml`/`uv.lock` se resuelve en el merge).
 
 ## Plan de tareas (TDD, en orden)
 1. **Contrato `app` ↛ `evals`:** canario en rojo → contrato `forbidden` en `pyproject.toml` → verde.
 2. **Esquema y whitelist:** `test_dataset.py` contra fixtures en `tmp_path` en rojo → `esquema.py` → verde. El fixture con un teléfono en `notas` tiene que fallar. El **advisor revisa la whitelist y la regla del nombre** (es cumplimiento).
 3. **Scorers de forma:** los 10 tests en rojo → `scorers/forma.py` → verde.
-4. **Puerto `Juez` + `JuezFalso` + runner:** los 19 tests de `test_runner.py` en rojo → `run.py`, `config.py`, `fingerprint.py` → verde. El **advisor revisa PASS^3, determinación, k=1 y la comparación con el baseline** (son las fórmulas del eval).
+4. **Puerto `Juez` + `JuezFalso` + runner:** los 34 tests (27 funciones, algunas parametrizadas) de `test_runner.py` en rojo → `run.py`, `config.py`, `fingerprint.py` → verde. El **advisor revisa PASS^3, determinación, k=1 y la comparación con el baseline** (son las fórmulas del eval).
 5. **`JuezClaude`:** primero `test_todo_juez_recibe_registro_costos` en rojo sin stub; después un stub de `JuezClaude` sin `registro_costos` (rojo por el assert del constructor) y recién con el parámetro agregado, la firma completa; el stub devuelve `Veredicto(-1.0, "")`, fuera de rango, sin escribir costos; recién ahí los 5 tests con `MockTransport`, la suite de contrato y `test_juez_escribe_filas_llm_en_costos` en integración, en rojo por assert (0 requests capturados donde se espera 1, probabilidad fuera de rango, 0 filas). El advisor los revisa → verde.
 6. **Exportación:** `test_exportar_candidatos.py` en rojo → verde. Se corre contra la búsqueda real del 002/003.
 7. **Tarea humana — dataset (~20 min):** etiquetar 20–40 candidatos, con mínimo 5 por etiqueta, y pasarlos a `dataset.json`. `test_dataset_real_valida_contra_esquema` pasa de rojo a verde recién acá.
