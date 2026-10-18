@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from evals import run
+from evals.config import cargar
 from tests.anthropic_falso import CLAVE_FALSA, transporte
 from tests.evals_falso import CASOS, K, config
 from tests.falsos import RegistroCostosFalso
@@ -59,3 +60,15 @@ def test_composicion_invalida_sale_2_sin_llamar(tmp_path, capsys, tenant, modelo
                                             registro_costos=costos)
 
     assert (codigo, reporte, capturados, costos.filas) == (2, None, [], [])
+
+
+def test_evals_yaml_real_declara_encaje_icp():
+    """T022: la entrada versionada; el prompt existe y el modelo tiene tarifa (si no, componer sale 2)."""
+    ruta = Path(run.__file__).parent / "evals.yaml"
+    assert ruta.is_file()
+    cfg = cargar(ruta)["encaje_icp"]
+
+    assert cfg == {"juez": "claude", "modelo": "claude-sonnet-5-5", "prompt": "jueces/encaje_v1.md",
+                   "casos": "dataset.json", "k": 3, "corte": 0.5, "umbral": 0.70, "tolerancia": 0}
+    assert (ruta.parent / cfg["prompt"]).is_file()
+    assert cfg["modelo"] in run._tarifas_llm()

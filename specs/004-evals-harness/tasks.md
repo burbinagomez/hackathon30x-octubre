@@ -103,7 +103,7 @@
   - `::test_aplica_whitelist` (sin email, teléfono, web ni NIT; Croma sin `nombre`, `id = c-` + 12 hex distinto de `sha256(pais:nit)[:12]` y distinto en dos exportaciones; OSM `juridica` con `nombre`; OSM `desconocido` sin `nombre`);
   - `::test_candidatos_estan_gitignored`.
 - [x] T021 [US1] 🤖 **Verde:** `backend/evals/exportar_candidatos.py` (`--tenant`, `--busqueda`; escribe `backend/evals/dataset.candidatos.json` con `etiqueta: null`; `id` con `secrets.token_hex(6)`; `rango_ingresos` como bucket, nunca la cifra) y la línea `backend/evals/dataset.candidatos.json` en `.gitignore`.
-- [ ] T022 [US1] 🤖 `backend/evals/evals.yaml`, entrada `encaje_icp`: `juez: claude`, `modelo: claude-sonnet-5-5`, `prompt: jueces/encaje_v1.md`, `casos: dataset.json`, `k: 3`, `corte: 0.5`, `umbral: 0.70`, `tolerancia: 0`.
+- [x] T022 [US1] 🤖 `backend/evals/evals.yaml`, entrada `encaje_icp`: `juez: claude`, `modelo: claude-sonnet-5-5`, `prompt: jueces/encaje_v1.md`, `casos: dataset.json`, `k: 3`, `corte: 0.5`, `umbral: 0.70`, `tolerancia: 0`.
 
 ### Datos y primera corrida
 - [ ] T023 [US1] 🧑 Correr `uv run python -m evals.exportar_candidatos --tenant <id> --busqueda <id>` contra una búsqueda real del 002/003 (D4, D6).
