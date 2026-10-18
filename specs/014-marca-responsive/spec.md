@@ -68,7 +68,7 @@ El e2e de esta spec corre en `e2e.yml` contra Railway, después del deploy, junt
 ## Tema oscuro (enmienda 2026-10-18)
 Decisión de Daniel: el tema sigue la preferencia del sistema operativo (`prefers-color-scheme`), sin selector. Claro como hoy; oscuro con la marca Dapta. Reemplaza "Modo oscuro" de Fuera del alcance.
 
-- **Tokens semánticos** en `tokens.css`, definidos en `:root` para claro y redefinidos en `@media (prefers-color-scheme: dark)`: `--color-superficie`, `--color-texto`, `--color-borde`, `--color-acento-texto`, `--color-cabecera-fondo`, `--color-cabecera-texto`, `--color-foco`. Las seis variables de marca no cambian; se suma `--color-blanco: #FFFFFF`.
+- **Tokens semánticos** en `tokens.css`, definidos en `:root` para claro y redefinidos en `@media (prefers-color-scheme: dark)`: `--color-superficie`, `--color-texto`, `--color-borde`, `--color-acento-texto`, `--color-cabecera-fondo`, `--color-cabecera-texto`, `--color-foco`, `--color-sobre-acento` (texto sobre lima; `--color-oscuro` en ambos temas, para que `estilos.css` no use `--color-oscuro` como `color`). Las seis variables de marca no cambian; se suma `--color-blanco: #FFFFFF`.
 - **Claro:** superficie `--color-fondo`, texto `--color-oscuro`, borde `--color-gris`, acento-texto `--color-oscuro` (el lima nunca es texto sobre blanco).
 - **Oscuro:** superficie `#1A1A1C` (`--color-oscuro`), texto `#FFFFFF` (`--color-blanco`), borde `--color-gris`. El lima puede ser texto, acento y foco sobre el oscuro (`--color-acento-texto` y `--color-foco` = lima).
 - **Lima como fondo** (botón primario, fila total, borde de la card): el texto encima es siempre `--color-oscuro`, en ambos temas.

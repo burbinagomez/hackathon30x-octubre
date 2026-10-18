@@ -4,14 +4,39 @@
   --color-oscuro: #1A1A1C;
   --color-fondo: #FFFFFF;
   --color-gris: #9B9999;
+  --color-blanco: #FFFFFF;
   --fuente-titulos: "Poppins", system-ui, sans-serif;
   --fuente-texto: "DM Sans", system-ui, sans-serif;
+
+  /* Semánticos, tema claro. Las pantallas usan estos, no las variables de marca. */
+  color-scheme: light dark;
+  --color-superficie: var(--color-fondo);
+  --color-texto: var(--color-oscuro);
+  --color-borde: var(--color-gris);
+  --color-acento-texto: var(--color-oscuro); /* el lima nunca es texto sobre blanco */
+  --color-cabecera-fondo: var(--color-oscuro);
+  --color-cabecera-texto: var(--color-blanco);
+  --color-foco: var(--color-oscuro);
+  --color-sobre-acento: var(--color-oscuro); /* texto sobre lima: oscuro en ambos temas */
+}
+
+/* Tema oscuro: sigue la preferencia del sistema, sin selector. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-superficie: var(--color-oscuro);
+    --color-texto: var(--color-blanco);
+    --color-borde: var(--color-gris);
+    --color-acento-texto: var(--color-acento);
+    --color-cabecera-fondo: var(--color-oscuro);
+    --color-cabecera-texto: var(--color-acento);
+    --color-foco: var(--color-acento);
+  }
 }
 
 body {
   margin: 0;
-  background: var(--color-fondo);
-  color: var(--color-oscuro);
+  background: var(--color-superficie);
+  color: var(--color-texto);
   font-family: var(--fuente-texto);
 }
 
