@@ -26,3 +26,8 @@ def test_tasa_sin_contactos_es_lista_vacia(cliente, usuarios):
 
 def test_sin_sesion_es_401(cliente):
     assert cliente.get("/contactos/tasa").status_code == 401
+
+
+def test_contactos_de_una_busqueda_sin_envios_es_lista_vacia(cliente, usuarios):
+    r = cliente.get(f"/busquedas/{uuid4()}/contactos", headers=_bearer(usuarios["a"]))
+    assert (r.status_code, r.json()) == (200, {"items": []})

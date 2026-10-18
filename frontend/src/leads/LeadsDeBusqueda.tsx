@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { estadoEnriquecimiento, iniciarEnriquecimiento, listarLeads, type EstadoEnriquecimiento } from "./api";
 import ListaLeads from "./ListaLeads";
+import PrimerMensaje from "./PrimerMensaje";
 
 const CADA_MS = 4000;
 
@@ -54,7 +55,10 @@ export default function LeadsDeBusqueda({ id, cadaMs = CADA_MS }: { id: string; 
   );
 
   return (
-    <ListaLeads clave={`busqueda:${id}:${version}`} titulo={t("leads.titulo_leads")} cargar={(p, c, i) => listarLeads(id, p, c, i)}
-      progreso={progreso || undefined} />
+    <>
+      <ListaLeads clave={`busqueda:${id}:${version}`} titulo={t("leads.titulo_leads")} cargar={(p, c, i) => listarLeads(id, p, c, i)}
+        progreso={progreso || undefined} />
+      <PrimerMensaje id={id} />
+    </>
   );
 }

@@ -1123,3 +1123,9 @@ table.tabla-costos {
   min-height: 44px;
   resize: none;
 }
+
+/* Primer mensaje (007): el cuerpo del email se lee tal cual, sin desbordar en el celular. */
+.primer-mensaje { margin-top: 1.5rem; }
+.cuerpo-envio { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; margin: 0; }
+.lista-envios { list-style: none; padding: 0; display: grid; gap: 0.5rem; }
+.lista-envios li { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; }

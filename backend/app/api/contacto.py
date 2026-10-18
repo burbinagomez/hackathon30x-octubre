@@ -69,3 +69,10 @@ def tasa(request: Request, tenant_id: UUID = Depends(tenant_actual)):
     filas = RepositorioContactosPostgres(request.app.state.engine, tenant_id).tasa_por_canal()
     return {"items": [{"canal": c, "contactados": n, "respondieron": r, "tasa": None if t is None else str(t)}
                       for c, n, r, t in filas]}
+
+
+@router.get("/busquedas/{busqueda_id}/contactos")
+def contactos(busqueda_id: UUID, request: Request, tenant_id: UUID = Depends(tenant_actual)):
+    filas = RepositorioContactosPostgres(request.app.state.engine, tenant_id).de_busqueda(busqueda_id)
+    return {"items": [{"id": str(i), "estado": e, "enviado_en": env and env.isoformat(),
+                       "respondio_en": resp and resp.isoformat()} for i, e, env, resp in filas]}
