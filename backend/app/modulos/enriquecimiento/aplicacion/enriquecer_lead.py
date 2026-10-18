@@ -54,10 +54,11 @@ class EnriquecerLead:
 
     def _enriquecer(self, lead: LeadParaEnriquecer) -> ResultadoEnriquecimiento:
         tipo = lead.tipo_titular
+        constancia = None
         if tipo == "desconocido":
             v = self._verificador.verificar(lead.id, lead.nombre, lead.ciudad)
-            log.info("croma_rues_co: %s", v.motivo)  # la razón va al log de la corrida, no al lead
-            tipo = v.tipo_titular
+            log.info("verificador_titular: %s", v.motivo)  # solo el motivo: nunca el nombre del lead
+            tipo, constancia = v.tipo_titular, v.constancia  # la evidencia va a `cumplimiento`, no al lead
         telefono, email = lead.telefono, lead.email
         if lead.web:
             c = self._enriquecedor.enriquecer(lead.id, lead.web)
@@ -68,7 +69,7 @@ class EnriquecerLead:
         nominal = email is not None and es_contacto_nominal(email[0])
         contactable, razon = calcular_contactable(tipo, telefono and telefono[1], email and email[1], nominal)
         return ResultadoEnriquecimiento(tipo, telefono, None if nominal else email, contactable, razon,
-                                        self._clasificar(lead, tipo))
+                                        self._clasificar(lead, tipo), constancia)
 
     def _clasificar(self, lead: LeadParaEnriquecer, tipo: str) -> str | None:
         # §2.5: solo jurídicas. Natural o desconocido no es contactable y su nombre puede ser el de una persona.

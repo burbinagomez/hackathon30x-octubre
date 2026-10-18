@@ -53,8 +53,20 @@ fuentes_descubrimiento:                 # puerto: FuenteDescubrimiento
     licencia: CC-BY-SA-4.0
 
 enriquecedores:                          # puerto: Enriquecedor
+  rues_datos_gov_co:                     # puerto: VerificadorTitular (006, enmienda 2026-10-18)
+    habilitado: true                     # un flag la desconecta: false y vuelve el stub que siempre dice desconocido
+    puerto: VerificadorTitular
+    adaptador: app.modulos.enriquecimiento.infraestructura.adaptadores.rues_datos_gov.RuesDatosGov
+    proveedor: datos.gov.co
+    dataset: c82u-588k
+    tipo: dataset
+    paises: [CO]
+    regla: "nombre normalizado exacto + misma ciudad + un solo NIT; cualquier otra cosa es desconocido"
+    trae: [tipo_titular]
+    licencia: CC-BY-SA-4.0
   croma_rues_co:
-    habilitado: true
+    habilitado: false                    # reemplazado por rues_datos_gov_co: el endpoint busca por NIT, no por nombre
+    puerto: VerificadorTitular
     adaptador: app.modulos.enriquecimiento.infraestructura.adaptadores.croma_rues.CromaRues
     endpoint: /co/rues/entity-by-nit/v1
     tipo: live

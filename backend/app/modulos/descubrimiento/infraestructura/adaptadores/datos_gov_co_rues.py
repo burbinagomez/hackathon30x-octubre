@@ -1,3 +1,5 @@
+import contextvars
+import logging
 import re
 import time
 from dataclasses import dataclass, replace
@@ -24,6 +26,11 @@ from app.modulos.descubrimiento.dominio.modelos import (
     MetaFuente,
     PaginaEmpresas,
 )
+
+# httpx en INFO loguea la URL completa de cada request, y la de una búsqueda por razón social lleva el nombre del lead.
+# Se calla solo dentro de `_pedir`: un setLevel global callaría al resto de la app.
+_en_pedido = contextvars.ContextVar("datos_gov_co_en_pedido", default=False)
+logging.getLogger("httpx").addFilter(lambda _registro: not _en_pedido.get())
 
 # Dataset público de Confecámaras en datos.gov.co. El override (stub, D9) llega desde settings por la fábrica.
 URL_DATASET = "https://www.datos.gov.co/resource/c82u-588k.json"
@@ -68,6 +75,7 @@ class CoincidenciaRazonSocial:
     ciiu: str | None
     camara: str | None
     estado_matricula: str | None
+    razon_social: str | None = None
 
 
 def _literal_like(nombre: str) -> str:
@@ -92,7 +100,11 @@ class DatosGovCoRues:
         url: str = URL_DATASET,
         app_token: str | None = None,
         monotonico: Callable[[], float] = time.monotonic,
+        timeout_seg: float = TIMEOUT_SEG,
+        intentos: int = INTENTOS,
     ) -> None:
+        self._timeout_seg = timeout_seg  # el descubrimiento espera 30 s; verificar un lead no puede retener al worker
+        self._intentos = intentos
         self._transporte = transporte
         self._reloj = reloj  # hora de pared: solo para el as_of
         self._monotonico = (
@@ -163,9 +175,11 @@ class DatosGovCoRues:
     def buscar_coincidencias(
         self, nombre_normalizado: str, contexto_costo: ContextoCosto
     ) -> list[CoincidenciaRazonSocial]:
-        """Todas las jurídicas activas cuya razón social contiene el nombre (Puerta A de la 010).
+        """Todas las jurídicas activas cuya razón social contiene el nombre (Puerta A de la 010 y verificación de titular
+        de la 006).
 
-        El costo de cada request se atribuye al contexto (`fuente='intake'`, `lote_id` de la corrida), no a una búsqueda.
+        El costo de cada request se atribuye al contexto: `fuente='intake'` y el `lote_id` de la corrida, o el `lead_id`
+        que se verifica; nunca a una búsqueda.
         """
         nombre = _literal_like(nombre_normalizado)
         if not nombre:
@@ -188,6 +202,7 @@ class DatosGovCoRues:
                     ciiu=fila.get("cod_ciiu_act_econ_pri"),
                     camara=None if fila.get("codigo_camara") is None else str(fila["codigo_camara"]),
                     estado_matricula=fila.get("estado_matricula"),
+                    razon_social=fila.get("razon_social"),
                 )
                 for fila in respuesta.json()
                 if _es_juridica_valida(fila)
@@ -198,11 +213,19 @@ class DatosGovCoRues:
     def _pedir(self, params: Mapping[str, str], contexto: ContextoCosto | None = None) -> httpx.Response:
         """GET con hasta 2 intentos. Cada intento deja su fila en costos antes de decidir."""
         cabeceras = {"X-App-Token": self._app_token} if self._app_token else {}
+        marca = _en_pedido.set(True)
+        try:
+            return self._pedir_con_reintentos(params, contexto, cabeceras)
+        finally:
+            _en_pedido.reset(marca)
+
+    def _pedir_con_reintentos(self, params: Mapping[str, str], contexto: ContextoCosto | None,
+                              cabeceras: Mapping[str, str]) -> httpx.Response:
         estado: int | str = "timeout"
         with httpx.Client(
-            transport=self._transporte, timeout=TIMEOUT_SEG, headers=cabeceras
+            transport=self._transporte, timeout=self._timeout_seg, headers=cabeceras
         ) as cliente:
-            for intento in range(INTENTOS):
+            for intento in range(self._intentos):
                 if intento:
                     self._dormir(ESPERA_REINTENTO_SEG)  # la espera no se cobra
                 inicio = self._monotonico()
@@ -239,7 +262,7 @@ class DatosGovCoRues:
                 proveedor=self.meta.proveedor,
                 fuente=self.meta.clave if contexto is None else contexto.fuente,
                 canal=None,
-                lead_id=None,
+                lead_id=None if contexto is None else contexto.lead_id,
                 lote_id=self._lote_id if contexto is None else contexto.lote_id,
                 gratis=False,
             )

@@ -47,6 +47,10 @@ _UPDATE_ENRIQUECIMIENTO = text(
     "direccion_cifrada = CASE WHEN CAST(:claro AS boolean) THEN NULL ELSE direccion_cifrada END "
     "WHERE id = :id"
 )
+_AGREGAR_SOLICITUD = text(
+    "UPDATE cumplimiento SET solicitudes = solicitudes || jsonb_build_array(CAST(:entrada AS jsonb) || "
+    "jsonb_build_object('ts', now())) WHERE lead_id = :id"
+)
 
 
 # Lectura para la pantalla de leads. Departamento y ciudad de la búsqueda salen de los criterios guardados.
@@ -262,11 +266,22 @@ class RepositorioLeadsPostgres:
                 "telefono": cifrar("telefono_cifrado", r.telefono), "telefono_canal": r.telefono and r.telefono[1],
                 "email": cifrar("email_cifrado", r.email), "email_canal": r.email and r.email[1],
             })
-            if claro:
-                c.execute(text(
-                    "UPDATE cumplimiento SET solicitudes = solicitudes || jsonb_build_array(jsonb_build_object("
-                    "'tipo', 'paso_a_claro', 'motivo', 'match_unico', 'fuente', 'croma_rues_co', 'ts', now())) "
-                    "WHERE lead_id = :id"), {"id": lead_id})
+            entrada = self._constancia(r, claro)
+            if entrada is not None:
+                c.execute(_AGREGAR_SOLICITUD, {"id": lead_id, "entrada": json.dumps(entrada)})
+
+    @staticmethod
+    def _constancia(r: ResultadoEnriquecimiento, claro: bool) -> dict | None:
+        """La entrada de `cumplimiento.solicitudes` de esta corrida. Con verificación (`rues_datos_gov_co`): una por cada
+        lead verificado, suba o no, con la evidencia del registro (empresa, nunca contacto). Sin ella, solo si sube a
+        jurídica (verificador sin evidencia)."""
+        k = r.constancia_titular
+        if k is None:
+            return {"tipo": "paso_a_claro", "motivo": "match_unico", "fuente": "croma_rues_co"} if claro else None
+        entrada = {"tipo": "paso_a_claro" if claro else "verificacion_titular", "motivo": k.motivo, "fuente": k.fuente,
+                   "dataset": k.dataset, "nit": k.nit, "razon_social": k.razon_social, "municipio": k.municipio,
+                   "candidatos": k.candidatos}
+        return {clave: valor for clave, valor in entrada.items() if valor is not None}
 
     def listar_busquedas(self) -> list[ResumenBusqueda]:
         """Solo lectura; el tenant lo filtra la RLS (sin WHERE tenant_id a propósito: el test lo sabotea)."""

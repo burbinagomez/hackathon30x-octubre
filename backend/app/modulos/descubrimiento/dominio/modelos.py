@@ -76,6 +76,19 @@ class LeadParaEnriquecer:
 
 
 @dataclass(frozen=True)
+class ConstanciaTitular:
+    """Evidencia de una verificación de titular contra un registro público, para `cumplimiento.solicitudes`.
+    Datos de la empresa (NIT, razón social, municipio), nunca contacto ni el nombre con que llegó el lead."""
+    motivo: str
+    fuente: str
+    dataset: str
+    nit: str | None = None
+    razon_social: str | None = None
+    municipio: str | None = None
+    candidatos: int | None = None  # solo si fue ambiguo: cuántos NIT cumplían
+
+
+@dataclass(frozen=True)
 class ResultadoEnriquecimiento:
     tipo_titular: TipoTitular
     telefono: Contacto | None
@@ -83,6 +96,7 @@ class ResultadoEnriquecimiento:
     contactable: bool
     razon_no_contactable: str | None
     encaje: str | None = None  # None = sin clasificar
+    constancia_titular: ConstanciaTitular | None = None  # None = no se verificó (el titular ya venía del registro)
 
 
 @dataclass(frozen=True)

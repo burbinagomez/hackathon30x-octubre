@@ -1,0 +1,223 @@
+"""RuesDatosGov (puerto VerificadorTitular): nombre + ciudad contra el RUES de datos.gov.co, enmienda 2026-10-18 de la 006.
+Reusa el cliente de la 011 (`DatosGovCoRues`) con transporte falso: sin red. Datos sintéticos."""
+import logging
+from datetime import UTC, datetime
+from decimal import Decimal
+from pathlib import Path
+from uuid import uuid4
+
+import httpx
+import pytest
+
+from app.modulos.descubrimiento.aplicacion.camaras import cargar_camaras
+from app.modulos.descubrimiento.dominio.modelos import MetaFuente
+from app.modulos.descubrimiento.infraestructura.adaptadores.datos_gov_co_rues import (
+    LIMITE_COINCIDENCIAS, DatosGovCoRues)
+from app.modulos.enriquecimiento.infraestructura.adaptadores.rues_datos_gov import RuesDatosGov
+from tests.falsos import RegistroCostosFalso
+
+BACKEND = Path(__file__).resolve().parents[3]
+CAMARAS = cargar_camaras(BACKEND / "config" / "camaras_co.yaml")
+MUNICIPIOS = {c.codigo: c.municipio_sede for c in CAMARAS.values()}
+SAS = "SOCIEDADES POR ACCIONES SIMPLIFICADAS SAS"
+NOMBRE = "Transportes Andinos"  # lo que trae OSM: sin sufijo, con mayúsculas de uso
+
+
+def _fila(nit="900111222", razon="TRANSPORTES ANDINOS S.A.S.", camara="04", estado="ACTIVA"):
+    return {"nit": nit, "digito_verificacion": "1", "razon_social": razon, "cod_ciiu_act_econ_pri": "4923",
+            "codigo_camara": camara, "organizacion_juridica": SAS, "estado_matricula": estado,
+            "fecha_renovacion": "20260410"}
+
+
+def _verificador(respuesta, intentos=2):
+    """`respuesta`: lista de filas (200), o una función request -> Response / que lanza."""
+    pedidas = []
+
+    def responder(request):
+        pedidas.append(request)
+        if callable(respuesta):
+            return respuesta(request)
+        return httpx.Response(200, json=respuesta)
+
+    costos = RegistroCostosFalso()
+    cliente = DatosGovCoRues(
+        transporte=httpx.MockTransport(responder), reloj=lambda: datetime(2026, 10, 18, tzinfo=UTC),
+        dormir=lambda s: None, costos=costos, cache=None, camaras=CAMARAS, tarifas={"computo_seg_usd": Decimal("0.000007")},
+        lote_id=None, intentos=intentos, timeout_seg=5.0,
+        meta=MetaFuente(clave="datos_gov_co_rues", proveedor="datos.gov.co", paises=frozenset({"CO"}),
+                        filtros=frozenset({"ciiu", "departamento"}), trae=frozenset({"nit"}), tipo="dataset",
+                        licencia="CC-BY-SA-4.0"))
+    return RuesDatosGov(cliente, MUNICIPIOS, tope=LIMITE_COINCIDENCIAS), pedidas, costos
+
+
+def test_match_exacto_unico_en_la_misma_ciudad_es_juridica():
+    v, _, _ = _verificador([_fila()])
+
+    r = v.verificar(uuid4(), NOMBRE, "Bogotá")
+
+    assert (r.tipo_titular, r.motivo) == ("juridica", "match_unico")
+    c = r.constancia
+    assert (c.motivo, c.fuente, c.dataset) == ("match_unico", "datos_gov_co_rues", "c82u-588k")
+    assert (c.nit, c.razon_social, c.municipio) == ("900111222", "TRANSPORTES ANDINOS S.A.S.", "Bogotá")
+
+
+def test_el_nombre_y_la_ciudad_se_comparan_normalizados():
+    v, _, _ = _verificador([_fila(razon="TRANSPORTES ANDINOS LTDA")])
+
+    assert v.verificar(uuid4(), "  transportes   ANDÍNOS S.A.S. ", "BOGOTA D.C.").tipo_titular == "juridica"
+
+
+def test_dos_nit_distintos_con_el_mismo_nombre_en_la_ciudad_es_desconocido():
+    v, _, _ = _verificador([_fila("900111222"), _fila("900333444", razon="TRANSPORTES ANDINOS LTDA")])
+
+    r = v.verificar(uuid4(), NOMBRE, "Bogotá")
+
+    assert (r.tipo_titular, r.motivo) == ("desconocido", "ambiguo")
+    assert r.constancia.candidatos == 2 and r.constancia.nit is None
+
+
+def test_varias_matriculas_del_mismo_nit_son_un_solo_candidato():
+    v, _, _ = _verificador([_fila("900111222"), _fila("900111222", razon="TRANSPORTES ANDINOS SAS")])
+
+    assert v.verificar(uuid4(), NOMBRE, "Bogotá").tipo_titular == "juridica"
+
+
+def test_la_misma_razon_social_en_otra_ciudad_es_desconocido():
+    v, _, _ = _verificador([_fila(camara="14")])  # cámara de Girardot
+
+    r = v.verificar(uuid4(), NOMBRE, "Bogotá")
+
+    assert (r.tipo_titular, r.motivo) == ("desconocido", "sin_match")
+    assert r.constancia.nit is None  # sin match no se guarda a quién se parecía
+
+
+def test_otra_empresa_con_el_mismo_nombre_en_otra_ciudad_no_vuelve_ambiguo_el_match():
+    # La regla del dueño: "una sola empresa en la misma ciudad".
+    v, _, _ = _verificador([_fila("900111222", camara="04"), _fila("900333444", camara="14")])
+
+    r = v.verificar(uuid4(), NOMBRE, "Bogotá")
+
+    assert (r.tipo_titular, r.constancia.nit) == ("juridica", "900111222")
+
+
+def test_una_camara_sin_municipio_conocido_nunca_matchea():
+    v, _, _ = _verificador([_fila(camara="99")])
+
+    assert v.verificar(uuid4(), NOMBRE, "Bogotá").tipo_titular == "desconocido"
+
+
+@pytest.mark.parametrize("ciudad", [None, "", "   "])
+def test_sin_ciudad_es_desconocido_y_ni_siquiera_consulta(ciudad):
+    v, pedidas, costos = _verificador([_fila()])
+
+    r = v.verificar(uuid4(), NOMBRE, ciudad)
+
+    assert (r.tipo_titular, r.motivo) == ("desconocido", "sin_ciudad")
+    assert r.constancia.motivo == "sin_ciudad"
+    assert pedidas == [] and costos.filas == []
+
+
+def test_un_nombre_que_solo_es_sufijo_no_se_consulta():
+    v, pedidas, _ = _verificador([_fila()])
+
+    assert v.verificar(uuid4(), "S.A.S.", "Bogotá").tipo_titular == "desconocido"
+    assert pedidas == []
+
+
+def test_un_nombre_parecido_no_es_exacto():
+    v, _, _ = _verificador([_fila(razon="TRANSPORTES ANDINOS DEL SUR SAS"), _fila("900333444", razon="ANDINOS")])
+
+    assert v.verificar(uuid4(), NOMBRE, "Bogotá").tipo_titular == "desconocido"
+
+
+def test_si_la_respuesta_llega_al_tope_no_se_puede_afirmar_que_es_unica():
+    filas = [_fila("9001%05d" % i, razon=f"TRANSPORTES ANDINOS {i} SAS") for i in range(LIMITE_COINCIDENCIAS - 1)]
+    v, _, _ = _verificador(filas + [_fila()])  # exactamente el tope: pudo haber más sin traer
+
+    r = v.verificar(uuid4(), NOMBRE, "Bogotá")
+
+    assert (r.tipo_titular, r.motivo) == ("desconocido", "ambiguo")
+
+
+def test_sin_resultados_es_desconocido():
+    v, _, _ = _verificador([])
+
+    assert v.verificar(uuid4(), NOMBRE, "Bogotá").motivo == "sin_match"
+
+
+def test_la_fuente_caida_es_desconocido_no_una_excepcion():
+    v, _, _ = _verificador(lambda r: httpx.Response(503, json={}))
+
+    r = v.verificar(uuid4(), NOMBRE, "Bogotá")
+
+    assert (r.tipo_titular, r.motivo) == ("desconocido", "fuente_no_disponible")
+    assert r.constancia.motivo == "fuente_no_disponible"
+
+
+def test_el_timeout_es_desconocido():
+    def tarda(request):
+        raise httpx.ReadTimeout("lento", request=request)
+
+    v, _, _ = _verificador(tarda)
+
+    assert v.verificar(uuid4(), NOMBRE, "Bogotá").motivo == "fuente_no_disponible"
+
+
+def test_una_respuesta_ilegible_es_desconocido():
+    v, _, _ = _verificador([{"nit": ["no", "es", "texto"]}, "basura"])
+
+    assert v.verificar(uuid4(), NOMBRE, "Bogotá").tipo_titular == "desconocido"
+
+
+def test_cada_request_escribe_su_costo_con_el_lead_antes_de_devolver():
+    v, pedidas, costos = _verificador([_fila()])
+    lead = uuid4()
+
+    v.verificar(lead, NOMBRE, "Bogotá")
+
+    assert len(pedidas) == len(costos.filas) == 1
+    c = costos.filas[0]
+    assert (c.tipo, c.proveedor, c.lead_id, c.lote_id, c.fuente) == ("socrata_descarga", "datos.gov.co", lead, None, None)
+    assert c.costo_unitario == Decimal("0.000007") and c.unidades >= 0
+
+
+def test_la_falla_tambien_cobra_cada_intento():
+    v, pedidas, costos = _verificador(lambda r: httpx.Response(503, json={}), intentos=2)
+    lead = uuid4()
+
+    v.verificar(lead, NOMBRE, "Bogotá")
+
+    assert len(pedidas) == len(costos.filas) == 2
+    assert {c.lead_id for c in costos.filas} == {lead}
+
+
+def test_la_consulta_lleva_el_nombre_normalizado_y_solo_campos_de_empresa():
+    v, pedidas, _ = _verificador([_fila()])
+
+    v.verificar(uuid4(), "Transportes Andínos S.A.S.", "Bogotá")
+
+    params = pedidas[0].url.params
+    assert "'%TRANSPORTES ANDINOS%'" in params["$where"]
+    assert "representante" not in params["$select"] and "nombre" not in params["$select"].replace("razon_social", "")
+
+
+@pytest.mark.parametrize("respuesta", [[_fila()], lambda r: httpx.Response(503, json={})])
+def test_el_nombre_del_lead_no_sale_en_los_logs(caplog, respuesta):
+    caplog.set_level(logging.DEBUG)
+    v, _, _ = _verificador(respuesta)
+    secreto = "Zxqvk Ficticia Andina"
+
+    v.verificar(uuid4(), secreto, "Bogotá")
+
+    texto = caplog.text.upper() + "".join(str(r.args) for r in caplog.records).upper()
+    assert "ZXQVK" not in texto
+
+
+def test_el_nombre_no_sale_en_el_mensaje_de_error_interno(caplog):
+    # La excepción de la fuente lleva solo la clave y el status; lo que sube no incluye el nombre.
+    v, _, _ = _verificador(lambda r: httpx.Response(500, json={"error": "Zxqvk"}))
+    caplog.set_level(logging.DEBUG)
+
+    v.verificar(uuid4(), "Zxqvk Ficticia", "Bogotá")
+
+    assert "ZXQVK" not in caplog.text.upper()
