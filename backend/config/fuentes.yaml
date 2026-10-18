@@ -55,12 +55,13 @@ fuentes_descubrimiento:                 # puerto: FuenteDescubrimiento
 enriquecedores:                          # puerto: Enriquecedor
   croma_rues_co:
     habilitado: true
+    adaptador: app.modulos.enriquecimiento.infraestructura.adaptadores.croma_rues.CromaRues
     endpoint: /co/rues/entity-by-nit/v1
     tipo: live
     paises: [CO]
     trae: [estado_matricula, ciiu, representantes, financieros, renovaciones, tipo_titular]
   croma_supersociedades_detalle_co:
-    habilitado: true
+    habilitado: false                    # P4: sin implementación en la 006
     paises: [CO]
     trae: [accionistas, representante_legal, email_notificacion]
   croma_sunat_pe:
@@ -72,6 +73,7 @@ enriquecedores:                          # puerto: Enriquecedor
     trae: [telefono, email, web, direccion, empleados]
   sitio_web:
     habilitado: true
+    adaptador: app.modulos.enriquecimiento.infraestructura.adaptadores.sitio_web.SitioWeb
     paises: ["*"]
     trae: [email_publicado, whatsapp_publicado, telefono_publicado]
     reglas: [robots_txt, sin_ips_privadas, max_2mb, 3_redirecciones]

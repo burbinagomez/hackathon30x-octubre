@@ -32,10 +32,11 @@ def _arbol_modulos(raiz: Path, archivo: str, contenido: str) -> None:
     # Réplica mínima de app.modulos, con la config real copiada al lado.
     shutil.copy(BACKEND / "pyproject.toml", raiz)
     paquetes = ["app", "app/modulos",
-                "app/modulos/descubrimiento", "app/modulos/costos", "app/modulos/acceso",
+                "app/modulos/descubrimiento", "app/modulos/costos", "app/modulos/acceso", "app/modulos/enriquecimiento",
                 *(f"app/modulos/descubrimiento/{c}" for c in ("dominio", "aplicacion", "infraestructura")),
                 *(f"app/modulos/costos/{c}" for c in ("dominio", "infraestructura")),
-                *(f"app/modulos/acceso/{c}" for c in ("dominio", "infraestructura"))]
+                *(f"app/modulos/acceso/{c}" for c in ("dominio", "infraestructura")),
+                *(f"app/modulos/enriquecimiento/{c}" for c in ("dominio", "infraestructura"))]
     for p in paquetes:
         (raiz / p).mkdir(parents=True, exist_ok=True)
         (raiz / p / "__init__.py").touch()
@@ -100,3 +101,15 @@ def test_acceso_dominio_no_importa_su_infraestructura(tmp_path):
 
     assert r.returncode != 0
     assert f"{CAPAS} BROKEN" in r.stdout
+
+
+SIN_HTTP_ENRIQ = "Enriquecimiento: dominio sin HTTP ni infraestructura"
+
+
+def test_enriquecimiento_dominio_no_importa_httpx(tmp_path):
+    _arbol_modulos(tmp_path, "app/modulos/enriquecimiento/dominio/x.py", "import httpx\n")
+
+    r = lint_imports(tmp_path)
+
+    assert r.returncode != 0
+    assert f"{SIN_HTTP_ENRIQ} BROKEN" in r.stdout

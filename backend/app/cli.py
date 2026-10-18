@@ -30,7 +30,8 @@ def _cargar_tarifas() -> dict[str, Decimal]:
     """Tarifa unitaria por proveedor desde tarifas.yaml; cada valor pasa por str para no arrastrar el error del float."""
     t = yaml.safe_load((CONFIG / "tarifas.yaml").read_text())
     return {"croma": Decimal(str(t["croma"]["usd_por_credito"])), "osm": Decimal(str(t["computo_seg_usd"])),
-            "datos.gov.co": Decimal(str(t["computo_seg_usd"]))}
+            "datos.gov.co": Decimal(str(t["computo_seg_usd"])), "web_fetch": Decimal(str(t["web_fetch_usd"])),
+            "jev_in_por_M": Decimal(str(t["jev"]["in_usd_por_M"]))}
 
 
 @dataclass(frozen=True)

@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 
 from app.modulos.costos.dominio.modelos import OperacionCosto
 from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, EmpresaCruda, MetaFuente, PaginaEmpresas
+from app.modulos.enriquecimiento.dominio.puertos import Encaje
 
 
 class RepositorioLeadsFalso:
@@ -73,3 +74,14 @@ class FuenteFalsa:
             raise self._error
         del_pais = tuple(e for e in self._empresas if e.pais == criterios.pais)
         return PaginaEmpresas(empresas=del_pais if pagina == 1 else (), total=len(del_pais))
+
+
+class JevFalso:
+    """ClasificadorEncaje en memoria: devuelve la salida configurada ({"etiqueta", "probabilidad"})."""
+
+    def __init__(self, salida: dict | None = None):
+        self.salida = salida or {"etiqueta": "encaja", "probabilidad": 0.9}
+
+    def clasificar(self, lead_id: UUID, descripcion_icp: str, nombre: str, ciudad: str | None,
+                   actividad: str | None) -> Encaje:
+        return Encaje("encaja", 1.0)

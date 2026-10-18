@@ -45,7 +45,7 @@ name = "Capas de los modulos"
 type = "layers"
 # "(aplicacion)": capa opcional; costos todavía no la tiene.
 layers = ["infraestructura", "(aplicacion)", "dominio"]
-containers = ["app.modulos.descubrimiento", "app.modulos.costos", "app.modulos.acceso"]
+containers = ["app.modulos.descubrimiento", "app.modulos.costos", "app.modulos.acceso", "app.modulos.enriquecimiento"]
 
 [[tool.importlinter.contracts]]
 name = "Descubrimiento no usa la infraestructura de costos"
@@ -60,6 +60,13 @@ type = "forbidden"
 # El dominio maneja texto en claro; cifrar y llamar por HTTP son adaptadores (principio I).
 source_modules = ["app.modulos.descubrimiento.dominio"]
 forbidden_modules = ["cryptography", "httpx"]
+
+[[tool.importlinter.contracts]]
+name = "Enriquecimiento: dominio sin HTTP ni infraestructura"
+type = "forbidden"
+# layers no ve httpx (externo): el dominio decide contactable sin red; fetch y jev son adaptadores.
+source_modules = ["app.modulos.enriquecimiento.dominio"]
+forbidden_modules = ["httpx", "app.modulos.enriquecimiento.infraestructura"]
 
 [[tool.importlinter.contracts]]
 name = "App no importa evals"
