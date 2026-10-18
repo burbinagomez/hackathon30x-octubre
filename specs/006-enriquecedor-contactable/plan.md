@@ -145,7 +145,10 @@ Son dos puertos y no un `Enriquecedor` genérico porque los dos adaptadores reci
 - `follow_redirects=False` con un loop manual de hasta 3 saltos; el 4.º lanza `DemasiadasRedirecciones`.
 - Lee el stream por chunks y corta en 2 MB.
 - Extrae `mailto:`, `wa.me/` y teléfonos con regex. `wa.me` entra como `whatsapp_comercial` y gana sobre el teléfono plano.
+- `web_fetch` va con `proveedor="web"` (aceptado por Daniel el 2026-10-18; sumado a la lista de `libro-costos`).
 - Registra `web_fetch` solo por request real, robots incluido (P9). El corte por SSRF no hace request y no registra costo; no hay fila con costo 0 ni columna nueva en `costos`.
+- **Spec y T009 reconciliados en capas (Daniel, 2026-10-18).** El validador SSRF interno lanza `IPPrivadaRechazada` (error tipado, con test unitario propio), como pide `spec.md:67`. `SitioWeb.enriquecer()` la atrapa y devuelve `ContactoPublicado(estado="fallo")`, como pide T009. El motivo va al log de la corrida, no al lead. `DemasiadasRedirecciones` sigue el mismo patrón: la lanza el fetch interno y `enriquecer()` la convierte en `fallo`.
+- **Redirecciones solo dentro del dominio del lead.** Un salto se sigue si su host, sin el `www.` inicial, es exactamente el dominio del lead sin `www.` (`empresa.co` ↔ `www.empresa.co`). Cualquier otro host (`facebook.com`, `notempresa.co`) corta con `fallo`. Cada host nuevo pasa por su propia validación SSRF y su propio `robots.txt`. Una página final que no sea 200 también es `fallo`: no se extrae contacto de un 404.
 
 **`croma_rues_co`.**
 - Busca por `nombre_normalizado`, filtra por ciudad en local y agrupa por NIT.
@@ -171,9 +174,9 @@ Son dos puertos y no un `Enriquecedor` genérico porque los dos adaptadores reci
 
 **Front.** `Tablero.tsx` suma `con_telefono · contactables` y el % `no_contactables_politica / icp` con un decimal entero ("14 %"). Muestra "sin dato" con `icp=0`. El front formatea y no cuenta.
 
-## Migración 0008 — PENDIENTE DE APROBACIÓN DE DANIEL
+## Migración 0007 — APROBADA POR DANIEL (2026-10-18)
 
-> **PENDIENTE DE APROBACIÓN DE DANIEL.** Esto es una propuesta dentro del plan. No se crea `supabase/migrations/0008_enriquecimiento.sql` hasta que Daniel apruebe este DDL. La spec dice `0005`. En `main` están 0001, 0002, 0003, 0005 y 0006, y la **0007 queda reservada para la 012**. Si al momento de T001 hay otra migración mergeada, se usa el siguiente número libre.
+> **Aprobada** con dos cambios: `email_canal` admite solo `sitio_web` y `osm_contacto`, y el número es el siguiente libre en `main` al momento del merge (era la 0007; la tomó la 008, así que queda **0008**). El archivo `supabase/migrations/0008_enriquecimiento.sql` es este bloque byte a byte (`test_migracion_enriquecimiento.py`, que lo busca por patrón).
 
 - `costos.tipo` **no cambia**: su CHECK ya admite las tres operaciones (D2). P9 no suma columnas a `costos`.
 - Las columnas de contacto y `v_leads_icp` entran acá porque Daniel aprobó P3 y P2.
@@ -181,7 +184,7 @@ Son dos puertos y no un `Enriquecedor` genérico porque los dos adaptadores reci
 - Igual que la 0006, sin `BEGIN`/`COMMIT` propios.
 
 ```sql
--- 0008_enriquecimiento.sql — PENDIENTE DE APROBACIÓN DE DANIEL
+-- 0008_enriquecimiento.sql — aprobada por Daniel (2026-10-18)
 
 -- encaje y contactable viven en leads: son uno por lead, igual que tipo_titular.
 ALTER TABLE public.leads
@@ -212,9 +215,11 @@ ALTER TABLE public.leads
     CHECK (telefono_cifrado IS NULL OR octet_length(telefono_cifrado) > 28),
   ADD CONSTRAINT leads_email_cifrado_ck
     CHECK (email_cifrado IS NULL OR octet_length(email_cifrado) > 28),
-  ADD CONSTRAINT leads_canal_enum
-    CHECK (telefono_canal IN ('whatsapp_comercial','sitio_web','osm_contacto','whatsapp_osm')
-       AND email_canal    IN ('whatsapp_comercial','sitio_web','osm_contacto','whatsapp_osm')),
+  ADD CONSTRAINT leads_telefono_canal_enum
+    CHECK (telefono_canal IN ('whatsapp_comercial','sitio_web','osm_contacto','whatsapp_osm')),
+  -- Un email solo sale del sitio propio o de un tag de OSM: los canales whatsapp no aplican.
+  ADD CONSTRAINT leads_email_canal_enum
+    CHECK (email_canal IN ('sitio_web','osm_contacto')),
   -- La etiqueta sin dato (o el dato sin etiqueta) es un estado roto.
   ADD CONSTRAINT leads_canal_con_dato
     CHECK ((telefono_canal IS NULL) = (telefono_cifrado IS NULL)
@@ -283,7 +288,7 @@ $$;
 
 `catalogo_sensibles` (`seguridad/cifrado.py`) suma `telefono` y `email` a `CIFRADAS` en el mismo PR (P3). No es DDL: es código de la app.
 
-Si Daniel aprueba, entra también `backend/tests/arquitectura/test_migracion_0008.py` con el patrón de `test_migracion_0006.py`: el archivo contiene los CHECKs, repite `security_invoker` en cada vista, no toca `costos` y no reordena las columnas de `v_tablero_fuentes`.
+Entra también `backend/tests/arquitectura/test_migracion_0007.py` con el patrón de `test_migracion_0006.py`: el archivo contiene los CHECKs, repite `security_invoker` en cada vista, no toca `costos` y no reordena las columnas de `v_tablero_fuentes`.
 
 ## Fases y dueños
 

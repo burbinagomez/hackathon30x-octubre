@@ -1,5 +1,6 @@
 """Raíz de composición: único módulo que une descubrimiento con la infraestructura de costos."""
 import argparse
+import socket
 import sys
 from dataclasses import dataclass
 from decimal import Decimal
@@ -59,6 +60,23 @@ def _persistencia_postgres(settings: Settings, tenant: UUID) -> Persistencia:
     return Persistencia(RepositorioLeadsPostgres(engine, tenant, Cifrador(settings.cifrado_key.get_secret_value())), PostgresCostos(engine, tenant))
 
 
+def _resolver(host: str) -> list[str]:
+    return [info[4][0] for info in socket.getaddrinfo(host, None)]
+
+
+def _adaptadores_enriquecer(ajustes: Settings, costos: RegistroCostos, tarifas: dict[str, Decimal]):
+    """Croma RUES, sitio web y jev. Sin TYPESAFE_API_KEY o TYPESAFE_URL no hay clasificador: encaje queda NULL."""
+    from app.modulos.enriquecimiento.infraestructura.adaptadores.croma_rues import CromaRues
+    from app.modulos.enriquecimiento.infraestructura.adaptadores.jev_clasificador import JevClasificador
+    from app.modulos.enriquecimiento.infraestructura.adaptadores.sitio_web import SitioWeb
+
+    clasificador = None
+    if ajustes.typesafe_api_key and ajustes.typesafe_url:
+        clasificador = JevClasificador(costos, httpx.HTTPTransport(), ajustes.typesafe_url, ajustes.typesafe_api_key,
+                                       tarifas["jev_in_por_M"])
+    return CromaRues(), SitioWeb(costos, httpx.HTTPTransport(), _resolver, tarifas["web_fetch"]), clasificador
+
+
 def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="app.cli")
     sub = p.add_subparsers(dest="comando", required=True)
@@ -81,6 +99,9 @@ def _parser() -> argparse.ArgumentParser:
     r.add_argument("--contacto", type=UUID, required=True)
     t = sub.add_parser("tasa-respuesta", help="Contactados, respondieron y tasa por canal del tenant.")
     t.add_argument("--tenant", type=UUID, required=True)
+    n = sub.add_parser("enriquecer", help="Enriquece los leads de una búsqueda que todavía no se enriquecieron.")
+    n.add_argument("--tenant", type=UUID, required=True)
+    n.add_argument("--busqueda", type=UUID, required=True)
     return p
 
 
@@ -165,7 +186,27 @@ def _enviar(args, armar_envio) -> int:
         return 1
 
 
-def main(argv=None, *, catalogo=catalogo, persistencia=None, armar_envio=None) -> int:
+
+
+def _enriquecer(args, ajustes, persistencia, adaptadores) -> int:
+    from app.modulos.enriquecimiento.aplicacion.enriquecer_lead import EnriquecerLead
+
+    try:
+        if persistencia is None:
+            persistencia = _persistencia_postgres(ajustes(), args.tenant)
+        verificador, enriquecedor, clasificador = adaptadores(ajustes(), persistencia.costos, cargar_tarifas())
+    except ValidationError as error:  # solo los nombres de las variables, nunca sus valores
+        print(f"configuración inválida: {', '.join(sorted({str(e['loc'][0]).upper() for e in error.errors()}))}",
+              file=sys.stderr)
+        return 2
+    r = EnriquecerLead(persistencia.repo, verificador, enriquecedor, clasificador).ejecutar(args.busqueda)
+    # Solo conteos: el contacto nunca sale de memoria sin cifrar.
+    print(f"procesados {r.procesados} · contactables {r.contactables} · clasificados {r.clasificados}"
+          f" · sin_clasificar {r.sin_clasificar} · cortado {'sí' if r.cortado else 'no'}")
+    return 0
+
+
+def main(argv=None, *, catalogo=catalogo, persistencia=None, adaptadores=None, armar_envio=None) -> int:
     try:
         args = _parser().parse_args(argv)
     except SystemExit as salida:
@@ -178,6 +219,9 @@ def main(argv=None, *, catalogo=catalogo, persistencia=None, armar_envio=None) -
     @cache
     def ajustes() -> Settings:
         return Settings()
+
+    if args.comando == "enriquecer":
+        return _enriquecer(args, ajustes, persistencia, adaptadores or _adaptadores_enriquecer)
 
     registro = cargar_registro(CONFIG / "fuentes.yaml", catalogo)
     limites = (yaml.safe_load((CONFIG / "fuentes.yaml").read_text()) or {}).get("limites") or {}

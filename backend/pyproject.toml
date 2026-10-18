@@ -45,7 +45,7 @@ type = "layers"
 # "(aplicacion)": capa opcional; costos todavía no la tiene.
 layers = ["infraestructura", "(aplicacion)", "dominio"]
 containers = ["app.modulos.descubrimiento", "app.modulos.costos", "app.modulos.acceso", "app.modulos.calificacion",
-              "app.modulos.intake", "app.modulos.contacto"]
+              "app.modulos.intake", "app.modulos.contacto", "app.modulos.enriquecimiento"]
 
 [[tool.importlinter.contracts]]
 name = "Descubrimiento no usa la infraestructura de costos"
@@ -74,6 +74,20 @@ type = "forbidden"
 # El dominio compone y firma; mandar por SMTP y descifrar la dirección son adaptadores (principio I).
 source_modules = ["app.modulos.contacto.dominio"]
 forbidden_modules = ["smtplib", "cryptography"]
+
+[[tool.importlinter.contracts]]
+name = "Enriquecimiento: dominio sin HTTP ni infraestructura"
+type = "forbidden"
+# layers no ve httpx (externo): el dominio decide contactable sin red; fetch y jev son adaptadores.
+source_modules = ["app.modulos.enriquecimiento.dominio"]
+forbidden_modules = ["httpx", "app.modulos.enriquecimiento.infraestructura"]
+
+[[tool.importlinter.contracts]]
+name = "Enriquecimiento: aplicacion sin base de datos"
+type = "forbidden"
+# El caso de uso no abre transacciones: el HTTP queda siempre fuera de una (cada guardado es su propia UoW en el repo).
+source_modules = ["app.modulos.enriquecimiento.aplicacion"]
+forbidden_modules = ["sqlalchemy", "app.db"]
 
 [[tool.importlinter.contracts]]
 name = "Intake no importa enriquecimiento"

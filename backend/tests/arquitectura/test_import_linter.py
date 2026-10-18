@@ -43,7 +43,7 @@ def _arbol_modulos(raiz: Path, archivo: str, contenido: str) -> None:
                 "app/modulos/contacto",
                 *(f"app/modulos/contacto/{c}" for c in ("dominio", "aplicacion", "infraestructura")),
                 *(f"app/modulos/calificacion/{c}" for c in ("dominio", "infraestructura")),
-                *(f"app/modulos/intake/{c}" for c in ("dominio", "aplicacion", "infraestructura"))]
+                *(f"app/modulos/enriquecimiento/{c}" for c in ("dominio", "aplicacion", "infraestructura"))]
     for p in paquetes:
         (raiz / p).mkdir(parents=True, exist_ok=True)
         (raiz / p / "__init__.py").touch()
@@ -131,6 +131,31 @@ def test_smtp_y_cifrado_no_entran_al_dominio_de_contacto(tmp_path, libreria):
 
     assert r.returncode != 0, r.stdout + r.stderr
     assert f"{SMTP_FUERA} BROKEN" in r.stdout
+
+
+SIN_HTTP_ENRIQ = "Enriquecimiento: dominio sin HTTP ni infraestructura"
+
+
+def test_enriquecimiento_dominio_no_importa_httpx(tmp_path):
+    _arbol_modulos(tmp_path, "app/modulos/enriquecimiento/dominio/x.py", "import httpx\n")
+
+    r = lint_imports(tmp_path)
+
+    assert r.returncode != 0
+    assert f"{SIN_HTTP_ENRIQ} BROKEN" in r.stdout
+
+
+SIN_DB_APLIC = "Enriquecimiento: aplicacion sin base de datos"
+
+
+def test_enriquecimiento_aplicacion_no_importa_sqlalchemy(tmp_path):
+    # El caso de uso no abre transacciones: el HTTP nunca queda dentro de una.
+    _arbol_modulos(tmp_path, "app/modulos/enriquecimiento/aplicacion/x.py", "import sqlalchemy\n")
+
+    r = lint_imports(tmp_path)
+
+    assert r.returncode != 0
+    assert f"{SIN_DB_APLIC} BROKEN" in r.stdout
 
 
 SIN_ENRIQUECIMIENTO = "Intake no importa enriquecimiento"

@@ -427,3 +427,23 @@ test("la_vista_previa_fuera_del_tope_lo_dice_y_deshabilita_buscar", async () => 
   expect(screen.queryByText(es.busqueda.dentro_del_tope)).not.toBeInTheDocument();
   expect(boton("Buscar")).toBeDisabled();
 });
+
+test("mientras_busca_muestra_que_trabaja_fuente_por_fuente_y_despues_el_resultado", async () => {
+  let responder: (r: Response) => void = () => undefined;
+  server.use(
+    http.post("*/busquedas/:id/ejecutar", () => new Promise<Response>((r) => { responder = r; })),
+  );
+  await previsualizar();
+  await waitFor(() => expect(boton("Buscar")).toBeEnabled());
+
+  fireEvent.click(boton("Buscar"));
+
+  const estado = await screen.findByRole("status", { name: es.busqueda.trabajando.buscando });
+  expect(estado).toHaveTextContent("OpenStreetMap");
+  expect(boton(es.busqueda.trabajando.buscando_boton)).toBeDisabled();
+  expect(boton(es.busqueda.trabajando.buscando_boton)).toHaveAttribute("aria-busy", "true");
+
+  responder(HttpResponse.json({ estado: "completada", por_fuente: { osm_overpass: { estado: "con_resultados", encontrados: 7 } } }));
+  await waitFor(() => expect(fila("OpenStreetMap: 7 empresas")).toBeDefined());
+  expect(screen.queryByRole("status", { name: es.busqueda.trabajando.buscando })).not.toBeInTheDocument();
+});

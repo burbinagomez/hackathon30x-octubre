@@ -58,6 +58,33 @@ class Lead:
     web: str | None = None
 
 
+Contacto = tuple[str, str]  # (valor, canal publicado); el valor nunca sale de memoria sin cifrar
+
+
+@dataclass(frozen=True)
+class LeadParaEnriquecer:
+    """Lo que el enriquecimiento necesita de un lead, descifrado por el repositorio."""
+    id: UUID
+    tipo_titular: TipoTitular
+    nombre: str
+    ciudad: str | None
+    web: str | None
+    actividad: str | None
+    descripcion_icp: str | None  # de la búsqueda; None = no se clasifica
+    telefono: Contacto | None = None
+    email: Contacto | None = None
+
+
+@dataclass(frozen=True)
+class ResultadoEnriquecimiento:
+    tipo_titular: TipoTitular
+    telefono: Contacto | None
+    email: Contacto | None
+    contactable: bool
+    razon_no_contactable: str | None
+    encaje: str | None = None  # None = sin clasificar
+
+
 @dataclass(frozen=True)
 class ResumenBusqueda:
     id: UUID

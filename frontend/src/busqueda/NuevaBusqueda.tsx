@@ -6,6 +6,7 @@ import {
   divisionesDe, ejecutar, estadoIntake, listarActividades, listarPaises, sugerirDesdeFrase, vistaPrevia,
   type EstadoIntake, type Sugerencia,
 } from "./api";
+import Trabajando from "../compartido/Trabajando";
 import IntakeLookalike from "./IntakeLookalike";
 import ResultadoPorFuente from "./ResultadoPorFuente";
 import ResultadoVistaPrevia from "./ResultadoVistaPrevia";
@@ -23,6 +24,7 @@ const INICIAL: Formulario = {
 };
 
 type Pestana = "lookalike" | "frase" | "filtros";
+type Ocupado = "vista" | "buscar" | null;
 const MAX_FRASE = 500;
 
 /** La sugerencia de una puerta pisa solo los criterios del ICP; canal, tope y mensaje son del usuario. */
@@ -78,6 +80,7 @@ export default function NuevaBusqueda() {
   const [pestana, setPestana] = useState<Pestana>("filtros");
   const [frase, setFrase] = useState("");
   const [pensando, setPensando] = useState(false);
+  const [ocupado, setOcupado] = useState<Ocupado>(null);
   const [errorFrase, setErrorFrase] = useState<string | null>(null);
   const [sugerido, setSugerido] = useState(false);
   const [resultado, setResultado] = useState<ResultadoEjecucion | null>(null);
@@ -132,12 +135,15 @@ export default function NuevaBusqueda() {
     }
   }
 
-  async function intentar(accion: () => Promise<void>) {
+  async function intentar(accion: () => Promise<void>, enCurso: Ocupado) {
     setFallo(false);
+    setOcupado(enCurso);
     try {
       await accion();
     } catch {
       setFallo(true);
+    } finally {
+      setOcupado(null);
     }
   }
 
@@ -181,10 +187,12 @@ export default function NuevaBusqueda() {
           </Campo>
           <p className="ayuda">{t("busqueda.frase.ayuda")}</p>
           <div className="acciones">
-            <button type="button" className="boton boton-primario" disabled={!frase.trim() || pensando} onClick={sugerir}>
+            <button type="button" className="boton boton-primario" disabled={!frase.trim() || pensando} aria-busy={pensando} onClick={sugerir}>
+              {pensando && <span className="anillo anillo-chico" aria-hidden="true" />}
               {pensando ? t("busqueda.frase.pensando") : t("busqueda.frase.sugerir")}
             </button>
           </div>
+          {pensando && <Trabajando texto={t("busqueda.trabajando.frase")} />}
           {errorFrase && <p role="alert" className="error">{t(`busqueda.frase.${errorFrase}`)}</p>}
         </div>
       )}
@@ -249,28 +257,39 @@ export default function NuevaBusqueda() {
       <button
         type="button"
         className="boton"
-        disabled={!form.ciiu || !(Number(form.tope) > 0)}
-        onClick={() => intentar(async () => setVista(await vistaPrevia(aPedido(form))))}
+        disabled={!form.ciiu || !(Number(form.tope) > 0) || ocupado !== null}
+        aria-busy={ocupado === "vista"}
+        onClick={() => intentar(async () => setVista(await vistaPrevia(aPedido(form))), "vista")}
       >
         {t("busqueda.vista_previa")}
       </button>
       </div>
+      {ocupado === "vista" && <Trabajando texto={t("busqueda.trabajando.vista_previa")} />}
       {vista && <ResultadoVistaPrevia vista={vista} tope={Number(form.tope)} />}
       <div className="acciones">
       <button
         type="button"
         className="boton boton-primario"
-        disabled={!puedeBuscar}
+        disabled={!puedeBuscar || ocupado !== null}
+        aria-busy={ocupado === "buscar"}
         onClick={() =>
           intentar(async () => {
             // Se queda en la pantalla: primero se lee qué pasó con cada fuente; el tablero es un clic aparte.
             setResultado(await ejecutar(vista!.busqueda_id));
-          })
+          }, "buscar")
         }
       >
-        {t("busqueda.buscar")}
+        {ocupado === "buscar" && <span className="anillo anillo-chico" aria-hidden="true" />}
+        {ocupado === "buscar" ? t("busqueda.trabajando.buscando_boton") : t("busqueda.buscar")}
       </button>
       </div>
+      {ocupado === "buscar" && vista && (
+        // La API responde todo junto al final: mientras tanto se ve qué fuentes se están consultando.
+        <Trabajando
+          texto={t("busqueda.trabajando.buscando")}
+          pasos={vista.fuentes.map((f) => t("busqueda.trabajando.consultando", { fuente: t(`fuentes.${f.fuente}`, { defaultValue: f.fuente }) }))}
+        />
+      )}
       {resultado && (
         <>
           <ResultadoPorFuente porFuente={resultado.por_fuente} />

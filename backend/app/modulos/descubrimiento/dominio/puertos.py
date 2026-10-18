@@ -4,7 +4,9 @@ from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
-from app.modulos.descubrimiento.dominio.modelos import Borrador, CriteriosICP, EmpresaCruda, Lead, MetaFuente, PaginaEmpresas
+from app.modulos.descubrimiento.dominio.modelos import (
+    Borrador, CriteriosICP, EmpresaCruda, Lead, LeadParaEnriquecer, MetaFuente, PaginaEmpresas,
+    ResultadoEnriquecimiento)
 
 
 class FuenteDescubrimiento(Protocol):
@@ -55,6 +57,14 @@ class RepositorioLeads(Protocol):
 
     def obtener_lead(self, lead_id: UUID) -> Lead | None:
         """Con nombre y dirección descifrados. None si no existe o es de otro tenant."""
+        ...
+
+    def sin_enriquecer(self, busqueda_id: UUID) -> list[LeadParaEnriquecer]:
+        """Leads de la búsqueda con enriquecido_en NULL, descifrados."""
+        ...
+
+    def guardar_enriquecimiento(self, lead_id: UUID, r: ResultadoEnriquecimiento) -> None:
+        """Una UPDATE. Contacto siempre cifrado; si sube a jurídica, nombre y dirección pasan a claro y se anota en cumplimiento."""
         ...
 
 

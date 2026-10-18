@@ -31,7 +31,8 @@ def cargar_tarifas(ruta: Path = CONFIG / "tarifas.yaml") -> dict[str, Decimal]:
     t = yaml.safe_load(ruta.read_text())
     usd_por_minuto = t["dapta"]["usd_por_minuto"]
     return {"croma": Decimal(str(t["croma"]["usd_por_credito"])), "osm": Decimal(str(t["computo_seg_usd"])),
-            "datos.gov.co": Decimal(str(t["computo_seg_usd"])),
+            "datos.gov.co": Decimal(str(t["computo_seg_usd"])), "web_fetch": Decimal(str(t["web_fetch_usd"])),
+            "jev_in_por_M": Decimal(str(t["jev"]["in_usd_por_M"])),
             "dapta": Decimal(str(usd_por_minuto)) if usd_por_minuto is not None else None}
 
 
