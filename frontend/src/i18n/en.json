@@ -46,7 +46,7 @@
     "creditos_restantes": "Croma credits left this month: {{n}}",
     "requests_restantes": "Croma requests left in 24 h: {{n}}",
     "descartadas": "Discarded sources",
-    "ignorados": "ignored: {{lista}}",
+    "ignorados": "does not filter by: {{lista}}",
     "error": "The operation could not be completed. Try again.",
     "pestanas": {
       "lookalike": "Already buying from me",
@@ -74,7 +74,13 @@
       "detalle_ignora": "does not filter by: {{campos}}",
       "detalle_costo": "Maximum cost {{maximo}} · cap {{tope}}"
     },
-    "revisar_clientes": "We prefilled the filters from your customers. Review and adjust them before the preview."
+    "revisar_clientes": "We prefilled the filters from your customers. Review and adjust them before the preview.",
+    "sin_conteo_corto": "no prior count",
+    "grupos": {
+      "quien": "Who are you looking for?",
+      "afinar": "Refine the search",
+      "mensaje": "Message and spend"
+    }
   },
   "fuentes": {
     "croma_supersociedades_co": "Supersociedades (Croma)",

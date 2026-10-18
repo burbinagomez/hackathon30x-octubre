@@ -10,15 +10,25 @@ export default function ResultadoVistaPrevia({ vista, tope }: Props) {
     <section className="resultado">
       <p className="nota">{t("busqueda.conteo_antes_de_filtros")}</p>
       {vista.fuentes.length === 0 && <p>{t("busqueda.ninguna_fuente_cubre")}</p>}
-      <ul>
+      {/* Una fila por fuente: nombre | conteo | lo que no filtra. "Sin conteo" va corto y se explica una vez abajo. */}
+      <ul className="fuentes-vista">
         {vista.fuentes.map((f) => (
-          <li key={f.fuente}>
-            {t(`fuentes.${f.fuente}`)}: {f.conteo === null ? t(`motivos.${f.motivo}`) : entero(f.conteo)}
-            {f.ignorados.length > 0 &&
-              ` (${t("busqueda.ignorados", { lista: f.ignorados.map((k) => t(`criterios.${k}`)).join(", ") })})`}
+          <li key={f.fuente} className="fila-fuente">
+            <span className="fila-fuente-nombre">{t(`fuentes.${f.fuente}`)}</span>
+            <span>
+              {f.conteo !== null ? entero(f.conteo) : f.motivo === "sin_conteo" ? t("busqueda.sin_conteo_corto") : t(`motivos.${f.motivo}`)}
+            </span>
+            {f.ignorados.length > 0 && (
+              <span className="fila-fuente-ignora">
+                {t("busqueda.ignorados", { lista: f.ignorados.map((k) => t(`criterios.${k}`)).join(", ") })}
+              </span>
+            )}
           </li>
         ))}
       </ul>
+      {vista.fuentes.some((f) => f.conteo === null && f.motivo === "sin_conteo") && (
+        <p className="nota">{t("motivos.sin_conteo")}</p>
+      )}
       {vista.descartadas.length > 0 && (
         <>
           <h2>{t("busqueda.descartadas")}</h2>
@@ -37,11 +47,15 @@ export default function ResultadoVistaPrevia({ vista, tope }: Props) {
       )}
       {vista.costo_maximo_usd !== null && (
         <>
-          <p>{t("busqueda.costo_maximo", { monto: monedaFina(vista.costo_maximo_usd) })}</p>
-          <p>{t("busqueda.tope_linea", { monto: monedaFina(tope) })}</p>
-          {vista.dentro_del_tope !== null && (
-            <p role="status">{t(vista.dentro_del_tope ? "busqueda.dentro_del_tope" : "busqueda.fuera_del_tope")}</p>
-          )}
+          <div className="metricas-vista">
+            <p className="metrica">{t("busqueda.costo_maximo", { monto: monedaFina(vista.costo_maximo_usd) })}</p>
+            <p className="metrica">{t("busqueda.tope_linea", { monto: monedaFina(tope) })}</p>
+            {vista.dentro_del_tope !== null && (
+              <p role="status" className="metrica">
+                {t(vista.dentro_del_tope ? "busqueda.dentro_del_tope" : "busqueda.fuera_del_tope")}
+              </p>
+            )}
+          </div>
           <p className="nota">{t("busqueda.se_compara_el_maximo")}</p>
         </>
       )}
