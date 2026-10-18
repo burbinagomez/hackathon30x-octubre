@@ -224,7 +224,11 @@ export default function NuevaBusqueda() {
       {pestana === "lookalike" && (
         <div className="panel-intake" role="tabpanel">
           {sugerido && <p role="status" className="aviso">{t("busqueda.frase.revisar")}</p>}
-          <IntakeLookalike alSugerir={aplicarLookalike} />
+          <IntakeLookalike
+            alSugerir={aplicarLookalike}
+            nombreActividad={(c) => { const a = actividades.find((x) => x.codigo === c); return a && nombre(a); }}
+            nombreDivision={(c) => { const d = divisiones.find((x) => x.codigo_nativo === c); return d && (i18n.language === "en" ? d.nombre_en : d.nombre_es); }}
+          />
         </div>
       )}
       {pestana === "filtros" && (

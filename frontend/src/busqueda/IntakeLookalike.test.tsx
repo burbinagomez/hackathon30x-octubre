@@ -148,3 +148,23 @@ test("los_nombres_pegados_no_se_guardan_en_el_navegador", async () => {
   const guardado = JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage });
   expect(guardado).not.toContain("Uno SAS");
 });
+
+test("la_explicacion_muestra_nombres_si_la_pantalla_los_conoce", async () => {
+  iniciarSesion();
+  atender();
+  const nombres: Record<string, string> = { "4711": "Supermercados", "11": "Bogotá D.C." };
+  render(
+    <IntakeLookalike
+      alSugerir={() => undefined}
+      nombreActividad={(c) => nombres[c]}
+      nombreDivision={(c) => nombres[c]}
+    />,
+  );
+
+  escribir(cinco.join("\n"));
+  fireEvent.click(boton(es.intake.lookalike.sugerir));
+
+  await waitFor(() => expect(screen.queryByText("Supermercados: 5")).toBeInTheDocument());
+  expect(screen.queryByText("Bogotá D.C.: 4")).toBeInTheDocument();
+  expect(screen.queryByText("4752: 1")).toBeInTheDocument(); // sin nombre conocido, queda el código
+});
