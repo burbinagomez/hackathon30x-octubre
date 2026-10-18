@@ -1,0 +1,29 @@
+[
+  {
+    "nit": "999000001",
+    "digito_verificacion": "1",
+    "razon_social": "EJEMPLO FICTICIO ALFA S.A.S.",
+    "cod_ciiu_act_econ_pri": "4711",
+    "codigo_camara": "04",
+    "organizacion_juridica": "SOCIEDADES POR ACCIONES SIMPLIFICADAS SAS",
+    "fecha_renovacion": "20260410"
+  },
+  {
+    "nit": "999000002",
+    "digito_verificacion": "7",
+    "razon_social": "EJEMPLO FICTICIO BETA LTDA",
+    "cod_ciiu_act_econ_pri": "4711",
+    "codigo_camara": "04",
+    "organizacion_juridica": "SOCIEDAD LIMITADA",
+    "fecha_renovacion": "20250318"
+  },
+  {
+    "nit": "999000003",
+    "digito_verificacion": "3",
+    "razon_social": "EJEMPLO FICTICIO GAMA S.A.S.",
+    "cod_ciiu_act_econ_pri": "4711",
+    "codigo_camara": "14",
+    "organizacion_juridica": "SOCIEDADES POR ACCIONES SIMPLIFICADAS SAS",
+    "fecha_renovacion": "20260201"
+  }
+]

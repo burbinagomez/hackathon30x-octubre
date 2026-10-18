@@ -27,14 +27,18 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           version: "0.12.1"
       - name: roles.sql + password de test
         run: |
           psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f scripts/roles.sql
           psql -h localhost -U postgres -v ON_ERROR_STOP=1 -c "ALTER ROLE app_rt PASSWORD 'rt-ci'"
+      - name: supabase_simulado.sql (anon y authenticated, peor caso)
+        run: psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f scripts/supabase_simulado.sql
       # Como superusuario, igual que `supabase db push` en prod (corre como postgres).
       - name: supabase/migrations desde vacío
         run: scripts/migrar_local.sh postgresql://postgres@localhost:5432/postgres
@@ -48,8 +52,10 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
@@ -60,9 +66,14 @@ jobs:
 
   seguridad:
     runs-on: ubuntu-24.04
+    env:
+      GITLEAKS_VERSION: 8.30.1
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           version: "0.12.1"
       - name: pip-audit
@@ -71,6 +82,26 @@ jobs:
       - name: npm audit
         working-directory: frontend
         run: npm audit --audit-level=high
+      - name: gitleaks
+        env:
+          EVENTO: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          ANTES: ${{ github.event.before }}
+        run: |
+          base_url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          curl --proto '=https' -sSfLO "$base_url/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl --proto '=https' -sSfLO "$base_url/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          sha256sum --check --ignore-missing "gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          tar -xzf "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" gitleaks
+          if [ "$EVENTO" = pull_request ]; then
+            rango="$BASE..$HEAD"
+          elif [ "$ANTES" = 0000000000000000000000000000000000000000 ]; then
+            rango="$GITHUB_SHA"  # rama nueva: todo el historial
+          else
+            rango="$ANTES..$GITHUB_SHA"
+          fi
+          ./gitleaks git --config .gitleaks.toml --log-opts="$rango" --redact --no-banner -v
 
   evals:
     runs-on: ubuntu-24.04
@@ -78,8 +109,10 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           version: "0.12.1"
       - run: uv run python -m evals.run
@@ -87,7 +120,9 @@ jobs:
   imagenes:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: docker build -t api backend
       - run: docker build -t web frontend
       - name: el check sigue detectando los tres motivos
@@ -105,6 +140,35 @@ jobs:
           docker logs web-sin-caps
           exit 1
 
+  # Agente `security` sobre el diff del PR (principio V, spec 012). Fail-closed: sin la línea de
+  # veredicto exacta, bloquea. Herramienta de desarrollo: no escribe en `costos` (spec 012, Costos).
+  revision-seguridad:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - run: npm install -g @anthropic-ai/claude-code@2.1.302
+      - name: revisión del agente security
+        env:
+          # Sin el secret (fork, o todavía sin cargar) el script omite la revisión con un warning.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        # La lógica vive en el script para poder correrla en test_required_checks.py.
+        run: .github/scripts/revision_seguridad.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: revision-seguridad
+          path: revision.md
+          if-no-files-found: ignore
+
   migrar:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [back, front, seguridad, imagenes]
@@ -114,7 +178,9 @@ jobs:
       group: migrar
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
         with:
           version: 2.119.0

@@ -1,0 +1,18 @@
+title = "gitleaks config — hackathon30x-octubre"
+
+[extend]
+useDefault = true
+
+# Fixtures de test_secrets.py: valores con forma de secret de Supabase (sb_publishable_,
+# sb_secret_, sbp_) usados a propósito para probar que `api` rechaza arrancar con ellos.
+# Nunca son secrets reales (R7).
+[[allowlists]]
+targetRules = ["generic-api-key"]
+paths = [
+  '''backend/tests/arquitectura/test_secrets\.py''',
+]
+regexes = [
+  '''sb_publishable_valorsecreto\d''',
+  '''sb_secret_valorsecreto\d''',
+  '''sbp_valorsecreto\d''',
+]

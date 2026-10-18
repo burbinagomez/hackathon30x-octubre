@@ -12,6 +12,7 @@ from app.modelos import metadata
 BACKEND = Path(__file__).resolve().parents[2]
 MIGRAR = BACKEND / "scripts" / "migrar_local.sh"
 ROLES = BACKEND / "scripts" / "roles.sql"
+MIGRACIONES = BACKEND.parent / "supabase" / "migrations"
 BASE = "migraciones_t017"
 
 
@@ -58,7 +59,7 @@ def test_migrar_local_desde_vacio_dos_veces_sin_drift(base_vacia):
     assert _migrar(base_vacia).returncode == 0
     assert _migrar(base_vacia).returncode == 0
     assert _drift(base_vacia) == []
-    assert _aplicadas(base_vacia) == "0001"
+    assert _aplicadas(base_vacia) == ",".join(sorted(p.name.split("_", 1)[0] for p in MIGRACIONES.glob("*.sql")))
 
 
 def _consultar(url, sql):
