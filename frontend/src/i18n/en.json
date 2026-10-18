@@ -58,6 +58,7 @@
     "ingresos_min": "Minimum revenue"
   },
   "tablero": {
+    "error": "The dashboard could not be loaded. Try again.",
     "titulo": "Dashboard by source",
     "fuente": "Source",
     "encontrados": "Found",

@@ -20,7 +20,7 @@ function css(): string {
   expect(Object.keys(hojas)).toContain("./estilos.css");
   const texto = hojas["./estilos.css"];
   expect(texto.length).toBeGreaterThan(0);
-  return texto;
+  return texto.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
 /** El cuerpo de la primera regla cuyo selector contiene `selector` como elemento de una lista. */

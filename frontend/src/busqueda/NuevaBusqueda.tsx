@@ -35,7 +35,7 @@ function aPedido(f: Formulario): PedidoVistaPrevia {
 
 function Campo({ id, etiqueta, children }: { id: string; etiqueta: string; children: ReactNode }) {
   return (
-    <div>
+    <div className="campo">
       <label htmlFor={id}>{etiqueta}</label>
       {children}
     </div>
@@ -83,8 +83,9 @@ export default function NuevaBusqueda() {
   const puedeBuscar = vista !== null && vista.dentro_del_tope && vista.fuentes.length > 0;
 
   return (
-    <main>
+    <main className="pantalla">
       <h1>{t("busqueda.titulo")}</h1>
+      <div className="formulario formulario-ancho">
       <Campo id="pais" etiqueta={t("busqueda.pais")}>
         <select id="pais" value={form.pais} onChange={(e) => cambiar("pais", e.target.value)}>
           {PAISES.map((p) => <option key={p} value={p}>{t(`paises.${p}`)}</option>)}
@@ -110,16 +111,21 @@ export default function NuevaBusqueda() {
         <textarea id="mensaje" value={form.mensaje} onChange={(e) => cambiar("mensaje", e.target.value)} />
       </Campo>
 
+      <div className="acciones">
       <button
         type="button"
+        className="boton"
         disabled={!form.ciiu || !(Number(form.tope) > 0)}
         onClick={() => intentar(async () => setVista(await vistaPrevia(aPedido(form))))}
       >
         {t("busqueda.vista_previa")}
       </button>
+      </div>
       {vista && <ResultadoVistaPrevia vista={vista} tope={Number(form.tope)} />}
+      <div className="acciones">
       <button
         type="button"
+        className="boton boton-primario"
         disabled={!puedeBuscar}
         onClick={() =>
           intentar(async () => {
@@ -130,7 +136,9 @@ export default function NuevaBusqueda() {
       >
         {t("busqueda.buscar")}
       </button>
-      {fallo && <p role="alert">{t("busqueda.error")}</p>}
+      </div>
+      {fallo && <p role="alert" className="error">{t("busqueda.error")}</p>}
+      </div>
     </main>
   );
 }

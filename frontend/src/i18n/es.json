@@ -74,7 +74,8 @@
     "cobertura": "Cobertura por país",
     "revisiones_pendientes": "Revisiones pendientes: {{n}}",
     "atribucion": "Atribución de datos",
-    "desperdicio_real": "Desperdicio (real)"
+    "desperdicio_real": "Desperdicio (real)",
+    "error": "No se pudo cargar el tablero. Probá de nuevo."
   },
   "idioma": {
     "etiqueta": "Idioma",

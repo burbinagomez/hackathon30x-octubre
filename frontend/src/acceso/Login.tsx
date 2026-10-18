@@ -35,17 +35,25 @@ export default function Login() {
   }
 
   return (
-    <main>
-      <SelectorIdioma />
-      <h1>{t("acceso.titulo")}</h1>
-      <form onSubmit={ingresar}>
-        <label htmlFor="email">{t("acceso.email")}</label>
-        <input id="email" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <label htmlFor="clave">{t("acceso.clave")}</label>
-        <input id="clave" type="password" autoComplete="current-password" value={clave} onChange={(e) => setClave(e.target.value)} />
-        {fallo && <p role="alert">{t(`acceso.${fallo}`)}</p>}
-        <button type="submit">{t("acceso.ingresar")}</button>
-      </form>
+    <main className="pantalla pantalla-tarjeta">
+      <div className="tarjeta">
+        <div className="barra">
+          <SelectorIdioma />
+        </div>
+        <h1>{t("acceso.titulo")}</h1>
+        <form onSubmit={ingresar} className="formulario">
+          <div className="campo">
+            <label htmlFor="email">{t("acceso.email")}</label>
+            <input id="email" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <div className="campo">
+            <label htmlFor="clave">{t("acceso.clave")}</label>
+            <input id="clave" type="password" autoComplete="current-password" value={clave} onChange={(e) => setClave(e.target.value)} />
+          </div>
+          {fallo && <p role="alert" className="error">{t(`acceso.${fallo}`)}</p>}
+          <button type="submit" className="boton boton-primario">{t("acceso.ingresar")}</button>
+        </form>
+      </div>
     </main>
   );
 }
