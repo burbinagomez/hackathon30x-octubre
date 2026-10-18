@@ -18,8 +18,19 @@ from app.modulos.costos.dominio.puertos import RegistroCostos
 from app.modulos.descubrimiento.aplicacion.camaras import cargar_camaras
 from app.modulos.descubrimiento.aplicacion.registro import Registro, cargar_registro
 from app.modulos.descubrimiento.dominio.modelos import MetaFuente
-from app.modulos.descubrimiento.dominio.puertos import FabricaFuentes, FuenteDescubrimiento
-from app.modulos.intake.infraestructura.llm.interpretador_claude import InterpretadorClaude
+from app.modulos.descubrimiento.dominio.puertos import (
+    FabricaFuentes,
+    FuenteDescubrimiento,
+)
+from app.modulos.intake.infraestructura.llm.interpretador_claude import (
+    InterpretadorClaude,
+)
+from app.modulos.intake.infraestructura.llm.interpretador_openrouter import (
+    URL_BASE as URL_OPENROUTER,
+)
+from app.modulos.intake.infraestructura.llm.interpretador_openrouter import (
+    InterpretadorOpenRouter,
+)
 
 CONFIG = Path(__file__).resolve().parents[1] / "config"
 
@@ -42,20 +53,34 @@ def cargar_tarifas_llm() -> dict[str, dict[str, Decimal]]:
     return {modelo: {k: Decimal(str(v)) for k, v in t.items()} for modelo, t in llm.items()}
 
 
+# Proveedores de la Puerta B: mismo puerto (GeneradorEstructurado), un adaptador cada uno. Se elige con IA_PROVEEDOR.
+URL_IA = {"anthropic": "https://api.anthropic.com", "openrouter": URL_OPENROUTER}
+
+
+def _proveedor(ajustes) -> str:
+    return (getattr(ajustes, "ia_proveedor", None) or "anthropic").strip().lower()
+
+
 def ia_configurada(ajustes, tarifas_llm: Mapping[str, Mapping]) -> bool:
-    """Key + modelo + tarifa de ese modelo. Cualquier falta = la Puerta B no está disponible."""
+    """Key + modelo + tarifa de ese modelo + proveedor conocido. Cualquier falta = la Puerta B no está disponible.
+    La tarifa se busca por IA_MODELO (el nombre del libro de costos), no por el nombre que usa el proveedor."""
     key, modelo = ajustes.ia_api_key, (ajustes.ia_modelo or "").strip()
-    return bool(key and key.get_secret_value().strip() and modelo in tarifas_llm)
+    return bool(key and key.get_secret_value().strip() and modelo in tarifas_llm and _proveedor(ajustes) in URL_IA)
 
 
 def generador_de_frase(ajustes, tarifas_llm: Mapping[str, Mapping], costos: RegistroCostos,
-                       transporte: httpx.BaseTransport) -> InterpretadorClaude | None:
+                       transporte: httpx.BaseTransport) -> InterpretadorClaude | InterpretadorOpenRouter | None:
     """El adaptador de la Puerta B atado a este tenant (por `costos`), o None si la IA no está disponible."""
     if not ia_configurada(ajustes, tarifas_llm):
         return None
     modelo = ajustes.ia_modelo.strip()
-    http = httpx.Client(base_url="https://api.anthropic.com", transport=transporte, timeout=30)
-    return InterpretadorClaude(costos, dict(tarifas_llm[modelo]), modelo, ajustes.ia_api_key.get_secret_value(), http)
+    proveedor = _proveedor(ajustes)
+    http = httpx.Client(base_url=URL_IA[proveedor], transport=transporte, timeout=30)
+    clave, tarifa = ajustes.ia_api_key.get_secret_value(), dict(tarifas_llm[modelo])
+    if proveedor == "openrouter":
+        nombre = (getattr(ajustes, "ia_modelo_proveedor", None) or modelo).strip()
+        return InterpretadorOpenRouter(costos, tarifa, nombre, clave, http)
+    return InterpretadorClaude(costos, tarifa, modelo, clave, http)
 
 
 def registro_api(ruta_yaml: Path, catalogo: dict[str, type]) -> Registro:
