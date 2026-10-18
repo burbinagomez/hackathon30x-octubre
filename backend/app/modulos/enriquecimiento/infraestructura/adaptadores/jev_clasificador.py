@@ -2,7 +2,8 @@
 
 Defensas: los datos del lead van como JSON dentro de un bloque delimitado, con < y > escapados (un nombre no
 abre ni cierra el bloque); las instrucciones salen de encaje_jev_v1.json, nunca del lead. El costo se registra
-con los tokens que informa jev, antes de validar la salida: una salida rota también se paga.
+con los tokens que informa jev, antes de validar la salida: una salida rota también se paga. Un 200 que no es
+JSON se cobra al techo (bytes del body enviado), como JuezClaude; un JSON sin uso válido lanza sin fila.
 """
 import json
 from decimal import Decimal
@@ -20,6 +21,7 @@ from app.modulos.enriquecimiento.dominio.puertos import Encaje
 PROMPT = json.loads((Path(__file__).parent / "encaje_jev_v1.json").read_text(encoding="utf-8"))
 TIMEOUT_S = 30.0
 ETIQUETAS = {"encaja", "no_encaja", "ninguna"}
+SIN_JSON = object()
 
 
 def bloque_de_datos(descripcion_icp: str, nombre: str, ciudad: str | None, actividad: str | None) -> str:
@@ -67,7 +69,14 @@ class JevClasificador:
                                      json={"model": PROMPT["modelo"], "instrucciones": PROMPT["instrucciones"],
                                            "entrada": bloque_de_datos(descripcion_icp, nombre, ciudad, actividad)})
             respuesta.raise_for_status()  # 5xx o timeout: jev no midió tokens, no hay fila
-        cuerpo = respuesta.json()
+        try:
+            cuerpo = respuesta.json()
+        except ValueError:
+            cuerpo = SIN_JSON
+        if cuerpo is SIN_JSON:  # fuera del except: el error no cuelga la decodificación ni el cuerpo
+            # Salió y se pagó sin uso legible: se cobra el techo, como JuezClaude (un token >= un byte del body).
+            self._costos.registrar(operacion_jev(lead_id, len(respuesta.request.content), self._usd_in_por_M))
+            raise SalidaJevInvalida
         uso = cuerpo.get("uso") if isinstance(cuerpo, dict) else None
         tokens_in = validar_tokens(uso.get("tokens_in") if isinstance(uso, dict) else None)
         self._costos.registrar(operacion_jev(lead_id, tokens_in, self._usd_in_por_M))

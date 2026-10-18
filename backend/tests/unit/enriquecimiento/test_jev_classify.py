@@ -174,3 +174,22 @@ def test_timeout_lanza_sin_fila():
         _clasificar(clasificador)
 
     assert costos.filas == []
+
+
+def test_200_que_no_es_json_cobra_el_techo_y_lanza_salida_invalida():
+    # Mismo criterio que JuezClaude: salió y se pagó; sin uso legible se cobra el techo (un token >= un byte del body).
+    requests: list[httpx.Request] = []
+
+    def roto(request):
+        requests.append(request)
+        return httpx.Response(200, content=b"<html>502 detras del proxy</html>")
+    costos = RegistroCostosFalso()
+    clasificador = JevClasificador(costos, httpx.MockTransport(roto), URL, SecretStr(CREDENCIAL), TARIFA_POR_M)
+    lead_id = uuid4()
+
+    with pytest.raises(Exception) as error:  # amplio a propósito: el rojo es un assert, no un JSONDecodeError suelto
+        clasificador.clasificar(lead_id, "icp", "Transportes Andinos SAS", "Cali", None)
+
+    _fila_jev(costos, lead_id, len(requests[0].content))
+    assert error.type is SalidaJevInvalida
+    assert error.value.__context__ is None  # sin la excepción de decodificación (y su cuerpo) colgada

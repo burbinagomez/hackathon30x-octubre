@@ -125,8 +125,8 @@ Notas de cierre (2026-10-18):
 - No verificado (P8): si jev cobra las llamadas que fallan. Hoy un 5xx o un timeout no escribe fila, porque jev no informa tokens.
 
 **Pendientes de la Fase 5:**
-- [ ] Un 200 con cuerpo que no es JSON lanza `JSONDecodeError` sin mapear y sin fila de costo (nota no bloqueante de security).
-- [ ] Fase 6: decidir si un `httpx.HTTPError` de jev cuenta como falla del lead o corta la corrida entera (advisor).
+- [x] Un 200 con cuerpo que no es JSON registra `jev_tokens` al techo (bytes del body enviado) y lanza `SalidaJevInvalida`, mismo criterio que JuezClaude. Diferencia que queda: un JSON sin `uso` válido lanza `UsoJevInvalido` sin fila (JuezClaude ahí cobra el techo).
+- [x] Fase 6: una falla HTTP de jev cuenta solo contra ese lead (se marca y se sigue con el resto), salvo que se agote el límite o falle la red completa. Decidido por Daniel.
 
 ## Fase 6: Migración 0008 (columnas), repo y casos de uso (Paso 5) — advisor + security
 
