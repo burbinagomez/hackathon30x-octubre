@@ -249,7 +249,8 @@ def test_salida_invalida_falla_el_caso_con_motivo(tmp_path, correr):
 @pytest.mark.parametrize("nombre, datos", [
     (ENCAJE, _dataset({**_caso("a"), "etiqueta": None})),
     (CALIBRACION, [{**_mensaje("m-a"), "pertinente": None}]),
-], ids=["etiqueta", "pertinente"])
+    (ENCAJE, _dataset({k: v for k, v in _caso("a").items() if k != "etiqueta"})),
+], ids=["etiqueta", "pertinente", "etiqueta_ausente"])
 def test_etiqueta_invalida_es_config_invalida(tmp_path, correr, nombre, datos):
     config = _config(tmp_path, {nombre: {"datos": datos}})
     juez = _juez({"a": [SI] * 3, "m-a": [SI] * 3})
@@ -392,7 +393,7 @@ def test_tolerancia_absorbe_una_baja_dentro_del_margen(tmp_path, correr):
     _fijar_baseline(correr, _encaje(tmp_path, *casos), "abcd", agregado=0.80)
     # tolerancia no entra en el fingerprint: cambiarla no vuelve obsoleto el baseline.
     config = _encaje(tmp_path, *casos, tolerancia=0.05)
-    juez = _juez({"a": [NO] * 3, **_todos("bcd", SI)})  # 0.75 ≥ 0.80 − 0.05 (0.8 − 0.05 en float no da 0.75 exacto)
+    juez = _juez({"a": [NO] * 3, **_todos("bcd", SI)})  # 0.75 ≥ 0.80 − 0.05
 
     r = correr(config, juez)
 
