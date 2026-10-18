@@ -10,7 +10,8 @@
   "motivos": {
     "sin_mapeo_actividad": "La actividad no tiene equivalente en esta fuente",
     "pais": "La fuente no cubre este país",
-    "sin_geografia": "La fuente necesita un departamento o ciudad"
+    "sin_geografia": "La fuente necesita un departamento o ciudad",
+    "sin_conteo": "Sin conteo: todavía no se consulta cuántas empresas hay"
   },
   "config": {
     "incompleta": "Configuración incompleta"
@@ -24,6 +25,8 @@
     "actividad": "Actividad",
     "actividad_vacia": "Elegí una actividad",
     "departamento": "Departamento",
+    "ciudad": "Ciudad (opcional)",
+    "departamento_vacio": "Todos los departamentos",
     "ingresos_min": "Ingresos mínimos (USD)",
     "palabras_clave": "Palabras clave (separadas por coma)",
     "exclusiones": "Exclusiones (separadas por coma)",
@@ -42,7 +45,8 @@
     "requests_restantes": "Consultas de Croma restantes en 24 h: {{n}}",
     "descartadas": "Fuentes descartadas",
     "ignorados": "se ignora: {{lista}}",
-    "error": "No se pudo completar la operación. Probá de nuevo."
+    "error": "No se pudo completar la operación. Probá de nuevo.",
+    "tope_nota": "Se guarda; todavía no se aplica."
   },
   "fuentes": {
     "croma_supersociedades_co": "Supersociedades (Croma)",
@@ -55,7 +59,10 @@
     "pais": "País",
     "ciiu": "Actividad",
     "departamento": "Departamento",
-    "ingresos_min": "Ingresos mínimos"
+    "ingresos_min": "Ingresos mínimos",
+    "ciudad": "Ciudad",
+    "palabras_clave": "Palabras clave",
+    "exclusiones": "Exclusiones"
   },
   "tablero": {
     "titulo": "Tablero por fuente",
@@ -90,5 +97,13 @@
   },
   "canales": {
     "email": "Correo electrónico"
+  },
+  "geografia": {
+    "division": {
+      "CO": "Departamento",
+      "MX": "Estado",
+      "BR": "Estado",
+      "PE": "Departamento"
+    }
   }
 }

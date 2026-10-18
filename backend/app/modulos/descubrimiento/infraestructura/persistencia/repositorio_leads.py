@@ -1,6 +1,7 @@
 import json
 from collections.abc import Iterator
 from contextlib import contextmanager
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import Connection, Engine, text
@@ -8,7 +9,7 @@ from sqlalchemy.exc import DBAPIError
 
 from app.db import unidad_de_trabajo
 from app.modulos.descubrimiento.dominio.errores import ErrorPersistencia
-from app.modulos.descubrimiento.dominio.modelos import CriteriosICP, EmpresaCruda, Lead
+from app.modulos.descubrimiento.dominio.modelos import Borrador, CriteriosICP, EmpresaCruda, Lead
 from app.seguridad.cifrado import Cifrador
 
 _INSERT_LEAD = text(
@@ -39,6 +40,39 @@ class RepositorioLeadsPostgres:
                      "RETURNING id"),
                 {"t": self._tenant_id, "pais": criterios.pais, "criterios": json.dumps(dict(criterios.filtros))},
             ).scalar_one()
+
+    def crear_borrador(self, criterios: CriteriosICP, canal_preferido: str | None, tope_gasto_usd: Decimal,
+                       mensaje_base: str | None) -> UUID:
+        with self._uow() as c:
+            return c.execute(
+                text("INSERT INTO busquedas (tenant_id, pais, criterios, estado, canal_preferido, tope_gasto_usd, "
+                     "mensaje_base) VALUES (:t, :pais, CAST(:criterios AS jsonb), 'borrador', :canal, :tope, :mensaje) "
+                     "RETURNING id"),
+                {"t": self._tenant_id, "pais": criterios.pais, "criterios": json.dumps(dict(criterios.filtros)),
+                 "canal": canal_preferido, "tope": tope_gasto_usd, "mensaje": mensaje_base},
+            ).scalar_one()
+
+    def estado(self, busqueda_id: UUID) -> str | None:
+        with self._uow() as c:  # RLS: la de otro tenant no aparece
+            return c.execute(text("SELECT estado FROM busquedas WHERE id = :id"), {"id": busqueda_id}).scalar_one_or_none()
+
+    def obtener_borrador(self, busqueda_id: UUID) -> Borrador | None:
+        with self._uow() as c:
+            f = c.execute(
+                text("SELECT pais, criterios, canal_preferido, tope_gasto_usd, mensaje_base FROM busquedas "
+                     "WHERE id = :id AND estado = 'borrador'"), {"id": busqueda_id}).one_or_none()
+        if f is None:
+            return None
+        # JSON no distingue tupla de lista: las listas vuelven a ser tuplas (varios valores de un filtro).
+        filtros = {k: tuple(v) if isinstance(v, list) else v for k, v in f.criterios.items()}
+        return Borrador(id=busqueda_id, criterios=CriteriosICP(f.pais, filtros), canal_preferido=f.canal_preferido,
+                        tope_gasto_usd=Decimal(f.tope_gasto_usd), mensaje_base=f.mensaje_base)
+
+    def pasar_a_ejecutando(self, busqueda_id: UUID) -> bool:
+        with self._uow() as c:
+            return c.execute(
+                text("UPDATE busquedas SET estado = 'ejecutando' WHERE id = :id AND estado = 'borrador'"),
+                {"id": busqueda_id}).rowcount == 1
 
     @contextmanager
     def _uow(self) -> Iterator[Connection]:

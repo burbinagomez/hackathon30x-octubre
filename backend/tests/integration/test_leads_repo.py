@@ -1,4 +1,5 @@
 from dataclasses import replace
+from decimal import Decimal
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -98,3 +99,58 @@ def test_cerrar_busqueda_guarda_estado(rt, admin, tenants, cifrador):
     busqueda_id = repo.crear_busqueda(CriteriosICP(pais="CO", filtros={}))
     repo.cerrar_busqueda(busqueda_id, "con_errores")
     assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=busqueda_id) == "con_errores"
+
+
+# --- Borradores (T025, P2) ---
+
+CRITERIOS = CriteriosICP(pais="CO", filtros={"ciiu": "4711", "departamento": ("Cundinamarca", "Antioquia")})
+
+
+def test_borrador_se_guarda_y_se_lee_con_sus_criterios_congelados(rt, admin, tenants, cifrador):
+    repo = RepositorioLeadsPostgres(rt, tenants["a"], cifrador)
+
+    busqueda_id = repo.crear_borrador(CRITERIOS, "email", Decimal("5.25"), "Hola")
+
+    b = repo.obtener_borrador(busqueda_id)
+    assert b is not None
+    assert b.id == busqueda_id
+    assert b.criterios == CRITERIOS  # la tupla vuelve como tupla, no como lista
+    assert (b.canal_preferido, b.mensaje_base) == ("email", "Hola")
+    assert b.tope_gasto_usd == Decimal("5.25") and type(b.tope_gasto_usd) is Decimal
+    assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=busqueda_id) == "borrador"
+
+
+def test_borrador_de_a_no_se_ve_ni_se_ejecuta_desde_b(rt, admin, tenants, cifrador):
+    busqueda_id = RepositorioLeadsPostgres(rt, tenants["a"], cifrador).crear_borrador(CRITERIOS, None, Decimal("1"), None)
+    repo_b = RepositorioLeadsPostgres(rt, tenants["b"], cifrador)
+
+    assert repo_b.obtener_borrador(busqueda_id) is None
+    assert repo_b.pasar_a_ejecutando(busqueda_id) is False
+    assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=busqueda_id) == "borrador"
+
+
+def test_pasar_a_ejecutando_funciona_una_sola_vez(rt, admin, tenants, cifrador):
+    repo = RepositorioLeadsPostgres(rt, tenants["a"], cifrador)
+    busqueda_id = repo.crear_borrador(CRITERIOS, None, Decimal("1"), None)
+
+    assert repo.pasar_a_ejecutando(busqueda_id) is True
+    assert repo.pasar_a_ejecutando(busqueda_id) is False
+    assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=busqueda_id) == "ejecutando"
+    assert repo.obtener_borrador(busqueda_id) is None  # ya no es borrador
+
+
+def test_obtener_borrador_no_devuelve_una_busqueda_que_no_es_borrador(rt, tenants, cifrador):
+    repo = RepositorioLeadsPostgres(rt, tenants["a"], cifrador)
+    assert repo.obtener_borrador(tenants["busqueda"]) is None  # sembrada en `creada`
+    assert repo.pasar_a_ejecutando(tenants["busqueda"]) is False
+
+
+def test_estado_de_una_busqueda_de_otro_tenant_es_none_igual_que_si_no_existiera(rt, tenants, cifrador):
+    repo_a = RepositorioLeadsPostgres(rt, tenants["a"], cifrador)
+    repo_b = RepositorioLeadsPostgres(rt, tenants["b"], cifrador)
+    borrador = repo_a.crear_borrador(CRITERIOS, None, Decimal("1"), None)
+
+    assert repo_a.estado(borrador) == "borrador"
+    assert repo_a.estado(tenants["busqueda"]) == "creada"
+    assert repo_b.estado(borrador) is None  # 404, no 409: B no se entera de que existe
+    assert repo_a.estado(uuid4()) is None
