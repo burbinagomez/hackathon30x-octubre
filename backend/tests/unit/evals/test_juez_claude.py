@@ -3,6 +3,7 @@
 Nacieron rojos contra el stub de T013 (no mandaba request, no lanzaba, 0 filas de costo) y pasan a verde en T018.
 Excepción: `test_repr_no_muestra_la_key` nace verde (ver su docstring).
 """
+import json
 import logging
 import re
 from decimal import Decimal
@@ -13,6 +14,7 @@ import httpx
 import pytest
 
 from app.modulos.costos.dominio.modelos import OperacionCosto
+from evals.jueces.claude import MAX_TOKENS
 from evals.jueces.puerto import ErrorJuez, SalidaJuezInvalida, Veredicto
 from tests.anthropic_falso import CASO, CLAVE_FALSA, MODELO, SIN_TOOL_USE, USO, juez
 from tests.falsos import RegistroCostosFalso
@@ -152,7 +154,9 @@ FALLAS_HTTP = {
                                                                  "message": f"invalid x-api-key {CLAVE_FALSA}"}}),
             "http_401"),
     "503": (httpx.Response(503, text=f"overloaded {CLAVE_FALSA}"), "http_503"),
-    "timeout": (httpx.ConnectTimeout("timeout"), "red"),
+    # Sin conexión el request nunca salió: no hay nada que cobrar.
+    "connect_timeout": (httpx.ConnectTimeout("timeout"), "red"),
+    "connect_error": (httpx.ConnectError("rechazada"), "red"),
 }
 
 
@@ -170,15 +174,48 @@ def test_error_http_no_filtra_la_key(http, codigo):
     assert CLAVE_FALSA not in _cadena(error)
 
 
+# Tokens que la API suma y que no viajan en el body: el system prompt de tool use (~346 con tool_choice tool).
+TOKENS_OCULTOS_TOOL_USE = 346
+
+
+def _assert_costo_maximo(costos, capturados, lote):
+    # El request salió y la respuesta no se pudo leer: se cobra el techo de la llamada, no 0 ni nada.
+    assert len(capturados) == 1
+    filas = {f.tipo: f for f in costos.filas}
+    assert len(costos.filas) == 2 and filas.keys() == {"llm_tokens_in", "llm_tokens_out"}  # una por tarifa
+    bytes_body = len(json.dumps(capturados[0], ensure_ascii=False).encode("utf-8"))
+    assert filas["llm_tokens_in"].unidades >= bytes_body + TOKENS_OCULTOS_TOOL_USE  # un token nunca es < 1 byte
+    assert filas["llm_tokens_out"].unidades == Decimal(MAX_TOKENS)
+    esperadas = _filas_esperadas(lote)
+    assert [f.costo_unitario for f in sorted(costos.filas, key=lambda f: f.tipo)] == \
+        [e.costo_unitario for e in esperadas]
+    assert all(f.lote_id == lote and f.proveedor == "anthropic" and f.fuente == "evals" for f in costos.filas)
+    assert CLAVE_FALSA not in repr(costos.filas)
+
+
+@pytest.mark.parametrize("http", [httpx.ReadTimeout("timeout"), httpx.RemoteProtocolError("cortada")],
+                         ids=["read_timeout", "remote_protocol"])
+def test_falla_despues_de_enviar_cobra_el_maximo(http):
+    costos, capturados, lote = RegistroCostosFalso(), [], uuid4()
+    error = _lanza(juez(costos, capturados, lote_id=lote, http=http), Exception)
+
+    assert isinstance(error, ErrorJuez), f"lanzó {type(error).__name__}"
+    assert str(error) == "red" and error.__cause__ is None and error.__context__ is None
+    _assert_costo_maximo(costos, capturados, lote)
+
+
 @pytest.mark.parametrize("http", [httpx.Response(200, text="<html>no es json</html>"),
-                                  httpx.Response(200, json=["no", "es", "objeto"])], ids=["no_json", "no_objeto"])
-def test_200_ilegible_es_salida_invalida_sin_costos(http):
-    # Sin un objeto JSON no hay usage que leer: no se inventa una fila con 0 tokens (sin usage, sin costo).
-    costos = RegistroCostosFalso()
-    error = _lanza(juez(costos, [], http=http), Exception)
+                                  httpx.Response(200, json=["no", "es", "objeto"]),
+                                  httpx.Response(200, json={"content": [], "stop_reason": "end_turn"}),
+                                  httpx.Response(200, json={"content": [], "usage": {"input_tokens": 5}})],
+                         ids=["no_json", "no_objeto", "sin_usage", "usage_parcial"])
+def test_200_ilegible_es_salida_invalida_y_cobra_el_maximo(http):
+    # Un 200 se factura aunque no se pueda leer el usage: se cobra el techo, nunca una fila con 0 tokens.
+    costos, capturados, lote = RegistroCostosFalso(), [], uuid4()
+    error = _lanza(juez(costos, capturados, lote_id=lote, http=http), Exception)
 
     assert isinstance(error, SalidaJuezInvalida), f"lanzó {type(error).__name__}"
-    assert costos.filas == []
+    _assert_costo_maximo(costos, capturados, lote)
 
 
 def test_salida_no_filtra_la_key(capsys, caplog):
