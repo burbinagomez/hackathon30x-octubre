@@ -641,3 +641,42 @@ def test_tolima_con_el_yaml_real_de_camaras_no_tumba_la_busqueda_porque_no_hay_c
     with admin.connect() as c:
         filas = c.execute(text("SELECT proveedor FROM costos WHERE lote_id = :l"), {"l": busqueda_id}).all()
     assert [f.proveedor for f in filas] == ["osm"]
+
+
+# --- 015: resultado por fuente -------------------------------------------------------------------------------
+
+def _osm_con(api, respuesta):
+    """Overpass responde `respuesta` (una Response o una excepción a lanzar); datos.gov.co sigue con las filas de prueba."""
+    previo = api.app.state.transporte_http
+
+    def responder(request):
+        if request.url.host == "www.datos.gov.co":
+            return previo.handle_request(request)
+        api.pedidas.append(request)
+        if isinstance(respuesta, Exception):
+            raise respuesta
+        return respuesta
+
+    api.app.state.transporte_http = httpx.MockTransport(responder)
+
+
+@pytest.mark.parametrize("causa", [
+    pytest.param(httpx.ReadTimeout("t"), id="overpass_timeout"),
+    pytest.param(httpx.ConnectError("c"), id="overpass_sin_conexion"),
+])
+def test_tolima_no_da_500(api, admin, usuarios, causa):
+    """Tolima + Ibagué con el YAML real de cámaras (datos.gov.co: criterio no soportado) y Overpass caído por red:
+    antes, la excepción de httpx no la atrapa nadie y la API devuelve 500 con la búsqueda en `error`."""
+    api.app.state.geografia = GEOGRAFIA_DE_PRUEBA
+    _osm_con(api, causa)
+    busqueda_id = _crear(api, usuarios["a"], departamento="73", ciudad="Ibagué")
+
+    r = _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    assert r.status_code == 200
+    assert r.json()["por_fuente"] == {
+        "osm_overpass": {"estado": "no_disponible", "encontrados": 0},
+        "datos_gov_co_rues": {"estado": "no_soporta_criterio", "encontrados": 0}}
+    assert r.json()["estado"] == "error"  # las dos fallaron; la respuesta sigue siendo 200
+    assert _contar(admin, "SELECT estado FROM busquedas WHERE id = :id", id=busqueda_id) == "error"
+
