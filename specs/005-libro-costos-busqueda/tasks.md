@@ -221,6 +221,7 @@
   Un test que nazca verde contra estos esqueletos (por ejemplo, un positivo de `limites.test.ts` con la config vacía) se acepta solo si su mutación lo pone en rojo.
 - [ ] T035 [MIN] [Paso 8] **Rojo:** `frontend/tests/arquitectura/limites.test.ts`, los 6 tests de spec:221-235. **Mutación:** cada negativo, con su dirección en `allow`; para `import_sin_resolver_es_error`, `import/no-unresolved` en `off`.
 - [ ] T036 [Pulido] [Paso 8] **Verde:** `frontend/eslint.config.js` (boundaries, en el orden de tipos de spec:445-452, más el resolver de TS).
+  - Nota: `eslint-plugin-boundaries` se sacó de devDependencies (PR #37) porque arrastra handlebars 4.7.9 (3 CVE críticos) y braces 3.0.3 (CVE alto, sin versión arreglada) y rompía `npm audit`. Al retomar la T036, elegí un plugin sin braces vulnerable: `eslint-plugin-import`, ya instalado, trae `import/no-restricted-paths`.
 - [x] T037 [MIN] [Paso 8] **Rojo:**
   - `frontend/tests/arquitectura/i18n.test.ts`, los 4 tests. **Mutación:** borrar una clave de `en.json`; `mode` que no atrapa atributos.
   - `frontend/src/i18n/elegirIdioma.test.ts::precedencia[caso]`. **Mutación:** el tenant antes que el navegador.
