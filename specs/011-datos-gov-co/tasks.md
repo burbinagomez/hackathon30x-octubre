@@ -95,15 +95,15 @@ Comando de la suite: `cd backend && uv run pytest -q && uv run lint-imports`.
 
 ### Fase 5: Resto del adaptador (Paso 6) [002] [003], bloqueada por D4, D9 y (advisor) en costos
 
-- [ ] T023 [MIN] [P] [Paso 6] **Rojo:** `::test_departamento_se_traduce_a_camaras`. *[MIN: el caso del CIIU inyectado es la guarda contra inyección SoQL.]*
+- [X] T023 [MIN] [P] [Paso 6] **Rojo:** `::test_departamento_se_traduce_a_camaras`. *[MIN: el caso del CIIU inyectado es la guarda contra inyección SoQL.]*
   - 25 → `in('04','14','47','58')`.
   - Un departamento fuera del YAML y el CIIU `"47' OR '1'='1"` → `CriterioNoSoportado` y 0 requests.
   - Si el caso 11 → `'04'` ya pasa por T018, se comprueba por mutación.
   - La validación `^\d{4}$` del CIIU (que T018 ya trae) se comprueba por mutación: quitarla debe poner en rojo el caso inyectado.
-- [ ] T024 [MIN] [P] [003] [Paso 6] **Rojo:** `::test_mapea_fila_a_empresa_cruda`. Afirma los campos de la spec que existan en `EmpresaCruda` después de la 003, más `adaptador.meta.licencia == "CC-BY-SA-4.0"`. La licencia va en `meta`, no en `EmpresaCruda` (D4).
-- [ ] T025 [MIN] [P] [Paso 6] **Rojo:** `::test_as_of_sale_del_header`, con el header y sin él (reloj inyectable). *[MIN: `test_habilitada_por_yaml_temporal_da_leads_cc_by_sa` (T043) exige el `as_of` del header en el lead.]*
-- [ ] T027 [MIN] [P] [Paso 6] **Rojo:** `::test_pagina_2_vacia_sin_request`. Afirma 0 requests y 0 filas de costo. *[MIN: sin `$offset`, una página 2 traería otra vez las mismas filas y las mismas filas de costo.]*
-- [ ] T028 [MIN] [Paso 6] **Verde** de T023, T024, T025 y T027.
+- [X] T024 [MIN] [P] [003] [Paso 6] **Rojo:** `::test_mapea_fila_a_empresa_cruda`. Afirma los campos de la spec que existan en `EmpresaCruda` después de la 003, más `adaptador.meta.licencia == "CC-BY-SA-4.0"`. La licencia va en `meta`, no en `EmpresaCruda` (D4).
+- [X] T025 [MIN] [P] [Paso 6] **Rojo:** `::test_as_of_sale_del_header`, con el header y sin él (reloj inyectable). *[MIN: `test_habilitada_por_yaml_temporal_da_leads_cc_by_sa` (T043) exige el `as_of` del header en el lead.]*
+- [X] T027 [MIN] [P] [Paso 6] **Rojo:** `::test_pagina_2_vacia_sin_request`. Afirma 0 requests y 0 filas de costo. *[MIN: sin `$offset`, una página 2 traería otra vez las mismas filas y las mismas filas de costo.]*
+- [X] T028 [MIN] [Paso 6] **Verde** de T023, T024, T025 y T027.
 - [ ] T029 [MIN] [Paso 6] **Rojo (advisor):** dos tests de costos. *[MIN: principio de costos, todo adaptador de salida escribe su fila antes de devolver.]*
   - `::test_registra_segundos_de_cada_intento`, con 503 → 200 en filas a 2 s y 3 s. En el mínimo quedan 2 filas `socrata_descarga` con `unidades` 2 y 3, `Decimal(str(computo_seg_usd))`, `proveedor="datos.gov.co"`, `gratis=False`, `lead_id=None` y el `lote_id`. La tercera fila, la del conteo a 1 s, se suma en T021 (Pulido).
   - `::test_segundo_fallo_lanza_fuente_no_disponible`: dos 503 (y la variante con dos `httpx.TimeoutException`) dan `FuenteNoDisponible`, 2 filas y un `str(exc)` que no contiene el cuerpo de la respuesta (un marcador `"CUERPO-SECRETO"`). El assert de "0 requests de conteo" se suma en T021.

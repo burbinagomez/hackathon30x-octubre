@@ -1,6 +1,7 @@
 import re
 from collections.abc import Callable, Mapping
-from datetime import datetime
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any
 from uuid import UUID
 
@@ -91,7 +92,9 @@ class DatosGovCoRues:
         ciiu, codigos = self._validar(criterios)
         if pagina > 1:  # una sola página: sin $order no hay $offset estable
             return PaginaEmpresas(empresas=(), total=None)
-        enlista = ",".join(f"'{c}'" for c in codigos)  # códigos del YAML, nunca texto libre
+        enlista = ",".join(
+            f"'{c}'" for c in codigos
+        )  # códigos del YAML, nunca texto libre
         where = (
             "organizacion_juridica != 'PERSONA NATURAL'"
             " AND organizacion_juridica IS NOT NULL"
@@ -101,12 +104,19 @@ class DatosGovCoRues:
             " AND nit IS NOT NULL"
         )
         cabeceras = {"X-App-Token": self._app_token} if self._app_token else {}
-        with httpx.Client(transport=self._transporte, timeout=TIMEOUT_SEG, headers=cabeceras) as cliente:
+        with httpx.Client(
+            transport=self._transporte, timeout=TIMEOUT_SEG, headers=cabeceras
+        ) as cliente:
             respuesta = cliente.get(
-                self._url, params={"$select": SELECT_FILAS, "$where": where, "$limit": str(LIMITE_FILAS)}
+                self._url,
+                params={
+                    "$select": SELECT_FILAS,
+                    "$where": where,
+                    "$limit": str(LIMITE_FILAS),
+                },
             )
         respuesta.raise_for_status()
-        as_of = self._reloj()
+        as_of = self._as_of(respuesta)
         empresas = tuple(
             EmpresaCruda(
                 pais="CO",
@@ -123,6 +133,16 @@ class DatosGovCoRues:
             if _es_juridica_valida(fila)
         )
         return PaginaEmpresas(empresas=empresas, total=None)
+
+    def _as_of(self, respuesta: httpx.Response) -> datetime:
+        """Última modificación del dataset según SODA; sin header, la hora de la consulta."""
+        valor = respuesta.headers.get("X-SODA2-Truth-Last-Modified")
+        if valor:
+            try:
+                return parsedate_to_datetime(valor).astimezone(UTC)
+            except (TypeError, ValueError):
+                pass
+        return self._reloj()
 
     def _ciudad(self, codigo: Any) -> str | None:
         camara = self._camaras.get(str(codigo))

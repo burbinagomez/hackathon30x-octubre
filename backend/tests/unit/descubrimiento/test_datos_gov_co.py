@@ -91,7 +91,9 @@ def _transporte_fijo(
 
 
 def _transporte_guionado(
-    reloj: RelojFalso, pasos: list[tuple[int | str, float]], capturadas: list[httpx.Request]
+    reloj: RelojFalso,
+    pasos: list[tuple[int | str, float]],
+    capturadas: list[httpx.Request],
 ) -> httpx.MockTransport:
     """Cada paso es (status | "timeout", segundos que tarda la request según el reloj)."""
     restantes = list(pasos)
@@ -230,7 +232,9 @@ def test_descartados_no_se_loguean(caplog):
 
 
 def _criterios(**filtros: str | tuple[str, ...]) -> CriteriosICP:
-    return CriteriosICP(pais="CO", filtros={"ciiu": "4711", "departamento": "11", **filtros})
+    return CriteriosICP(
+        pais="CO", filtros={"ciiu": "4711", "departamento": "11", **filtros}
+    )
 
 
 def test_departamento_25_se_traduce_a_cuatro_camaras():
@@ -273,19 +277,27 @@ def test_mapea_fila_a_empresa_cruda():
     assert alfa.actividad == ("4711", "CIIU")
     assert alfa.tipo_titular == "juridica"
     assert alfa.fuente == "datos_gov_co_rues"
-    assert alfa.url_origen == "https://www.datos.gov.co/resource/c82u-588k.json?nit=999000001"
+    assert (
+        alfa.url_origen
+        == "https://www.datos.gov.co/resource/c82u-588k.json?nit=999000001"
+    )
     assert alfa.direccion is None
     assert alfa.web is None
-    assert adaptador.meta.licencia == "CC-BY-SA-4.0"  # la licencia va en meta, no en EmpresaCruda (D4)
+    assert (
+        adaptador.meta.licencia == "CC-BY-SA-4.0"
+    )  # la licencia va en meta, no en EmpresaCruda (D4)
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="rojo T025; verde en T028")
 def test_as_of_sale_del_header():
-    adaptador, _ = _adaptador(cabeceras={"X-SODA2-Truth-Last-Modified": "Fri, 02 Oct 2026 21:39:26 GMT"})
+    adaptador, _ = _adaptador(
+        cabeceras={"X-SODA2-Truth-Last-Modified": "Fri, 02 Oct 2026 21:39:26 GMT"}
+    )
 
     pagina = adaptador.buscar(CRITERIOS, 1)
 
-    assert {e.as_of for e in pagina.empresas} == {datetime(2026, 10, 2, 21, 39, 26, tzinfo=UTC)}
+    assert {e.as_of for e in pagina.empresas} == {
+        datetime(2026, 10, 2, 21, 39, 26, tzinfo=UTC)
+    }
 
 
 def test_as_of_sin_header_es_la_hora_del_reloj():
