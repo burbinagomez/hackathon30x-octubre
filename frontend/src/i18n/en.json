@@ -125,6 +125,7 @@
     "siguiente": "Next",
     "pagina_de": "Page {{pagina}} of {{paginas}}",
     "ver_costos": "View costs",
+    "unidad": {"segundos_one": "s", "segundos_other": "s", "creditos_one": "credit", "creditos_other": "credits", "tokens_one": "token", "tokens_other": "tokens"},
     "col": {"ts": "Date", "tipo": "Type", "fuente": "Source", "proveedor": "Provider", "cantidad": "Quantity", "costo": "Cost (USD)", "gratis": "Free", "lead": "From a lead"},
     "tipos": {
       "socrata_descarga": "Socrata download", "overpass_query": "Overpass query", "web_fetch": "Web fetch",
