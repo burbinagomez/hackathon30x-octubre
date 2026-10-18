@@ -34,7 +34,7 @@ class SmtpEmail:
         aceptado = False
         try:
             with self._conectar() as smtp:
-                smtp.login(self._ajustes.smtp_usuario, self._ajustes.smtp_clave.get_secret_value())
+                smtp.login(self._ajustes.smtp_usuario.get_secret_value(), self._ajustes.smtp_clave.get_secret_value())
                 # to_addrs explícito: el sobre nunca se deriva del encabezado To.
                 smtp.send_message(msg, to_addrs=[mensaje.direccion])
                 aceptado = True

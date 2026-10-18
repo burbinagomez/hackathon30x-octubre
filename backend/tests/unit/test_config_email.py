@@ -6,6 +6,7 @@ from app.config import SettingsEmail
 
 CLAVE_SMTP = "re_clave_smtp_de_prueba_123"
 BAJA_SECRET = "b" * 32
+USUARIO_SMTP = "usuario_smtp_de_prueba_456"
 
 
 @pytest.fixture
@@ -14,7 +15,7 @@ def entorno(monkeypatch):
         "DATABASE_URL": "postgresql+psycopg://app_rt@localhost/db",
         "CIFRADO_KEY": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
         "SMTP_HOST": "smtp.resend.com",
-        "SMTP_USUARIO": "resend",
+        "SMTP_USUARIO": USUARIO_SMTP,
         "SMTP_CLAVE": CLAVE_SMTP,
         "REMITENTE": "Equipo <hola@ejemplo.test>",
         "BAJA_SECRET": BAJA_SECRET,
@@ -57,6 +58,7 @@ def test_secretos_no_salen_en_repr(entorno):
 
     assert CLAVE_SMTP not in repr(s)
     assert BAJA_SECRET not in repr(s)
+    assert USUARIO_SMTP not in repr(s)
 
 
 def test_secretos_no_salen_en_el_error_de_validacion(entorno):

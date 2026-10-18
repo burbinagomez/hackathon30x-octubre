@@ -9,6 +9,7 @@ from sqlalchemy import text
 from app import cli
 from app.modulos.contacto.dominio.tokens import verificar
 from app.modulos.contacto.infraestructura.leads_contactables import LeadsContactablesPostgres
+from app.modulos.contacto.infraestructura.repositorio_contactos import BASE_LEGAL, RepositorioContactosPostgres
 from app.seguridad.cifrado import Cifrador
 from tests.contratos.test_smtp_email import _ajustes
 from tests.integration.conftest import _url
@@ -84,3 +85,18 @@ def test_envio_de_punta_a_punta_en_modo_prueba(monkeypatch, admin, tenants, busq
     capsys.readouterr()
     assert _cli("tasa-respuesta", "--tenant", t) == 0
     assert capsys.readouterr().out == "email: contactados=1 respondieron=1 tasa=1\n"
+
+
+def test_reclamar_no_pisa_una_base_legal_existente(rt, admin, tenants, busqueda):  # noqa: F811
+    t = tenants["a"]
+    con_base, sin_base = _lead(admin, t, busqueda, 0), _lead(admin, t, busqueda, 1)
+    with admin.begin() as c:
+        c.execute(text("UPDATE cumplimiento SET base_legal = 'consentimiento_previo' WHERE lead_id = :l"), {"l": con_base})
+    repo = RepositorioContactosPostgres(rt, t)
+    for lead in (con_base, sin_base):
+        cid = uuid4()
+        assert repo.crear(busqueda, cid, lead, "a", "c") and repo.reclamar(cid)
+    with admin.connect() as c:
+        bases = dict(c.execute(text("SELECT lead_id, base_legal FROM cumplimiento WHERE lead_id IN (:a, :b)"),
+                               {"a": con_base, "b": sin_base}).all())
+    assert bases == {con_base: "consentimiento_previo", sin_base: BASE_LEGAL}

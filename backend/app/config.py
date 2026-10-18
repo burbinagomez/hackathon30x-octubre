@@ -84,7 +84,7 @@ class SettingsEmail(Settings):
 
     smtp_host: str = Field(min_length=1)
     smtp_port: int = 465
-    smtp_usuario: str = Field(min_length=1)
+    smtp_usuario: SecretStr = Field(min_length=1)
     smtp_clave: SecretStr
     # ninguna: solo contra el SMTP falso de los tests (localhost); nunca credenciales en claro por la red.
     smtp_seguridad: Literal["ssl", "starttls", "ninguna"] = "ssl"

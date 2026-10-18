@@ -46,7 +46,7 @@ class RepositorioContactosPostgres:
                 + _ELEGIBLE.format(lead="contactos.lead_id") + " RETURNING lead_id"), {"c": contacto_id}).scalar()
             if lead is None:
                 return False
-            c.execute(text("UPDATE cumplimiento SET base_legal = :bl WHERE lead_id = :l"), {"bl": BASE_LEGAL, "l": lead})
+            c.execute(text("UPDATE cumplimiento SET base_legal = COALESCE(base_legal, :bl) WHERE lead_id = :l"), {"bl": BASE_LEGAL, "l": lead})
             return True
 
     def vigente(self, contacto_id: UUID) -> bool:
@@ -70,8 +70,10 @@ class RepositorioContactosPostgres:
     def dar_de_baja(self, contacto_id: UUID, via: str) -> bool:
         with unidad_de_trabajo(self._engine, self._tenant) as c:
             lead = c.execute(text(
-                "UPDATE cumplimiento SET opt_out_at = COALESCE(opt_out_at, now()), solicitudes = solicitudes || "
-                "jsonb_build_array(jsonb_build_object('tipo', 'baja', 'via', CAST(:v AS text), 'ts', now())) "
+                "UPDATE cumplimiento SET opt_out_at = COALESCE(opt_out_at, now()), "
+                # Solo la primera baja queda registrada: repetir el enlace no infla solicitudes.
+                "solicitudes = CASE WHEN opt_out_at IS NULL THEN solicitudes || jsonb_build_array(jsonb_build_object("
+                "'tipo', 'baja', 'via', CAST(:v AS text), 'ts', now())) ELSE solicitudes END "
                 "WHERE lead_id = (SELECT lead_id FROM contactos WHERE id = :c) RETURNING lead_id"),
                 {"c": contacto_id, "v": via}).scalar()
             if lead is None:

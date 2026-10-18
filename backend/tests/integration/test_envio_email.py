@@ -55,7 +55,7 @@ def _lead(admin, t, i, tipo="juridica", cumplimiento=True, opt_out=False, origen
 def entorno_email(falso, **extra):
     a = _ajustes(falso)
     return {"DATABASE_URL": a.database_url, "CIFRADO_KEY": a.cifrado_key.get_secret_value(),
-            "SMTP_HOST": a.smtp_host, "SMTP_PORT": str(a.smtp_port), "SMTP_USUARIO": a.smtp_usuario,
+            "SMTP_HOST": a.smtp_host, "SMTP_PORT": str(a.smtp_port), "SMTP_USUARIO": a.smtp_usuario.get_secret_value(),
             "SMTP_CLAVE": a.smtp_clave.get_secret_value(), "SMTP_SEGURIDAD": a.smtp_seguridad,
             "REMITENTE": a.remitente, "BAJA_SECRET": a.baja_secret.get_secret_value(),
             "API_BASE_URL": a.api_base_url, "URL_PRIVACIDAD": a.url_privacidad,

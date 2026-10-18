@@ -64,7 +64,7 @@ def test_post_da_de_baja_y_es_idempotente(cliente, admin, contacto):
     assert [cliente.post(f"/baja/{token}").status_code for _ in range(2)] == [200, 200]
     opt_out, solicitudes = _cumplimiento(admin, contacto[1])
     assert opt_out is not None
-    assert [(s["tipo"], s["via"]) for s in solicitudes] == [("baja", "enlace")] * 2
+    assert [(s["tipo"], s["via"]) for s in solicitudes] == [("baja", "enlace")]  # la segunda no suma: el enlace no infla el registro
     assert _bloqueos(admin, contacto[1]) == [True]
 
 
@@ -108,7 +108,7 @@ def test_opt_out_es_monotonico(cliente, admin, contacto):
     cliente.post(f"/baja/{token}")
     opt_out, solicitudes = _cumplimiento(admin, contacto[1])
     assert opt_out.isoformat().startswith("2026-01-01")
-    assert len(solicitudes) == 2
+    assert solicitudes == []  # ya estaba de baja: ni la primera ni la segunda suman
 
 
 # T052 (desvío: `canal` solo admite 'email' y LeadsContactablesPostgres solo sirve email. El cierre de todos los
