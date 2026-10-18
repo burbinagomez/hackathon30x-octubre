@@ -33,11 +33,12 @@ export function fijarIdiomaUsuario(idioma: IdiomaGuardado): void {
 }
 
 export async function tokenActual(): Promise<string | null> {
+  if (!supabase) return null;
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token ?? null;
 }
 
 export async function cerrarSesion(): Promise<void> {
-  await supabase.auth.signOut();
+  await supabase?.auth.signOut();
   for (const clave of Object.values(CLAVES)) sessionStorage.removeItem(clave);
 }

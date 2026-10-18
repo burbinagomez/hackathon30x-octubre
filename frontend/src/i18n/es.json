@@ -12,6 +12,9 @@
     "pais": "La fuente no cubre este país",
     "sin_geografia": "La fuente necesita un departamento o ciudad"
   },
+  "config": {
+    "incompleta": "Configuración incompleta"
+  },
   "salud": {
     "estado": "API: {{api}} · DB: {{db}}"
   },
