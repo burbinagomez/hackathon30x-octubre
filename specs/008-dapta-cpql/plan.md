@@ -18,7 +18,7 @@ La 008 mínima entrega:
 ## Technical Context
 
 - **Back:** Python 3.12, FastAPI y SQLAlchemy Core, todos ya instalados. **Sin dependencias nuevas.** El import recibe el CSV como cuerpo `text/csv` (`Request.body()`), no como multipart, para no sumar `python-multipart`.
-- **Storage:** una migración a mano, la **0009**. Su DDL está abajo y espera aprobación.
+- **Storage:** una migración a mano, `supabase/migrations/0007_calificaciones.sql` (el número es el siguiente libre en main al mergear).
 - **Testing:** pytest. La integración corre contra Postgres real como `app_rt` y la valida CI. Los datos son sintéticos y no hay red.
 - **Scale/Scope:** 1 módulo, 1 tabla, 1 vista, 2 endpoints, 1 adaptador.
 
@@ -64,75 +64,23 @@ La 008 mínima entrega:
 
 La fila `TOTAL` suma **todos** los costos del tenant, incluidos los `dapta_llamada` sin fuente, y los divide por los calificados distintos. Un divisor 0 da NULL ("sin dato"), nunca 0.
 
-## DDL 0009 — **PENDIENTE DE APROBACIÓN DE DANIEL**
+## DDL 0007 — aprobado por Daniel (2026-10-18)
 
-Todavía no existe en `supabase/migrations/`. Se crea como `0009_calificaciones.sql` cuando Daniel lo apruebe.
+Está en `supabase/migrations/0007_calificaciones.sql`. Lo aprobó con tres cambios:
+1. el número es el siguiente libre en main y se renombra si al mergear ya entró otro;
+2. `REVOKE ALL` a `anon` y `authenticated` sobre `calificaciones` y `v_cpql`, en un bloque `DO` como el de la 0006, con test de privilegios;
+3. la FK compuesta va a `leads (tenant_id, id)`, que existe como UNIQUE desde la 0002.
 
-```sql
--- 0009 (008): calificaciones de Dapta y CPQL por fuente. SQL a mano. Corre como postgres (dueño).
-CREATE TABLE public.calificaciones (
-  tenant_id     uuid NOT NULL REFERENCES public.tenants(id),
-  lead_id       uuid NOT NULL,
-  calificado    boolean NOT NULL,
-  calificado_en timestamptz NOT NULL,
-  minutos       numeric NOT NULL CHECK (minutos BETWEEN 0 AND 60),
-  importado_en  timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (tenant_id, lead_id),
-  -- Compuesta: una FK no pasa por RLS (igual que 0002).
-  FOREIGN KEY (tenant_id, lead_id) REFERENCES public.leads (tenant_id, id)
-);
+Además, `v_cpql` se alineó al criterio de costos del tablero (#49):
+- los costos con `fuente = 'evals'` no entran;
+- un costo sin dato queda NULL y no se convierte en 0;
+- un tenant sin datos no tiene fila `TOTAL`.
 
-GRANT SELECT, INSERT ON public.calificaciones TO app_rt;
-
-ALTER TABLE public.calificaciones ENABLE ROW LEVEL SECURITY;
-CREATE POLICY tenant_aislado ON public.calificaciones
-  USING (tenant_id = current_setting('app.tenant_id')::uuid)
-  WITH CHECK (tenant_id = current_setting('app.tenant_id')::uuid);
-
--- security_invoker: corre como app_rt y pasa por la RLS de costos, lead_fuentes y calificaciones.
-CREATE VIEW public.v_cpql WITH (security_invoker = true) AS
-  WITH costo AS (
-    SELECT fuente,
-           sum(unidades * costo_unitario) AS costo_lista,
-           sum(unidades * costo_unitario) FILTER (WHERE NOT gratis) AS costo_real
-    FROM public.costos
-    WHERE fuente IS NOT NULL
-    GROUP BY fuente
-  ), calif AS (
-    SELECT lf.fuente, count(DISTINCT lf.lead_id) AS calificados
-    FROM public.lead_fuentes lf
-    JOIN public.calificaciones c ON c.tenant_id = lf.tenant_id AND c.lead_id = lf.lead_id
-    WHERE c.calificado
-    GROUP BY lf.fuente
-  ), fuentes AS (
-    SELECT fuente FROM costo UNION SELECT fuente FROM public.lead_fuentes
-  )
-  SELECT f.fuente,
-         coalesce(co.costo_lista, 0) AS costo_lista,
-         coalesce(co.costo_real, 0)  AS costo_real,
-         coalesce(ca.calificados, 0) AS calificados,
-         co.costo_lista / NULLIF(ca.calificados, 0) AS cpql_lista,
-         co.costo_real  / NULLIF(ca.calificados, 0) AS cpql_real
-  FROM fuentes f
-  LEFT JOIN costo co USING (fuente)
-  LEFT JOIN calif ca USING (fuente)
-  UNION ALL
-  SELECT 'TOTAL', t.costo_lista, t.costo_real, t.calificados,
-         t.costo_lista / NULLIF(t.calificados, 0), t.costo_real / NULLIF(t.calificados, 0)
-  FROM (
-    SELECT coalesce((SELECT sum(unidades * costo_unitario) FROM public.costos), 0) AS costo_lista,
-           coalesce((SELECT sum(unidades * costo_unitario) FROM public.costos WHERE NOT gratis), 0) AS costo_real,
-           (SELECT count(*) FROM public.calificaciones WHERE calificado) AS calificados
-  ) t;
-
-GRANT SELECT ON public.v_cpql TO app_rt;
-```
-
-La tabla no tiene UPDATE ni DELETE porque un conflicto lo resuelve un humano. Hace falta además el espejo en `app/modelos.py` para el drift check.
+La tabla no tiene UPDATE ni DELETE porque un conflicto lo resuelve un humano. El espejo está en `app/modelos.py`.
 
 ## Preguntas abiertas
 
-- **P1. Tarifa de Dapta para la demo.** `usd_por_minuto: null` [MENTORES]. Default propuesto: dejar `TarifaPendiente` como dice la spec y cargar un valor provisional en `tarifas.yaml` antes de la demo, marcado `# [MENTORES] provisional`. Lo decide Daniel.
+- **P1. Tarifa de Dapta para la demo.** Daniel decidió un valor provisional en `tarifas.yaml`, marcado `[PROVISIONAL]`. Con `null` sigue siendo `TarifaPendiente`.
 - **P2. Costo de Dapta en el CPQL por fuente.** Pediste costo de la fuente / calificados: el `dapta_llamada` no tiene fuente, así que entra solo en `TOTAL`. El reparto en partes iguales entre las fuentes del lead (spec, Decisiones) queda fuera del mínimo. Revisión del advisor de costos.
 - **P3. Moneda.** Todo `costos` está en USD hoy (`tarifas.yaml`). La vista no filtra por `moneda`. Revisión del advisor de costos.
 

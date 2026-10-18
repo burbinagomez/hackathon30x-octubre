@@ -4,17 +4,17 @@
 
 Formato: `- [ ] TNNN [MIN] [P?] [Paso n] descripción`. Rojo por aserción: antes de cada rojo va un esqueleto que devuelve un valor equivocado, para que el test falle por `assert` y no por `ImportError`. Cada test lleva su **Mutación**, el sabotaje con nombre que lo tiene que poner rojo. Las marcas (advisor) y (security) indican quién revisa.
 
-Los tests de integración necesitan `TEST_DATABASE_URL`. No hay Postgres local: los corre CI.
+Los tests de integración necesitan `TEST_DATABASE_URL`: corren contra un Postgres 16 local en docker, y CI los vuelve a correr.
 
 ## Fase 0 — DDL (PARADA)
 
-- [ ] T001 [MIN] [Paso 0] Aprobación de Daniel del DDL 0009 (plan.md). **No se crea ningún archivo en `supabase/migrations/` antes.**
-- [ ] T002 [MIN] [Paso 0] Tests rojos de migración:
-  - `tests/arquitectura/test_migraciones.py` cubre la 0009;
+- [x] T001 [MIN] [Paso 0] Aprobación de Daniel del DDL 0007 (plan.md), con 3 cambios.
+- [x] T002 [MIN] [Paso 0] Tests rojos de migración:
+  - `tests/integration/test_privilegios_supabase.py` exige `calificaciones` y `v_cpql` sin privilegios para `anon` y `authenticated` (**Mutación `sin_revoke`**);
   - `tests/integration/test_rls.py` suma `calificaciones` a `TABLAS` y `v_cpql` a `VISTAS`.
   - **Mutación `rls_calificaciones_apagada`**: sin `ENABLE ROW LEVEL SECURITY`, tenant B lee la calificación de A.
   - **Mutación `v_cpql_sin_security_invoker`**: la vista corre como dueño y B ve el CPQL de A.
-- [ ] T003 [MIN] [Paso 0] `supabase/migrations/0009_calificaciones.sql` y el espejo en `app/modelos.py`. Verde de T002 y del drift check.
+- [x] T003 [MIN] [Paso 0] `supabase/migrations/0007_calificaciones.sql` y el espejo en `app/modelos.py`. Verde de T002 y del drift check.
 
 ## Fase 1 — Puerto y adaptador
 

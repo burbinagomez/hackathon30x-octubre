@@ -106,12 +106,13 @@ def test_la_lista_cubre_todas_las_tablas_de_public(rt):
 
 @pytest.mark.parametrize("tabla", TABLAS)
 def test_tenant_b_no_accede_a_datos_de_a(rt, datos, tabla):
-    fila_de_a = f"WHERE {COLUMNA_ID.get(tabla, 'id')} = '{datos[tabla]}'"
+    col = COLUMNA_ID.get(tabla, "id")
+    fila_de_a = f"WHERE {col} = '{datos[tabla]}'"
     assert _como_b(rt, datos, f"SELECT * FROM {tabla} {fila_de_a}").all() == []
 
     if tabla in SIN_UPDATE_NI_DELETE:
         # La siembra corre con postgres.
-        for sql in (f"UPDATE {tabla} SET tenant_id = tenant_id {fila_de_a}", f"DELETE FROM {tabla} {fila_de_a}"):
+        for sql in (f"UPDATE {tabla} SET {col} = {col} {fila_de_a}", f"DELETE FROM {tabla} {fila_de_a}"):
             _rechazado(rt, datos, sql, PRIVILEGIO_INSUFICIENTE)
     else:
         assert _como_b(rt, datos, f"UPDATE {tabla} SET id = id {fila_de_a}").rowcount == 0
