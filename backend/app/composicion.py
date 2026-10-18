@@ -77,6 +77,8 @@ def ia_configurada(ajustes, tarifas_llm: Mapping[str, Mapping]) -> bool:
 # datos.gov.co, con sus dos requests, no puede pasar de 40 s. El costo máximo sigue calculado con el peor caso del cliente.
 DATOS_GOV_TIMEOUT_BUSQUEDA = 20.0
 DATOS_GOV_INTENTOS_BUSQUEDA = 1
+# Cada fila se guarda con 2-3 consultas por el pooler: 5000 filas eran minutos. 200 entran holgadas en el plazo.
+DATOS_GOV_FILAS_BUSQUEDA = 200
 
 
 def generador_de_frase(ajustes, tarifas_llm: Mapping[str, Mapping], costos: RegistroCostos,
@@ -119,7 +121,8 @@ def armador_de_fuente(
                 camaras=cargar_camaras(camaras_yaml()),
                 tarifas={"computo_seg_usd": tarifas["datos.gov.co"]}, lote_id=lote_id, meta=meta,
                 app_token=token.get_secret_value() if token else None,
-                timeout_seg=DATOS_GOV_TIMEOUT_BUSQUEDA, intentos=DATOS_GOV_INTENTOS_BUSQUEDA, **extra,
+                timeout_seg=DATOS_GOV_TIMEOUT_BUSQUEDA, intentos=DATOS_GOV_INTENTOS_BUSQUEDA,
+                limite_filas=DATOS_GOV_FILAS_BUSQUEDA, **extra,
             )
         kwargs = {"meta": meta, "registro_costos": costos, "transporte": transporte(), "lote_id": lote_id}
         if meta.proveedor in tarifas:

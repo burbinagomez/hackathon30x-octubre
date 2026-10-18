@@ -110,7 +110,9 @@ class DatosGovCoRues:
         monotonico: Callable[[], float] = time.monotonic,
         timeout_seg: float = TIMEOUT_SEG,
         intentos: int = INTENTOS,
+        limite_filas: int = LIMITE_FILAS,
     ) -> None:
+        self._limite_filas = limite_filas
         self._timeout_seg = timeout_seg  # el descubrimiento espera 30 s; verificar un lead no puede retener al worker
         self._intentos = intentos
         self._transporte = transporte
@@ -156,7 +158,7 @@ class DatosGovCoRues:
             " AND nit IS NOT NULL"
         )
         respuesta = self._pedir(
-            {"$select": SELECT_FILAS, "$where": where, "$limit": str(LIMITE_FILAS)}
+            {"$select": SELECT_FILAS, "$where": where, "$limit": str(self._limite_filas)}
         )
         as_of = self._as_of(respuesta)
         try:

@@ -763,3 +763,13 @@ def test_tablero_devuelve_el_embudo_por_fuente_y_total_solo_con_conteos(api, adm
     sin = next(f for f in t["fuentes"] if f["fuente"] == "sin_atribuir")
     assert [sin[k] for k in campos] == [None] * 4  # costo sin lead: no aplica, no un 0 inventado
     assert all(isinstance(osm[k], int) for k in campos)
+
+
+def test_datos_gov_co_trae_pocas_filas_dentro_de_una_busqueda(api, usuarios):
+    # Con 5000 filas, guardarlas de a una por el pooler pasaba los 100 s de Cloudflare (524 en prod).
+    busqueda_id = _crear(api, usuarios["a"])
+
+    _ejecutar_o_500(api, usuarios["a"], busqueda_id)
+
+    filas = [q for q in api.pedidas if q.url.host == "www.datos.gov.co" and q.url.params.get("$select") != "count(*)"]
+    assert filas and {q.url.params["$limit"] for q in filas} == {"200"}
