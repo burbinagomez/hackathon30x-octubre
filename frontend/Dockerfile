@@ -1,5 +1,5 @@
 # Multi-stage (R-docker): node solo existe en el build; el final es alpine con el binario de Caddy sirviendo dist/.
-FROM node:22.23.3-alpine AS builder
+FROM node:26.12.0-alpine AS builder
 # Solo estos ARG: Railway pasa al build lo declarado, así nada más llega al bundle (R2).
 # La publishable key de Supabase es pública por diseño (constitución 2.0.0); jamás una sb_secret_.
 ARG VITE_API_URL
