@@ -14,7 +14,7 @@ RUN npm run build
 # El binario trae cap_net_bind_service: como no root, un runtime que bloquee file capabilities
 # rompe el exec recién en Railway. Con puerto > 1024 no hace falta. Se saca acá y se copia solo
 # el binario: hacer setcap en el final duplicaba los 46 MB en otra capa (111 → 56 MB).
-FROM caddy:2.11.7-alpine AS caddy
+FROM caddy:2.11.8-alpine AS caddy
 RUN apk add --no-cache libcap && setcap -r /usr/bin/caddy
 
 FROM alpine:3.23.6
